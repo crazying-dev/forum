@@ -24,6 +24,16 @@
     <link rel="preload" href="//assets.crazying-dev.top/font/CEFFontsCJK.woff2" as="font" type="font/woff2" crossorigin>
 
     <link rel="stylesheet" href="//assets.crazying-dev.top/text/one/CSS/main.css">
+
+    <script>
+    // 防闪屏：在 body 渲染前同步决定主题
+    (function() {
+        var h = new Date().getHours();
+        if (h < 6 || h >= 18) {
+            document.documentElement.classList.add('night-mode');
+        }
+    })();
+    </script>
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css" media="print" onload="this.media='all'">
 
