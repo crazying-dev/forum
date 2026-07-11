@@ -189,5 +189,4 @@ cython_debug/
 data/
 *测试*.*
 *.local
-admin/
 clear_db.py
