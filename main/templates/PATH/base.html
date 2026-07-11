@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="妖精论坛 - 罗小黑战记社区">
+    <meta name="theme-color" content="#6A8C89">
+    <meta name="dns-prefetch-control" content="on">
+
+    <title>妖精论坛</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <link rel="dns-prefetch" href="//assets.crazying-dev.top">
+    <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
+    <link rel="dns-prefetch" href="//img.crazying-dev.top">
+    <link rel="dns-prefetch" href="//av.huijiwiki.com">
+
+    <link rel="preconnect" href="//assets.crazying-dev.top" crossorigin>
+    <link rel="preconnect" href="//cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="//img.crazying-dev.top" crossorigin>
+
+    <link rel="preload" href="//assets.crazying-dev.top/text/one/CSS/main.css" as="style">
+    <link rel="preload" href="//assets.crazying-dev.top/text/one/JS/AfterBody.js" as="script">
+    <link rel="preload" href="//assets.crazying-dev.top/font/CEFFontsCJK.woff2" as="font" type="font/woff2" crossorigin>
+
+    <link rel="stylesheet" href="//assets.crazying-dev.top/text/one/CSS/main.css">
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css" media="print" onload="this.media='all'">
+
+    <script src="//cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+
+    <noscript>
+        <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+        <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css">
+    </noscript>
+
+</head>
+<body id="body">
+
+<header id="header">
+    <a class="header-left" href="/">
+        <img src="//img.crazying-dev.top/text/one/favicon.png" alt="logo" id="logo">
+        <h1>妖精论坛</h1>
+    </a>
+    <div class="header-center">
+        <div id='search'>
+            <label for="search_input">
+                <input id="search_input" placeholder="搜索帖子、用户...">
+            </label>
+            <button id="search_button">
+                <img alt="search_Button_ICON" src="//img.crazying-dev.top/crazying-dev.top/search.svg" id="search_Button_ICON">
+            </button>
+        </div>
+    </div>
+    <div class="header-right">
+        <ul>
+            <li class="header-collapsible">
+                <button class="header-btn" id="Easter-Egg" onclick="Easter_Egg()">
+                    <i class="fa fa-gift"></i>
+                    <span>彩蛋</span>
+                </button>
+            </li>
+            <li class="header-collapsible header-setting">
+                <button class="header-btn" id="settingBtn">
+                    <i class="fa fa-cog"></i>
+                    <span>设置</span>
+                </button>
+                <div class="setting-dropdown" id="settingDropdown">
+                    <ul class="setting-dropdown-menu">
+                        <li class="setting-dropdown-title">主题</li>
+                        <li class="setting-dropdown-item" data-value="day">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">亮色</span>
+                        </li>
+                        <li class="setting-dropdown-item" data-value="night">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">暗色</span>
+                        </li>
+                        <li class="setting-dropdown-item active" data-value="default">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">默认</span>
+                        </li>
+                        <li class="setting-dropdown-divider"></li>
+                        <li class="setting-dropdown-item" id="logoutBtn" onclick="handleLogout()">
+                            <span class="setting-item-icon"><i class="fa fa-sign-out"></i></span>
+                            <span class="setting-item-text">退出登录</span>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            <li class="header-collapsible">
+                <a class="header-btn" id="LuoXiaoHeiWIKI" href="/WIKI">
+                    <img src="https://av.huijiwiki.com/site_avatar_luoxiaohei_l.png?1781282427" alt="" id="WIKIForIcon">
+                    <span>WIKI</span>
+                </a>
+            </li>
+            <li class="header-menu-toggle" id="headerMenuToggle">
+                <button class="header-btn" type="button">
+                    <i class="fa fa-bars"></i>
+                </button>
+            </li>
+            <li>
+                <a id="UserInfo" href="#">
+                    <div class="user-avatar" id="user-avatar">
+                        <i class="fa fa-user"></i>
+                    </div>
+                    <div id="user-name" class="Username">登录</div>
+                </a>
+            </li>
+        </ul>
+        <div class="header-mobile-menu" id="headerMobileMenu">
+            <a class="mobile-menu-item" href="/WIKI">
+                <i class="fa fa-book"></i> WIKI
+            </a>
+            <button class="mobile-menu-item" onclick="Easter_Egg()">
+                <i class="fa fa-gift"></i> 彩蛋
+            </button>
+            <div class="mobile-menu-divider"></div>
+            <div class="mobile-menu-title">主题</div>
+            <button class="mobile-menu-item mobile-theme-btn" data-value="day">
+                <i class="fa fa-sun-o"></i> 亮色
+            </button>
+            <button class="mobile-menu-item mobile-theme-btn" data-value="night">
+                <i class="fa fa-moon-o"></i> 暗色
+            </button>
+            <button class="mobile-menu-item mobile-theme-btn" data-value="default">
+                <i class="fa fa-desktop"></i> 默认
+            </button>
+            <div class="mobile-menu-divider"></div>
+            <button class="mobile-menu-item" onclick="handleLogout()">
+                <i class="fa fa-sign-out"></i> 退出登录
+            </button>
+        </div>
+    </div>
+</header>
+
+<div id="ui"></div>
+
+<div id="footer-spacer"></div>
+
+<div id="WindowsCardWithCenterSreen">
+    <!-- 关闭按钮，调用 ShowOrhidenWindowsCardWithCenterSreen(0) -->
+    <button class="windows-card-close" onclick="ShowOrhidenWindowsCardWithCenterSreen(0)">&times;</button>
+
+    <div id="WindowsCardWithCenterSreenText" class="windows-card">
+    </div>
+</div>
+
+<footer id="footer">
+    <a href="/privacy" id="FooterPrivacy">隐私</a>
+    <br>
+    联系方式<br>
+    邮箱：3890320020@qq.com<br>
+    <a href="https://github.com/crazying-dev">Github（大号）：crazying-dev</a><br>
+    小红书：<a href="https://xhslink.com/m/7yCXhVvmCaJ">卡里</a><br>
+    公众号：
+    <span class="qr-hover-wrap">
+        <span id="Footer公众号">悬停扫码</span>
+        <img class="qr-img" src="//img.crazying-dev.top/crazying-dev.top/OfficialAccount.jpg" alt="公众号二维码">
+    </span>
+    <br>
+    <br>
+
+</footer>
+<script src="//assets.crazying-dev.top/text/one/JS/AfterBody.js" defer></script>
+</body>
+</html>

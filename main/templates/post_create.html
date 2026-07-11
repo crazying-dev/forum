@@ -1,0 +1,66 @@
+<div class="post-create-container">
+    <div class="post-create-header">
+        <a href="javascript:history.back()" class="post-create-back">
+            <i class="fa fa-arrow-left"></i> 返回
+        </a>
+        <h1 class="post-create-title">发布新帖子</h1>
+        <div style="width:60px;"></div>
+    </div>
+
+    <div class="post-create-form">
+        <div class="form-group">
+            <label class="form-label">帖子分类</label>
+            <div class="form-category-select" id="form-category-select">
+                <button class="category-chip active" data-value="general">综合</button>
+                <button class="category-chip" data-value="talk">闲聊</button>
+                <button class="category-chip" data-value="question">求助</button>
+                <button class="category-chip" data-value="share">分享</button>
+                <button class="category-chip" data-value="creative">创作</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">帖子标题</label>
+            <input type="text" class="form-input" id="post-title-input" placeholder="请输入标题..." maxlength="100" />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">帖子内容</label>
+            <div class="form-html-warning">
+                <i class="fa fa-code"></i> 支持 HTML 富文本编辑（危险标签会被过滤）
+            </div>
+            <div class="form-editor-toolbar" id="post-editor-toolbar">
+                <button class="editor-tool" onclick="insertFormat('b')" title="加粗"><i class="fa fa-bold"></i></button>
+                <button class="editor-tool" onclick="insertFormat('i')" title="斜体"><i class="fa fa-italic"></i></button>
+                <button class="editor-tool" onclick="insertFormat('u')" title="下划线"><i class="fa fa-underline"></i></button>
+                <button class="editor-tool" onclick="insertFormat('s')" title="删除线"><i class="fa fa-strikethrough"></i></button>
+                <span class="editor-sep"></span>
+                <button class="editor-tool" onclick="insertFormat('h2')" title="标题"><i class="fa fa-header"></i></button>
+                <button class="editor-tool" onclick="insertFormat('quote')" title="引用"><i class="fa fa-quote-left"></i></button>
+                <button class="editor-tool" onclick="insertFormat('code')" title="代码"><i class="fa fa-code"></i></button>
+                <span class="editor-sep"></span>
+                <button class="editor-tool" onclick="insertFormat('ul')" title="无序列表"><i class="fa fa-list-ul"></i></button>
+                <button class="editor-tool" onclick="insertFormat('ol')" title="有序列表"><i class="fa fa-list-ol"></i></button>
+                <span class="editor-sep"></span>
+                <button class="editor-tool" onclick="insertFormat('link')" title="链接"><i class="fa fa-link"></i></button>
+                <button class="editor-tool" onclick="insertFormat('image')" title="图片"><i class="fa fa-image"></i></button>
+                <span class="editor-sep"></span>
+                <button class="editor-tool" onclick="insertFormat('color')" title="颜色"><i class="fa fa-paint-brush"></i></button>
+                <button class="editor-tool" onclick="insertFormat('center')" title="居中"><i class="fa fa-align-center"></i></button>
+            </div>
+            <div class="form-editor" id="post-content-editor" contenteditable="true" placeholder="写下你的想法..."></div>
+            <div class="form-editor-tips">
+                <span style="color:var(--color-text-tertiary);">可直接输入 HTML 代码</span>
+                <span style="color:var(--color-text-tertiary);margin:0 8px;">·</span>
+                <span style="color:var(--color-text-accent);">script/iframe 等危险标签会被自动过滤</span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn-cancel" onclick="history.back()">取消</button>
+            <button class="btn-submit" id="post-submit-btn" onclick="submitPost()">
+                <i class="fa fa-paper-plane"></i> 发布
+            </button>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,16 @@
+<div class="world-chat-container">
+    <div class="world-chat-header">
+        <h3><i class="fa fa-globe"></i> 世界频道</h3>
+        <span class="world-chat-status" id="world-chat-status">未连接</span>
+    </div>
+    <div class="world-chat-messages" id="WorldMessageDOM">
+        <div class="world-chat-empty">点击下方按钮开始获取消息</div>
+    </div>
+    <div class="world-chat-input-bar">
+        <input type="text" id="world-chat-input" placeholder="输入消息..." maxlength="500" />
+        <button id="world-chat-send" onclick="SendWorldMessage()" disabled>
+            <i class="fa fa-paper-plane"></i> 发送
+        </button>
+        <button id="world-chat-toggle" onclick="OpenTheWorld()">开始获取</button>
+    </div>
+</div>

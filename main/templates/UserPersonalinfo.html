@@ -1,0 +1,63 @@
+<div class="user-profile-page">
+    <div class="user-profile-card">
+        <div class="user-profile-avatar-wrapper">
+            <div class="user-profile-avatar">
+                <img id="user-profile-avatar-img" src="" alt="用户头像">
+            </div>
+            <span class="prefix-badge" id="user-prefix-badge"></span>
+        </div>
+        <div class="user-profile-info">
+            <h2>
+                <div id="user-profile-name" class="user-name-clickable Username" title="点击查看详情" onclick="ShowUserProfileDetail()">加载中...</div>
+                <span class="user-vip-icon" id="user-vip-label"></span>
+            </h2>
+            <p class="user-profile-intro" id="user-profile-intro">这个人很懒，什么都没留下~</p>
+            <div class="user-profile-meta">
+                <button type="button" class="user-meta-item user-meta-clickable" id="user-profile-gender" title="点击查看/修改" onclick="ClickUserProfileAge()">
+                    <i class="fa fa-user"></i> 保密
+                </button>
+                <button type="button" class="user-meta-item user-meta-clickable" id="user-profile-age" title="点击修改出生日期" onclick="ClickUserProfileAge()">
+                    <i class="fa fa-birthday-cake"></i> 保密
+                </button>
+            </div>
+        </div>
+        <div class="user-profile-stats">
+            <div class="stat-item">
+                <span class="stat-number" id="user-post-count">0</span>
+                <span class="stat-label">帖子</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="user-total-likes">0</span>
+                <span class="stat-label">获赞</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="user-total-views">0</span>
+                <span class="stat-label">浏览</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="user-following-count">0</span>
+                <span class="stat-label">关注</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="user-follower-count">0</span>
+                <span class="stat-label">粉丝</span>
+            </div>
+        </div>
+        <button class="user-follow-btn" id="user-follow-btn" style="display:none;"></button>
+    </div>
+
+    <div class="user-profile-tabs">
+        <button class="profile-tab active" data-tab="posts">
+            <i class="fa fa-file-text"></i> 帖子列表
+        </button>
+        <a href="/post/create" class="profile-tab profile-tab-create">
+            <i class="fa fa-pencil"></i> 发布新帖
+        </a>
+    </div>
+
+    <div class="user-profile-content">
+        <div id="user-posts-list" class="user-posts-list">
+            <p class="loading-text">加载中...</p>
+        </div>
+    </div>
+</div>

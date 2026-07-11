@@ -1,0 +1,26 @@
+<div class="forum-container">
+    <div class="forum-header">
+        <h1 class="forum-title">妖精论坛</h1>
+        <p class="forum-subtitle">分享你的想法与故事</p>
+        <a href="/post/create" class="forum-create-btn">
+            <i class="fa fa-pencil"></i> 发布帖子
+        </a>
+    </div>
+
+    <div class="forum-category-tabs">
+        <button class="forum-tab active" data-category="all">全部</button>
+        <button class="forum-tab" data-category="general">综合</button>
+        <button class="forum-tab" data-category="talk">闲聊</button>
+        <button class="forum-tab" data-category="question">求助</button>
+        <button class="forum-tab" data-category="share">分享</button>
+        <button class="forum-tab" data-category="creative">创作</button>
+    </div>
+
+    <div class="forum-post-list" id="forum-post-list">
+        <div class="forum-loading">加载中...</div>
+    </div>
+
+    <div class="forum-load-more" id="forum-load-more" style="display:none;">
+        <button onclick="loadMorePosts()">加载更多</button>
+    </div>
+</div>
