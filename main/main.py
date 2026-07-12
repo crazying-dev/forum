@@ -85,45 +85,85 @@ def strip_easter_egg(name):
 def login_page():
 	if current_user.is_authenticated:
 		return redirect('/')
-	return render_template(base)
-
-
-@app.route('/login/GET')
-def login_get():
-	return render_template('auth.html')
-
-
-@app.route('/GET')
-def indexGet():
-	return render_template('index.html')
-
-
-@app.route('/privacy/GET')
-def PrivacyGet():
-	return render_template('privacy.html')
+	return render_template(base, page_template='auth.html')
 
 
 @app.route('/')
+def index_page():
+	return render_template(base, page_template='index.html')
+
+
 @app.route('/privacy')
+def privacy_page():
+	return render_template(base, page_template='privacy.html')
+
+
 @app.route('/WIKI')
+def WIKI():
+	return render_template(base, page_template='WIKI/WIKI.html')
+
+
 @app.route("/World")
+def World():
+	return render_template(base, page_template='World.html')
+
+
 @app.route('/WIKI/GuanFang')
+def WIKIGuanFang():
+	return render_template(base, page_template='WIKI/GuanFang/GuanFang.html')
+
+
 @app.route('/WIKI/Personal')
+def WIKIPersonal():
+	return render_template(base, page_template='WIKI/Personal/Personal.html')
+
+
 @app.route('/WIKI/GuanFang/film')
+def WIKIGuanFangFilm():
+	return render_template(base, page_template='WIKI/GuanFang/film/film.html')
+
+
 @app.route('/WIKI/Personal/mouse')
+def WIKIPersonalMouse():
+	return render_template(base, page_template='WIKI/Personal/mouse/mouse.html')
+
+
 @app.route('/WIKI/Personal/mouse/Liunx')
+def WIKIPersonalMouseLiunx():
+	return render_template(base, page_template='WIKI/Personal/mouse/Liunx.html')
+
+
 @app.route('/WIKI/GuanFang/film/FilmFor2')
+def WIKIFilmFor2():
+	return render_template(base, page_template='WIKI/GuanFang/film/FilmFor2.html')
+
+
 @app.route('/WIKI/GuanFang/film/FilmFor1')
+def WIKIFilmFor1():
+	return render_template(base, page_template='WIKI/GuanFang/film/FilmFor1.html')
+
+
 @app.route('/forum')
+def forum_page():
+	return render_template(base, page_template='forum.html')
+
+
 @app.route('/post/create')
+def post_create_page():
+	return render_template(base, page_template='post_create.html')
+
+
 @app.route('/WIKI/Personal/Live2D')
-def BaseWithAll():
-	return render_template(base)
+def WIKIPersonalLive2D():
+	return render_template(base, page_template='WIKI/Personal/Live2D.html')
 
 
 @app.route('/users/<ID>')
-def usersbase(ID):
-	return render_template(base)
+def users_page(ID):
+	UserInfo = db.get_user_by_id(ID)
+	if not UserInfo:
+		return "No this user", 401
+	return render_template(base, page_template='UserPersonalinfo.html')
 
 
 @app.route('/favicon.ico')
@@ -139,64 +179,6 @@ def EasterEgg():
 		return jsonify(data)
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500
-
-
-@app.route('/WIKI/GET')
-def WIKI():
-	return render_template('WIKI/WIKI.html')
-
-
-@app.route('/WIKI/GuanFang/GET')
-def WIKIGuanFang():
-	return render_template('WIKI/GuanFang/GuanFang.html')
-
-
-@app.route('/WIKI/GuanFang/film/GET')
-def WIKIGuanFangFilm():
-	return render_template('WIKI/GuanFang/film/film.html')
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor1/GET')
-def WIKIFilmFor1():
-	return render_template('WIKI/GuanFang/film/FilmFor1.html')
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor2/GET')
-def WIKIFilmFor2():
-	return render_template('WIKI/GuanFang/film/FilmFor2.html')
-
-
-@app.route('/WIKI/Personal/GET')
-def WIKIPersonal():
-	return render_template('WIKI/Personal/Personal.html')
-
-
-@app.route('/WIKI/Personal/mouse/GET')
-def WIKIPersonalMouse():
-	return render_template('WIKI/Personal/mouse/mouse.html')
-
-
-@app.route('/WIKI/Personal/mouse/Liunx/GET')
-def WIKIPersonalMouseLiunx():
-	return render_template('WIKI/Personal/mouse/Liunx.html')
-
-
-@app.route('/WIKI/Personal/Live2D/GET')
-def WIKIPersonalLive2D():
-	return render_template('WIKI/Personal/Live2D.html')
-
-
-@app.route('/users/<ID>/GET')
-def users(ID):
-	UserInfo = db.get_user_by_id(ID)
-	if not UserInfo:
-		return "No this user", 401
-	return render_template('UserPersonalinfo.html')
-
-
-@app.route('/World/GET')
-def Wrold():
-	return render_template("World.html")
 
 
 @app.route('/WIKI/GuanFang/film/FilmFor2/Photo')
@@ -653,32 +635,12 @@ def api_search():
 
 @app.route('/search')
 def search_page():
-	return render_template(base)
-
-
-@app.route('/search/GET')
-def search_get():
-	return render_template('search.html')
-
-
-@app.route('/forum/GET')
-def forum_get():
-	return render_template('forum.html')
-
-
-@app.route('/post/create/GET')
-def post_create_get():
-	return render_template('post_create.html')
+	return render_template(base, page_template='search.html')
 
 
 @app.route('/post/<post_id>')
 def page_post_detail(post_id):
-	return render_template(base)
-
-
-@app.route('/post/<post_id>/GET')
-def post_detail_get(post_id):
-	return render_template('post_detail.html')
+	return render_template(base, page_template='post_detail.html')
 
 
 @app.route('/rss.xml')
