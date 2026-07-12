@@ -26,10 +26,9 @@ def _ok(data):
 def _verify_time_token(admin_id, send_time, time_token):
 	"""验证时间令牌，防止重放攻击。
 
-	令牌 = SHA256(admin_id + send_time + AUTH_SALT) 的前16位
+	令牌 = SHA256(admin_id + send_time) 的前16位
 	"""
-	from api.config import AUTH_SALT
-	raw = f"{admin_id}{send_time}{AUTH_SALT}"
+	raw = f"{admin_id}{send_time}"
 	expected = hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
 	return time_token == expected
 
