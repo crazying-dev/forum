@@ -2,10 +2,14 @@ import random
 import json
 import os
 import re
+import io
+import hashlib
+import requests as http_requests
 from flask import *
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from PIL import Image
 from api import database as db, config, cache as cache_api
 
 app = Flask(__name__)
@@ -360,6 +364,50 @@ def api_user_change():
 	if result:
 		cache_api.invalidate_user_cache(current_user['id'])
 	return jsonify({'success': result})
+
+
+@app.route('/api/user/avatar/upload', methods=['POST'])
+@login_required
+def api_avatar_upload():
+	file = request.files.get('avatar')
+	if not file or not file.filename:
+		return jsonify({'success': False, 'message': '请选择图片'}), 400
+	try:
+		img = Image.open(file.stream)
+		img = img.convert('RGBA')
+		bg = Image.new('RGBA', img.size, (255, 255, 255, 255))
+		bg.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else None)
+		img = bg.convert('RGB')
+		img = img.resize((400, 400), Image.LANCZOS)
+		buf = io.BytesIO()
+		img.save(buf, format='WEBP', quality=85)
+		buf.seek(0)
+		token = os.getenv('avatar_READ_WRITE_TOKEN')
+		if not token:
+			return jsonify({'success': False, 'message': '存储服务未配置'}), 500
+		filename = hashlib.md5(f"{current_user['id']}{os.urandom(8).hex()}".encode()).hexdigest()
+		pathname = f'avatars/{filename}.webp'
+		upload_url = f'https://blob.vercel-storage.com/{pathname}'
+		resp = http_requests.put(
+			upload_url,
+			data=buf.getvalue(),
+			headers={
+				'Authorization': f'Bearer {token}',
+				'Content-Type': 'image/webp',
+			},
+			timeout=30
+		)
+		if resp.status_code != 200:
+			return jsonify({'success': False, 'message': '上传失败'}), 500
+		blob_url = resp.json().get('url')
+		if not blob_url:
+			return jsonify({'success': False, 'message': '获取URL失败'}), 500
+		result = db.update_user_profile(current_user['id'], avatar=blob_url)
+		if result:
+			cache_api.invalidate_user_cache(current_user['id'])
+		return jsonify({'success': result, 'avatar': blob_url})
+	except Exception as e:
+		return jsonify({'success': False, 'message': f'处理失败: {str(e)}'}), 500
 
 
 @app.route('/api/users/<user_id>/favorites')
