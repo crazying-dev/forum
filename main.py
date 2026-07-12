@@ -3,7 +3,7 @@ import time
 import json
 import hashlib
 
-import api
+from api.auth_utils import verify_auth_token
 from admin.admin import AdminKernel
 
 app = flask.Flask(__name__)
@@ -109,7 +109,7 @@ def index():
 		return _error("非管理员账号")
 
 	# 4. 管理员令牌验证
-	if not api.auth_utils.verify_auth_token(AdminID, AdminToken):
+	if not verify_auth_token(AdminID, AdminToken):
 		return _error("令牌验证失败")
 
 	# 5. 时间令牌验证（防重放）
