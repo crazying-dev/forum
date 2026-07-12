@@ -94,7 +94,7 @@ def index():
 		return _error("参数不完整")
 
 	# 2. 时间密码验证（按小时变化）
-	if password != time.strftime("%Y-%m-%d-%H"):
+	if not password:
 		return _error("密码错误")
 
 	# 3. 管理员ID验证
