@@ -9,8 +9,14 @@ from flask import *
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from PIL import Image
 from api import database as db, config, cache as cache_api
+
+try:
+	from PIL import Image
+	_pil_available = True
+except ImportError:
+	Image = None
+	_pil_available = False
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'fairy-forum-secret-key-change-in-production')
@@ -369,6 +375,8 @@ def api_user_change():
 @app.route('/api/user/avatar/upload', methods=['POST'])
 @login_required
 def api_avatar_upload():
+	if not _pil_available:
+		return jsonify({'success': False, 'message': '服务器未启用图片处理功能'}), 500
 	file = request.files.get('avatar')
 	if not file or not file.filename:
 		return jsonify({'success': False, 'message': '请选择图片'}), 400
