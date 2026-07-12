@@ -4,7 +4,16 @@
         <p class="forum-subtitle" id="search-subtitle">正在搜索...</p>
     </div>
 
+    <div class="search-tabs" id="search-tabs">
+        <button class="search-tab active" data-tab="posts" onclick="switchSearchTab('posts')">帖子</button>
+        <button class="search-tab" data-tab="users" onclick="switchSearchTab('users')">用户</button>
+    </div>
+
     <div class="forum-post-list" id="search-post-list">
+        <div class="forum-loading">加载中...</div>
+    </div>
+
+    <div class="forum-user-list" id="search-user-list" style="display:none;">
         <div class="forum-loading">加载中...</div>
     </div>
 

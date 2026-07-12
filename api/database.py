@@ -1222,6 +1222,35 @@ def search_posts(keyword, page=1, page_size=20):
 	return posts
 
 
+def search_users(keyword, page=1, page_size=20):
+	if not keyword or not keyword.strip():
+		return []
+	offset = (page - 1) * page_size
+	results = execute_query(
+		"""
+        SELECT id, name, avatar, vip, prefix, status, created_at
+        FROM users
+        WHERE status = 1 AND name ILIKE %s
+        ORDER BY created_at DESC
+        LIMIT %s OFFSET %s
+        """,
+		(f"%{keyword}%", page_size, offset),
+		fetch_all=True
+	)
+	users = []
+	for r in results:
+		users.append({
+			"id": r[0],
+			"name": r[1],
+			"avatar": r[2],
+			"vip": r[3],
+			"prefix": r[4],
+			"status": r[5],
+			"created_at": str(r[6]) if r[6] else None,
+		})
+	return users
+
+
 def close_pool():
 	"""关闭所有数据库连接池。
     

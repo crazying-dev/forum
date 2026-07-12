@@ -636,9 +636,11 @@ def api_search():
 	if cached is not None:
 		return jsonify(cached)
 	posts = db.search_posts(keyword, page, page_size)
+	users = db.search_users(keyword, page, page_size)
 	result = {
 		'success': True,
 		'posts': posts,
+		'users': users,
 		'keyword': keyword,
 		'page': page,
 		'page_size': page_size
