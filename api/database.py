@@ -406,7 +406,7 @@ def get_user_by_id(user_id):
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, gender, age, intro, vip, created_at, last_login FROM users WHERE id = %s",
+		"SELECT id, name, avatar, email, gender, age, intro, vip, is_banned, created_at, last_login FROM users WHERE id = %s",
 		(user_id,),
 		fetch=True
 	)
@@ -420,8 +420,9 @@ def get_user_by_id(user_id):
 			"age": result[5],
 			"intro": result[6],
 			"vip": result[7],
-			"created_at": str(result[8]) if result[8] else None,
-			"last_login": str(result[9]) if result[9] else None,
+			"is_banned": result[8],
+			"created_at": str(result[9]) if result[9] else None,
+			"last_login": str(result[10]) if result[10] else None,
 		}
 	return None
 
@@ -438,7 +439,7 @@ def get_user_by_name(name):
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, password, gender, age, intro, vip, created_at, last_login FROM users WHERE name = %s",
+		"SELECT id, name, avatar, email, password, gender, age, intro, vip, is_banned, created_at, last_login FROM users WHERE name = %s",
 		(name,),
 		fetch=True
 	)
@@ -453,8 +454,9 @@ def get_user_by_name(name):
 			"age": result[6],
 			"intro": result[7],
 			"vip": result[8],
-			"created_at": str(result[9]) if result[9] else None,
-			"last_login": str(result[10]) if result[10] else None,
+			"is_banned": result[9],
+			"created_at": str(result[10]) if result[10] else None,
+			"last_login": str(result[11]) if result[11] else None,
 		}
 	return None
 
@@ -471,7 +473,7 @@ def get_user_by_email(email):
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, password, gender, age, intro, vip, created_at FROM users WHERE email = %s",
+		"SELECT id, name, avatar, email, password, gender, age, intro, vip, is_banned, created_at FROM users WHERE email = %s",
 		(email,),
 		fetch=True
 	)
@@ -486,7 +488,8 @@ def get_user_by_email(email):
 			"age": result[6],
 			"intro": result[7],
 			"vip": result[8],
-			"created_at": str(result[9]) if result[9] else None,
+			"is_banned": result[9],
+			"created_at": str(result[10]) if result[10] else None,
 		}
 	return None
 
@@ -756,37 +759,6 @@ def get_user_stats(user_id):
 			"total_views": result[2] or 0,
 		}
 	return {"post_count": 0, "total_likes": 0, "total_views": 0}
-
-
-def get_all_users():
-	"""获取所有用户信息（调试用）。
-
-    Returns:
-        list: 用户列表，每项包含 {"id", "name", "avatar", "email", "gender", "age", "intro", "vip", "created_at", "last_login"}
-    """
-	results = execute_query(
-		"""
-        SELECT id, name, avatar, email, gender, age, intro, vip, created_at, last_login
-        FROM users
-        ORDER BY created_at DESC
-        """,
-		fetch_all=True
-	)
-	users = []
-	for r in results:
-		users.append({
-			"id": r[0],
-			"name": r[1],
-			"avatar": r[2],
-			"email": r[3],
-			"gender": r[4],
-			"age": r[5],
-			"intro": r[6],
-			"vip": r[7],
-			"created_at": str(r[8]) if r[8] else None,
-			"last_login": str(r[9]) if r[9] else None,
-		})
-	return users
 
 
 def increment_post_views(post_id):

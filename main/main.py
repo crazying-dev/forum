@@ -267,6 +267,9 @@ def api_login():
 	if not check_password_hash(user['password'], password):
 		return jsonify({'success': False, 'message': '密码错误'})
 
+	if user.get('is_banned') == 1:
+		return jsonify({'success': False, 'message': '该账号已被封禁'})
+
 	db.update_user_last_login(user['id'])
 	login_user(UserWrapper(user), remember=remember)
 	return jsonify({'success': True, 'id': user['id']})
