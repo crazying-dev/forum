@@ -18,18 +18,33 @@ class AdminAPIClient:
         raw = f"{self.admin_id}{self.admin_token}{send_time}"
         return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
+    def _generate_time_token(self, send_time):
+        raw = f"{self.admin_id}{send_time}"
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
+
+    def _generate_time_password(self):
+        from datetime import datetime
+        now = datetime.now()
+        return f"{now.year}-{now.month:02d}-{now.day:02d}-{now.hour:02d}"
+
     def call(self, action, **args):
         send_time = str(time.time())
         signature = self._generate_signature(send_time)
+        time_token = self._generate_time_token(send_time)
+        password = self._generate_time_password()
+        run_msg = json.dumps({'action': action, 'args': args})
 
         data = {
             'adminId': self.admin_id,
             'signature': signature,
             'sendTime': send_time,
-            'runMessage': json.dumps({
-                'action': action,
-                'args': args
-            })
+            'runMessage': run_msg,
+            'password': password,
+            'AdminID': self.admin_id,
+            'AdminToken': self.admin_token,
+            'TimeToken': time_token,
+            'SendTime': send_time,
+            'RunMessage': run_msg,
         }
 
         try:
