@@ -105,7 +105,3 @@ def verify_auth_token(data, token):
     if token[:10] == expected:
         return True
     return False
-
-
-if __name__ == '__main__':
-    print(generate_auth_token("391415411193"))

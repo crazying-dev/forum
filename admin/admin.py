@@ -42,65 +42,64 @@ from api.database import execute_query, get_conn
 
 
 class AdminKernel:
-    """管理员内核，提供所有管理操作的编程接口。"""
+    """管理员内核（兼容旧接口，组合 UserKernel + PostKernel）。"""
 
-    # ========================
-    # 举报管理
-    # ========================
+    def __init__(self):
+        self.user_kernel = UserKernel()
+        self.post_kernel = PostKernel()
 
     def list_reports(self, status_filter=None):
-        """查看被举报的帖子列表。
-
-        Args:
-            status_filter: None=全部, 0=待处理, 1=已处理
-
-        Returns:
-            list: 举报记录列表
-        """
-        sql = """
-            SELECT r.id, r.post_id, r.reporter_id, r.reason, r.detail, r.status, r.created_at,
-                   p.title, p.user_id, u.name AS author_name,
-                   ru.name AS reporter_name
-            FROM post_reports r
-            LEFT JOIN posts p ON r.post_id = p.id
-            LEFT JOIN users u ON p.user_id = u.id
-            LEFT JOIN users ru ON r.reporter_id = ru.id
-        """
-        params = ()
-        if status_filter is not None:
-            sql += " WHERE r.status = %s"
-            params = (status_filter,)
-        sql += " ORDER BY r.created_at DESC"
-
-        results = execute_query(sql, params, fetch_all=True) or []
-        reports = []
-        for r in results:
-            reports.append({
-                "id": r[0],
-                "post_id": r[1],
-                "reporter_id": r[2],
-                "reason": r[3],
-                "detail": r[4],
-                "status": r[5],
-                "created_at": str(r[6]) if r[6] else None,
-                "post_title": r[7] or "[帖子已删除]",
-                "post_author_id": r[8],
-                "post_author": r[9] or "[未知]",
-                "reporter_name": r[10] or "[未知]",
-            })
-        return reports
+        return self.post_kernel.list_reports(status_filter)
 
     def resolve_report(self, report_id):
-        """将举报标记为已处理。"""
-        affected = execute_query(
-            "UPDATE post_reports SET status = 1 WHERE id = %s",
-            (report_id,)
-        )
-        return affected > 0
+        return self.post_kernel.resolve_report(report_id)
 
-    # ========================
-    # 用户管理
-    # ========================
+    def list_users(self):
+        return self.user_kernel.list_users()
+
+    def find_user(self, key, value):
+        return self.user_kernel.find_user(key, value)
+
+    def find_user_smart(self, identifier):
+        return self.user_kernel.find_user_smart(identifier)
+
+    def update_user(self, user_id, key, value):
+        return self.user_kernel.update_user(user_id, key, value)
+
+    def ban_user(self, user_id):
+        return self.user_kernel.ban_user(user_id)
+
+    def unban_user(self, user_id):
+        return self.user_kernel.unban_user(user_id)
+
+    def get_post_detail(self, post_id):
+        return self.post_kernel.get_post_detail(post_id)
+
+    def delete_post(self, post_id):
+        return self.post_kernel.delete_post(post_id)
+
+    def get_post_comments(self, post_id):
+        return self.post_kernel.get_post_comments(post_id)
+
+    def delete_comment(self, comment_id):
+        return self.post_kernel.delete_comment(comment_id)
+
+    def get_stats(self):
+        return self.post_kernel.get_stats()
+
+
+class UserKernel:
+    """用户数据管理内核。"""
+
+    @staticmethod
+    def check():
+        """检查内核是否可用。"""
+        try:
+            from api.database import execute_query
+            execute_query("SELECT 1 FROM users LIMIT 1", fetch=True)
+            return True
+        except Exception:
+            return False
 
     def list_users(self):
         """获取所有用户列表。"""
@@ -182,6 +181,62 @@ class AdminKernel:
     def unban_user(self, user_id):
         """解封用户。"""
         return self.update_user(user_id, 'is_banned', 0)
+
+
+class PostKernel:
+    """帖子管理与举报查看内核。"""
+
+    @staticmethod
+    def check():
+        """检查内核是否可用。"""
+        try:
+            from api.database import execute_query
+            execute_query("SELECT 1 FROM posts LIMIT 1", fetch=True)
+            return True
+        except Exception:
+            return False
+
+    # ========================
+    # 举报管理
+    # ========================
+
+    def list_reports(self, status_filter=None):
+        """查看被举报的帖子列表。"""
+        sql = """
+            SELECT r.id, r.post_id, r.reporter_id, r.reason, r.detail, r.status, r.created_at,
+                   p.title, p.user_id, u.name AS author_name,
+                   ru.name AS reporter_name
+            FROM post_reports r
+            LEFT JOIN posts p ON r.post_id = p.id
+            LEFT JOIN users u ON p.user_id = u.id
+            LEFT JOIN users ru ON r.reporter_id = ru.id
+        """
+        params = ()
+        if status_filter is not None:
+            sql += " WHERE r.status = %s"
+            params = (status_filter,)
+        sql += " ORDER BY r.created_at DESC"
+
+        results = execute_query(sql, params, fetch_all=True) or []
+        reports = []
+        for r in results:
+            reports.append({
+                "id": r[0], "post_id": r[1], "reporter_id": r[2],
+                "reason": r[3], "detail": r[4], "status": r[5],
+                "created_at": str(r[6]) if r[6] else None,
+                "post_title": r[7] or "[帖子已删除]",
+                "post_author_id": r[8], "post_author": r[9] or "[未知]",
+                "reporter_name": r[10] or "[未知]",
+            })
+        return reports
+
+    def resolve_report(self, report_id):
+        """将举报标记为已处理。"""
+        affected = execute_query(
+            "UPDATE post_reports SET status = 1 WHERE id = %s",
+            (report_id,)
+        )
+        return affected > 0
 
     # ========================
     # 帖子管理
