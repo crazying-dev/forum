@@ -128,11 +128,6 @@ def WIKIPersonal():
 	return render_template(base, page_template='WIKI/Personal/Personal.html')
 
 
-@app.route('/WIKI/GuanFang/film')
-def WIKIGuanFangFilm():
-	return render_template(base, page_template='WIKI/GuanFang/film/film.html')
-
-
 @app.route('/WIKI/Personal/mouse')
 def WIKIPersonalMouse():
 	return render_template(base, page_template='WIKI/Personal/mouse/mouse.html')
@@ -141,16 +136,6 @@ def WIKIPersonalMouse():
 @app.route('/WIKI/Personal/mouse/Liunx')
 def WIKIPersonalMouseLiunx():
 	return render_template(base, page_template='WIKI/Personal/mouse/Liunx.html')
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor2')
-def WIKIFilmFor2():
-	return render_template(base, page_template='WIKI/GuanFang/film/FilmFor2.html')
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor1')
-def WIKIFilmFor1():
-	return render_template(base, page_template='WIKI/GuanFang/film/FilmFor1.html')
 
 
 @app.route('/forum')
@@ -189,29 +174,6 @@ def EasterEgg():
 		return jsonify(data)
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor2/Photo')
-def WIKIFilmFor2Photo():
-	return redirect(config.Image_father_URL + "/" + random.choice(
-		[
-			"f0a6658d490a588add803b536a1ebe12.jpg",
-			"Camera_XHS_17826569776881040g00832023q3k2jq6g5nqj.jpg"
-		]
-	))
-
-
-@app.route('/WIKI/GuanFang/film/Photo')
-def WIKIFilmPhoto():
-	return redirect(config.Image_father_URL + "/" + random.choice(
-		[
-			"32ea892873b7c4214dd82c6070ffa1f5.jpg",
-			"20190930192812_ZdJUw.jpeg",
-			"Camera_XHS_17826569776881040g00832023q3k2jq6g5nqj.jpg",
-			"f0a6658d490a588add803b536a1ebe12.jpg",
-			"Image_1782657911213_521.png"
-		]
-	))
 
 
 # ── 认证 API ──────────────────────────────────────────────
