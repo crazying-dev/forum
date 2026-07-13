@@ -106,7 +106,7 @@ class VercelBlobCache:
                             self.delete(key)
                             return None
                         return obj.get('value')
-        except:
+        except Exception:
             pass
         return None
 
@@ -128,7 +128,7 @@ class VercelBlobCache:
                 result = resp.json()
                 if result.get('url'):
                     self._url_cache[key] = result['url']
-        except:
+        except Exception:
             pass
 
     def delete(self, key):
@@ -137,7 +137,7 @@ class VercelBlobCache:
         try:
             pathname = self._make_key(key)
             delete_url = f'{self.BASE_URL}/delete'
-            resp = requests.post(
+            requests.post(
                 delete_url,
                 json={'urls': [pathname]},
                 headers=self._headers(),
@@ -145,7 +145,7 @@ class VercelBlobCache:
             )
             if key in self._url_cache:
                 del self._url_cache[key]
-        except:
+        except Exception:
             pass
 
 

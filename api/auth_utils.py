@@ -9,7 +9,6 @@ from api.config import (
     AUTH_COMBINING_SETS,
     AUTH_ZW_SETS,
     AUTH_PADDING_SETS,
-    AUTH_LIST_FOR_1,
 )
 
 sys.set_int_max_str_digits(10000)
