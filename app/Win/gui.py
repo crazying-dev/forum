@@ -666,7 +666,7 @@ class AdminGUI(QMainWindow):
             gl.addWidget(lbl_key3, 2, 0)
             gl.addWidget(lbl_val3, 2, 1)
 
-            lbl_hint = QLabel("配置文件: config.bin（后移一位加密）")
+            lbl_hint = QLabel("配置文件: config.bin")
             lbl_hint.setFont(QFont("微软雅黑", 8))
             lbl_hint.setStyleSheet("color: #6b7280;")
             gl.addWidget(lbl_hint, 3, 0, 1, 2)

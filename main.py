@@ -27,6 +27,10 @@ def _get_admin_tokens():
 			data = json.load(f)
 		if isinstance(data, dict):
 			return data.get('tokens', {})
+		# 兼容旧版列表格式
+		if isinstance(data, list):
+			from api.auth_utils import generate_auth_token
+			return {str(aid): generate_auth_token(str(aid)) for aid in data}
 		return {}
 	except Exception:
 		return {}
