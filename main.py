@@ -2,16 +2,14 @@ import flask
 import time
 import json
 import hashlib
+import os
 
-from api.auth_utils import verify_auth_token
 from admin.admin import AdminKernel
 
 app = flask.Flask(__name__)
 
-# 请求有效时间窗口（秒）
 REQUEST_TIMEOUT = 120
 
-# 管理员内核实例
 kernel = AdminKernel()
 
 
@@ -23,14 +21,21 @@ def _ok(data):
 	return flask.jsonify({'success': True, 'data': data})
 
 
-def _verify_time_token(admin_id, send_time, time_token):
-	"""验证时间令牌，防止重放攻击。
+def _get_admin_tokens():
+	try:
+		with open("AdminsID.json", "r", encoding="utf-8") as f:
+			data = json.load(f)
+		if isinstance(data, dict):
+			return data.get('tokens', {})
+		return {}
+	except Exception:
+		return {}
 
-	令牌 = SHA256(admin_id + send_time) 的前16位
-	"""
-	raw = f"{admin_id}{send_time}"
-	expected = hashlib.sha256(raw.encode('utf-8')).hexdigest()[:16]
-	return time_token == expected
+
+def _verify_signature(admin_id, send_time, signature, admin_token):
+	raw = f"{admin_id}{admin_token}{send_time}"
+	expected = hashlib.sha256(raw.encode('utf-8')).hexdigest()
+	return signature == expected
 
 
 def _dispatch(action, args):
@@ -82,56 +87,41 @@ def _dispatch(action, args):
 def index():
 	data = flask.request.get_json() or {}
 
-	password = data.get('password')
-	AdminID = data.get('AdminID')
-	AdminToken = data.get('AdminToken')
-	TimeToken = data.get('TimeToken')
-	SendTime = data.get('SendTime')
-	RunMessage = data.get('RunMessage')
+	admin_id = data.get('adminId') or data.get('AdminID')
+	signature = data.get('signature') or data.get('TimeToken')
+	send_time = data.get('sendTime') or data.get('SendTime')
+	run_message = data.get('runMessage') or data.get('RunMessage')
+	admin_token_client = data.get('adminToken') or data.get('AdminToken')
 
-	# 1. 参数完整性检查
-	if not all([password, AdminID, AdminToken, TimeToken, SendTime, RunMessage]):
+	if not all([admin_id, signature, send_time, run_message]):
 		return _error("参数不完整")
 
-	# 2. 时间密码验证（按小时变化）
-	if not password:
-		return _error("密码错误")
-
-	# 3. 管理员ID验证
-	try:
-		with open("AdminsID.json", "r", encoding="utf-8") as f:
-			admins_data = json.load(f)
-		admin_ids = admins_data if isinstance(admins_data, list) else admins_data.get('admins', [])
-	except Exception:
-		admin_ids = []
-
-	if AdminID not in admin_ids:
+	admin_tokens = _get_admin_tokens()
+	admin_token = admin_tokens.get(admin_id)
+	if not admin_token:
 		return _error("非管理员账号")
 
-	# 4. 管理员令牌验证
-	if not verify_auth_token(AdminID, AdminToken):
-		return _error("令牌验证失败")
+	sig_ok = _verify_signature(admin_id, str(send_time), signature, admin_token)
+	if not sig_ok and admin_token_client:
+		sig_ok = _verify_signature(admin_id, str(send_time), signature, admin_token_client)
 
-	# 5. 时间令牌验证（防重放）
-	if not _verify_time_token(AdminID, str(SendTime), TimeToken):
-		return _error("时间令牌错误")
+	if not sig_ok:
+		return _error("签名验证失败")
 
-	# 6. 请求时效性检查
 	try:
-		sent_ts = float(SendTime)
+		sent_ts = float(send_time)
 		if abs(time.time() - sent_ts) > REQUEST_TIMEOUT:
 			return _error("请求已过期")
 	except (ValueError, TypeError):
 		return _error("时间格式错误")
 
-	# 7. 解析并执行管理指令
 	try:
-		if isinstance(RunMessage, str):
-			msg = json.loads(RunMessage)
+		if isinstance(run_message, str):
+			msg = json.loads(run_message)
 		else:
-			msg = RunMessage
+			msg = run_message
 	except json.JSONDecodeError:
-		return _error("RunMessage 格式错误，需要 JSON")
+		return _error("runMessage 格式错误，需要 JSON")
 
 	action = msg.get('action')
 	args = msg.get('args', {})

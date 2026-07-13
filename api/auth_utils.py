@@ -108,4 +108,4 @@ def verify_auth_token(data, token):
 
 
 if __name__ == '__main__':
-    print(generate_auth_token("391415411193"))
+    print(generate_auth_token("7777777"))

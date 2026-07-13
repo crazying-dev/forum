@@ -190,3 +190,4 @@ data/
 *测试*.*
 *.local
 clear_db.py
+dist/
