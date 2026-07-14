@@ -19,6 +19,8 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
 from PyQt6.QtGui import QFont, QColor, QIcon
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    APP_DIR = os.path.dirname(sys.executable)
 sys.path.insert(0, APP_DIR)
 CONFIG_FILE = os.path.join(APP_DIR, "config.bin")
 LOGO_FILE = os.path.join(APP_DIR, "logo.png")

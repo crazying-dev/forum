@@ -56,14 +56,16 @@ def main():
     print(f"管理员令牌: {'*' * len(config.get('adminToken', ''))}")
 
     try:
+        from api_client import AdminAPIClient
         from user_manager import UserManager
         from post_manager import PostManager
     except ImportError as e:
         print(f"\n[错误] 加载模块失败: {e}")
         sys.exit(1)
 
-    user_mgr = UserManager()
-    post_mgr = PostManager()
+    api_client = AdminAPIClient(config.get('apiUrl'), config.get('adminId'), config.get('adminToken'))
+    user_mgr = UserManager(api_client)
+    post_mgr = PostManager(api_client)
 
     while True:
         print_main_menu()
@@ -98,14 +100,16 @@ if __name__ == "__main__":
             sys.exit(1)
 
         try:
+            from api_client import AdminAPIClient
             from user_manager import UserManager
             from post_manager import PostManager
         except ImportError as e:
             print(f"[错误] 加载模块失败: {e}")
             sys.exit(1)
 
-        user_mgr = UserManager()
-        post_mgr = PostManager()
+        api_client = AdminAPIClient(config.get('apiUrl'), config.get('adminId'), config.get('adminToken'))
+        user_mgr = UserManager(api_client)
+        post_mgr = PostManager(api_client)
 
         cmd = sys.argv[1]
 

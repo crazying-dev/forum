@@ -35,20 +35,20 @@ class AdminAPIClient:
         run_msg = json.dumps({'action': action, 'args': args})
 
         data = {
-            'adminId': self.admin_id,
-            'signature': signature,
-            'sendTime': send_time,
-            'runMessage': run_msg,
             'password': password,
             'AdminID': self.admin_id,
             'AdminToken': self.admin_token,
             'TimeToken': time_token,
             'SendTime': send_time,
             'RunMessage': run_msg,
+            'adminId': self.admin_id,
+            'signature': signature,
+            'sendTime': send_time,
+            'runMessage': run_msg,
         }
 
         try:
-            resp = requests.post(self.base_url, json=data, timeout=30)
+            resp = requests.post(self.base_url, json=data, timeout=30, verify=False)
             result = resp.json()
             if result.get('success'):
                 return result.get('data')
@@ -106,7 +106,7 @@ class AdminAPIClient:
 
     def ping(self):
         try:
-            resp = requests.get(f"{self.base_url}/ping", timeout=5)
+            resp = requests.get(f"{self.base_url}/ping", timeout=5, verify=False)
             return resp.json()
         except Exception:
             return None

@@ -35,16 +35,16 @@ class AdminAPIClient:
         run_msg = json.dumps({'action': action, 'args': args})
 
         data = {
-            'adminId': self.admin_id,
-            'signature': signature,
-            'sendTime': send_time,
-            'runMessage': run_msg,
             'password': password,
             'AdminID': self.admin_id,
             'AdminToken': self.admin_token,
             'TimeToken': time_token,
             'SendTime': send_time,
             'RunMessage': run_msg,
+            'adminId': self.admin_id,
+            'signature': signature,
+            'sendTime': send_time,
+            'runMessage': run_msg,
         }
 
         try:
