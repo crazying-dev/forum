@@ -161,6 +161,24 @@ def users_page(ID):
 	return render_template(base, page_template='UserPersonalinfo.html')
 
 
+@app.route('/huiguan')
+def huiguan_page():
+	return render_template(base, page_template='huiguan.html')
+
+
+@app.route('/api/huiguan')
+def api_huiguan_list():
+	try:
+		with app.open_resource("huiguan.json", "r", encoding="utf-8") as f:
+			data = json.load(f)
+		return jsonify({
+			'success': True,
+			'list': data
+		})
+	except Exception as e:
+		return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @app.route('/favicon.ico')
 def favicon():
 	return redirect(config.Image_father_URL + '/favicon.png')
@@ -174,7 +192,6 @@ def EasterEgg():
 		return jsonify(data)
 	except Exception as e:
 		return jsonify({"error": str(e)}), 500
-
 
 # ── 认证 API ──────────────────────────────────────────────
 
@@ -403,6 +420,64 @@ def api_user_follow(user_id):
 	if result.get('success'):
 		cache_api.invalidate_user_cache(user_id)
 		cache_api.invalidate_user_cache(current_user['id'])
+	return jsonify(result)
+
+
+@app.route('/api/users/<user_id>/following')
+def api_user_following(user_id):
+	page = request.args.get('page', 1, type=int)
+	page_size = request.args.get('page_size', 20, type=int)
+	user = db.get_user_by_id(user_id)
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+	users = db.get_following_list(user_id, page, page_size)
+	result = {
+		'success': True,
+		'users': users,
+		'page': page,
+		'page_size': page_size
+	}
+	if current_user.is_authenticated:
+		following_ids = [u['id'] for u in users]
+		is_following_map = {}
+		for uid in following_ids:
+			is_following_map[uid] = db.is_following(current_user['id'], uid)
+		for u in users:
+			u['is_following'] = is_following_map.get(u['id'], False)
+			u['is_self'] = current_user['id'] == u['id']
+	else:
+		for u in users:
+			u['is_following'] = False
+			u['is_self'] = False
+	return jsonify(result)
+
+
+@app.route('/api/users/<user_id>/followers')
+def api_user_followers(user_id):
+	page = request.args.get('page', 1, type=int)
+	page_size = request.args.get('page_size', 20, type=int)
+	user = db.get_user_by_id(user_id)
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+	users = db.get_follower_list(user_id, page, page_size)
+	result = {
+		'success': True,
+		'users': users,
+		'page': page,
+		'page_size': page_size
+	}
+	if current_user.is_authenticated:
+		following_ids = [u['id'] for u in users]
+		is_following_map = {}
+		for uid in following_ids:
+			is_following_map[uid] = db.is_following(current_user['id'], uid)
+		for u in users:
+			u['is_following'] = is_following_map.get(u['id'], False)
+			u['is_self'] = current_user['id'] == u['id']
+	else:
+		for u in users:
+			u['is_following'] = False
+			u['is_self'] = False
 	return jsonify(result)
 
 

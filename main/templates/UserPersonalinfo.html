@@ -34,11 +34,11 @@
                 <span class="stat-number" id="user-total-views">0</span>
                 <span class="stat-label">浏览</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-item stat-item-clickable" onclick="showFollowList('following')">
                 <span class="stat-number" id="user-following-count">0</span>
                 <span class="stat-label">关注</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-item stat-item-clickable" onclick="showFollowList('followers')">
                 <span class="stat-number" id="user-follower-count">0</span>
                 <span class="stat-label">粉丝</span>
             </div>
@@ -61,3 +61,438 @@
         </div>
     </div>
 </div>
+
+<div id="follow-list-modal" class="follow-list-modal" style="display:none;">
+    <div class="follow-list-overlay" onclick="closeFollowList()"></div>
+    <div class="follow-list-container">
+        <div class="follow-list-header">
+            <h3 id="follow-list-title">关注列表</h3>
+            <button class="follow-list-close" onclick="closeFollowList()">&times;</button>
+        </div>
+        <div class="follow-list-tabs">
+            <button class="follow-tab active" data-type="following" onclick="switchFollowTab('following')">关注</button>
+            <button class="follow-tab" data-type="followers" onclick="switchFollowTab('followers')">粉丝</button>
+        </div>
+        <div id="follow-list-content" class="follow-list-content">
+            <p class="loading-text">加载中...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+var _currentUserId = null;
+var _currentFollowType = 'following';
+var _followPage = 1;
+var _followLoading = false;
+var _followHasMore = true;
+
+function initFollowUserId() {
+    var path = window.location.pathname;
+    var match = path.match(/\/users\/([^/]+)/);
+    if (match) {
+        _currentUserId = match[1];
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFollowUserId);
+} else {
+    initFollowUserId();
+}
+
+function showFollowList(type) {
+    _currentFollowType = type || 'following';
+    _followPage = 1;
+    _followHasMore = true;
+    
+    var modal = document.getElementById('follow-list-modal');
+    var title = document.getElementById('follow-list-title');
+    var tabs = document.querySelectorAll('.follow-tab');
+    
+    title.textContent = _currentFollowType === 'following' ? '关注列表' : '粉丝列表';
+    tabs.forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.type === _currentFollowType);
+    });
+    
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    loadFollowList();
+}
+
+function closeFollowList() {
+    var modal = document.getElementById('follow-list-modal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function switchFollowTab(type) {
+    if (_currentFollowType === type) return;
+    _currentFollowType = type;
+    _followPage = 1;
+    _followHasMore = true;
+    
+    var title = document.getElementById('follow-list-title');
+    var tabs = document.querySelectorAll('.follow-tab');
+    title.textContent = type === 'following' ? '关注列表' : '粉丝列表';
+    tabs.forEach(function(tab) {
+        tab.classList.toggle('active', tab.dataset.type === type);
+    });
+    
+    loadFollowList();
+}
+
+function loadFollowList() {
+    if (_followLoading || !_followHasMore) return;
+    _followLoading = true;
+    
+    var content = document.getElementById('follow-list-content');
+    if (_followPage === 1) {
+        content.innerHTML = '<p class="loading-text">加载中...</p>';
+    }
+    
+    var url = '/api/users/' + _currentUserId + '/' + _currentFollowType + '?page=' + _followPage + '&page_size=20';
+    
+    fetch(url)
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            _followLoading = false;
+            if (!data.success) {
+                if (_followPage === 1) {
+                    content.innerHTML = '<p class="loading-text">加载失败: ' + data.message + '</p>';
+                }
+                return;
+            }
+            
+            var users = data.users || [];
+            if (_followPage === 1 && users.length === 0) {
+                content.innerHTML = '<p class="loading-text">暂无' + (_currentFollowType === 'following' ? '关注' : '粉丝') + '</p>';
+                _followHasMore = false;
+                return;
+            }
+            
+            if (users.length < 20) {
+                _followHasMore = false;
+            }
+            
+            var html = '';
+            if (_followPage === 1) {
+                html = '';
+            } else {
+                html = content.innerHTML;
+            }
+            
+            users.forEach(function(user) {
+                html += renderFollowUserItem(user);
+            });
+            
+            if (_followPage === 1) {
+                content.innerHTML = html;
+            } else {
+                content.innerHTML = html;
+            }
+            
+            _followPage++;
+        })
+        .catch(function(err) {
+            _followLoading = false;
+            if (_followPage === 1) {
+                content.innerHTML = '<p class="loading-text">加载失败: ' + err.message + '</p>';
+            }
+        });
+}
+
+function renderFollowUserItem(user) {
+    var vipBadge = '';
+    if (user.vip && user.vip !== '0') {
+        vipBadge = '<span class="follow-user-vip"><i class="fa fa-diamond"></i></span>';
+    }
+    
+    var actionBtn = '';
+    if (!user.is_self) {
+        if (user.is_following) {
+            actionBtn = '<button class="follow-btn followed" onclick="toggleFollow(\'' + user.id + '\', this)">已关注</button>';
+        } else {
+            actionBtn = '<button class="follow-btn" onclick="toggleFollow(\'' + user.id + '\', this)">关注</button>';
+        }
+    }
+    
+    var intro = user.intro || '这个人很懒，什么都没留下~';
+    
+    return '<div class="follow-user-item">' +
+        '<a href="/users/' + user.id + '" class="follow-user-avatar">' +
+            '<img src="' + user.avatar + '" alt="' + user.name + '">' +
+            vipBadge +
+        '</a>' +
+        '<div class="follow-user-info">' +
+            '<a href="/users/' + user.id + '" class="follow-user-name Username">' + user.name + '</a>' +
+            '<p class="follow-user-intro">' + intro + '</p>' +
+        '</div>' +
+        actionBtn +
+    '</div>';
+}
+
+function toggleFollow(userId, btn) {
+    fetch('/api/users/' + userId + '/follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            if (data.following) {
+                btn.textContent = '已关注';
+                btn.classList.add('followed');
+            } else {
+                btn.textContent = '关注';
+                btn.classList.remove('followed');
+            }
+            if (typeof loadUserProfileStats === 'function') {
+                loadUserProfileStats();
+            }
+        }
+    })
+    .catch(function(err) {
+        console.error('关注操作失败:', err);
+    });
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('follow-list-modal');
+        if (modal && modal.style.display === 'flex') {
+            closeFollowList();
+        }
+    }
+});
+</script>
+
+<style>
+.stat-item-clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.stat-item-clickable:hover {
+    opacity: 0.8;
+}
+
+.follow-list-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.follow-list-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.follow-list-container {
+    position: relative;
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: followListScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+@keyframes followListScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.follow-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.08));
+}
+
+.follow-list-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--color-text-primary);
+}
+
+.follow-list-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.follow-list-close:hover {
+    color: var(--color-text-primary);
+}
+
+.follow-list-tabs {
+    display: flex;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.08));
+}
+
+.follow-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 12px 0;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease;
+    font: inherit;
+}
+
+.follow-tab.active {
+    color: var(--color-primary);
+}
+
+.follow-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 2px;
+}
+
+.follow-list-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.follow-user-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    gap: 12px;
+    transition: background-color 0.2s ease;
+}
+
+.follow-user-item:hover {
+    background: var(--color-bg-item-hover, rgba(0,0,0,0.04));
+}
+
+.follow-user-avatar {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+.follow-user-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.follow-user-vip {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    border: 2px solid var(--color-bg-card);
+}
+
+.follow-user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.follow-user-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.follow-user-intro {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin: 2px 0 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.follow-btn {
+    flex-shrink: 0;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 20px;
+    background: var(--color-primary);
+    color: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+    font: inherit;
+}
+
+.follow-btn:hover {
+    opacity: 0.9;
+}
+
+.follow-btn.followed {
+    background: var(--color-bg-item-hover, rgba(0,0,0,0.08));
+    color: var(--color-text-secondary);
+}
+
+.follow-btn.followed:hover {
+    background: var(--color-bg-item-active, rgba(0,0,0,0.12));
+}
+
+@media (max-width: 640px) {
+    .follow-list-container {
+        width: 100%;
+        max-width: none;
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+</style>

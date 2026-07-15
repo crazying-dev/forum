@@ -1004,6 +1004,80 @@ def get_follow_stats(user_id):
 	}
 
 
+def get_following_list(user_id, page=1, page_size=20):
+	"""获取用户关注的人列表。
+
+    Args:
+        user_id (str): 用户ID
+        page (int): 页码
+        page_size (int): 每页数量
+
+    Returns:
+        list: 用户列表
+    """
+	offset = (page - 1) * page_size
+	results = execute_query(
+		"""
+		SELECT u.id, u.name, u.avatar, u.vip, u.intro, uf.created_at
+		FROM user_follows uf
+		JOIN users u ON uf.following_id = u.id
+		WHERE uf.follower_id = %s
+		ORDER BY uf.created_at DESC
+		LIMIT %s OFFSET %s
+		""",
+		(user_id, page_size, offset),
+		fetch_all=True
+	)
+	users = []
+	for r in results:
+		users.append({
+			"id": r[0],
+			"name": r[1],
+			"avatar": r[2],
+			"vip": r[3],
+			"intro": r[4] or '',
+			"followed_at": str(r[5]) if r[5] else None,
+		})
+	return users
+
+
+def get_follower_list(user_id, page=1, page_size=20):
+	"""获取用户的粉丝列表。
+
+    Args:
+        user_id (str): 用户ID
+        page (int): 页码
+        page_size (int): 每页数量
+
+    Returns:
+        list: 用户列表
+    """
+	offset = (page - 1) * page_size
+	results = execute_query(
+		"""
+		SELECT u.id, u.name, u.avatar, u.vip, u.intro, uf.created_at
+		FROM user_follows uf
+		JOIN users u ON uf.follower_id = u.id
+		WHERE uf.following_id = %s
+		ORDER BY uf.created_at DESC
+		LIMIT %s OFFSET %s
+		""",
+		(user_id, page_size, offset),
+		fetch_all=True
+	)
+	users = []
+	for r in results:
+		users.append({
+			"id": r[0],
+			"name": r[1],
+			"avatar": r[2],
+			"vip": r[3],
+			"intro": r[4] or '',
+			"followed_at": str(r[5]) if r[5] else None,
+		})
+	return users
+
+
 def report_post(post_id, reporter_id, reason, detail=''):
 	"""举报帖子。
 

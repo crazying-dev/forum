@@ -1,0 +1,131 @@
+<div class="forum-container">
+    <div class="forum-header">
+        <h1 class="forum-title">会馆列表</h1>
+        <p class="forum-subtitle">妖精论坛各地会馆</p>
+    </div>
+
+    <div class="huiguan-list" id="huiguan-list">
+        <div class="forum-loading">加载中...</div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function loadHuiguanList() {
+        fetch('/api/huiguan')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var list = document.getElementById('huiguan-list');
+                if (!data.success) {
+                    list.innerHTML = '<p class="loading-text">加载失败: ' + data.message + '</p>';
+                    return;
+                }
+                if (!data.list || data.list.length === 0) {
+                    list.innerHTML = '<p class="loading-text">暂无会馆数据</p>';
+                    return;
+                }
+                var html = '';
+                data.list.forEach(function(item) {
+                    html += '<div class="huiguan-card">';
+                    html += '<div class="huiguan-name"><i class="fa fa-home"></i> ' + (item['会馆名称'] || '未知') + '</div>';
+                    html += '<div class="huiguan-info">';
+                    if (item['馆长在总群的名称']) {
+                        html += '<div class="huiguan-info-item"><span class="huiguan-label">馆长：</span><span class="huiguan-value">' + item['馆长在总群的名称'] + '</span></div>';
+                    }
+                    if (item['馆长QQ号']) {
+                        html += '<div class="huiguan-info-item"><span class="huiguan-label">馆长QQ：</span><span class="huiguan-value">' + item['馆长QQ号'] + '</span></div>';
+                    }
+                    if (item['会馆QQ号']) {
+                        html += '<div class="huiguan-info-item"><span class="huiguan-label">会馆QQ群：</span><span class="huiguan-value">' + item['会馆QQ号'] + '</span></div>';
+                    }
+                    if (item['馆长个人站点']) {
+                        var site = item['馆长个人站点'];
+                        var siteUrl = site;
+                        if (siteUrl && !siteUrl.startsWith('http')) {
+                            siteUrl = 'https://' + siteUrl;
+                        }
+                        html += '<div class="huiguan-info-item"><span class="huiguan-label">个人站点：</span><a class="huiguan-link" href="' + siteUrl + '" target="_blank" rel="noopener">' + site + '</a></div>';
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                });
+                list.innerHTML = html;
+            })
+            .catch(function(err) {
+                var list = document.getElementById('huiguan-list');
+                list.innerHTML = '<p class="loading-text">加载失败: ' + err.message + '</p>';
+            });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadHuiguanList);
+    } else {
+        loadHuiguanList();
+    }
+})();
+</script>
+
+<style>
+.huiguan-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.huiguan-card {
+    background: var(--color-bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.huiguan-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.huiguan-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.huiguan-name i {
+    color: var(--color-primary);
+}
+
+.huiguan-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.huiguan-info-item {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+}
+
+.huiguan-label {
+    color: var(--color-text-tertiary);
+}
+
+.huiguan-value {
+    color: var(--color-text-primary);
+}
+
+.huiguan-link {
+    color: var(--color-primary);
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+}
+
+.huiguan-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+</style>
