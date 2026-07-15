@@ -107,5 +107,3 @@ def verify_auth_token(data, token):
     return False
 
 
-if __name__ == '__main__':
-    print(generate_auth_token("7777777"))
