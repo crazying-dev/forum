@@ -154,75 +154,6 @@ class VercelBlobCache:
             pass
 
 
-class UpstashRedisCache:
-    """基于 Upstash Redis (Vercel KV) 的缓存实现。
-
-    使用 REST API 访问，无需额外 Redis 客户端依赖。
-    """
-
-    def __init__(self, enabled=True):
-        self.token = os.getenv('KV_REST_API_TOKEN')
-        self.base_url = os.getenv('KV_REST_API_URL')
-        self.enabled = enabled and bool(self.token) and bool(self.base_url) and requests is not None
-        self._session = requests.Session() if (requests and self.enabled) else None
-        if self._session:
-            adapter = requests.adapters.HTTPAdapter(pool_connections=5, pool_maxsize=10)
-            self._session.mount('https://', adapter)
-
-    def _headers(self):
-        return {
-            'Authorization': f'Bearer {self.token}',
-            'Content-Type': 'application/json'
-        }
-
-    def get(self, key):
-        if not self.enabled or not self._session:
-            return None
-        try:
-            url = f'{self.base_url}/get/{key}'
-            resp = self._session.get(url, headers=self._headers(), timeout=3)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get('result') is not None:
-                    result = data['result']
-                    # 检测并清理损坏的数据：如果内容中包含大量转义字符（\\" 模式），说明被重复序列化了
-                    if isinstance(result, str):
-                        if result.count('\\\\') > 10 or (result.startswith('{') and result.count('"value"') > 3):
-                            self.delete(key)
-                            return None
-                        try:
-                            parsed = json.loads(result)
-                            if isinstance(parsed, dict) and 'value' in parsed:
-                                result = parsed['value']
-                        except:
-                            pass
-                    return result
-            return None
-        except:
-            pass
-        return None
-
-    def set(self, key, value, ttl=3600):
-        if not self.enabled or not self._session:
-            return
-        try:
-            url = f'{self.base_url}/set/{key}'
-            resp = self._session.post(url, headers=self._headers(), json={'value': value, 'ex': ttl}, timeout=5)
-            if resp.status_code != 200:
-                pass
-        except:
-            pass
-
-    def delete(self, key):
-        if not self.enabled or not self._session:
-            return
-        try:
-            url = f'{self.base_url}/del/{key}'
-            self._session.post(url, headers=self._headers(), timeout=3)
-        except:
-            pass
-
-
 class TwoLevelCache:
     def __init__(self, lru_capacity=500, lru_ttl=300, blob_enabled=True, blob_ttl=3600):
         self.l1 = LRUCache(capacity=lru_capacity, ttl=lru_ttl)
@@ -285,33 +216,3 @@ def invalidate_user_cache(user_id):
 
 def invalidate_world_cache():
     world_cache.delete('world:all')
-
-
-static_page_cache = UpstashRedisCache()
-
-
-def get_static_page(key):
-    return static_page_cache.get(key)
-
-
-def set_static_page(key, content, ttl=300):
-    static_page_cache.set(key, content, ttl=ttl)
-
-
-def delete_static_page(key):
-    static_page_cache.delete(key)
-
-
-def invalidate_all_static_pages():
-    try:
-        import requests
-        token = os.getenv('KV_REST_API_TOKEN')
-        base_url = os.getenv('KV_REST_API_URL')
-        if token and base_url and requests:
-            resp = requests.post(
-                f'{base_url}/flushall',
-                headers={'Authorization': f'Bearer {token}'},
-                timeout=5
-            )
-    except:
-        pass
