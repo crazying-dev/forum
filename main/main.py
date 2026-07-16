@@ -18,6 +18,96 @@ except ImportError:
 	Image = None
 	_pil_available = False
 
+
+def send_email(to_email, subject, body):
+	"""发送邮件。
+
+	Args:
+		to_email (str): 收件人邮箱
+		subject (str): 邮件主题
+		body (str): 邮件正文
+
+	Returns:
+		bool: 是否发送成功
+	"""
+	if not config.SMTP_ENABLED:
+		return False
+
+	try:
+		import smtplib
+		from email.mime.text import MIMEText
+		from email.header import Header
+
+		msg = MIMEText(body, 'html', 'utf-8')
+		msg['Subject'] = Header(subject, 'utf-8')
+		msg['From'] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USER}>"
+		msg['To'] = to_email
+
+		with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
+			server.starttls()
+			server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+			server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
+		return True
+	except Exception as e:
+		print(f"邮件发送失败: {e}")
+		return False
+
+
+def generate_verify_email_body(user_name, token, token_type):
+	"""生成验证邮件正文。
+
+	Args:
+		user_name (str): 用户名
+		token (str): 验证token
+		token_type (str): token类型
+
+	Returns:
+		str: 邮件正文HTML
+	"""
+	if token_type == 'email_verify':
+		verify_url = f"{request.host_url}verify-email?token={token}"
+		title = "邮箱验证"
+		description = "点击下方按钮完成邮箱验证"
+		button_text = "验证邮箱"
+	else:
+		verify_url = f"{request.host_url}reset-password?token={token}"
+		title = "重置密码"
+		description = "点击下方按钮重置密码"
+		button_text = "重置密码"
+
+	return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{title}</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
+        .container {{ max-width: 480px; margin: 0 auto; padding: 20px; }}
+        .card {{ background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
+        .logo {{ font-size: 24px; font-weight: bold; color: #333; margin-bottom: 16px; }}
+        .greeting {{ font-size: 18px; color: #333; margin-bottom: 12px; }}
+        .description {{ font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.6; }}
+        .button {{ display: inline-block; padding: 12px 32px; background: #4f46e5; color: #fff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 500; }}
+        .button:hover {{ background: #4338ca; }}
+        .link {{ color: #4f46e5; text-decoration: none; }}
+        .footer {{ font-size: 12px; color: #999; margin-top: 24px; text-align: center; }}
+        .token-info {{ font-size: 12px; color: #999; margin-top: 16px; font-family: monospace; word-break: break-all; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">妖精论坛</div>
+            <div class="greeting">亲爱的 {user_name}，</div>
+            <div class="description">{description}。<br><br>如果这不是您本人操作，请忽略此邮件。</div>
+            <a href="{verify_url}" class="button">{button_text}</a>
+            <div class="token-info">链接有效期：30分钟<br>链接地址：<a href="{verify_url}" class="link">{verify_url}</a></div>
+        </div>
+        <div class="footer">© 2024 妖精论坛 - 粉丝公益创作</div>
+    </div>
+</body>
+</html>"""
+
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'fairy-forum-secret-key-change-in-production')
 CORS(app)
@@ -106,6 +196,32 @@ def index_page():
 @app.route('/privacy')
 def privacy_page():
 	return render_template(base, page_template='privacy.html')
+
+
+@app.route('/verify-email')
+def verify_email_page():
+	token = request.args.get('token', '')
+	if token:
+		token_info = db.get_verify_token(token, 'email_verify')
+		if token_info:
+			db.update_user_email_verified(token_info['user_id'])
+			db.delete_verify_token(token)
+			return render_template(base, page_template='verify_success.html')
+		else:
+			return render_template(base, page_template='verify_failed.html')
+	return render_template(base, page_template='auth.html')
+
+
+@app.route('/reset-password')
+def reset_password_page():
+	token = request.args.get('token', '')
+	if token:
+		token_info = db.get_verify_token(token, 'password_reset')
+		if token_info:
+			return render_template(base, page_template='auth.html')
+		else:
+			return render_template(base, page_template='verify_failed.html')
+	return render_template(base, page_template='auth.html')
 
 
 @app.route('/WIKI')
@@ -260,6 +376,98 @@ def api_logout():
 	return jsonify({'success': True})
 
 
+@app.route('/api/send-verify-email', methods=['POST'])
+@login_required
+def api_send_verify_email():
+	user = db.get_user_by_id(current_user['id'])
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+
+	token_result = db.create_verify_token(user['id'], 'email_verify')
+	if not token_result.get('success'):
+		return jsonify({'success': False, 'message': '生成验证链接失败'})
+
+	token = token_result['token']
+	subject = '【妖精论坛】邮箱验证'
+	body = generate_verify_email_body(user['name'], token, 'email_verify')
+	
+	sent = send_email(user['email'], subject, body)
+	if sent:
+		return jsonify({'success': True, 'message': '验证邮件已发送，请查收邮箱'})
+	else:
+		return jsonify({'success': True, 'message': '验证链接已生成（邮件服务未启用）', 'token': token})
+
+
+@app.route('/api/verify-email', methods=['POST'])
+def api_verify_email():
+	data = request.get_json() or {}
+	token = data.get('token') or ''
+
+	if not token:
+		return jsonify({'success': False, 'message': '验证链接无效'})
+
+	token_info = db.get_verify_token(token, 'email_verify')
+	if not token_info:
+		return jsonify({'success': False, 'message': '验证链接已过期或无效'})
+
+	db.update_user_email_verified(token_info['user_id'])
+	db.delete_verify_token(token)
+	
+	return jsonify({'success': True, 'message': '邮箱验证成功'})
+
+
+@app.route('/api/send-reset-password', methods=['POST'])
+def api_send_reset_password():
+	data = request.get_json() or {}
+	email = (data.get('email') or '').strip().lower()
+
+	if not email or '@' not in email:
+		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+
+	user = db.get_user_by_email(email)
+	if not user:
+		return jsonify({'success': False, 'message': '该邮箱未注册'})
+
+	token_result = db.create_verify_token(user['id'], 'password_reset')
+	if not token_result.get('success'):
+		return jsonify({'success': False, 'message': '生成重置链接失败'})
+
+	token = token_result['token']
+	subject = '【妖精论坛】重置密码'
+	body = generate_verify_email_body(user['name'], token, 'password_reset')
+	
+	sent = send_email(email, subject, body)
+	if sent:
+		return jsonify({'success': True, 'message': '重置链接已发送，请查收邮箱'})
+	else:
+		return jsonify({'success': True, 'message': '重置链接已生成（邮件服务未启用）', 'token': token})
+
+
+@app.route('/api/reset-password', methods=['POST'])
+def api_reset_password():
+	data = request.get_json() or {}
+	token = data.get('token') or ''
+	password = data.get('password') or ''
+
+	if not token:
+		return jsonify({'success': False, 'message': '重置链接无效'})
+	if len(password) < 6:
+		return jsonify({'success': False, 'message': '密码至少6位'})
+
+	token_info = db.get_verify_token(token, 'password_reset')
+	if not token_info:
+		return jsonify({'success': False, 'message': '重置链接已过期或无效'})
+
+	hashed = generate_password_hash(password)
+	db.execute_query(
+		"UPDATE users SET password = %s WHERE id = %s",
+		(hashed, token_info['user_id'])
+	)
+	db.delete_verify_token(token)
+	
+	return jsonify({'success': True, 'message': '密码重置成功'})
+
+
 @app.route('/api/user/info')
 def api_user_info():
 	if not current_user.is_authenticated:
@@ -271,6 +479,7 @@ def api_user_info():
 			'name': current_user['name'],
 			'avatar': current_user['avatar'],
 			'vip': current_user['vip'],
+			'email_verified': current_user.get('email_verified', 0),
 		}
 	})
 
@@ -299,6 +508,7 @@ def api_user_profile_info(user_id):
 				'age': user['age'],
 				'intro': user['intro'],
 				'vip': user['vip'],
+				'email_verified': user.get('email_verified', 0),
 				'created_at': user['created_at'],
 				'last_login': user['last_login']
 			},

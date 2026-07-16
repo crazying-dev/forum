@@ -23,7 +23,7 @@
                     <input type="checkbox" id="rememberMe" checked>
                     <span>记住我</span>
                 </label>
-                <a href="#" class="forgot-password">忘记密码？</a>
+                <a href="#" class="forgot-password" onclick="showForgotPassword()">忘记密码？</a>
             </div>
             <button class="auth-btn primary" onclick="handleLogin()">登录</button>
             <div class="auth-error" id="loginError"></div>
@@ -54,8 +54,235 @@
             <div class="auth-error" id="registerError"></div>
         </div>
 
+        <div class="auth-form" id="forgotPasswordForm" style="display:none;">
+            <div class="auth-header">
+                <h2>忘记密码</h2>
+                <p>输入您的注册邮箱，我们将发送重置链接</p>
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-envelope"></i></span>
+                <input type="email" id="forgotEmail" placeholder="注册邮箱">
+            </div>
+            <button class="auth-btn primary" onclick="handleForgotPassword()">发送重置链接</button>
+            <div class="auth-error" id="forgotPasswordError"></div>
+            <button class="auth-btn secondary" onclick="showLogin()">返回登录</button>
+        </div>
+
+        <div class="auth-form" id="resetPasswordForm" style="display:none;">
+            <div class="auth-header">
+                <h2>重置密码</h2>
+                <p>设置新密码</p>
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                <input type="password" id="resetPassword" placeholder="新密码（至少6位）">
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                <input type="password" id="resetConfirmPassword" placeholder="确认新密码">
+            </div>
+            <button class="auth-btn primary" onclick="handleResetPassword()">重置密码</button>
+            <div class="auth-error" id="resetPasswordError"></div>
+            <button class="auth-btn secondary" onclick="showLogin()">返回登录</button>
+        </div>
+
         <div class="auth-footer">
             <p>登录即表示您同意<a href="/privacy">隐私政策</a>和服务条款</p>
         </div>
     </div>
 </div>
+
+<script>
+var _resetToken = '';
+
+function showLogin() {
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('loginForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+    document.querySelector('[data-tab="login"]').classList.add('active');
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('registerError').textContent = '';
+    document.getElementById('forgotPasswordError').textContent = '';
+    document.getElementById('resetPasswordError').textContent = '';
+}
+
+function showForgotPassword() {
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('forgotPasswordForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+}
+
+function showResetPassword(token) {
+    _resetToken = token;
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('resetPasswordForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+}
+
+function handleLogin() {
+    var name = document.getElementById('loginName').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    var remember = document.getElementById('rememberMe').checked;
+
+    if (!name || !password) {
+        document.getElementById('loginError').textContent = '请输入账号和密码';
+        return;
+    }
+
+    fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, password: password, remember: remember })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            window.location.href = '/';
+        } else {
+            document.getElementById('loginError').textContent = data.message || '登录失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('loginError').textContent = '网络错误';
+    });
+}
+
+function handleRegister() {
+    var name = document.getElementById('regName').value.trim();
+    var email = document.getElementById('regEmail').value.trim();
+    var password = document.getElementById('regPassword').value;
+    var confirmPassword = document.getElementById('regConfirmPassword').value;
+
+    if (!name || !email || !password || !confirmPassword) {
+        document.getElementById('registerError').textContent = '请填写所有字段';
+        return;
+    }
+    if (password !== confirmPassword) {
+        document.getElementById('registerError').textContent = '两次密码不一致';
+        return;
+    }
+
+    fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, email: email, password: password })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            window.location.href = '/';
+        } else {
+            document.getElementById('registerError').textContent = data.message || '注册失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('registerError').textContent = '网络错误';
+    });
+}
+
+function handleForgotPassword() {
+    var email = document.getElementById('forgotEmail').value.trim();
+
+    if (!email) {
+        document.getElementById('forgotPasswordError').textContent = '请输入邮箱';
+        return;
+    }
+
+    fetch('/api/send-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('forgotPasswordError').textContent = '';
+            alert(data.message);
+            if (data.token) {
+                showResetPassword(data.token);
+            } else {
+                showLogin();
+            }
+        } else {
+            document.getElementById('forgotPasswordError').textContent = data.message || '操作失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('forgotPasswordError').textContent = '网络错误';
+    });
+}
+
+function handleResetPassword() {
+    var password = document.getElementById('resetPassword').value;
+    var confirmPassword = document.getElementById('resetConfirmPassword').value;
+
+    if (!password || !confirmPassword) {
+        document.getElementById('resetPasswordError').textContent = '请填写所有字段';
+        return;
+    }
+    if (password !== confirmPassword) {
+        document.getElementById('resetPasswordError').textContent = '两次密码不一致';
+        return;
+    }
+
+    fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: _resetToken, password: password })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('密码重置成功，请重新登录');
+            showLogin();
+        } else {
+            document.getElementById('resetPasswordError').textContent = data.message || '操作失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('resetPasswordError').textContent = '网络错误';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var targetTab = this.dataset.tab;
+            document.querySelectorAll('.auth-tab').forEach(function(t) {
+                t.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            document.querySelectorAll('.auth-form').forEach(function(form) {
+                form.style.display = 'none';
+            });
+            
+            if (targetTab === 'login') {
+                document.getElementById('loginForm').style.display = 'block';
+            } else if (targetTab === 'register') {
+                document.getElementById('registerForm').style.display = 'block';
+            }
+        });
+    });
+
+    var urlParams = new URLSearchParams(window.location.search);
+    var token = urlParams.get('token');
+    var mode = urlParams.get('mode');
+    
+    if (token && mode === 'reset') {
+        showResetPassword(token);
+    }
+});
+</script>

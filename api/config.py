@@ -6,6 +6,14 @@ vip = "1"  # 用户默认为VIP
 POOL_ENABLED = False  # Vercel数据库不需要连接池，所以为False;传统服务器需要连接池进行优化，当使用传统服务器时改为True
 Image_father_URL = "https://img.crazying-dev.top/text/one"
 
+# 邮件相关配置
+SMTP_ENABLED = True
+SMTP_HOST = "smtp.163.com"
+SMTP_PORT = 587
+SMTP_USER = "ourpet001@163.com"
+SMTP_PASSWORD = "QMujS6PuyYxsd7qY"
+SMTP_FROM_NAME = "妖精论坛(二创)"
+
 # 数据库相关变量
 allowed_search_keys = ['id', 'name', 'email']  # 用户查找可用键
 
@@ -22,6 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     intro TEXT DEFAULT '',
     vip VARCHAR(32) NOT NULL DEFAULT '0',
     is_banned INTEGER NOT NULL DEFAULT 0,
+    email_verified INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP
 );
@@ -103,6 +112,18 @@ CREATE TABLE IF NOT EXISTS user_follows (
     UNIQUE(follower_id, following_id),
     FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (following_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
+CREATE_VERIFY_TOKENS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS verify_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    token_type VARCHAR(32) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 """
 

@@ -202,6 +202,7 @@ def init_tables():
 		cursor.execute(config.CREATE_POST_LIKES_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_FAVORITES_TABLE_SQL)
 		cursor.execute(config.CREATE_USER_FOLLOWS_TABLE_SQL)
+		cursor.execute(config.CREATE_VERIFY_TOKENS_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_REPORTS_TABLE_SQL)
 		try:
 			cursor.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)")
@@ -209,6 +210,10 @@ def init_tables():
 			pass
 		try:
 			cursor.execute("ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER")
+		except:
+			pass
+		try:
+			cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0")
 		except:
 			pass
 		for sql in config.CREATE_INDEX_SQLS:
@@ -402,11 +407,11 @@ def get_user_by_id(user_id):
 
     Returns:
         dict: 用户信息字典，不含密码
-              {"id", "name", "avatar", "email", "gender", "age", "intro", "vip", "created_at", "last_login"}
+              {"id", "name", "avatar", "email", "gender", "age", "intro", "vip", "email_verified", "created_at", "last_login"}
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, gender, age, intro, vip, is_banned, created_at, last_login FROM users WHERE id = %s",
+		"SELECT id, name, avatar, email, gender, age, intro, vip, email_verified, is_banned, created_at, last_login FROM users WHERE id = %s",
 		(user_id,),
 		fetch=True
 	)
@@ -420,9 +425,10 @@ def get_user_by_id(user_id):
 			"age": result[5],
 			"intro": result[6],
 			"vip": result[7],
-			"is_banned": result[8],
-			"created_at": str(result[9]) if result[9] else None,
-			"last_login": str(result[10]) if result[10] else None,
+			"email_verified": result[8],
+			"is_banned": result[9],
+			"created_at": str(result[10]) if result[10] else None,
+			"last_login": str(result[11]) if result[11] else None,
 		}
 	return None
 
@@ -435,11 +441,11 @@ def get_user_by_name(name):
 
     Returns:
         dict: 用户信息字典，包含密码
-              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "created_at", "last_login"}
+              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "email_verified", "created_at", "last_login"}
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, password, gender, age, intro, vip, is_banned, created_at, last_login FROM users WHERE name = %s",
+		"SELECT id, name, avatar, email, password, gender, age, intro, vip, email_verified, is_banned, created_at, last_login FROM users WHERE name = %s",
 		(name,),
 		fetch=True
 	)
@@ -454,9 +460,10 @@ def get_user_by_name(name):
 			"age": result[6],
 			"intro": result[7],
 			"vip": result[8],
-			"is_banned": result[9],
-			"created_at": str(result[10]) if result[10] else None,
-			"last_login": str(result[11]) if result[11] else None,
+			"email_verified": result[9],
+			"is_banned": result[10],
+			"created_at": str(result[11]) if result[11] else None,
+			"last_login": str(result[12]) if result[12] else None,
 		}
 	return None
 
@@ -469,11 +476,11 @@ def get_user_by_email(email):
 
     Returns:
         dict: 用户信息字典，包含密码
-              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "created_at"}
+              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "email_verified", "created_at"}
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, password, gender, age, intro, vip, is_banned, created_at FROM users WHERE email = %s",
+		"SELECT id, name, avatar, email, password, gender, age, intro, vip, email_verified, is_banned, created_at FROM users WHERE email = %s",
 		(email,),
 		fetch=True
 	)
@@ -488,8 +495,9 @@ def get_user_by_email(email):
 			"age": result[6],
 			"intro": result[7],
 			"vip": result[8],
-			"is_banned": result[9],
-			"created_at": str(result[10]) if result[10] else None,
+			"email_verified": result[9],
+			"is_banned": result[10],
+			"created_at": str(result[11]) if result[11] else None,
 		}
 	return None
 
@@ -502,6 +510,82 @@ def update_user_last_login(user_id):
     """
 	execute_query(
 		"UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = %s",
+		(user_id,)
+	)
+
+
+def create_verify_token(user_id, token_type, expires_minutes=30):
+	"""创建验证token。
+
+    Args:
+        user_id (str): 用户ID
+        token_type (str): token类型 ('email_verify', 'password_reset')
+        expires_minutes (int): 过期时间（分钟）
+
+    Returns:
+        dict: {"success": True, "token": token}
+    """
+	import uuid
+	import time
+	token = str(uuid.uuid4())
+	expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + expires_minutes * 60))
+	
+	try:
+		execute_insert(
+			"INSERT INTO verify_tokens (user_id, token, token_type, expires_at) VALUES (%s, %s, %s, %s)",
+			(user_id, token, token_type, expires_at)
+		)
+		return {"success": True, "token": token}
+	except Exception as e:
+		return {"success": False, "error": str(e)}
+
+
+def get_verify_token(token, token_type):
+	"""获取验证token信息。
+
+    Args:
+        token (str): token值
+        token_type (str): token类型
+
+    Returns:
+        dict: token信息 {"user_id", "token", "token_type", "expires_at"}
+        None: token不存在或已过期
+    """
+	result = execute_query(
+		"SELECT user_id, token, token_type, expires_at FROM verify_tokens WHERE token = %s AND token_type = %s AND expires_at > CURRENT_TIMESTAMP",
+		(token, token_type),
+		fetch=True
+	)
+	if result:
+		return {
+			"user_id": result[0],
+			"token": result[1],
+			"token_type": result[2],
+			"expires_at": str(result[3]) if result[3] else None,
+		}
+	return None
+
+
+def delete_verify_token(token):
+	"""删除验证token。
+
+    Args:
+        token (str): token值
+    """
+	execute_query(
+		"DELETE FROM verify_tokens WHERE token = %s",
+		(token,)
+	)
+
+
+def update_user_email_verified(user_id):
+	"""更新用户邮箱验证状态为已验证。
+
+    Args:
+        user_id (str): 用户ID
+    """
+	execute_query(
+		"UPDATE users SET email_verified = 1 WHERE id = %s",
 		(user_id,)
 	)
 
