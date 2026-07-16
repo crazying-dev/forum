@@ -184,7 +184,19 @@ class UpstashRedisCache:
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get('result') is not None:
-                    return data['result']
+                    result = data['result']
+                    # 检测并清理损坏的数据：如果内容中包含大量转义字符（\\" 模式），说明被重复序列化了
+                    if isinstance(result, str):
+                        if result.count('\\\\') > 10 or (result.startswith('{') and result.count('"value"') > 3):
+                            self.delete(key)
+                            return None
+                        try:
+                            parsed = json.loads(result)
+                            if isinstance(parsed, dict) and 'value' in parsed:
+                                result = parsed['value']
+                        except:
+                            pass
+                    return result
             return None
         except:
             pass

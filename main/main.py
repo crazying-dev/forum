@@ -114,6 +114,8 @@ CORS(app)
 
 base = 'PATH/base.html'
 
+cache_api.invalidate_all_static_pages()
+
 
 # ── 性能优化：gzip 压缩 + ETag ────────────────────────────
 
