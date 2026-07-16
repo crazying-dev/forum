@@ -113,8 +113,14 @@
             <li class="header-collapsible">
                 <a class="header-btn" id="RikanBtn" href="https://yaonews.unknownmp.top/" target="_blank" rel="noopener">
                     <i class="fa fa-newspaper-o"></i>
-                    <span>刊物</span>
+                    <span>日刊</span>
                 </a>
+            </li>
+            <li class="header-collapsible">
+                <button class="header-btn" id="DonateBtn" onclick="showDonateCard()">
+                    <i class="fa fa-heart"></i>
+                    <span>赞赏</span>
+                </button>
             </li>
             <li class="header-menu-toggle" id="headerMenuToggle">
                 <button class="header-btn" type="button">
@@ -140,6 +146,9 @@
             <a class="mobile-menu-item" href="https://yaonews.unknownmp.top/" target="_blank" rel="noopener">
                 <i class="fa fa-newspaper-o"></i> 日刊
             </a>
+            <button class="mobile-menu-item" onclick="showDonateCard()">
+                <i class="fa fa-heart"></i> 赞赏
+            </button>
             <button class="mobile-menu-item" onclick="Easter_Egg()">
                 <i class="fa fa-gift"></i> 彩蛋
             </button>
@@ -177,6 +186,7 @@
 <footer id="footer">
     <a href="/privacy" id="FooterPrivacy">隐私</a>
     <br>
+    <br>
     联系方式<br>
     邮箱：3890320020@qq.com<br>
     <a href="https://github.com/crazying-dev">Github（大号）：crazying-dev</a><br>
@@ -188,8 +198,178 @@
     </span>
     <br>
     <br>
+    <span class="footer-disclaimer">
+        <i class="fa fa-info-circle"></i> 本二创无官方授权，仅粉丝公益创作
+    </span>
+    <br>
+    <br>
 
 </footer>
+
+<div id="donate-modal" class="donate-modal" style="display:none;">
+    <div class="donate-overlay" onclick="closeDonateCard()"></div>
+    <div class="donate-card">
+        <button class="donate-close" onclick="closeDonateCard()">&times;</button>
+        <h3 class="donate-title"><i class="fa fa-heart"></i> 赞赏支持</h3>
+        <p class="donate-subtitle">个人自发投喂，不为项目收益</p>
+        <div class="donate-qr-wrap">
+            <img src="//img.crazying-dev.top/other/help.png" alt="赞赏码">
+        </div>
+        <p class="donate-tip">你的支持是我持续创作的动力 ❤️</p>
+    </div>
+</div>
+
+<script>
+function showDonateCard() {
+    var modal = document.getElementById('donate-modal');
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDonateCard() {
+    var modal = document.getElementById('donate-modal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        var modal = document.getElementById('donate-modal');
+        if (modal && modal.style.display === 'flex') {
+            closeDonateCard();
+        }
+    }
+});
+</script>
+
+<style>
+.footer-disclaimer {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.footer-donate-btn {
+    background: none;
+    border: 1px solid var(--color-text-tertiary);
+    color: var(--color-text-secondary);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font: inherit;
+}
+
+.footer-donate-btn:hover {
+    color: #e74c3c;
+    border-color: #e74c3c;
+}
+
+.donate-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.donate-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.donate-card {
+    position: relative;
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 28px 32px;
+    width: 90%;
+    max-width: 320px;
+    text-align: center;
+    animation: donateScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes donateScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.donate-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 22px;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.donate-close:hover {
+    color: var(--color-text-primary);
+}
+
+.donate-title {
+    margin: 0 0 6px 0;
+    font-size: 20px;
+    color: var(--color-text-primary);
+}
+
+.donate-title i {
+    color: #e74c3c;
+}
+
+.donate-subtitle {
+    margin: 0 0 20px 0;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.donate-qr-wrap {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto 16px auto;
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+    padding: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.donate-qr-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+.donate-tip {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+</style>
 <script src="//assets.crazying-dev.top/text/one/JS/AfterBody.js" defer></script>
 </body>
 </html>
