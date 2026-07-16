@@ -221,14 +221,17 @@ def init_tables():
 		conn.commit()
 
 
-def ensure_tables():
+def ensure_tables(force=False):
 	"""懒加载：仅在需要时创建表。
-    
-    首次调用时检查并创建表，之后直接返回。
-    如果表创建失败则打印错误。
-    """
+
+	首次调用时检查并创建表，之后直接返回。
+	如果表创建失败则打印错误。
+
+	Args:
+		force (bool): 为 True 时强制重新初始化（用于补齐缺失字段等情况）
+	"""
 	global _table_checked
-	if _table_checked:
+	if _table_checked and not force:
 		return
 	try:
 		init_tables()
@@ -275,8 +278,8 @@ def execute_query(query, params=None, fetch=False, fetch_all=False):
 				conn.commit()
 				result = cursor.rowcount
 			return result
-	except psycopg2.errors.UndefinedTable:
-		ensure_tables()
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn):
+		ensure_tables(force=True)
 		with get_conn() as (conn, cursor):
 			cursor.execute(query, params or ())
 			if fetch:
@@ -307,8 +310,8 @@ def execute_insert(query, params=None):
 			cursor.execute(query, params or ())
 			conn.commit()
 			return cursor.rowcount
-	except psycopg2.errors.UndefinedTable:
-		ensure_tables()
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn):
+		ensure_tables(force=True)
 		with get_conn() as (conn, cursor):
 			cursor.execute(query, params or ())
 			conn.commit()

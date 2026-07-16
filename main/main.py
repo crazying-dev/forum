@@ -115,6 +115,76 @@ CORS(app)
 base = 'PATH/base.html'
 
 
+# ── 性能优化：gzip 压缩 + ETag ────────────────────────────
+
+import gzip
+import hashlib as _hashlib
+from io import BytesIO as _BytesIO
+
+STATIC_ROUTES = {
+	'/', '/privacy', '/WIKI', '/WIKI/GuanFang', '/WIKI/Personal',
+	'/WIKI/Personal/mouse', '/WIKI/Personal/mouse/Liunx',
+	'/WIKI/Personal/Live2D', '/forum', '/huiguan'
+}
+
+
+@app.before_request
+def static_page_cache_check():
+	if request.method != 'GET':
+		return None
+	if current_user.is_authenticated:
+		return None
+	if request.path not in STATIC_ROUTES:
+		return None
+	cache_key = f'static:{request.path}'
+	cached_content = cache_api.get_static_page(cache_key)
+	if cached_content:
+		return cached_content
+	return None
+
+
+@app.after_request
+def performance_optimize(response):
+	# 静态页面缓存
+	if request.method == 'GET' and response.status_code == 200:
+		if not current_user.is_authenticated and request.path in STATIC_ROUTES:
+			content_type = response.content_type or ''
+			if 'text/html' in content_type:
+				content = response.get_data(as_text=True)
+				cache_key = f'static:{request.path}'
+				cache_api.set_static_page(cache_key, content, ttl=300)
+
+	# gzip 压缩文本类响应
+	accept_encoding = request.headers.get('Accept-Encoding', '')
+	if 'gzip' in accept_encoding and response.status_code < 500:
+		content_type = response.content_type or ''
+		if any(ct in content_type for ct in ('text/', 'application/json', 'application/javascript', 'image/svg+xml')):
+			resp_data = response.get_data()
+			if len(resp_data) > 500:
+				buf = _BytesIO()
+				with gzip.GzipFile(fileobj=buf, mode='wb', compresslevel=6) as f:
+					f.write(resp_data)
+				response.set_data(buf.getvalue())
+				response.headers['Content-Encoding'] = 'gzip'
+				response.headers['Content-Length'] = len(response.get_data())
+				response.headers['Vary'] = 'Accept-Encoding'
+
+	# 为 GET 请求的 HTML/JSON 响应添加 ETag
+	if request.method == 'GET' and response.status_code == 200:
+		content_type = response.content_type or ''
+		if any(ct in content_type for ct in ('text/html', 'application/json')):
+			resp_data = response.get_data()
+			if resp_data:
+				etag = _hashlib.md5(resp_data).hexdigest()[:16]
+				response.headers['ETag'] = f'"{etag}"'
+				if response.headers.get('ETag') == request.headers.get('If-None-Match'):
+					response.status_code = 304
+					response.set_data(b'')
+					response.headers['Content-Length'] = '0'
+
+	return response
+
+
 # ── Flask-Login 配置 ──────────────────────────────────────
 
 class UserWrapper(UserMixin):

@@ -12,7 +12,12 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "main/main.py"
+      "dest": "main/main.py",
+      "headers": {
+        "Cache-Control": "public, max-age=0, must-revalidate",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "SAMEORIGIN"
+      }
     }
   ]
 }
