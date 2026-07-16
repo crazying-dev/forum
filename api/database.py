@@ -204,20 +204,21 @@ def init_tables():
 		cursor.execute(config.CREATE_USER_FOLLOWS_TABLE_SQL)
 		cursor.execute(config.CREATE_VERIFY_TOKENS_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_REPORTS_TABLE_SQL)
-		try:
-			cursor.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)")
-		except:
-			pass
-		try:
-			cursor.execute("ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER")
-		except:
-			pass
-		try:
-			cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0")
-		except:
-			pass
+		for alter_sql in (
+			"ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)",
+			"ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER",
+			"ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER NOT NULL DEFAULT 0",
+		):
+			try:
+				cursor.execute(alter_sql)
+			except Exception as alter_err:
+				print(f"[DB] ALTER 失败（已忽略）: {alter_err}")
 		for sql in config.CREATE_INDEX_SQLS:
-			cursor.execute(sql)
+			try:
+				cursor.execute(sql)
+			except Exception as idx_err:
+				print(f"[DB] 索引创建失败（已忽略）: {idx_err}")
 		conn.commit()
 
 
@@ -240,6 +241,43 @@ def ensure_tables(force=False):
 		print(f"[DB] 初始化表失败: {e}")
 
 
+# 已知需要补齐的列：表名 -> [(列名, 类型定义), ...]
+_KNOWN_COLUMNS = {
+	'users': [
+		('email_verified', 'INTEGER NOT NULL DEFAULT 0'),
+		('is_banned', 'INTEGER NOT NULL DEFAULT 0'),
+	],
+	'comments': [
+		('parent_id', 'VARCHAR(64)'),
+	],
+	'World': [
+		('parent_id', 'INTEGER'),
+	],
+}
+
+
+def _patch_missing_column(table_name, column_name):
+	"""直接对指定表添加缺失列（带 IF NOT EXISTS）。"""
+	type_def = ''
+	for tbl, cols in _KNOWN_COLUMNS.items():
+		if tbl == table_name:
+			for col, td in cols:
+				if col == column_name:
+					type_def = td
+					break
+			break
+	if not type_def:
+		return False
+	try:
+		with get_conn() as (conn, cursor):
+			cursor.execute(f'ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {type_def}')
+			conn.commit()
+		return True
+	except Exception as e:
+		print(f"[DB] 补齐列 {table_name}.{column_name} 失败: {e}")
+		return False
+
+
 def _gen_id(prefix):
 	"""生成带前缀的唯一ID。
     
@@ -250,6 +288,29 @@ def _gen_id(prefix):
         str: 形如 'YJ1234567890' 的唯一ID
     """
 	return prefix + str(int(time.time() * 10000000000))
+
+
+def _handle_missing_schema(e):
+	"""处理表/列缺失错误：解析错误信息，直接补齐缺失的列。
+
+	Args:
+		e: psycopg2 异常对象（UndefinedTable 或 UndefinedColumn）
+	"""
+	ensure_tables(force=True)
+	# 如果是 UndefinedColumn，尝试从错误信息中提取列名并直接补齐
+	err_msg = str(e)
+	if 'does not exist' in err_msg and 'column' in err_msg:
+		# 错误格式: column "email_verified" does not exist
+		import re as _re
+		col_match = _re.search(r'column "(\w+)" does not exist', err_msg)
+		if col_match:
+			missing_col = col_match.group(1)
+			# 从 query 中推断表名（简单的启发式：查找 FROM/UPDATE/INTO 后的表名）
+			for tbl in _KNOWN_COLUMNS:
+				for col, _ in _KNOWN_COLUMNS[tbl]:
+					if col == missing_col:
+						_patch_missing_column(tbl, missing_col)
+						return
 
 
 def execute_query(query, params=None, fetch=False, fetch_all=False):
@@ -278,8 +339,8 @@ def execute_query(query, params=None, fetch=False, fetch_all=False):
 				conn.commit()
 				result = cursor.rowcount
 			return result
-	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn):
-		ensure_tables(force=True)
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
+		_handle_missing_schema(e)
 		with get_conn() as (conn, cursor):
 			cursor.execute(query, params or ())
 			if fetch:
@@ -310,8 +371,8 @@ def execute_insert(query, params=None):
 			cursor.execute(query, params or ())
 			conn.commit()
 			return cursor.rowcount
-	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn):
-		ensure_tables(force=True)
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
+		_handle_missing_schema(e)
 		with get_conn() as (conn, cursor):
 			cursor.execute(query, params or ())
 			conn.commit()
