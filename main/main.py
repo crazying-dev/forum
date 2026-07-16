@@ -166,8 +166,14 @@ class UserWrapper(UserMixin):
 	def get_id(self):
 		return str(self._user['id'])
 
+	def get(self, key, default=None):
+		return self._user.get(key, default)
+
 	def __getitem__(self, key):
 		return self._user[key]
+
+	def __contains__(self, key):
+		return key in self._user
 
 	def __getattr__(self, key):
 		if key.startswith('_'):
