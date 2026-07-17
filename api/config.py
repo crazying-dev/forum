@@ -1,5 +1,5 @@
 # 用户相关变量
-USER_ID_PREFIX = 'YJ'  # 用户ID前缀
+USER_ID_PREFIX = 'RL'  # 用户ID前缀
 vip = "1"  # 用户默认为VIP
 
 # 服务器相关全局变量
