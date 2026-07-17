@@ -45,7 +45,11 @@ from psycopg2 import pool
 from contextlib import contextmanager
 from api import config
 
-dotenv.load_dotenv()
+# 加载 .env 文件（Vercel 等生产环境无此文件时静默跳过，使用平台注入的环境变量）
+try:
+	dotenv.load_dotenv(override=False)
+except Exception:
+	pass
 DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('POSTGRES_URL') or os.getenv('POSTGRES_PRISMA_URL')
 
 if not DATABASE_URL:
