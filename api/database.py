@@ -54,7 +54,7 @@ if not DATABASE_URL:
 POST_ID_PREFIX = 'PS'
 _table_checked = False
 
-DANGEROUS_TAGS = {'script', 'style', 'iframe', 'embed', 'object', 'applet', 'base', 'form', 'input', 'textarea',
+DANGEROUS_TAGS = {'script', 'iframe', 'embed', 'object', 'applet', 'base', 'form', 'input', 'textarea',
                   'select', 'option', 'button'}
 
 
@@ -63,9 +63,9 @@ def safe_html(content):
 		return ''
 	content = content.replace('<script', '<p')
 	content = content.replace('</script>', '</p>')
-	content = re.sub(r'<(script|style|iframe|embed|object|applet|base|form|input|textarea|select|option|button)[^>]*>',
+	content = re.sub(r'<(script|iframe|embed|object|applet|base|form|input|textarea|select|option|button)[^>]*>',
 	                 '', content, flags=re.IGNORECASE)
-	content = re.sub(r'</(script|style|iframe|embed|object|applet|base|form|input|textarea|select|option|button)>', '',
+	content = re.sub(r'</(script|iframe|embed|object|applet|base|form|input|textarea|select|option|button)>', '',
 	                 content, flags=re.IGNORECASE)
 	content = re.sub(r'on\w+\s*=\s*["\'][^"\']*["\']', '', content, flags=re.IGNORECASE)
 	content = re.sub(r'on\w+\s*=\s*[^>\s]+', '', content, flags=re.IGNORECASE)

@@ -44,7 +44,7 @@
         <div class="form-group">
             <label class="form-label">帖子内容</label>
             <div class="form-html-warning">
-                <i class="fa fa-code"></i> 支持 HTML 富文本编辑（危险标签会被过滤）
+                <i class="fa fa-code"></i> 支持 HTML 富文本编辑，内容以 HTML 形式渲染
             </div>
             <div class="form-editor-toolbar" id="post-editor-toolbar">
                 <button class="editor-tool" onclick="insertFormat('b')" title="加粗"><i class="fa fa-bold"></i></button>
@@ -69,7 +69,7 @@
             <div class="form-editor-tips">
                 <span style="color:var(--color-text-tertiary);">可直接输入 HTML 代码</span>
                 <span style="color:var(--color-text-tertiary);margin:0 8px;">·</span>
-                <span style="color:var(--color-text-accent);">script/iframe 等危险标签会被自动过滤</span>
+                <span style="color:var(--color-text-accent);">JS 脚本不会执行，事件属性会被过滤</span>
             </div>
         </div>
 
