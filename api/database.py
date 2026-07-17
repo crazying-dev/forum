@@ -61,6 +61,8 @@ DANGEROUS_TAGS = {'script', 'iframe', 'embed', 'object', 'applet', 'base', 'form
 def safe_html(content):
 	if not content:
 		return ''
+	import html as html_module
+	content = html_module.unescape(content)
 	content = content.replace('<script', '<p')
 	content = content.replace('</script>', '</p>')
 	content = re.sub(r'<(script|iframe|embed|object|applet|base|form|input|textarea|select|option|button)[^>]*>',
