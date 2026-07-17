@@ -1,3 +1,5 @@
+import os
+
 # 用户相关变量
 USER_ID_PREFIX = 'RL'  # 用户ID前缀
 vip = "1"  # 用户默认为VIP
@@ -10,8 +12,8 @@ Image_father_URL = "https://img.crazying-dev.top/text/one"
 SMTP_ENABLED = True
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 587
-SMTP_USER = "ourpet001@163.com"
-SMTP_PASSWORD = "QMujS6PuyYxsd7qY"
+SMTP_USER = os.getenv('SMTP_USER', 'ourpet001@163.com')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', '')
 SMTP_FROM_NAME = "妖精论坛(二创)"
 
 # 数据库相关变量

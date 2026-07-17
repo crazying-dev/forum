@@ -55,22 +55,33 @@ POST_ID_PREFIX = 'PS'
 _table_checked = False
 
 DANGEROUS_TAGS = {'script', 'iframe', 'embed', 'object', 'applet', 'base', 'form', 'input', 'textarea',
-                  'select', 'option', 'button'}
+                  'select', 'option', 'button', 'link', 'meta', 'svg', 'math'}
 
 
 def safe_html(content):
+	"""对用户提交的 HTML 内容进行净化（黑名单 + 事件属性移除）。
+
+	注意：这是基础净化。更严格的场景应使用 bleach 等专用库。
+	"""
 	if not content:
 		return ''
 	import html as html_module
+	# 先反转义，确保实体编码的内容也能被检测到
 	content = html_module.unescape(content)
-	content = content.replace('<script', '<p')
-	content = content.replace('</script>', '</p>')
-	content = re.sub(r'<(script|iframe|embed|object|applet|base|form|input|textarea|select|option|button)[^>]*>',
+	# 移除 HTML 注释（可藏恶意代码）
+	content = re.sub(r'<!--[\s\S]*?-->', '', content)
+	# 移除危险标签（开标签和自闭合）
+	tag_pattern = '|'.join(sorted(DANGEROUS_TAGS))
+	content = re.sub(rf'<(?:{tag_pattern})\b[^>]*>', '', content, flags=re.IGNORECASE)
+	content = re.sub(rf'</(?:{tag_pattern})\s*>', '', content, flags=re.IGNORECASE)
+	# 移除所有事件处理属性 onXxx=...
+	content = re.sub(r'\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', '', content, flags=re.IGNORECASE)
+	# 移除 javascript: 伪协议
+	content = re.sub(r'(href|src|action|formaction)\s*=\s*("javascript:[^"]*"|\'javascript:[^\']*\'|javascript:[^\s>]+)',
 	                 '', content, flags=re.IGNORECASE)
-	content = re.sub(r'</(script|iframe|embed|object|applet|base|form|input|textarea|select|option|button)>', '',
-	                 content, flags=re.IGNORECASE)
-	content = re.sub(r'on\w+\s*=\s*["\'][^"\']*["\']', '', content, flags=re.IGNORECASE)
-	content = re.sub(r'on\w+\s*=\s*[^>\s]+', '', content, flags=re.IGNORECASE)
+	# 移除 data: 伪协议中的非图片类型（防 HTML 注入）
+	content = re.sub(r'(href|src|action)\s*=\s*("data:text/html[^"]*"|\'data:text/html[^\']*\')',
+	                 '', content, flags=re.IGNORECASE)
 	return content
 
 
@@ -430,7 +441,7 @@ def SendWorldMessage(sender_id, sender_name, content, parent_id=None):
 		INSERT INTO World (sender_id, sender_name, content, parent_id)
 		VALUES (%s, %s, %s, %s)
 		""",
-		(sender_id, sender_name, content, parent_id)
+		(sender_id, sender_name, safe_html(content), parent_id)
 	)
 	return {"success": True, "message": "发送成功"}
 
@@ -603,7 +614,8 @@ def create_verify_token(user_id, token_type, expires_minutes=30):
 		)
 		return {"success": True, "token": token}
 	except Exception as e:
-		return {"success": False, "error": str(e)}
+		print(f"[DB ERROR] create_verify_token: {e}")
+		return {"success": False, "error": "操作失败"}
 
 
 def get_verify_token(token, token_type):
@@ -703,7 +715,8 @@ def Send_Post(user_id, title, content, category='general'):
 		)
 		return {"success": True, "id": post_id}
 	except Exception as e:
-		return {"success": False, "error": str(e)}
+		print(f"[DB ERROR] Send_Post: {e}")
+		return {"success": False, "error": "发布失败"}
 
 
 def get_post(post_id):
@@ -1284,6 +1297,8 @@ def add_comment(post_id, user_id, content, parent_id=None):
     """
 	comment_id = _gen_id('CM')
 	try:
+		# 对评论内容进行 XSS 净化
+		content = safe_html(content)
 		execute_insert(
 			"INSERT INTO comments (id, post_id, user_id, content, parent_id) VALUES (%s, %s, %s, %s, %s)",
 			(comment_id, post_id, user_id, content, parent_id)
@@ -1304,7 +1319,8 @@ def add_comment(post_id, user_id, content, parent_id=None):
 			}
 		}
 	except Exception as e:
-		return {"success": False, "error": str(e)}
+		print(f"[DB ERROR] add_comment: {e}")
+		return {"success": False, "error": "评论失败"}
 
 
 def get_post_comments(post_id, page=1, page_size=50):

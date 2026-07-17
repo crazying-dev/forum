@@ -3,12 +3,14 @@ import json
 import os
 import re
 import io
+import time
 import hashlib
 import requests as http_requests
 from flask import *
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from markupsafe import escape as html_escape
 from api import database as db, config, cache as cache_api
 
 try:
@@ -75,6 +77,7 @@ def generate_verify_email_body(user_name, token, token_type):
 		description = "点击下方按钮重置密码"
 		button_text = "重置密码"
 
+	safe_user_name = str(html_escape(user_name))
 	return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -98,7 +101,7 @@ def generate_verify_email_body(user_name, token, token_type):
     <div class="container">
         <div class="card">
             <div class="logo">妖精论坛</div>
-            <div class="greeting">亲爱的 {user_name}，</div>
+            <div class="greeting">亲爱的 {safe_user_name}，</div>
             <div class="description">{description}。<br><br>如果这不是您本人操作，请忽略此邮件。</div>
             <a href="{verify_url}" class="button">{button_text}</a>
             <div class="token-info">链接有效期：30分钟<br>链接地址：<a href="{verify_url}" class="link">{verify_url}</a></div>
@@ -109,10 +112,99 @@ def generate_verify_email_body(user_name, token, token_type):
 </html>"""
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'fairy-forum-secret-key-change-in-production')
-CORS(app)
+
+# 安全配置：SECRET_KEY 必须由环境变量提供
+_secret = os.getenv('SECRET_KEY')
+if not _secret:
+	import secrets as _secrets
+	_secret = _secrets.token_hex(32)
+	print("[SECURITY WARNING] SECRET_KEY 未设置，已生成临时密钥。生产环境请配置 SECRET_KEY 环境变量。")
+app.secret_key = _secret
+
+# Session/Cookie 安全加固
+app.config.update(
+	SESSION_COOKIE_HTTPONLY=True,
+	SESSION_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
+	SESSION_COOKIE_SAMESITE='Lax',
+	PERMANENT_SESSION_LIFETIME=86400,
+	REMEMBER_COOKIE_HTTPONLY=True,
+	REMEMBER_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
+	REMEMBER_COOKIE_SAMESITE='Lax',
+)
+
+# CORS 限定已知域名
+_allowed_origins = os.getenv('CORS_ORIGINS', '').split(',')
+_allowed_origins = [o.strip() for o in _allowed_origins if o.strip()]
+CORS(app, origins=_allowed_origins or True)
 
 base = 'PATH/base.html'
+
+
+# ── CSRF 保护：校验 Origin/Referer ─────────────────────────
+
+_ALLOWED_ORIGINS_SET = set(_allowed_origins) if _allowed_origins else set()
+
+@app.before_request
+def csrf_protect():
+	"""对状态变更请求（POST/PUT/DELETE/PATCH）校验 Origin/Referer。"""
+	if request.method in ('GET', 'HEAD', 'OPTIONS'):
+		return
+	origin = request.headers.get('Origin') or ''
+	referer = request.headers.get('Referer') or ''
+	host = request.host_url.rstrip('/')
+
+	def _is_allowed(url):
+		if not url:
+			return False
+		# 同源请求
+		if url.startswith(host) or url.rstrip('/') == host:
+			return True
+		# 命中白名单
+		for ao in _ALLOWED_ORIGINS_SET:
+			if url.startswith(ao.rstrip('/')):
+				return True
+		return False
+
+	if _is_allowed(origin) or _is_allowed(referer):
+		return
+	# 无 Origin 和 Referer 的纯 API 客户端请求（如 curl）放行，但浏览器请求必须带其中之一
+	if not origin and not referer:
+		return
+	return jsonify({'success': False, 'message': '跨站请求已被拦截'}), 403
+
+
+# ── 速率限制（内存，按 IP 维度）───────────────────────────
+
+_rate_limit_store = {}
+
+def rate_limit(key, max_count, window_seconds):
+	"""简易速率限制装饰器。
+
+	Args:
+		key: 限流维度标识
+		max_count: 窗口内最大请求次数
+		window_seconds: 窗口时长（秒）
+	Returns:
+		403 响应或 None
+	"""
+	now = time.time()
+	client_ip = request.headers.get('x-forwarded-for', '').split(',')[0].strip() or request.remote_addr or 'unknown'
+	rk = f"{key}:{client_ip}"
+	bucket = _rate_limit_store.get(rk, [])
+	bucket = [t for t in bucket if t > now - window_seconds]
+	if len(bucket) >= max_count:
+		return True
+	bucket.append(now)
+	_rate_limit_store[rk] = bucket
+	# 清理过期条目，防止内存泄漏
+	if len(_rate_limit_store) > 10000:
+		cutoff = now - max(window_seconds, 3600)
+		_rate_limit_store.clear()
+		for k, v in list(_rate_limit_store.items()):
+			v_clean = [t for t in v if t > cutoff]
+			if v_clean:
+				_rate_limit_store[k] = v_clean
+	return False
 
 
 # ── 性能优化：gzip 压缩 + ETag ────────────────────────────
@@ -124,6 +216,16 @@ from io import BytesIO as _BytesIO
 
 @app.after_request
 def performance_optimize(response):
+	# ── 安全响应头 ──
+	response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+	response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+	response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+	response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()')
+	response.headers.setdefault('X-XSS-Protection', '1; mode=block')
+	# HSTS 仅在 HTTPS 下生效
+	if request.is_secure or request.headers.get('x-forwarded-proto') == 'https':
+		response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+
 	# gzip 压缩文本类响应
 	accept_encoding = request.headers.get('Accept-Encoding', '')
 	if 'gzip' in accept_encoding and response.status_code < 500:
@@ -338,7 +440,8 @@ def api_huiguan_list():
 			'list': data
 		})
 	except Exception as e:
-		return jsonify({'success': False, 'message': str(e)}), 500
+		print(f"[ERROR] /api/huiguan: {e}")
+		return jsonify({'success': False, 'message': '服务器内部错误'}), 500
 
 
 @app.route('/favicon.ico')
@@ -353,12 +456,15 @@ def EasterEgg():
 			data = random.choice(json.load(f))
 		return jsonify(data)
 	except Exception as e:
-		return jsonify({"error": str(e)}), 500
+		print(f"[ERROR] /Easter-Egg: {e}")
+		return jsonify({"error": "服务器内部错误"}), 500
 
 # ── 认证 API ──────────────────────────────────────────────
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
+	if rate_limit('register', 5, 300):
+		return jsonify({'success': False, 'message': '注册过于频繁，请5分钟后再试'}), 429
 	data = request.get_json() or {}
 	name = (data.get('name') or '').strip()
 	email = (data.get('email') or '').strip().lower()
@@ -369,8 +475,10 @@ def api_register():
 		return jsonify({'success': False, 'message': '用户名需要2-20个字符（不含彩蛋）'})
 	if not email or '@' not in email:
 		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
-	if len(password) < 6:
-		return jsonify({'success': False, 'message': '密码至少6位'})
+	if len(password) < 8:
+		return jsonify({'success': False, 'message': '密码至少8位'})
+	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
+		return jsonify({'success': False, 'message': '密码需包含字母和数字'})
 
 	hashed = generate_password_hash(password)
 	result = db.new_user(name, email, hashed)
@@ -387,6 +495,8 @@ def api_register():
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
+	if rate_limit('login', 10, 300):
+		return jsonify({'success': False, 'message': '登录尝试过于频繁，请5分钟后再试'}), 429
 	data = request.get_json() or {}
 	name_or_email = (data.get('name') or '').strip()
 	password = data.get('password') or ''
@@ -403,10 +513,10 @@ def api_login():
 		user = db.get_user_by_name(name_or_email)
 
 	if not user:
-		return jsonify({'success': False, 'message': '用户不存在'})
+		return jsonify({'success': False, 'message': '账号或密码错误'})
 
 	if not check_password_hash(user['password'], password):
-		return jsonify({'success': False, 'message': '密码错误'})
+		return jsonify({'success': False, 'message': '账号或密码错误'})
 
 	if user.get('is_banned') == 1:
 		return jsonify({'success': False, 'message': '该账号已被封禁'})
@@ -425,6 +535,8 @@ def api_logout():
 @app.route('/api/send-verify-email', methods=['POST'])
 @login_required
 def api_send_verify_email():
+	if rate_limit('verify_email', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
 	user = db.get_user_by_id(current_user['id'])
 	if not user:
 		return jsonify({'success': False, 'message': '用户不存在'})
@@ -441,7 +553,7 @@ def api_send_verify_email():
 	if sent:
 		return jsonify({'success': True, 'message': '验证邮件已发送，请查收邮箱'})
 	else:
-		return jsonify({'success': True, 'message': '验证链接已生成（邮件服务未启用）', 'token': token})
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
 @app.route('/api/verify-email', methods=['POST'])
@@ -464,6 +576,8 @@ def api_verify_email():
 
 @app.route('/api/send-reset-password', methods=['POST'])
 def api_send_reset_password():
+	if rate_limit('reset_pwd', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
 	data = request.get_json() or {}
 	email = (data.get('email') or '').strip().lower()
 
@@ -472,7 +586,8 @@ def api_send_reset_password():
 
 	user = db.get_user_by_email(email)
 	if not user:
-		return jsonify({'success': False, 'message': '该邮箱未注册'})
+		# 防止邮箱枚举：无论邮箱是否存在都返回相同信息
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
 
 	token_result = db.create_verify_token(user['id'], 'password_reset')
 	if not token_result.get('success'):
@@ -484,9 +599,9 @@ def api_send_reset_password():
 	
 	sent = send_email(email, subject, body)
 	if sent:
-		return jsonify({'success': True, 'message': '重置链接已发送，请查收邮箱'})
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
 	else:
-		return jsonify({'success': True, 'message': '重置链接已生成（邮件服务未启用）', 'token': token})
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
 @app.route('/api/reset-password', methods=['POST'])
@@ -497,8 +612,10 @@ def api_reset_password():
 
 	if not token:
 		return jsonify({'success': False, 'message': '重置链接无效'})
-	if len(password) < 6:
-		return jsonify({'success': False, 'message': '密码至少6位'})
+	if len(password) < 8:
+		return jsonify({'success': False, 'message': '密码至少8位'})
+	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
+		return jsonify({'success': False, 'message': '密码需包含字母和数字'})
 
 	token_info = db.get_verify_token(token, 'password_reset')
 	if not token_info:
@@ -653,7 +770,8 @@ def api_avatar_upload():
 			cache_api.invalidate_user_cache(current_user['id'])
 		return jsonify({'success': result, 'avatar': blob_url})
 	except Exception as e:
-		return jsonify({'success': False, 'message': f'处理失败: {str(e)}'}), 500
+		print(f"[ERROR] avatar upload: {e}")
+		return jsonify({'success': False, 'message': '头像上传失败'}), 500
 
 
 @app.route('/api/users/<user_id>/favorites')
@@ -759,6 +877,8 @@ def Api_World_all():
 @app.route('/api/World/Send', methods=['POST'])
 @login_required
 def Api_World_send():
+	if rate_limit('world_send', 5, 60):
+		return jsonify({'success': False, 'message': '发送过于频繁，请稍后再试'}), 429
 	content = (request.json or {}).get('content', '').strip()
 	parent_id = (request.json or {}).get('parent_id')
 	if not content:
@@ -845,6 +965,8 @@ def api_post_detail(post_id):
 @app.route('/api/posts/create', methods=['POST'])
 @login_required
 def api_post_create():
+	if rate_limit('post_create', 10, 60):
+		return jsonify({'success': False, 'message': '发帖过于频繁，请稍后再试'}), 429
 	data = request.get_json() or {}
 	title = data.get('title', '').strip()
 	content = data.get('content', '').strip()
@@ -903,6 +1025,8 @@ def api_post_delete(post_id):
 @app.route('/api/posts/<post_id>/comments/create', methods=['POST'])
 @login_required
 def api_comment_create(post_id):
+	if rate_limit('comment', 20, 60):
+		return jsonify({'success': False, 'message': '评论过于频繁，请稍后再试'}), 429
 	data = request.get_json() or {}
 	content = data.get('content', '').strip()
 	parent_id = data.get('parent_id')
@@ -1001,4 +1125,4 @@ def RSS():
 
 
 if __name__ == '__main__':
-	app.run(debug=True)
+	app.run(debug=os.getenv('FLASK_DEBUG', '0') == '1')
