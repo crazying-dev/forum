@@ -68,9 +68,12 @@
                 <span class="editor-sep"></span>
                 <button class="editor-tool" onclick="insertFormat('color')" title="颜色"><i class="fa fa-paint-brush"></i></button>
                 <button class="editor-tool" onclick="insertFormat('center')" title="居中"><i class="fa fa-align-center"></i></button>
+                <span class="editor-sep"></span>
+                <button class="editor-tool" id="editor-html-mode-btn" onclick="toggleHtmlSourceMode()" title="HTML源码模式"><i class="fa fa-code"></i></button>
             </div>
             <div class="form-editor-container">
                 <div class="form-editor" id="post-content-editor" contenteditable="true" placeholder="写下你的想法..."></div>
+                <textarea class="form-editor-source" id="post-content-source" placeholder="在此直接输入HTML代码..."></textarea>
                 <div class="form-preview" id="post-content-preview"></div>
             </div>
             <div class="form-editor-tips">
