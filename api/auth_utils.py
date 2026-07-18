@@ -105,5 +105,3 @@ def verify_auth_token(data, token):
     if token[:10] == expected:
         return True
     return False
-
-
