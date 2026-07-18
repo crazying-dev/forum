@@ -263,6 +263,7 @@ _KNOWN_COLUMNS = {
 	'users': [
 		('email_verified', 'INTEGER NOT NULL DEFAULT 0'),
 		('is_banned', 'INTEGER NOT NULL DEFAULT 0'),
+		('prefix', 'VARCHAR(32) DEFAULT \'\''),
 	],
 	'comments': [
 		('parent_id', 'VARCHAR(64)'),
@@ -1444,9 +1445,9 @@ def search_users(keyword, page=1, page_size=20):
 	offset = (page - 1) * page_size
 	results = execute_query(
 		"""
-        SELECT id, name, avatar, vip, prefix, status, created_at
+        SELECT id, name, avatar, vip, prefix, is_banned, created_at
         FROM users
-        WHERE status = 1 AND name ILIKE %s
+        WHERE is_banned = 0 AND name ILIKE %s
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
