@@ -147,5 +147,38 @@ def ping():
 	return flask.jsonify({'success': True, 'message': 'pong'})
 
 
+@app.route('/auth', methods=['POST'])
+def auth():
+	"""管理员鉴权接口。
+	
+	客户端发送管理员凭证，服务端验证是否有效。
+	请求体：
+	  - adminId / AdminID: 管理员ID
+	  - adminToken / AdminToken: 管理员凭证令牌
+	响应：
+	  - 成功: {"success": true, "data": {"message": "验证通过"}}
+	  - 失败: {"success": false, "message": "..."}
+	"""
+	data = flask.request.get_json() or {}
+
+	admin_id = data.get('adminId') or data.get('AdminID')
+	admin_token = data.get('adminToken') or data.get('AdminToken')
+
+	if not admin_id or not admin_token:
+		return _error("凭证验证失败")
+
+	# 检查管理员ID是否在白名单中
+	admin_tokens = _get_admin_tokens()
+	if str(admin_id) not in admin_tokens:
+		return _error("凭证验证失败")
+
+	# 验证凭证令牌
+	from api.auth_utils import verify_auth_token
+	if not verify_auth_token(str(admin_id), admin_token):
+		return _error("凭证验证失败")
+
+	return _ok({"message": "验证通过"})
+
+
 if __name__ == '__main__':
 	app.run(debug=True, port=5001)
