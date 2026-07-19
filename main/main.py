@@ -1123,5 +1123,10 @@ def RSS():
 	return ""
 
 
+@app.route('/QQ/redirect')
+def QQ_redirect():
+	return redirect("https://qm.qq.com/q/bLxr68HnUI")
+
+
 if __name__ == '__main__':
 	app.run(debug=os.getenv('FLASK_DEBUG', '0') == '1')
