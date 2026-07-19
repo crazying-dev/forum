@@ -1,4 +1,7 @@
 import os
+import dotenv
+
+dotenv.load_dotenv(override=False)
 
 # 用户相关变量
 USER_ID_PREFIX = 'RL'  # 用户ID前缀
@@ -10,10 +13,10 @@ Image_father_URL = "https://img.crazying-dev.top/text/one"
 
 # 邮件相关配置
 SMTP_ENABLED = True
-SMTP_HOST = "smtpdm.aliyun.com"
-SMTP_PORT = 465
-SMTP_USER = "maomi@email.yjlt.top"
-SMTP_PASSWORD = "LiMingGe120615"
+SMTP_HOST = os.getenv('SMTP_HOST', 'smtpdm.aliyun.com')
+SMTP_PORT = int(os.getenv('SMTP_PORT', '465'))
+SMTP_USER = os.getenv('SMTP_USER', 'maomi@email.yjlt.top')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', 'LiMingGe120615')
 SMTP_FROM_NAME = "妖精论坛(二创)"
 
 # 数据库相关变量
