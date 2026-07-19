@@ -45,8 +45,7 @@ def send_email(to_email, subject, body):
 		msg['From'] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USER}>"
 		msg['To'] = to_email
 
-		with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
-			server.starttls()
+		with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT) as server:
 			server.login(config.SMTP_USER, config.SMTP_PASSWORD)
 			server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
 		return True
