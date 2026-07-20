@@ -5,7 +5,7 @@ dotenv.load_dotenv(override=False)
 
 # 用户相关变量
 USER_ID_PREFIX = 'RL'  # 用户ID前缀
-vip = "1"  # 用户默认为VIP
+vip = "0"  # 用户默认为VIP
 
 # 服务器相关全局变量
 POOL_ENABLED = False  # Vercel数据库不需要连接池，所以为False;传统服务器需要连接池进行优化，当使用传统服务器时改为True
