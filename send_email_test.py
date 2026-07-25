@@ -12,10 +12,11 @@ SMTP_PASSWORD = "LiMingGe120615"
 
 SENDER = "maomi@email.yjlt.top"
 SENDER_NAME = "妖精论坛"
-RECEIVER = "1103060396@qq.com"
+RECEIVER = ""
+post_ID = "PS17847825537000173568"
 
 
-def send_email(content: str, subject: str = "测试邮件", receiver_list: list = None) -> bool:
+def send_email(subject: str, content: str, receiver_list: list = None) -> bool:
     if receiver_list is None:
         receiver_list = [RECEIVER]
     try:
@@ -57,4 +58,4 @@ def send_email(content: str, subject: str = "测试邮件", receiver_list: list 
 
 
 if __name__ == "__main__":
-    send_email("这是妖精论坛系统测试消息", "妖精论坛测试邮件")
+    send_email("论坛帖子违规警告", f"您的ID为 {post_ID} 的帖子包含违规行为，先将帖子下架并给予警告，平台将重点追踪后续行为    ───妖精论坛二创平台")

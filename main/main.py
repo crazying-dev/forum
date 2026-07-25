@@ -5,13 +5,18 @@ import re
 import io
 import time
 import hashlib
+import uuid
+
 import requests as http_requests
 from flask import *
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from markupsafe import escape as html_escape
 from api import database as db, config, cache as cache_api
+import gzip
+import hashlib as _hashlib
+from io import BytesIO as _BytesIO
 
 try:
 	from PIL import Image
@@ -207,12 +212,6 @@ def rate_limit(key, max_count, window_seconds):
 
 
 # ── 性能优化：gzip 压缩 + ETag ────────────────────────────
-
-import gzip
-import hashlib as _hashlib
-from io import BytesIO as _BytesIO
-
-
 @app.after_request
 def performance_optimize(response):
 	# ── 安全响应头 ──
@@ -1126,6 +1125,19 @@ def RSS():
 @app.route('/QQ/redirect')
 def QQ_redirect():
 	return redirect("https://qm.qq.com/q/bLxr68HnUI")
+
+
+# ─────── 蓝溪拾遗用户头像返回API ───────
+subdomain_rule = re.compile(r"^https://[\w\-]+\.navifox\.net$")
+
+@app.route('/api/users/avatar/navifox/', methods=['GET'])
+@cross_origin(origins="")
+def navifox_avatar():return ""
+
+# ─────── 众生之门API ───────
+@app.route("/TheDoorOfBings/UUID4/")
+def TheDoorOfBings_UUID():
+	return uuid.uuid4()
 
 
 if __name__ == '__main__':
