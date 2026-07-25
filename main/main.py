@@ -1137,7 +1137,7 @@ def navifox_avatar():return ""
 # ─────── 众生之门API ───────
 @app.route("/TheDoorOfBings/UUID4/")
 def TheDoorOfBings_UUID():
-	return uuid.uuid4()
+	return str(uuid.uuid4())
 
 
 if __name__ == '__main__':
