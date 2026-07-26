@@ -241,7 +241,8 @@ function handleRegister() {
         return;
     }
     if (!code || code.length !== 6) {
-        document.getElementById('registerError').textContent = '请输入6位数字验证码';
+        document.getElementById('registerError').textContent = '请输入6位数字验证码（前端校验失败）';
+        document.getElementById('registerError').setAttribute('data-source', 'frontend');
         return;
     }
 

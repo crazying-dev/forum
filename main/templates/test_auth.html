@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="妖精论坛 - 罗小黑战记社区">
+    <meta name="theme-color" content="#6A8C89">
+    <title>妖精论坛 - 登录/注册</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="stylesheet" href="https://assets.crazying-dev.top/text/one/CSS/main.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <style>
+        /* auth.html 内联样式 */
+        .auth-code-group { display: flex; gap: 8px; }
+        .auth-code-group input { flex: 1; min-width: 0; width: auto; }
+        .code-btn {
+            flex-shrink: 0; width: auto; height: 48px; padding: 0 14px; border: none;
+            border-radius: 12px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+            transition: all 0.3s ease;
+        }
+        .code-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--color-primary); opacity: 0.9; }
+        .code-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        @media (max-width: 480px) { .code-btn { height: 44px; font-size: 13px; padding: 0 10px; } }
+    </style>
+</head>
+<body id="body">
+
+<header id="header">
+    <a class="header-left" href="/">
+        <img src="https://img.crazying-dev.top/text/one/favicon.png" alt="logo" id="logo">
+        <h1>妖精论坛</h1>
+    </a>
+    <div class="header-center">
+        <div id='search'>
+            <label for="search_input">
+                <input id="search_input" placeholder="搜索帖子、用户...">
+            </label>
+            <button id="search_button">
+                <img alt="search_Button_ICON" src="https://img.crazying-dev.top/crazying-dev.top/search.svg" id="search_Button_ICON">
+            </button>
+        </div>
+    </div>
+    <div class="header-right">
+        <ul>
+            <li class="header-collapsible">
+                <button class="header-btn" id="Easter-Egg" onclick="Easter_Egg()">
+                    <i class="fa fa-gift"></i>
+                    <span>彩蛋</span>
+                </button>
+            </li>
+            <li class="header-collapsible header-setting">
+                <button class="header-btn" id="settingBtn">
+                    <i class="fa fa-cog"></i>
+                    <span>设置</span>
+                </button>
+                <div class="setting-dropdown" id="settingDropdown">
+                    <ul class="setting-dropdown-menu">
+                        <li class="setting-dropdown-title">主题</li>
+                        <li class="setting-dropdown-item" data-value="day">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">亮色</span>
+                        </li>
+                        <li class="setting-dropdown-item" data-value="night">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">暗色</span>
+                        </li>
+                        <li class="setting-dropdown-item active" data-value="default">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">默认</span>
+                        </li>
+                        <li class="setting-dropdown-divider"></li>
+                        <li class="setting-dropdown-item" id="logoutBtn" onclick="handleLogout()">
+                            <span class="setting-item-icon"><i class="fa fa-sign-out"></i></span>
+                            <span class="setting-item-text">退出登录</span>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            <li class="header-collapsible">
+                <a class="header-btn" id="LuoXiaoHeiWIKI" href="/WIKI">
+                    <img src="https://av.huijiwiki.com/site_avatar_luoxiaohei_l.png?1781282427" alt="" id="WIKIForIcon">
+                    <span>WIKI</span>
+                </a>
+            </li>
+            <li class="header-collapsible">
+                <a class="header-btn" id="HuiguanBtn" href="/huiguan">
+                    <i class="fa fa-home"></i>
+                    <span>会馆</span>
+                </a>
+            </li>
+            <li class="header-collapsible">
+                <a class="header-btn" id="RikanBtn" href="//gaz.yjlt.top/" target="_blank" rel="noopener">
+                    <i class="fa fa-newspaper-o"></i>
+                    <span>刊物</span>
+                </a>
+            </li>
+            <li class="header-collapsible">
+                <button class="header-btn" id="DonateBtn" onclick="showDonateCard()">
+                    <i class="fa fa-heart"></i>
+                    <span>赞赏</span>
+                </button>
+            </li>
+            <li class="header-menu-toggle" id="headerMenuToggle">
+                <button class="header-btn" type="button">
+                    <i class="fa fa-bars"></i>
+                </button>
+            </li>
+            <li>
+                <a id="UserInfo" href="#">
+                    <div class="user-avatar" id="user-avatar">
+                        <i class="fa fa-user"></i>
+                    </div>
+                    <div id="user-name" class="Username">登录</div>
+                </a>
+            </li>
+        </ul>
+        <div class="header-mobile-menu" id="headerMobileMenu">
+            <a class="mobile-menu-item" href="/WIKI">
+                <i class="fa fa-book"></i> WIKI
+            </a>
+            <a class="mobile-menu-item" href="/huiguan">
+                <i class="fa fa-home"></i> 会馆
+            </a>
+            <a class="mobile-menu-item" href="https://yaonews.unknownmp.top/" target="_blank" rel="noopener">
+                <i class="fa fa-newspaper-o"></i> 日刊
+            </a>
+            <button class="mobile-menu-item" onclick="showDonateCard()">
+                <i class="fa fa-heart"></i> 赞赏
+            </button>
+            <button class="mobile-menu-item" onclick="Easter_Egg()">
+                <i class="fa fa-gift"></i> 彩蛋
+            </button>
+            <div class="mobile-menu-divider"></div>
+            <div class="mobile-menu-title">主题</div>
+            <button class="mobile-menu-item mobile-theme-btn" data-value="day">
+                <i class="fa fa-sun-o"></i> 亮色
+            </button>
+            <button class="mobile-menu-item mobile-theme-btn" data-value="night">
+                <i class="fa fa-moon-o"></i> 暗色
+            </button>
+            <button class="mobile-menu-item mobile-theme-btn" data-value="default">
+                <i class="fa fa-desktop"></i> 默认
+            </button>
+            <div class="mobile-menu-divider"></div>
+            <button class="mobile-menu-item" onclick="handleLogout()">
+                <i class="fa fa-sign-out"></i> 退出登录
+            </button>
+        </div>
+    </div>
+</header>
+
+<div id="ui">
+    <!-- ====== auth.html 内容开始 ====== -->
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">登录</button>
+                <button class="auth-tab" data-tab="register">注册</button>
+            </div>
+
+            <div class="auth-form" id="loginForm">
+                <div class="auth-header">
+                    <h2>欢迎回来</h2>
+                    <p>登录您的妖精论坛账号</p>
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-user"></i></span>
+                    <input type="text" id="loginName" placeholder="用户名或邮箱">
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                    <input type="password" id="loginPassword" placeholder="密码">
+                </div>
+                <div class="auth-options">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberMe" checked>
+                        <span>记住我</span>
+                    </label>
+                    <a href="#" class="forgot-password" onclick="showForgotPassword()">忘记密码？</a>
+                </div>
+                <button class="auth-btn primary" onclick="handleLogin()">登录</button>
+                <div class="auth-error" id="loginError"></div>
+            </div>
+
+            <div class="auth-form" id="registerForm" style="display:none;">
+                <div class="auth-header">
+                    <h2>加入我们</h2>
+                    <p>创建您的妖精论坛账号</p>
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-user"></i></span>
+                    <input type="text" id="regName" placeholder="用户名（2-20个字符）">
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-envelope"></i></span>
+                    <input type="email" id="regEmail" placeholder="邮箱">
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                    <input type="password" id="regPassword" placeholder="密码（至少8位，含字母和数字）">
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                    <input type="password" id="regConfirmPassword" placeholder="确认密码">
+                </div>
+                <div class="auth-input-group auth-code-group">
+                    <span class="auth-icon"><i class="fa fa-shield"></i></span>
+                    <input type="text" id="regCode" placeholder="验证码（6位数字）" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+                    <button class="auth-btn code-btn" id="sendCodeBtn" onclick="handleSendRegisterCode()">获取验证码</button>
+                </div>
+                <button class="auth-btn primary" onclick="handleRegister()">注册</button>
+                <div class="auth-error" id="registerError"></div>
+            </div>
+
+            <div class="auth-form" id="forgotPasswordForm" style="display:none;">
+                <div class="auth-header">
+                    <h2>忘记密码</h2>
+                    <p>输入您的注册邮箱，我们将发送重置链接</p>
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-envelope"></i></span>
+                    <input type="email" id="forgotEmail" placeholder="注册邮箱">
+                </div>
+                <button class="auth-btn primary" onclick="handleForgotPassword()">发送重置链接</button>
+                <div class="auth-error" id="forgotPasswordError"></div>
+                <button class="auth-btn secondary" onclick="showLogin()">返回登录</button>
+            </div>
+
+            <div class="auth-form" id="resetPasswordForm" style="display:none;">
+                <div class="auth-header">
+                    <h2>重置密码</h2>
+                    <p>设置新密码</p>
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-envelope"></i></span>
+                    <input type="password" id="resetPassword" placeholder="新密码（至少8位，含字母和数字）">
+                </div>
+                <div class="auth-input-group">
+                    <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                    <input type="password" id="resetConfirmPassword" placeholder="确认新密码">
+                </div>
+                <button class="auth-btn primary" onclick="handleResetPassword()">重置密码</button>
+                <div class="auth-error" id="resetPasswordError"></div>
+                <button class="auth-btn secondary" onclick="showLogin()">返回登录</button>
+            </div>
+
+            <div class="auth-footer">
+                <p>登录即表示您同意<a href="/privacy">隐私政策</a>和服务条款</p>
+            </div>
+        </div>
+    </div>
+    <!-- ====== auth.html 内容结束 ====== -->
+</div>
+
+<div id="footer-spacer"></div>
+
+<div id="WindowsCardWithCenterSreen">
+    <button class="windows-card-close" onclick="ShowOrhidenWindowsCardWithCenterSreen(0)">&times;</button>
+    <div id="WindowsCardWithCenterSreenText" class="windows-card"></div>
+</div>
+
+<footer id="footer">
+    <a href="/privacy" id="FooterPrivacy">隐私</a><br><br>
+    联系方式<br>
+    邮箱：3890320020@qq.com<br>
+    <a href="https://github.com/crazying-dev">Github（大号）：crazying-dev</a><br>
+    小红书：<a href="https://xhslink.com/m/7yCXhVvmCaJ">卡里</a><br>
+    公众号：
+    <span class="qr-hover-wrap">
+        <span id="Footer公众号">悬停扫码</span>
+        <img class="qr-img" src="//img.crazying-dev.top/crazying-dev.top/OfficialAccount.jpg" alt="公众号二维码">
+    </span><br><br>
+    <span class="footer-disclaimer"><i class="fa fa-info-circle"></i> 本二创无官方授权，仅粉丝公益创作</span><br><br>
+</footer>
+
+<script>
+var _resetToken = '';
+
+function showLogin() {
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('loginForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+    document.querySelector('[data-tab="login"]').classList.add('active');
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('registerError').textContent = '';
+    document.getElementById('forgotPasswordError').textContent = '';
+    document.getElementById('resetPasswordError').textContent = '';
+}
+
+function showForgotPassword() {
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('forgotPasswordForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+}
+
+function showResetPassword(token) {
+    _resetToken = token;
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('resetPasswordForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+}
+
+function handleLogin() {
+    var name = document.getElementById('loginName').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    var remember = document.getElementById('rememberMe').checked;
+    if (!name || !password) {
+        document.getElementById('loginError').textContent = '请输入账号和密码';
+        return;
+    }
+    fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, password: password, remember: remember })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) { window.location.href = '/'; }
+        else { document.getElementById('loginError').textContent = data.message || '登录失败'; }
+    })
+    .catch(function(err) { document.getElementById('loginError').textContent = '网络错误'; });
+}
+
+function handleSendRegisterCode() {
+    var email = document.getElementById('regEmail').value.trim();
+    var btn = document.getElementById('sendCodeBtn');
+    if (!email || email.indexOf('@') === -1) {
+        document.getElementById('registerError').textContent = '请先输入有效的邮箱';
+        return;
+    }
+    btn.disabled = true;
+    btn.textContent = '发送中...';
+    document.getElementById('registerError').textContent = '';
+    fetch('/api/send-register-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('registerError').textContent = '';
+            var countdown = 60;
+            btn.textContent = countdown + 's';
+            var timer = setInterval(function() {
+                countdown--;
+                btn.textContent = countdown + 's';
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    btn.textContent = '重新获取';
+                    btn.disabled = false;
+                }
+            }, 1000);
+        } else {
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+            document.getElementById('registerError').textContent = data.message || '发送失败';
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+        document.getElementById('registerError').textContent = '网络错误';
+    });
+}
+
+function handleRegister() {
+    var name = document.getElementById('regName').value.trim();
+    var email = document.getElementById('regEmail').value.trim();
+    var password = document.getElementById('regPassword').value;
+    var confirmPassword = document.getElementById('regConfirmPassword').value;
+    var rawCode = document.getElementById('regCode').value;
+    var code = rawCode.trim().replace(/\D/g, '');
+    console.log('[DEBUG] 原始输入:', JSON.stringify(rawCode), '处理后:', JSON.stringify(code), '长度:', code.length);
+
+    if (!name || !email || !password || !confirmPassword) {
+        document.getElementById('registerError').textContent = '请填写所有字段';
+        return;
+    }
+    if (password !== confirmPassword) {
+        document.getElementById('registerError').textContent = '两次密码不一致';
+        return;
+    }
+    if (!code || code.length !== 6) {
+        document.getElementById('registerError').textContent = '请输入6位数字验证码（前端校验失败）';
+        document.getElementById('registerError').setAttribute('data-source', 'frontend');
+        return;
+    }
+
+    fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, email: email, password: password, code: code })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) { window.location.href = '/'; }
+        else { document.getElementById('registerError').textContent = data.message || '注册失败'; }
+    })
+    .catch(function(err) { document.getElementById('registerError').textContent = '网络错误'; });
+}
+
+function handleForgotPassword() {
+    var email = document.getElementById('forgotEmail').value.trim();
+    if (!email) {
+        document.getElementById('forgotPasswordError').textContent = '请输入邮箱';
+        return;
+    }
+    fetch('/api/send-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('forgotPasswordError').textContent = '';
+            alert(data.message);
+            if (data.token) { showResetPassword(data.token); }
+            else { showLogin(); }
+        } else {
+            document.getElementById('forgotPasswordError').textContent = data.message || '操作失败';
+        }
+    })
+    .catch(function(err) { document.getElementById('forgotPasswordError').textContent = '网络错误'; });
+}
+
+function handleResetPassword() {
+    var password = document.getElementById('resetPassword').value;
+    var confirmPassword = document.getElementById('resetConfirmPassword').value;
+    if (!password || !confirmPassword) {
+        document.getElementById('resetPasswordError').textContent = '请填写所有字段';
+        return;
+    }
+    if (password !== confirmPassword) {
+        document.getElementById('resetPasswordError').textContent = '两次密码不一致';
+        return;
+    }
+    fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: _resetToken, password: password })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) { alert('密码重置成功，请重新登录'); showLogin(); }
+        else { document.getElementById('resetPasswordError').textContent = data.message || '操作失败'; }
+    })
+    .catch(function(err) { document.getElementById('resetPasswordError').textContent = '网络错误'; });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var targetTab = this.dataset.tab;
+            document.querySelectorAll('.auth-tab').forEach(function(t) { t.classList.remove('active'); });
+            this.classList.add('active');
+            document.querySelectorAll('.auth-form').forEach(function(form) { form.style.display = 'none'; });
+            if (targetTab === 'login') {
+                document.getElementById('loginForm').style.display = 'block';
+            } else if (targetTab === 'register') {
+                document.getElementById('registerForm').style.display = 'block';
+            }
+        });
+    });
+    var urlParams = new URLSearchParams(window.location.search);
+    var token = urlParams.get('token');
+    var mode = urlParams.get('mode');
+    if (token && mode === 'reset') { showResetPassword(token); }
+});
+</script>
+</body>
+</html>
