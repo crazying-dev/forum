@@ -1,0 +1,70 @@
+<div class="verify-container">
+    <div class="verify-card failed">
+        <div class="verify-icon">
+            <i class="fa fa-times-circle"></i>
+        </div>
+        <h2>验证失败</h2>
+        <p>验证链接已过期或无效，请重新操作。</p>
+        <button class="verify-btn" onclick="window.location.href='/login'">返回登录</button>
+    </div>
+</div>
+
+<style>
+.verify-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.verify-card {
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+.verify-card.success .verify-icon {
+    color: #10b981;
+}
+
+.verify-card.failed .verify-icon {
+    color: #ef4444;
+}
+
+.verify-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.verify-card h2 {
+    font-size: 24px;
+    margin: 0 0 8px 0;
+    color: var(--color-text-primary);
+}
+
+.verify-card p {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0 0 24px 0;
+}
+
+.verify-btn {
+    padding: 10px 24px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    font: inherit;
+    transition: opacity 0.2s ease;
+}
+
+.verify-btn:hover {
+    opacity: 0.9;
+}
+</style>

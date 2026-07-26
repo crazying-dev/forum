@@ -1,0 +1,83 @@
+<div class="verify-container">
+    <div class="verify-card success">
+        <div class="verify-icon">
+            <i class="fa fa-check-circle"></i>
+        </div>
+        <h2>验证成功</h2>
+        <p>您的邮箱已成功验证，感谢您的使用！</p>
+        <button class="verify-btn" onclick="window.location.href='/users/' + getUserId()">返回个人主页</button>
+    </div>
+</div>
+
+<script>
+function getUserId() {
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+        var cookie = cookies[i].trim();
+        if (cookie.indexOf('user_id=') === 0) {
+            return cookie.substring('user_id='.length);
+        }
+    }
+    return '';
+}
+</script>
+
+<style>
+.verify-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.verify-card {
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+.verify-card.success .verify-icon {
+    color: #10b981;
+}
+
+.verify-card.failed .verify-icon {
+    color: #ef4444;
+}
+
+.verify-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.verify-card h2 {
+    font-size: 24px;
+    margin: 0 0 8px 0;
+    color: var(--color-text-primary);
+}
+
+.verify-card p {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0 0 24px 0;
+}
+
+.verify-btn {
+    padding: 10px 24px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    font: inherit;
+    transition: opacity 0.2s ease;
+}
+
+.verify-btn:hover {
+    opacity: 0.9;
+}
+</style>

@@ -8,6 +8,23 @@
     </div>
 
     <div class="post-create-form">
+        <div class="post-compliance-notice">
+            <div class="post-compliance-header">
+                <i class="fa fa-shield"></i>
+                <span>发帖须知</span>
+            </div>
+            <ul class="post-compliance-list">
+                <li>遵守中华人民共和国相关法律法规，不得发布违法违规内容</li>
+                <li>禁止涉及政治敏感、涉黄涉暴、血腥恐怖、毒品赌博等内容</li>
+                <li>禁止人身攻击、谩骂侮辱、恶意引战、网络暴力等行为</li>
+                <li>禁止发布广告、 spam、外链刷量、引流等垃圾信息</li>
+                <li>禁止泄露他人或自己的隐私信息（真实姓名、电话、地址等）</li>
+                <li>禁止侵犯他人知识产权，转载请注明出处或获得授权</li>
+                <li>内容应与论坛主题（罗小黑战记及二次元文化）相关，鼓励友善交流</li>
+                <li>违反以上规定的帖子将被删除，情节严重者将封禁账号</li>
+            </ul>
+        </div>
+
         <div class="form-group">
             <label class="form-label">帖子分类</label>
             <div class="form-category-select" id="form-category-select">
@@ -27,19 +44,21 @@
         <div class="form-group">
             <label class="form-label">帖子内容</label>
             <div class="form-html-warning">
-                <i class="fa fa-markdown"></i> 支持 Markdown 语法编辑
+                <i class="fa fa-code"></i> 支持 HTML 富文本编辑，内容以 HTML 形式渲染
+            </div>
+            <div class="form-editor-tabs">
+                <button class="editor-tab active" id="tab-edit" onclick="switchPostEditorTab('edit')">编辑</button>
+                <button class="editor-tab" id="tab-preview" onclick="switchPostEditorTab('preview')">预览</button>
             </div>
             <div class="form-editor-toolbar" id="post-editor-toolbar">
                 <button class="editor-tool" onclick="insertFormat('b')" title="加粗"><i class="fa fa-bold"></i></button>
                 <button class="editor-tool" onclick="insertFormat('i')" title="斜体"><i class="fa fa-italic"></i></button>
+                <button class="editor-tool" onclick="insertFormat('u')" title="下划线"><i class="fa fa-underline"></i></button>
                 <button class="editor-tool" onclick="insertFormat('s')" title="删除线"><i class="fa fa-strikethrough"></i></button>
                 <span class="editor-sep"></span>
                 <button class="editor-tool" onclick="insertFormat('h2')" title="标题"><i class="fa fa-header"></i></button>
-                <button class="editor-tool" onclick="insertFormat('h3')" title="副标题"><i class="fa fa-subscript"></i></button>
                 <button class="editor-tool" onclick="insertFormat('quote')" title="引用"><i class="fa fa-quote-left"></i></button>
-                <span class="editor-sep"></span>
                 <button class="editor-tool" onclick="insertFormat('code')" title="代码"><i class="fa fa-code"></i></button>
-                <button class="editor-tool" onclick="insertFormat('codeblock')" title="代码块"><i class="fa fa-terminal"></i></button>
                 <span class="editor-sep"></span>
                 <button class="editor-tool" onclick="insertFormat('ul')" title="无序列表"><i class="fa fa-list-ul"></i></button>
                 <button class="editor-tool" onclick="insertFormat('ol')" title="有序列表"><i class="fa fa-list-ol"></i></button>
@@ -47,16 +66,20 @@
                 <button class="editor-tool" onclick="insertFormat('link')" title="链接"><i class="fa fa-link"></i></button>
                 <button class="editor-tool" onclick="insertFormat('image')" title="图片"><i class="fa fa-image"></i></button>
                 <span class="editor-sep"></span>
-                <button class="editor-tool" onclick="insertFormat('hr')" title="分割线"><i class="fa fa-minus"></i></button>
+                <button class="editor-tool" onclick="insertFormat('color')" title="颜色"><i class="fa fa-paint-brush"></i></button>
+                <button class="editor-tool" onclick="insertFormat('center')" title="居中"><i class="fa fa-align-center"></i></button>
+                <span class="editor-sep"></span>
+                <button class="editor-tool" id="editor-html-mode-btn" onclick="toggleHtmlSourceMode()" title="HTML源码模式"><i class="fa fa-code"></i></button>
             </div>
             <div class="form-editor-container">
-                <textarea class="form-editor" id="post-content-editor" placeholder="写下你的想法...（支持 Markdown 语法）"></textarea>
+                <div class="form-editor" id="post-content-editor" contenteditable="true" placeholder="写下你的想法..."></div>
+                <textarea class="form-editor-source" id="post-content-source" placeholder="在此直接输入HTML代码..."></textarea>
                 <div class="form-preview" id="post-content-preview"></div>
             </div>
             <div class="form-editor-tips">
-                <span style="color:var(--color-text-tertiary);">支持 <strong>加粗</strong> <em>斜体</em> <code>代码</code> 链接 图片 等 Markdown 语法</span>
+                <span style="color:var(--color-text-tertiary);">可直接输入 HTML 代码</span>
                 <span style="color:var(--color-text-tertiary);margin:0 8px;">·</span>
-                <span style="color:var(--color-text-accent);">所有内容经安全过滤，JS 无法执行</span>
+                <span style="color:var(--color-text-accent);">JS 脚本不会执行，事件属性会被过滤</span>
             </div>
         </div>
 

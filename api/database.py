@@ -45,7 +45,11 @@ from psycopg2 import pool
 from contextlib import contextmanager
 from api import config
 
-dotenv.load_dotenv()
+# 加载 .env 文件（Vercel 等生产环境无此文件时静默跳过，使用平台注入的环境变量）
+try:
+	dotenv.load_dotenv(override=False)
+except Exception:
+	pass
 DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('POSTGRES_URL') or os.getenv('POSTGRES_PRISMA_URL')
 
 if not DATABASE_URL:
@@ -54,67 +58,35 @@ if not DATABASE_URL:
 POST_ID_PREFIX = 'PS'
 _table_checked = False
 
-# 白名单：仅允许这些安全标签
-ALLOWED_TAGS = [
-    'p', 'br', 'hr',
-    'strong', 'em', 'u', 'del', 'ins', 'sub', 'sup',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'blockquote', 'code', 'pre',
-    'ul', 'ol', 'li',
-    'a', 'img',
-    'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption',
-    'span', 'div',
-    'dl', 'dt', 'dd',
-    'abbr', 'cite',
-]
-
-# 白名单：仅允许这些属性
-ALLOWED_ATTRS = {
-    '*': ['class', 'id', 'title', 'lang', 'dir', 'style'],
-    'a': ['href', 'target', 'rel', 'name'],
-    'img': ['src', 'alt', 'width', 'height', 'loading', 'style'],
-    'td': ['colspan', 'rowspan', 'align', 'valign'],
-    'th': ['colspan', 'rowspan', 'align', 'valign'],
-    'table': ['border', 'cellpadding', 'cellspacing'],
-    'ol': ['start', 'reversed'],
-    'abbr': ['title'],
-}
-
-# 允许的 URL 协议
-ALLOWED_PROTOCOLS = ['http:', 'https:', 'ftp:', 'mailto:']
-
-# 允许的 CSS 属性白名单
-ALLOWED_CSS_PROPERTIES = [
-    'color', 'background-color', 'background',
-    'font-size', 'font-weight', 'font-style', 'font-family',
-    'text-align', 'text-decoration', 'line-height',
-    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-    'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
-    'border-color', 'border-style', 'border-width', 'border-radius',
-    'width', 'max-width', 'min-width', 'height', 'max-height', 'min-height',
-    'display', 'overflow',
-]
+DANGEROUS_TAGS = {'script', 'iframe', 'embed', 'object', 'applet', 'base', 'form', 'input', 'textarea',
+                  'select', 'option', 'button', 'link', 'meta', 'svg', 'math'}
 
 
 def safe_html(content):
-	"""对用户提交的 HTML 内容进行净化（白名单 + bleach）。
+	"""对用户提交的 HTML 内容进行净化（黑名单 + 事件属性移除）。
 
-	使用 bleach 库进行白名单过滤，仅保留安全的标签、属性和 URL 协议。
+	注意：这是基础净化。更严格的场景应使用 bleach 等专用库。
 	"""
 	if not content:
 		return ''
-	import bleach
-	from bleach.css_sanitizer import CSSSanitizer
-	css_sanitizer = CSSSanitizer(allowed_css_properties=ALLOWED_CSS_PROPERTIES)
-	return bleach.clean(
-		content,
-		tags=ALLOWED_TAGS,
-		attributes=ALLOWED_ATTRS,
-		protocols=ALLOWED_PROTOCOLS,
-		css_sanitizer=css_sanitizer,
-		strip=True,
-	)
+	import html as html_module
+	# 先反转义，确保实体编码的内容也能被检测到
+	content = html_module.unescape(content)
+	# 移除 HTML 注释（可藏恶意代码）
+	content = re.sub(r'<!--[\s\S]*?-->', '', content)
+	# 移除危险标签（开标签和自闭合）
+	tag_pattern = '|'.join(sorted(DANGEROUS_TAGS))
+	content = re.sub(rf'<(?:{tag_pattern})\b[^>]*>', '', content, flags=re.IGNORECASE)
+	content = re.sub(rf'</(?:{tag_pattern})\s*>', '', content, flags=re.IGNORECASE)
+	# 移除所有事件处理属性 onXxx=...
+	content = re.sub(r'\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', '', content, flags=re.IGNORECASE)
+	# 移除 javascript: 伪协议
+	content = re.sub(r'(href|src|action|formaction)\s*=\s*("javascript:[^"]*"|\'javascript:[^\']*\'|javascript:[^\s>]+)',
+	                 '', content, flags=re.IGNORECASE)
+	# 移除 data: 伪协议中的非图片类型（防 HTML 注入）
+	content = re.sub(r'(href|src|action)\s*=\s*("data:text/html[^"]*"|\'data:text/html[^\']*\')',
+	                 '', content, flags=re.IGNORECASE)
+	return content
 
 
 DEFAULT_AVATARS = [
@@ -247,34 +219,81 @@ def init_tables():
 		cursor.execute(config.CREATE_POST_LIKES_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_FAVORITES_TABLE_SQL)
 		cursor.execute(config.CREATE_USER_FOLLOWS_TABLE_SQL)
+		cursor.execute(config.CREATE_VERIFY_TOKENS_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_REPORTS_TABLE_SQL)
-		try:
-			cursor.execute("ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)")
-		except:
-			pass
-		try:
-			cursor.execute("ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER")
-		except:
-			pass
+		for alter_sql in (
+			"ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)",
+			"ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER",
+			"ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified INTEGER NOT NULL DEFAULT 0",
+			"ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER NOT NULL DEFAULT 0",
+		):
+			try:
+				cursor.execute(alter_sql)
+			except Exception as alter_err:
+				print(f"[DB] ALTER 失败（已忽略）: {alter_err}")
 		for sql in config.CREATE_INDEX_SQLS:
-			cursor.execute(sql)
+			try:
+				cursor.execute(sql)
+			except Exception as idx_err:
+				print(f"[DB] 索引创建失败（已忽略）: {idx_err}")
 		conn.commit()
 
 
-def ensure_tables():
+def ensure_tables(force=False):
 	"""懒加载：仅在需要时创建表。
-    
-    首次调用时检查并创建表，之后直接返回。
-    如果表创建失败则打印错误。
-    """
+
+	首次调用时检查并创建表，之后直接返回。
+	如果表创建失败则打印错误。
+
+	Args:
+		force (bool): 为 True 时强制重新初始化（用于补齐缺失字段等情况）
+	"""
 	global _table_checked
-	if _table_checked:
+	if _table_checked and not force:
 		return
 	try:
 		init_tables()
 		_table_checked = True
 	except Exception as e:
 		print(f"[DB] 初始化表失败: {e}")
+
+
+# 已知需要补齐的列：表名 -> [(列名, 类型定义), ...]
+_KNOWN_COLUMNS = {
+	'users': [
+		('email_verified', 'INTEGER NOT NULL DEFAULT 0'),
+		('is_banned', 'INTEGER NOT NULL DEFAULT 0'),
+		('prefix', 'VARCHAR(32) DEFAULT \'\''),
+	],
+	'comments': [
+		('parent_id', 'VARCHAR(64)'),
+	],
+	'World': [
+		('parent_id', 'INTEGER'),
+	],
+}
+
+
+def _patch_missing_column(table_name, column_name):
+	"""直接对指定表添加缺失列（带 IF NOT EXISTS）。"""
+	type_def = ''
+	for tbl, cols in _KNOWN_COLUMNS.items():
+		if tbl == table_name:
+			for col, td in cols:
+				if col == column_name:
+					type_def = td
+					break
+			break
+	if not type_def:
+		return False
+	try:
+		with get_conn() as (conn, cursor):
+			cursor.execute(f'ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {type_def}')
+			conn.commit()
+		return True
+	except Exception as e:
+		print(f"[DB] 补齐列 {table_name}.{column_name} 失败: {e}")
+		return False
 
 
 def _gen_id(prefix):
@@ -287,6 +306,29 @@ def _gen_id(prefix):
         str: 形如 'YJ1234567890' 的唯一ID
     """
 	return prefix + str(int(time.time() * 10000000000))
+
+
+def _handle_missing_schema(e):
+	"""处理表/列缺失错误：解析错误信息，直接补齐缺失的列。
+
+	Args:
+		e: psycopg2 异常对象（UndefinedTable 或 UndefinedColumn）
+	"""
+	ensure_tables(force=True)
+	# 如果是 UndefinedColumn，尝试从错误信息中提取列名并直接补齐
+	err_msg = str(e)
+	if 'does not exist' in err_msg and 'column' in err_msg:
+		# 错误格式: column "email_verified" does not exist
+		import re as _re
+		col_match = _re.search(r'column "(\w+)" does not exist', err_msg)
+		if col_match:
+			missing_col = col_match.group(1)
+			# 从 query 中推断表名（简单的启发式：查找 FROM/UPDATE/INTO 后的表名）
+			for tbl in _KNOWN_COLUMNS:
+				for col, _ in _KNOWN_COLUMNS[tbl]:
+					if col == missing_col:
+						_patch_missing_column(tbl, missing_col)
+						return
 
 
 def execute_query(query, params=None, fetch=False, fetch_all=False):
@@ -315,8 +357,8 @@ def execute_query(query, params=None, fetch=False, fetch_all=False):
 				conn.commit()
 				result = cursor.rowcount
 			return result
-	except psycopg2.errors.UndefinedTable:
-		ensure_tables()
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
+		_handle_missing_schema(e)
 		with get_conn() as (conn, cursor):
 			cursor.execute(query, params or ())
 			if fetch:
@@ -347,8 +389,8 @@ def execute_insert(query, params=None):
 			cursor.execute(query, params or ())
 			conn.commit()
 			return cursor.rowcount
-	except psycopg2.errors.UndefinedTable:
-		ensure_tables()
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
+		_handle_missing_schema(e)
 		with get_conn() as (conn, cursor):
 			cursor.execute(query, params or ())
 			conn.commit()
@@ -404,7 +446,7 @@ def SendWorldMessage(sender_id, sender_name, content, parent_id=None):
 		INSERT INTO World (sender_id, sender_name, content, parent_id)
 		VALUES (%s, %s, %s, %s)
 		""",
-		(sender_id, sender_name, content, parent_id)
+		(sender_id, sender_name, safe_html(content), parent_id)
 	)
 	return {"success": True, "message": "发送成功"}
 
@@ -447,11 +489,11 @@ def get_user_by_id(user_id):
 
     Returns:
         dict: 用户信息字典，不含密码
-              {"id", "name", "avatar", "email", "gender", "age", "intro", "vip", "created_at", "last_login"}
+              {"id", "name", "avatar", "email", "gender", "age", "intro", "vip", "email_verified", "created_at", "last_login"}
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, gender, age, intro, vip, created_at, last_login FROM users WHERE id = %s",
+		"SELECT id, name, avatar, email, gender, age, intro, vip, email_verified, is_banned, created_at, last_login FROM users WHERE id = %s",
 		(user_id,),
 		fetch=True
 	)
@@ -465,8 +507,10 @@ def get_user_by_id(user_id):
 			"age": result[5],
 			"intro": result[6],
 			"vip": result[7],
-			"created_at": str(result[8]) if result[8] else None,
-			"last_login": str(result[9]) if result[9] else None,
+			"email_verified": result[8],
+			"is_banned": result[9],
+			"created_at": str(result[10]) if result[10] else None,
+			"last_login": str(result[11]) if result[11] else None,
 		}
 	return None
 
@@ -479,11 +523,11 @@ def get_user_by_name(name):
 
     Returns:
         dict: 用户信息字典，包含密码
-              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "created_at", "last_login"}
+              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "email_verified", "created_at", "last_login"}
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, password, gender, age, intro, vip, created_at, last_login FROM users WHERE name = %s",
+		"SELECT id, name, avatar, email, password, gender, age, intro, vip, email_verified, is_banned, created_at, last_login FROM users WHERE name = %s",
 		(name,),
 		fetch=True
 	)
@@ -498,8 +542,10 @@ def get_user_by_name(name):
 			"age": result[6],
 			"intro": result[7],
 			"vip": result[8],
-			"created_at": str(result[9]) if result[9] else None,
-			"last_login": str(result[10]) if result[10] else None,
+			"email_verified": result[9],
+			"is_banned": result[10],
+			"created_at": str(result[11]) if result[11] else None,
+			"last_login": str(result[12]) if result[12] else None,
 		}
 	return None
 
@@ -512,11 +558,11 @@ def get_user_by_email(email):
 
     Returns:
         dict: 用户信息字典，包含密码
-              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "created_at"}
+              {"id", "name", "avatar", "email", "password", "gender", "age", "intro", "vip", "email_verified", "created_at"}
         None: 用户不存在时返回
     """
 	result = execute_query(
-		"SELECT id, name, avatar, email, password, gender, age, intro, vip, created_at FROM users WHERE email = %s",
+		"SELECT id, name, avatar, email, password, gender, age, intro, vip, email_verified, is_banned, created_at FROM users WHERE email = %s",
 		(email,),
 		fetch=True
 	)
@@ -531,7 +577,9 @@ def get_user_by_email(email):
 			"age": result[6],
 			"intro": result[7],
 			"vip": result[8],
-			"created_at": str(result[9]) if result[9] else None,
+			"email_verified": result[9],
+			"is_banned": result[10],
+			"created_at": str(result[11]) if result[11] else None,
 		}
 	return None
 
@@ -549,34 +597,30 @@ def update_user_last_login(user_id):
 
 
 def create_verify_token(user_id, token_type, expires_minutes=30):
-	"""创建6位数字验证码。
+	"""创建验证token。
 
     Args:
         user_id (str): 用户ID
-        token_type (str): 验证码类型 ('email_verify', 'password_reset')
+        token_type (str): token类型 ('email_verify', 'password_reset')
         expires_minutes (int): 过期时间（分钟）
 
     Returns:
         dict: {"success": True, "token": token}
     """
-	import random
+	import uuid
 	import time
-	# 生成6位数字验证码，碰撞时重试
-	max_attempts = 10
-	for attempt in range(max_attempts):
-		token = str(random.randint(100000, 999999))
-		expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + expires_minutes * 60))
-		try:
-			execute_insert(
-				"INSERT INTO verify_tokens (user_id, token, token_type, expires_at) VALUES (%s, %s, %s, %s)",
-				(user_id, token, token_type, expires_at)
-			)
-			return {"success": True, "token": token}
-		except Exception as e:
-			if attempt == max_attempts - 1:
-				print(f"[DB ERROR] create_verify_token: {e}")
-				return {"success": False, "error": "操作失败"}
-			continue
+	token = str(uuid.uuid4())
+	expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + expires_minutes * 60))
+	
+	try:
+		execute_insert(
+			"INSERT INTO verify_tokens (user_id, token, token_type, expires_at) VALUES (%s, %s, %s, %s)",
+			(user_id, token, token_type, expires_at)
+		)
+		return {"success": True, "token": token}
+	except Exception as e:
+		print(f"[DB ERROR] create_verify_token: {e}")
+		return {"success": False, "error": "操作失败"}
 
 
 def get_verify_token(token, token_type):
@@ -676,7 +720,8 @@ def Send_Post(user_id, title, content, category='general'):
 		)
 		return {"success": True, "id": post_id}
 	except Exception as e:
-		return {"success": False, "error": str(e)}
+		print(f"[DB ERROR] Send_Post: {e}")
+		return {"success": False, "error": "发布失败"}
 
 
 def get_post(post_id):
@@ -882,37 +927,6 @@ def get_user_stats(user_id):
 			"total_views": result[2] or 0,
 		}
 	return {"post_count": 0, "total_likes": 0, "total_views": 0}
-
-
-def get_all_users():
-	"""获取所有用户信息（调试用）。
-
-    Returns:
-        list: 用户列表，每项包含 {"id", "name", "avatar", "email", "gender", "age", "intro", "vip", "created_at", "last_login"}
-    """
-	results = execute_query(
-		"""
-        SELECT id, name, avatar, email, gender, age, intro, vip, created_at, last_login
-        FROM users
-        ORDER BY created_at DESC
-        """,
-		fetch_all=True
-	)
-	users = []
-	for r in results:
-		users.append({
-			"id": r[0],
-			"name": r[1],
-			"avatar": r[2],
-			"email": r[3],
-			"gender": r[4],
-			"age": r[5],
-			"intro": r[6],
-			"vip": r[7],
-			"created_at": str(r[8]) if r[8] else None,
-			"last_login": str(r[9]) if r[9] else None,
-		})
-	return users
 
 
 def increment_post_views(post_id):
@@ -1158,6 +1172,80 @@ def get_follow_stats(user_id):
 	}
 
 
+def get_following_list(user_id, page=1, page_size=20):
+	"""获取用户关注的人列表。
+
+    Args:
+        user_id (str): 用户ID
+        page (int): 页码
+        page_size (int): 每页数量
+
+    Returns:
+        list: 用户列表
+    """
+	offset = (page - 1) * page_size
+	results = execute_query(
+		"""
+		SELECT u.id, u.name, u.avatar, u.vip, u.intro, uf.created_at
+		FROM user_follows uf
+		JOIN users u ON uf.following_id = u.id
+		WHERE uf.follower_id = %s
+		ORDER BY uf.created_at DESC
+		LIMIT %s OFFSET %s
+		""",
+		(user_id, page_size, offset),
+		fetch_all=True
+	)
+	users = []
+	for r in results:
+		users.append({
+			"id": r[0],
+			"name": r[1],
+			"avatar": r[2],
+			"vip": r[3],
+			"intro": r[4] or '',
+			"followed_at": str(r[5]) if r[5] else None,
+		})
+	return users
+
+
+def get_follower_list(user_id, page=1, page_size=20):
+	"""获取用户的粉丝列表。
+
+    Args:
+        user_id (str): 用户ID
+        page (int): 页码
+        page_size (int): 每页数量
+
+    Returns:
+        list: 用户列表
+    """
+	offset = (page - 1) * page_size
+	results = execute_query(
+		"""
+		SELECT u.id, u.name, u.avatar, u.vip, u.intro, uf.created_at
+		FROM user_follows uf
+		JOIN users u ON uf.follower_id = u.id
+		WHERE uf.following_id = %s
+		ORDER BY uf.created_at DESC
+		LIMIT %s OFFSET %s
+		""",
+		(user_id, page_size, offset),
+		fetch_all=True
+	)
+	users = []
+	for r in results:
+		users.append({
+			"id": r[0],
+			"name": r[1],
+			"avatar": r[2],
+			"vip": r[3],
+			"intro": r[4] or '',
+			"followed_at": str(r[5]) if r[5] else None,
+		})
+	return users
+
+
 def report_post(post_id, reporter_id, reason, detail=''):
 	"""举报帖子。
 
@@ -1214,6 +1302,8 @@ def add_comment(post_id, user_id, content, parent_id=None):
     """
 	comment_id = _gen_id('CM')
 	try:
+		# 对评论内容进行 XSS 净化
+		content = safe_html(content)
 		execute_insert(
 			"INSERT INTO comments (id, post_id, user_id, content, parent_id) VALUES (%s, %s, %s, %s, %s)",
 			(comment_id, post_id, user_id, content, parent_id)
@@ -1234,7 +1324,8 @@ def add_comment(post_id, user_id, content, parent_id=None):
 			}
 		}
 	except Exception as e:
-		return {"success": False, "error": str(e)}
+		print(f"[DB ERROR] add_comment: {e}")
+		return {"success": False, "error": "评论失败"}
 
 
 def get_post_comments(post_id, page=1, page_size=50):
@@ -1352,16 +1443,15 @@ def search_users(keyword, page=1, page_size=20):
 	if not keyword or not keyword.strip():
 		return []
 	offset = (page - 1) * page_size
-	like_pattern = f"%{keyword}%"
 	results = execute_query(
 		"""
-        SELECT id, name, avatar, vip, prefix, status, created_at
+        SELECT id, name, avatar, vip, prefix, is_banned, created_at
         FROM users
-        WHERE is_banned = 0 AND (name ILIKE %s OR intro ILIKE %s)
+        WHERE is_banned = 0 AND name ILIKE %s
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
-		(like_pattern, like_pattern, page_size, offset),
+		(f"%{keyword}%", page_size, offset),
 		fetch_all=True
 	)
 	users = []

@@ -19,11 +19,21 @@
     <link rel="preconnect" href="//cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="//img.crazying-dev.top" crossorigin>
 
-    <link rel="preload" href="//assets.crazying-dev.top/text/one/CSS/main.css" as="style">
-    <link rel="preload" href="//assets.crazying-dev.top/text/one/JS/AfterBody.js" as="script">
-    <link rel="preload" href="//assets.crazying-dev.top/font/CEFFontsCJK.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="//assets.crazying-dev.top/text/one/CSS/main.css" as="style" fetchpriority="high">
+    <link rel="preload" href="//assets.crazying-dev.top/text/one/JS/AfterBody.js" as="script" fetchpriority="high">
+    <link rel="preload" href="//assets.crazying-dev.top/font/CEFFontsCJK.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
 
     <link rel="stylesheet" href="//assets.crazying-dev.top/text/one/CSS/main.css">
+
+    <script>
+    // 防闪屏：在 body 渲染前同步决定主题
+    (function() {
+        var h = new Date().getHours();
+        if (h < 6 || h >= 18) {
+            document.documentElement.classList.add('night-mode');
+        }
+    })();
+    </script>
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" media="print" onload="this.media='all'">
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css" media="print" onload="this.media='all'">
 
@@ -94,6 +104,24 @@
                     <span>WIKI</span>
                 </a>
             </li>
+            <li class="header-collapsible">
+                <a class="header-btn" id="HuiguanBtn" href="/huiguan">
+                    <i class="fa fa-home"></i>
+                    <span>会馆</span>
+                </a>
+            </li>
+            <li class="header-collapsible">
+                <a class="header-btn" id="RikanBtn" href="//gaz.yjlt.top/" target="_blank" rel="noopener">
+                    <i class="fa fa-newspaper-o"></i>
+                    <span>刊物</span>
+                </a>
+            </li>
+            <li class="header-collapsible">
+                <button class="header-btn" id="DonateBtn" onclick="showDonateCard()">
+                    <i class="fa fa-heart"></i>
+                    <span>赞赏</span>
+                </button>
+            </li>
             <li class="header-menu-toggle" id="headerMenuToggle">
                 <button class="header-btn" type="button">
                     <i class="fa fa-bars"></i>
@@ -112,6 +140,15 @@
             <a class="mobile-menu-item" href="/WIKI">
                 <i class="fa fa-book"></i> WIKI
             </a>
+            <a class="mobile-menu-item" href="/huiguan">
+                <i class="fa fa-home"></i> 会馆
+            </a>
+            <a class="mobile-menu-item" href="https://yaonews.unknownmp.top/" target="_blank" rel="noopener">
+                <i class="fa fa-newspaper-o"></i> 日刊
+            </a>
+            <button class="mobile-menu-item" onclick="showDonateCard()">
+                <i class="fa fa-heart"></i> 赞赏
+            </button>
             <button class="mobile-menu-item" onclick="Easter_Egg()">
                 <i class="fa fa-gift"></i> 彩蛋
             </button>
@@ -134,7 +171,7 @@
     </div>
 </header>
 
-<div id="ui"></div>
+<div id="ui">{% if page_template %}{% include page_template %}{% endif %}</div>
 
 <div id="footer-spacer"></div>
 
@@ -149,6 +186,7 @@
 <footer id="footer">
     <a href="/privacy" id="FooterPrivacy">隐私</a>
     <br>
+    <br>
     联系方式<br>
     邮箱：3890320020@qq.com<br>
     <a href="https://github.com/crazying-dev">Github（大号）：crazying-dev</a><br>
@@ -157,6 +195,11 @@
     <span class="qr-hover-wrap">
         <span id="Footer公众号">悬停扫码</span>
         <img class="qr-img" src="//img.crazying-dev.top/crazying-dev.top/OfficialAccount.jpg" alt="公众号二维码">
+    </span>
+    <br>
+    <br>
+    <span class="footer-disclaimer">
+        <i class="fa fa-info-circle"></i> 本二创无官方授权，仅粉丝公益创作
     </span>
     <br>
     <br>
@@ -327,7 +370,6 @@ document.addEventListener('keydown', function(e) {
     color: var(--color-text-secondary);
 }
 </style>
-<script src="//assets.crazying-dev.top/text/one/JS/crypto_utils.js" defer></script>
 <script src="//assets.crazying-dev.top/text/one/JS/AfterBody.js" defer></script>
 </body>
 </html>

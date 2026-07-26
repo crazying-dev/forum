@@ -2,11 +2,18 @@ import random
 import json
 import os
 import re
+import io
+import time
+import hashlib
+import uuid
+
+import requests as http_requests
 from flask import *
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
+from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from markupsafe import escape as html_escape
 from api import database as db, config, cache as cache_api
-import markdown
 import gzip
 import hashlib as _hashlib
 from io import BytesIO as _BytesIO
@@ -20,12 +27,12 @@ except ImportError:
 
 
 def send_email(to_email, subject, body):
-	"""发送邮件（与 send_email_test.py 一致的实现）。
+	"""发送邮件。
 
 	Args:
 		to_email (str): 收件人邮箱
 		subject (str): 邮件主题
-		body (str): 邮件正文（HTML格式）
+		body (str): 邮件正文
 
 	Returns:
 		bool: 是否发送成功
@@ -35,37 +42,20 @@ def send_email(to_email, subject, body):
 
 	try:
 		import smtplib
-		import ssl
 		from email.mime.text import MIMEText
-		from email.mime.multipart import MIMEMultipart
 		from email.header import Header
 
-		msg = MIMEMultipart()
-		msg["From"] = Header(config.SMTP_FROM_NAME, "utf-8").encode() + f" <{config.SMTP_USER}>"
-		msg["To"] = to_email
-		msg["Subject"] = Header(subject, "utf-8").encode()
+		msg = MIMEText(body, 'html', 'utf-8')
+		msg['Subject'] = Header(subject, 'utf-8')
+		msg['From'] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USER}>"
+		msg['To'] = to_email
 
-		html_part = MIMEText(body, "html", "utf-8")
-		msg.attach(html_part)
-
-		context = ssl.create_default_context()
-		server = smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, context=context)
-		server.set_debuglevel(0)
-		server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-		server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
-		server.quit()
-
-		print(f"✅ 邮件发送成功 -> {to_email}")
+		with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT) as server:
+			server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+			server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
 		return True
-
-	except smtplib.SMTPAuthenticationError:
-		print("❌ SMTP认证失败：账号或密码错误")
-		return False
-	except smtplib.SMTPException as e:
-		print(f"❌ SMTP发送异常: {e}")
-		return False
 	except Exception as e:
-		print(f"❌ 邮件发送失败: {e}")
+		print(f"邮件发送失败: {e}")
 		return False
 
 
@@ -81,44 +71,44 @@ def generate_verify_email_body(user_name, token, token_type):
 		str: 邮件正文HTML
 	"""
 	if token_type == 'email_verify':
+		verify_url = f"{request.host_url}verify-email?token={token}"
 		title = "邮箱验证"
-		description = "请使用以下验证码完成邮箱验证"
-		action_text = "验证邮箱"
+		description = "点击下方按钮完成邮箱验证"
+		button_text = "验证邮箱"
 	else:
+		verify_url = f"{request.host_url}reset-password?token={token}"
 		title = "重置密码"
-		description = "请使用以下验证码重置密码"
-		action_text = "重置密码"
+		description = "点击下方按钮重置密码"
+		button_text = "重置密码"
 
+	safe_user_name = str(html_escape(user_name))
 	return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <title>{title}</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
         .container {{ max-width: 480px; margin: 0 auto; padding: 20px; }}
         .card {{ background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
-        .logo {{ font-size: 24px; font-weight: bold; color: #333; margin-bottom: 16px; text-align: center; }}
+        .logo {{ font-size: 24px; font-weight: bold; color: #333; margin-bottom: 16px; }}
         .greeting {{ font-size: 18px; color: #333; margin-bottom: 12px; }}
         .description {{ font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.6; }}
-        .code-box {{ background: #f0efff; border: 2px dashed #4f46e5; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }}
-        .code {{ font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #4f46e5; font-family: 'Courier New', Consolas, monospace; }}
-        .code-hint {{ font-size: 12px; color: #888; margin-top: 12px; }}
+        .button {{ display: inline-block; padding: 12px 32px; background: #4f46e5; color: #fff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 500; }}
+        .button:hover {{ background: #4338ca; }}
+        .link {{ color: #4f46e5; text-decoration: none; }}
         .footer {{ font-size: 12px; color: #999; margin-top: 24px; text-align: center; }}
-        .notice {{ font-size: 13px; color: #999; margin-top: 16px; text-align: center; }}
+        .token-info {{ font-size: 12px; color: #999; margin-top: 16px; font-family: monospace; word-break: break-all; }}
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <div class="logo">🐱 妖精论坛</div>
+            <div class="logo">妖精论坛</div>
             <div class="greeting">亲爱的 {safe_user_name}，</div>
-            <div class="description">{description}。<br>验证码有效期为30分钟，请勿泄露给他人。</div>
-            <div class="code-box">
-                <div class="code">{token}</div>
-                <div class="code-hint">{action_text}验证码（6位数字）</div>
-            </div>
-            <div class="notice">如果这不是您本人操作，请忽略此邮件。</div>
+            <div class="description">{description}。<br><br>如果这不是您本人操作，请忽略此邮件。</div>
+            <a href="{verify_url}" class="button">{button_text}</a>
+            <div class="token-info">链接有效期：30分钟<br>链接地址：<a href="{verify_url}" class="link">{verify_url}</a></div>
         </div>
         <div class="footer">© 2024 妖精论坛 - 粉丝公益创作</div>
     </div>
@@ -126,13 +116,32 @@ def generate_verify_email_body(user_name, token, token_type):
 </html>"""
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'fairy-forum-secret-key-change-in-production')
-CORS(app)
+
+# 安全配置：SECRET_KEY 必须由环境变量提供
+_secret = os.getenv('SECRET_KEY')
+if not _secret:
+	import secrets as _secrets
+	_secret = _secrets.token_hex(32)
+	print("[SECURITY WARNING] SECRET_KEY 未设置，已生成临时密钥。生产环境请配置 SECRET_KEY 环境变量。")
+app.secret_key = _secret
+
+# Session/Cookie 安全加固
+app.config.update(
+	SESSION_COOKIE_HTTPONLY=True,
+	SESSION_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
+	SESSION_COOKIE_SAMESITE='Lax',
+	PERMANENT_SESSION_LIFETIME=86400,
+	REMEMBER_COOKIE_HTTPONLY=True,
+	REMEMBER_COOKIE_SECURE=os.getenv('FLASK_ENV') == 'production',
+	REMEMBER_COOKIE_SAMESITE='Lax',
+)
+
+# CORS 限定已知域名
+_allowed_origins = os.getenv('CORS_ORIGINS', '').split(',')
+_allowed_origins = [o.strip() for o in _allowed_origins if o.strip()]
+CORS(app, origins=_allowed_origins or True)
 
 base = 'PATH/base.html'
-COOKIE_USER_ID = 'user_id'
-COOKIE_USER_TOKEN = 'user_token'
-TOKEN_EXPIRE_DAYS = 30
 
 
 # ── CSRF 保护：校验 Origin/Referer ─────────────────────────
@@ -171,7 +180,6 @@ def csrf_protect():
 # ── 速率限制（内存，按 IP 维度）───────────────────────────
 
 _rate_limit_store = {}
-_user_last_post_time = {}  # 用户发帖冷却：user_id → 上次发帖时间戳
 
 def rate_limit(key, max_count, window_seconds):
 	"""简易速率限制装饰器。
@@ -204,43 +212,17 @@ def rate_limit(key, max_count, window_seconds):
 
 
 # ── 性能优化：gzip 压缩 + ETag ────────────────────────────
-
-import gzip
-import hashlib as _hashlib
-from io import BytesIO as _BytesIO
-
-STATIC_ROUTES = {
-	'/', '/privacy', '/WIKI', '/WIKI/GuanFang', '/WIKI/Personal',
-	'/WIKI/Personal/mouse', '/WIKI/Personal/mouse/Liunx',
-	'/WIKI/Personal/Live2D', '/forum', '/huiguan'
-}
-
-
-@app.before_request
-def static_page_cache_check():
-	if request.method != 'GET':
-		return None
-	if current_user.is_authenticated:
-		return None
-	if request.path not in STATIC_ROUTES:
-		return None
-	cache_key = f'static:{request.path}'
-	cached_content = cache_api.get_static_page(cache_key)
-	if cached_content:
-		return cached_content
-	return None
-
-
 @app.after_request
 def performance_optimize(response):
-	# 静态页面缓存
-	if request.method == 'GET' and response.status_code == 200:
-		if not current_user.is_authenticated and request.path in STATIC_ROUTES:
-			content_type = response.content_type or ''
-			if 'text/html' in content_type:
-				content = response.get_data(as_text=True)
-				cache_key = f'static:{request.path}'
-				cache_api.set_static_page(cache_key, content, ttl=300)
+	# ── 安全响应头 ──
+	response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+	response.headers.setdefault('X-Frame-Options', 'SAMEORIGIN')
+	response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+	response.headers.setdefault('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=()')
+	response.headers.setdefault('X-XSS-Protection', '1; mode=block')
+	# HSTS 仅在 HTTPS 下生效
+	if request.is_secure or request.headers.get('x-forwarded-proto') == 'https':
+		response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
 
 	# gzip 压缩文本类响应
 	accept_encoding = request.headers.get('Accept-Encoding', '')
@@ -284,8 +266,14 @@ class UserWrapper(UserMixin):
 	def get_id(self):
 		return str(self._user['id'])
 
+	def get(self, key, default=None):
+		return self._user.get(key, default)
+
 	def __getitem__(self, key):
 		return self._user[key]
+
+	def __contains__(self, key):
+		return key in self._user
 
 	def __getattr__(self, key):
 		if key.startswith('_'):
@@ -337,63 +325,121 @@ def strip_easter_egg(name):
 	return name
 
 
-def get_current_user():
-	"""
-	
-	:return:{id", "name", "avatar", "email", "gender", "age", "intro", "vip", "created_at", "last_login"}
-	"""
-	user_id = request.cookies.get(COOKIE_USER_ID)
-	token = request.cookies.get(COOKIE_USER_TOKEN)
-	if verify_auth_token(user_id, token):
-		user = db.get_user_by_id(user_id)
-		if user:
-			return user
-	return None
-
+# ── 页面路由 ──────────────────────────────────────────────
 
 @app.route('/login')
 def login_page():
-	if get_current_user():
+	if current_user.is_authenticated:
 		return redirect('/')
-	return render_template(base)
-
-
-@app.route('/login/GET')
-def login_get():
-	return render_template('auth.html')
-
-
-@app.route('/GET')
-def indexGet():
-	return render_template('index.html')
-
-
-@app.route('/privacy/GET')
-def PrivacyGet():
-	return render_template('privacy.html')
+	return render_template(base, page_template='auth.html')
 
 
 @app.route('/')
+def index_page():
+	return render_template(base, page_template='index.html')
+
+
 @app.route('/privacy')
+def privacy_page():
+	return render_template(base, page_template='privacy.html')
+
+
+@app.route('/verify-email')
+def verify_email_page():
+	token = request.args.get('token', '')
+	if token:
+		token_info = db.get_verify_token(token, 'email_verify')
+		if token_info:
+			db.update_user_email_verified(token_info['user_id'])
+			db.delete_verify_token(token)
+			return render_template(base, page_template='verify_success.html')
+		else:
+			return render_template(base, page_template='verify_failed.html')
+	return render_template(base, page_template='auth.html')
+
+
+@app.route('/reset-password')
+def reset_password_page():
+	token = request.args.get('token', '')
+	if token:
+		token_info = db.get_verify_token(token, 'password_reset')
+		if token_info:
+			return render_template(base, page_template='auth.html')
+		else:
+			return render_template(base, page_template='verify_failed.html')
+	return render_template(base, page_template='auth.html')
+
+
 @app.route('/WIKI')
+def WIKI():
+	return render_template(base, page_template='WIKI/WIKI.html')
+
+
 @app.route("/World")
+def World():
+	return render_template(base, page_template='World.html')
+
+
 @app.route('/WIKI/GuanFang')
+def WIKIGuanFang():
+	return render_template(base, page_template='WIKI/GuanFang/GuanFang.html')
+
+
 @app.route('/WIKI/Personal')
-@app.route('/WIKI/GuanFang/film')
+def WIKIPersonal():
+	return render_template(base, page_template='WIKI/Personal/Personal.html')
+
+
 @app.route('/WIKI/Personal/mouse')
+def WIKIPersonalMouse():
+	return render_template(base, page_template='WIKI/Personal/mouse/mouse.html')
+
+
 @app.route('/WIKI/Personal/mouse/Liunx')
-@app.route('/WIKI/GuanFang/film/FilmFor2')
-@app.route('/WIKI/GuanFang/film/FilmFor1')
+def WIKIPersonalMouseLiunx():
+	return render_template(base, page_template='WIKI/Personal/mouse/Liunx.html')
+
+
 @app.route('/forum')
+def forum_page():
+	return render_template(base, page_template='forum.html')
+
+
 @app.route('/post/create')
+def post_create_page():
+	return render_template(base, page_template='post_create.html')
+
+
 @app.route('/WIKI/Personal/Live2D')
-def BaseWithAll():
-	return render_template(base)
+def WIKIPersonalLive2D():
+	return render_template(base, page_template='WIKI/Personal/Live2D.html')
 
 
 @app.route('/users/<ID>')
-def usersbase(ID):
-	return render_template(base)
+def users_page(ID):
+	UserInfo = db.get_user_by_id(ID)
+	if not UserInfo:
+		return "No this user", 401
+	return render_template(base, page_template='UserPersonalinfo.html')
+
+
+@app.route('/huiguan')
+def huiguan_page():
+	return render_template(base, page_template='huiguan.html')
+
+
+@app.route('/api/huiguan')
+def api_huiguan_list():
+	try:
+		with app.open_resource("huiguan.json", "r", encoding="utf-8") as f:
+			data = json.load(f)
+		return jsonify({
+			'success': True,
+			'list': data
+		})
+	except Exception as e:
+		print(f"[ERROR] /api/huiguan: {e}")
+		return jsonify({'success': False, 'message': '服务器内部错误'}), 500
 
 
 @app.route('/favicon.ico')
@@ -408,92 +454,15 @@ def EasterEgg():
 			data = random.choice(json.load(f))
 		return jsonify(data)
 	except Exception as e:
-		return jsonify({"error": str(e)}), 500
+		print(f"[ERROR] /Easter-Egg: {e}")
+		return jsonify({"error": "服务器内部错误"}), 500
 
-
-@app.route('/WIKI/GET')
-def WIKI():
-	return render_template('WIKI/WIKI.html')
-
-
-@app.route('/WIKI/GuanFang/GET')
-def WIKIGuanFang():
-	return render_template('WIKI/GuanFang/GuanFang.html')
-
-
-@app.route('/WIKI/GuanFang/film/GET')
-def WIKIGuanFangFilm():
-	return render_template('WIKI/GuanFang/film/film.html')
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor1/GET')
-def WIKIFilmFor1():
-	return render_template('WIKI/GuanFang/film/FilmFor1.html')
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor2/GET')
-def WIKIFilmFor2():
-	return render_template('WIKI/GuanFang/film/FilmFor2.html')
-
-
-@app.route('/WIKI/Personal/GET')
-def WIKIPersonal():
-	return render_template('WIKI/Personal/Personal.html')
-
-
-@app.route('/WIKI/Personal/mouse/GET')
-def WIKIPersonalMouse():
-	return render_template('WIKI/Personal/mouse/mouse.html')
-
-
-@app.route('/WIKI/Personal/mouse/Liunx/GET')
-def WIKIPersonalMouseLiunx():
-	return render_template('WIKI/Personal/mouse/Liunx.html')
-
-
-@app.route('/WIKI/Personal/Live2D/GET')
-def WIKIPersonalLive2D():
-	return render_template('WIKI/Personal/Live2D.html')
-
-
-@app.route('/users/<ID>/GET')
-def users(ID):
-	UserInfo = db.get_user_by_id(ID)
-	if not UserInfo:
-		return "No this user", 401
-	return render_template('UserPersonalinfo.html')
-
-
-@app.route('/World/GET')
-def Wrold():
-	return render_template("World.html")
-
-
-@app.route('/WIKI/GuanFang/film/FilmFor2/Photo')
-def WIKIFilmFor2Photo():
-	return redirect(config.Image_father_URL + "/" + random.choice(
-		[
-			"f0a6658d490a588add803b536a1ebe12.jpg",
-			"Camera_XHS_17826569776881040g00832023q3k2jq6g5nqj.jpg"
-		]
-	))
-
-
-@app.route('/WIKI/GuanFang/film/Photo')
-def WIKIFilmPhoto():
-	return redirect(config.Image_father_URL + "/" + random.choice(
-		[
-			"32ea892873b7c4214dd82c6070ffa1f5.jpg",
-			"20190930192812_ZdJUw.jpeg",
-			"Camera_XHS_17826569776881040g00832023q3k2jq6g5nqj.jpg",
-			"f0a6658d490a588add803b536a1ebe12.jpg",
-			"Image_1782657911213_521.png"
-		]
-	))
-
+# ── 认证 API ──────────────────────────────────────────────
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
+	if rate_limit('register', 5, 300):
+		return jsonify({'success': False, 'message': '注册过于频繁，请5分钟后再试'}), 429
 	data = request.get_json() or {}
 	name = (data.get('name') or '').strip()
 	email = (data.get('email') or '').strip().lower()
@@ -504,85 +473,75 @@ def api_register():
 		return jsonify({'success': False, 'message': '用户名需要2-20个字符（不含彩蛋）'})
 	if not email or '@' not in email:
 		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
-	if len(password) < 6:
-		return jsonify({'success': False, 'message': '密码至少6位'})
+	if len(password) < 8:
+		return jsonify({'success': False, 'message': '密码至少8位'})
+	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
+		return jsonify({'success': False, 'message': '密码需包含字母和数字'})
 
 	hashed = generate_password_hash(password)
 	result = db.new_user(name, email, hashed)
-	
+
 	if not result.get('success'):
 		return jsonify({'success': False, 'message': result.get('message', '注册失败')})
-	
+
 	user_id = result['id']
-
-	# 注册成功后自动发送邮箱验证邮件
-	token_result = db.create_verify_token(user_id, 'email_verify')
-	email_sent = False
-	if token_result.get('success'):
-		subject = '【妖精论坛】邮箱验证'
-		body = generate_verify_email_body(name, token_result['token'], 'email_verify')
-		email_sent = send_email(email, subject, body)
-
 	user = db.get_user_by_id(user_id)
 	if user:
 		login_user(UserWrapper(user), remember=True)
-
-	if email_sent:
-		return jsonify({'success': True, 'id': user_id, 'message': '注册成功，验证邮件已发送至您的邮箱'})
-	else:
-		return jsonify({'success': True, 'id': user_id, 'message': '注册成功，但验证邮件发送失败，请稍后重试'})
+	return jsonify({'success': True, 'id': user_id})
 
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
+	if rate_limit('login', 10, 300):
+		return jsonify({'success': False, 'message': '登录尝试过于频繁，请5分钟后再试'}), 429
 	data = request.get_json() or {}
 	name_or_email = (data.get('name') or '').strip()
 	password = data.get('password') or ''
 	remember = data.get('remember', True)
-	
+
 	if not name_or_email or not password:
 		return jsonify({'success': False, 'message': '请输入账号和密码'})
-	
+
 	user = None
 	if '@' in name_or_email and '.' in name_or_email:
 		user = db.get_user_by_email(name_or_email.lower())
 	else:
 		name_or_email = name_or_email.replace("[TIME]", '<p class="TimeWithUserNameAPI"></p>')
 		user = db.get_user_by_name(name_or_email)
-	
+
 	if not user:
-		return jsonify({'success': False, 'message': '用户不存在'})
-	
+		return jsonify({'success': False, 'message': '账号或密码错误'})
+
 	if not check_password_hash(user['password'], password):
-		return jsonify({'success': False, 'message': '密码错误'})
-	
+		return jsonify({'success': False, 'message': '账号或密码错误'})
+
+	if user.get('is_banned') == 1:
+		return jsonify({'success': False, 'message': '该账号已被封禁'})
+
 	db.update_user_last_login(user['id'])
-	token = generate_auth_token(user['id'])
-	max_age = TOKEN_EXPIRE_DAYS * 86400 if remember else None
-	resp = make_response(jsonify({'success': True, 'id': user['id']}))
-	resp.set_cookie(COOKIE_USER_ID, user['id'], max_age=max_age, httponly=True, samesite='Lax')
-	resp.set_cookie(COOKIE_USER_TOKEN, token, max_age=max_age, httponly=True, samesite='Lax')
-	return resp
+	login_user(UserWrapper(user), remember=remember)
+	return jsonify({'success': True, 'id': user['id']})
 
 
 @app.route('/api/logout', methods=['POST', 'GET'])
 def api_logout():
-	resp = make_response(redirect('/'))
-	resp.delete_cookie(COOKIE_USER_ID)
-	resp.delete_cookie(COOKIE_USER_TOKEN)
-	return resp
+	logout_user()
+	return jsonify({'success': True})
 
 
 @app.route('/api/send-verify-email', methods=['POST'])
 @login_required
 def api_send_verify_email():
+	if rate_limit('verify_email', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
 	user = db.get_user_by_id(current_user['id'])
 	if not user:
 		return jsonify({'success': False, 'message': '用户不存在'})
 
 	token_result = db.create_verify_token(user['id'], 'email_verify')
 	if not token_result.get('success'):
-		return jsonify({'success': False, 'message': '生成验证码失败'})
+		return jsonify({'success': False, 'message': '生成验证链接失败'})
 
 	token = token_result['token']
 	subject = '【妖精论坛】邮箱验证'
@@ -592,7 +551,7 @@ def api_send_verify_email():
 	if sent:
 		return jsonify({'success': True, 'message': '验证邮件已发送，请查收邮箱'})
 	else:
-		return jsonify({'success': True, 'message': '验证链接已生成（邮件服务未启用）', 'token': token})
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
 @app.route('/api/verify-email', methods=['POST'])
@@ -601,11 +560,11 @@ def api_verify_email():
 	token = data.get('token') or ''
 
 	if not token:
-		return jsonify({'success': False, 'message': '验证码无效'})
+		return jsonify({'success': False, 'message': '验证链接无效'})
 
 	token_info = db.get_verify_token(token, 'email_verify')
 	if not token_info:
-		return jsonify({'success': False, 'message': '验证码已过期或无效'})
+		return jsonify({'success': False, 'message': '验证链接已过期或无效'})
 
 	db.update_user_email_verified(token_info['user_id'])
 	db.delete_verify_token(token)
@@ -615,6 +574,8 @@ def api_verify_email():
 
 @app.route('/api/send-reset-password', methods=['POST'])
 def api_send_reset_password():
+	if rate_limit('reset_pwd', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
 	data = request.get_json() or {}
 	email = (data.get('email') or '').strip().lower()
 
@@ -624,11 +585,11 @@ def api_send_reset_password():
 	user = db.get_user_by_email(email)
 	if not user:
 		# 防止邮箱枚举：无论邮箱是否存在都返回相同信息
-		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置验证码已发送至邮箱'})
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
 
 	token_result = db.create_verify_token(user['id'], 'password_reset')
 	if not token_result.get('success'):
-		return jsonify({'success': False, 'message': '生成重置验证码失败'})
+		return jsonify({'success': False, 'message': '生成重置链接失败'})
 
 	token = token_result['token']
 	subject = '【妖精论坛】重置密码'
@@ -636,9 +597,9 @@ def api_send_reset_password():
 	
 	sent = send_email(email, subject, body)
 	if sent:
-		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置验证码已发送至邮箱'})
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
 	else:
-		return jsonify({'success': True, 'message': '重置链接已生成（邮件服务未启用）', 'token': token})
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
 @app.route('/api/reset-password', methods=['POST'])
@@ -648,7 +609,7 @@ def api_reset_password():
 	password = data.get('password') or ''
 
 	if not token:
-		return jsonify({'success': False, 'message': '重置验证码无效'})
+		return jsonify({'success': False, 'message': '重置链接无效'})
 	if len(password) < 8:
 		return jsonify({'success': False, 'message': '密码至少8位'})
 	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
@@ -656,7 +617,7 @@ def api_reset_password():
 
 	token_info = db.get_verify_token(token, 'password_reset')
 	if not token_info:
-		return jsonify({'success': False, 'message': '重置验证码已过期或无效'})
+		return jsonify({'success': False, 'message': '重置链接已过期或无效'})
 
 	hashed = generate_password_hash(password)
 	db.execute_query(
@@ -670,19 +631,21 @@ def api_reset_password():
 
 @app.route('/api/user/info')
 def api_user_info():
-	user = get_current_user()
-	if not user:
+	if not current_user.is_authenticated:
 		return jsonify({'success': False, 'message': '未登录'})
 	return jsonify({
 		'success': True,
 		'user': {
-			'id': user['id'],
-			'name': user['name'],
-			'avatar': user['avatar'],
-			'vip': user['vip'],
+			'id': current_user['id'],
+			'name': current_user['name'],
+			'avatar': current_user['avatar'],
+			'vip': current_user['vip'],
+			'email_verified': current_user.get('email_verified', 0),
 		}
 	})
 
+
+# ── 用户 API ──────────────────────────────────────────────
 
 @app.route('/api/users/<user_id>/info')
 def api_user_profile_info(user_id):
@@ -706,6 +669,7 @@ def api_user_profile_info(user_id):
 				'age': user['age'],
 				'intro': user['intro'],
 				'vip': user['vip'],
+				'email_verified': user.get('email_verified', 0),
 				'created_at': user['created_at'],
 				'last_login': user['last_login']
 			},
@@ -713,8 +677,7 @@ def api_user_profile_info(user_id):
 			'follow_stats': follow_stats
 		}
 		cache_api.user_info_cache.set(cache_key, result, l1_ttl=300, l2_ttl=1800)
-	current_user = get_current_user()
-	if current_user:
+	if current_user.is_authenticated:
 		result['is_following'] = db.is_following(current_user['id'], user_id)
 		result['is_self'] = current_user['id'] == user_id
 	else:
@@ -746,10 +709,8 @@ def api_user_profile_posts(user_id):
 
 
 @app.route('/api/users/change', methods=['POST'])
+@login_required
 def api_user_change():
-	user = get_current_user()
-	if not user:
-		return jsonify({'success': False, 'message': '用户不存在'}), 401
 	data = request.get_json()
 	Info = data.get("Info", None)
 	if not Info:
@@ -758,11 +719,141 @@ def api_user_change():
 		name_for_check = strip_easter_egg(Info['Name'])
 		if len(name_for_check) < 2 or len(name_for_check) > 20:
 			return jsonify({'success': False, 'message': '用户名需要2-20个字符（不含彩蛋）'}), 400
-	result = db.update_user_profile(user["id"], **Info)
+	result = db.update_user_profile(current_user['id'], **Info)
 	if result:
-		cache_api.invalidate_user_cache(user['id'])
+		cache_api.invalidate_user_cache(current_user['id'])
 	return jsonify({'success': result})
 
+
+@app.route('/api/user/avatar/upload', methods=['POST'])
+@login_required
+def api_avatar_upload():
+	if not _pil_available:
+		return jsonify({'success': False, 'message': '服务器未启用图片处理功能'}), 500
+	file = request.files.get('avatar')
+	if not file or not file.filename:
+		return jsonify({'success': False, 'message': '请选择图片'}), 400
+	try:
+		img = Image.open(file.stream)
+		img = img.convert('RGBA')
+		bg = Image.new('RGBA', img.size, (255, 255, 255, 255))
+		bg.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else None)
+		img = bg.convert('RGB')
+		img = img.resize((400, 400), Image.LANCZOS)
+		buf = io.BytesIO()
+		img.save(buf, format='WEBP', quality=85)
+		buf.seek(0)
+		token = os.getenv('avatar_READ_WRITE_TOKEN')
+		if not token:
+			return jsonify({'success': False, 'message': '存储服务未配置'}), 500
+		filename = hashlib.md5(f"{current_user['id']}{os.urandom(8).hex()}".encode()).hexdigest()
+		pathname = f'avatars/{filename}.webp'
+		upload_url = f'https://blob.vercel-storage.com/{pathname}'
+		resp = http_requests.put(
+			upload_url,
+			data=buf.getvalue(),
+			headers={
+				'Authorization': f'Bearer {token}',
+				'Content-Type': 'image/webp',
+			},
+			timeout=30
+		)
+		if resp.status_code != 200:
+			return jsonify({'success': False, 'message': '上传失败'}), 500
+		blob_url = resp.json().get('url')
+		if not blob_url:
+			return jsonify({'success': False, 'message': '获取URL失败'}), 500
+		result = db.update_user_profile(current_user['id'], avatar=blob_url)
+		if result:
+			cache_api.invalidate_user_cache(current_user['id'])
+		return jsonify({'success': result, 'avatar': blob_url})
+	except Exception as e:
+		print(f"[ERROR] avatar upload: {e}")
+		return jsonify({'success': False, 'message': '头像上传失败'}), 500
+
+
+@app.route('/api/users/<user_id>/favorites')
+def api_user_favorites(user_id):
+	page = request.args.get('page', 1, type=int)
+	page_size = request.args.get('page_size', 20, type=int)
+	posts = db.get_user_favorites(user_id, page, page_size)
+	return jsonify({
+		'success': True,
+		'posts': posts,
+		'page': page,
+		'page_size': page_size
+	})
+
+
+@app.route('/api/users/<user_id>/follow', methods=['POST'])
+@login_required
+def api_user_follow(user_id):
+	result = db.toggle_follow(current_user['id'], user_id)
+	if result.get('success'):
+		cache_api.invalidate_user_cache(user_id)
+		cache_api.invalidate_user_cache(current_user['id'])
+	return jsonify(result)
+
+
+@app.route('/api/users/<user_id>/following')
+def api_user_following(user_id):
+	page = request.args.get('page', 1, type=int)
+	page_size = request.args.get('page_size', 20, type=int)
+	user = db.get_user_by_id(user_id)
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+	users = db.get_following_list(user_id, page, page_size)
+	result = {
+		'success': True,
+		'users': users,
+		'page': page,
+		'page_size': page_size
+	}
+	if current_user.is_authenticated:
+		following_ids = [u['id'] for u in users]
+		is_following_map = {}
+		for uid in following_ids:
+			is_following_map[uid] = db.is_following(current_user['id'], uid)
+		for u in users:
+			u['is_following'] = is_following_map.get(u['id'], False)
+			u['is_self'] = current_user['id'] == u['id']
+	else:
+		for u in users:
+			u['is_following'] = False
+			u['is_self'] = False
+	return jsonify(result)
+
+
+@app.route('/api/users/<user_id>/followers')
+def api_user_followers(user_id):
+	page = request.args.get('page', 1, type=int)
+	page_size = request.args.get('page_size', 20, type=int)
+	user = db.get_user_by_id(user_id)
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+	users = db.get_follower_list(user_id, page, page_size)
+	result = {
+		'success': True,
+		'users': users,
+		'page': page,
+		'page_size': page_size
+	}
+	if current_user.is_authenticated:
+		following_ids = [u['id'] for u in users]
+		is_following_map = {}
+		for uid in following_ids:
+			is_following_map[uid] = db.is_following(current_user['id'], uid)
+		for u in users:
+			u['is_following'] = is_following_map.get(u['id'], False)
+			u['is_self'] = current_user['id'] == u['id']
+	else:
+		for u in users:
+			u['is_following'] = False
+			u['is_self'] = False
+	return jsonify(result)
+
+
+# ── 世界频道 API ──────────────────────────────────────────
 
 @app.route('/api/World/ALL')
 def Api_World_all():
@@ -782,21 +873,23 @@ def Api_World_all():
 
 
 @app.route('/api/World/Send', methods=['POST'])
+@login_required
 def Api_World_send():
-	user = get_current_user()
-	if not user:
-		return jsonify({'success': False, 'message': '请先登录'}), 401
+	if rate_limit('world_send', 5, 60):
+		return jsonify({'success': False, 'message': '发送过于频繁，请稍后再试'}), 429
 	content = (request.json or {}).get('content', '').strip()
 	parent_id = (request.json or {}).get('parent_id')
 	if not content:
 		return jsonify({'success': False, 'message': '内容不能为空'}), 400
 	if len(content) > 500:
 		return jsonify({'success': False, 'message': '内容过长（最多500字）'}), 400
-	result = db.SendWorldMessage(user['id'], user['name'], content, parent_id)
+	result = db.SendWorldMessage(current_user['id'], current_user['name'], content, parent_id)
 	if result.get('success'):
 		cache_api.invalidate_world_cache()
 	return jsonify(result)
 
+
+# ── 帖子 API ──────────────────────────────────────────────
 
 @app.route('/api/posts')
 def api_post_list():
@@ -828,8 +921,7 @@ def api_post_list():
 
 @app.route('/api/posts/random')
 def api_post_random():
-	user = get_current_user()
-	user_id = user['id'] if user else None
+	user_id = current_user['id'] if current_user.is_authenticated else None
 	posts = db.get_random_posts(user_id)
 	resp = jsonify({
 		'success': True,
@@ -854,10 +946,9 @@ def api_post_detail(post_id):
 		cache_api.post_detail_cache.set(cache_key, {'post': post, 'comments': comments}, l1_ttl=60, l2_ttl=300)
 	db.increment_post_views(post_id)
 	post['views'] = post.get('views', 0) + 1
-	current_user = get_current_user()
 	liked = False
 	favorited = False
-	if current_user:
+	if current_user.is_authenticated:
 		liked = db.has_liked_post(post_id, current_user['id'])
 		favorited = db.has_favorited_post(post_id, current_user['id'])
 	return jsonify({
@@ -870,20 +961,10 @@ def api_post_detail(post_id):
 
 
 @app.route('/api/posts/create', methods=['POST'])
+@login_required
 def api_post_create():
 	if rate_limit('post_create', 10, 60):
 		return jsonify({'success': False, 'message': '发帖过于频繁，请稍后再试'}), 429
-	
-	# 用户级发帖冷却：同一用户两次发帖间隔至少 60 秒
-	now = time.time()
-	last_time = _user_last_post_time.get(current_user['id'], 0)
-	if now - last_time < 60:
-		remaining = int(60 - (now - last_time))
-		return jsonify({
-			'success': False,
-			'message': f'发帖过于频繁，请等待 {remaining} 秒后再试'
-		}), 429
-	
 	data = request.get_json() or {}
 	title = data.get('title', '').strip()
 	content = data.get('content', '').strip()
@@ -894,22 +975,17 @@ def api_post_create():
 		return jsonify({'success': False, 'message': '标题过长（最多100字）'}), 400
 	if not content:
 		return jsonify({'success': False, 'message': '内容不能为空'}), 400
-	# 将 Markdown 内容转换为 HTML，再经 safe_html 过滤后存储
-	content = markdown.markdown(content, extensions=['extra', 'codehilite'])
 	result = db.Send_Post(current_user['id'], title, content, category)
 	if result.get('success'):
-		_user_last_post_time[current_user['id']] = time.time()  # 记录成功发帖时间
 		cache_api.invalidate_post_cache()
-		cache_api.invalidate_user_cache(user['id'])
+		cache_api.invalidate_user_cache(current_user['id'])
 	return jsonify(result)
 
 
 @app.route('/api/posts/<post_id>/like', methods=['POST'])
+@login_required
 def api_post_like(post_id):
-	user = get_current_user()
-	if not user:
-		return jsonify({'success': False, 'message': '请先登录'}), 401
-	result = db.like_post(post_id, user['id'])
+	result = db.like_post(post_id, current_user['id'])
 	cache_api.post_detail_cache.delete(f'post:{post_id}')
 	return jsonify(result)
 
@@ -934,23 +1010,21 @@ def api_post_comments(post_id):
 
 
 @app.route('/api/posts/<post_id>/delete', methods=['POST'])
+@login_required
 def api_post_delete(post_id):
-	user = get_current_user()
-	if not user:
-		return jsonify({'success': False, 'message': '请先登录'}), 401
-	result = db.delete_post(post_id, user['id'])
+	result = db.delete_post(post_id, current_user['id'])
 	if result.get('success'):
 		cache_api.invalidate_post_cache(post_id)
-		cache_api.invalidate_user_cache(user['id'])
+		cache_api.invalidate_user_cache(current_user['id'])
 		return jsonify({'success': True})
 	return jsonify(result)
 
 
 @app.route('/api/posts/<post_id>/comments/create', methods=['POST'])
+@login_required
 def api_comment_create(post_id):
-	user = get_current_user()
-	if not user:
-		return jsonify({'success': False, 'message': '请先登录'}), 401
+	if rate_limit('comment', 20, 60):
+		return jsonify({'success': False, 'message': '评论过于频繁，请稍后再试'}), 429
 	data = request.get_json() or {}
 	content = data.get('content', '').strip()
 	parent_id = data.get('parent_id')
@@ -958,7 +1032,7 @@ def api_comment_create(post_id):
 		return jsonify({'success': False, 'message': '评论内容不能为空'}), 400
 	if len(content) > 500:
 		return jsonify({'success': False, 'message': '评论过长（最多500字）'}), 400
-	result = db.add_comment(post_id, user['id'], content, parent_id)
+	result = db.add_comment(post_id, current_user['id'], content, parent_id)
 	if result.get('success'):
 		cache_api.post_detail_cache.delete(f'post:{post_id}')
 		cache_api.comment_cache.delete(f'comments:{post_id}:page:1:size:50')
@@ -968,11 +1042,9 @@ def api_comment_create(post_id):
 
 
 @app.route('/api/comments/<comment_id>/delete', methods=['POST'])
+@login_required
 def api_comment_delete(comment_id):
-	user = get_current_user()
-	if not user:
-		return jsonify({'success': False, 'message': '请先登录'}), 401
-	result = db.delete_comment(comment_id, user['id'])
+	result = db.delete_comment(comment_id, current_user['id'])
 	if result.get('success'):
 		post_id = result.get('post_id')
 		if post_id:
@@ -981,6 +1053,32 @@ def api_comment_delete(comment_id):
 		return jsonify({'success': True})
 	return jsonify(result)
 
+
+@app.route('/api/posts/<post_id>/favorite', methods=['POST'])
+@login_required
+def api_post_favorite(post_id):
+	result = db.toggle_favorite(post_id, current_user['id'])
+	return jsonify(result)
+
+
+@app.route('/api/posts/<post_id>/report', methods=['POST'])
+@login_required
+def api_post_report(post_id):
+	data = request.get_json() or {}
+	reason = (data.get('reason') or '').strip()
+	detail = (data.get('detail') or '').strip()
+	if not reason:
+		return jsonify({'success': False, 'message': '请选择举报原因'}), 400
+	if len(detail) > 500:
+		return jsonify({'success': False, 'message': '描述过长（最多500字）'}), 400
+	post = db.get_post(post_id)
+	if not post:
+		return jsonify({'success': False, 'message': '帖子不存在'}), 404
+	result = db.report_post(post_id, current_user['id'], reason, detail)
+	return jsonify(result)
+
+
+# ── 搜索 API ──────────────────────────────────────────────
 
 @app.route('/api/search')
 def api_search():
@@ -994,9 +1092,11 @@ def api_search():
 	if cached is not None:
 		return jsonify(cached)
 	posts = db.search_posts(keyword, page, page_size)
+	users = db.search_users(keyword, page, page_size)
 	result = {
 		'success': True,
 		'posts': posts,
+		'users': users,
 		'keyword': keyword,
 		'page': page,
 		'page_size': page_size
@@ -1005,34 +1105,16 @@ def api_search():
 	return jsonify(result)
 
 
+# ── 页面路由（续） ────────────────────────────────────────
+
 @app.route('/search')
 def search_page():
-	return render_template(base)
-
-
-@app.route('/search/GET')
-def search_get():
-	return render_template('search.html')
-
-
-@app.route('/forum/GET')
-def forum_get():
-	return render_template('forum.html')
-
-
-@app.route('/post/create/GET')
-def post_create_get():
-	return render_template('post_create.html')
+	return render_template(base, page_template='search.html')
 
 
 @app.route('/post/<post_id>')
 def page_post_detail(post_id):
-	return render_template(base)
-
-
-@app.route('/post/<post_id>/GET')
-def post_detail_get(post_id):
-	return render_template('post_detail.html')
+	return render_template(base, page_template='post_detail.html')
 
 
 @app.route('/rss.xml')
@@ -1059,4 +1141,4 @@ def TheDoorOfBings_UUID():
 
 
 if __name__ == '__main__':
-	app.run(debug=True)
+	app.run(debug=os.getenv('FLASK_DEBUG', '0') == '1')
