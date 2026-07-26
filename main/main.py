@@ -28,12 +28,12 @@ except ImportError:
 
 
 def send_email(to_email, subject, body):
-	"""发送邮件。
+	"""发送邮件（与 send_email_test.py 一致的实现）。
 
 	Args:
 		to_email (str): 收件人邮箱
 		subject (str): 邮件主题
-		body (str): 邮件正文
+		body (str): 邮件正文（HTML格式）
 
 	Returns:
 		bool: 是否发送成功
@@ -43,20 +43,37 @@ def send_email(to_email, subject, body):
 
 	try:
 		import smtplib
+		import ssl
 		from email.mime.text import MIMEText
+		from email.mime.multipart import MIMEMultipart
 		from email.header import Header
 
-		msg = MIMEText(body, 'html', 'utf-8')
-		msg['Subject'] = Header(subject, 'utf-8')
-		msg['From'] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USER}>"
-		msg['To'] = to_email
+		msg = MIMEMultipart()
+		msg["From"] = Header(config.SMTP_FROM_NAME, "utf-8").encode() + f" <{config.SMTP_USER}>"
+		msg["To"] = to_email
+		msg["Subject"] = Header(subject, "utf-8").encode()
 
-		with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT) as server:
-			server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-			server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
+		html_part = MIMEText(body, "html", "utf-8")
+		msg.attach(html_part)
+
+		context = ssl.create_default_context()
+		server = smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, context=context)
+		server.set_debuglevel(0)
+		server.login(config.SMTP_USER, config.SMTP_PASSWORD)
+		server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
+		server.quit()
+
+		print(f"✅ 邮件发送成功 -> {to_email}")
 		return True
+
+	except smtplib.SMTPAuthenticationError:
+		print("❌ SMTP认证失败：账号或密码错误")
+		return False
+	except smtplib.SMTPException as e:
+		print(f"❌ SMTP发送异常: {e}")
+		return False
 	except Exception as e:
-		print(f"邮件发送失败: {e}")
+		print(f"❌ 邮件发送失败: {e}")
 		return False
 
 
