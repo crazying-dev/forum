@@ -1,16 +1,16 @@
 <div class="auth-container">
     <style>
-        .auth-code-group { display: flex; gap: 8px; padding-right: 4px; }
-        .auth-code-group .auth-icon { flex-shrink: 0; }
+        .auth-code-group { display: flex; gap: 8px; }
         .auth-code-group input { flex: 1; min-width: 0; }
         .code-btn {
-            flex-shrink: 0; padding: 0 12px; height: 44px; border: none;
-            border-radius: 8px; background: linear-gradient(135deg, #667eea, #764ba2);
-            color: #fff; font-size: 13px; cursor: pointer; white-space: nowrap;
-            transition: opacity 0.3s, transform 0.2s; line-height: 44px;
+            flex-shrink: 0; height: 48px; padding: 0 16px; border: none;
+            border-radius: 12px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+            transition: all 0.3s ease;
         }
-        .code-btn:hover { opacity: 0.9; transform: translateY(-1px); }
-        .code-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .code-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--color-primary); opacity: 0.9; }
+        .code-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        @media (max-width: 480px) { .code-btn { height: 44px; font-size: 13px; padding: 0 12px; } }
     </style>
     <div class="auth-card">
         <div class="auth-tabs">
