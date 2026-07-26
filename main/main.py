@@ -14,6 +14,7 @@ from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user,
 from werkzeug.security import generate_password_hash, check_password_hash
 from markupsafe import escape as html_escape
 from api import database as db, config, cache as cache_api
+from Email import send_email
 import gzip
 import hashlib as _hashlib
 from io import BytesIO as _BytesIO
@@ -24,39 +25,6 @@ try:
 except ImportError:
 	Image = None
 	_pil_available = False
-
-
-def send_email(to_email, subject, body):
-	"""发送邮件。
-
-	Args:
-		to_email (str): 收件人邮箱
-		subject (str): 邮件主题
-		body (str): 邮件正文
-
-	Returns:
-		bool: 是否发送成功
-	"""
-	if not config.SMTP_ENABLED:
-		return False
-
-	try:
-		import smtplib
-		from email.mime.text import MIMEText
-		from email.header import Header
-
-		msg = MIMEText(body, 'html', 'utf-8')
-		msg['Subject'] = Header(subject, 'utf-8')
-		msg['From'] = f"{config.SMTP_FROM_NAME} <{config.SMTP_USER}>"
-		msg['To'] = to_email
-
-		with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT) as server:
-			server.login(config.SMTP_USER, config.SMTP_PASSWORD)
-			server.sendmail(config.SMTP_USER, [to_email], msg.as_string())
-		return True
-	except Exception as e:
-		print(f"邮件发送失败: {e}")
-		return False
 
 
 def generate_verify_email_body(user_name, token, token_type):
@@ -547,7 +515,7 @@ def api_send_verify_email():
 	subject = '【妖精论坛】邮箱验证'
 	body = generate_verify_email_body(user['name'], token, 'email_verify')
 	
-	sent = send_email(user['email'], subject, body)
+	sent = send_email(subject, body, receiver_list=[user['email']])
 	if sent:
 		return jsonify({'success': True, 'message': '验证邮件已发送，请查收邮箱'})
 	else:
@@ -595,7 +563,7 @@ def api_send_reset_password():
 	subject = '【妖精论坛】重置密码'
 	body = generate_verify_email_body(user['name'], token, 'password_reset')
 	
-	sent = send_email(email, subject, body)
+	sent = send_email(subject, body, receiver_list=[email])
 	if sent:
 		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
 	else:

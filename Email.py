@@ -7,16 +7,14 @@ from email.header import Header
 # 阿里云邮件推送配置
 SMTP_HOST = "smtpdm.aliyun.com"
 SMTP_PORT = 465
-SMTP_USER = "maomi@email.yjlt.top"
 SMTP_PASSWORD = "LiMingGe120615"
-
 SENDER = "maomi@email.yjlt.top"
 SENDER_NAME = "妖精论坛"
-RECEIVER = ""
+RECEIVERALL = "3890320020@qq.com"
 post_ID = "PS17847825537000173568"
 
 
-def send_email(subject: str, content: str, receiver_list: list = None) -> bool:
+def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER = RECEIVERALL) -> bool:
     if receiver_list is None:
         receiver_list = [RECEIVER]
     try:
@@ -35,7 +33,7 @@ def send_email(subject: str, content: str, receiver_list: list = None) -> bool:
         server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context)
         server.set_debuglevel(0)  # 1开启详细调试日志，正式环境改为0
 
-        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.login(SENDER, SMTP_PASSWORD)
         server.sendmail(SENDER, receiver_list, msg.as_string())
         server.quit()
 
