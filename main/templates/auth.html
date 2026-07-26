@@ -54,16 +54,30 @@
             <div class="auth-error" id="registerError"></div>
         </div>
 
+        <div class="auth-form" id="verifyCodeForm" style="display:none;">
+            <div class="auth-header">
+                <h2>验证邮箱</h2>
+                <p>验证码已发送至您的注册邮箱，请查收</p>
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-key"></i></span>
+                <input type="text" id="verifyCode" placeholder="请输入6位验证码" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')">
+            </div>
+            <button class="auth-btn primary" onclick="handleVerifyCode()">验证</button>
+            <div class="auth-error" id="verifyCodeError"></div>
+            <button class="auth-btn secondary" onclick="handleResendVerifyCode()" style="margin-top:8px;">重新发送验证码</button>
+        </div>
+
         <div class="auth-form" id="forgotPasswordForm" style="display:none;">
             <div class="auth-header">
                 <h2>忘记密码</h2>
-                <p>输入您的注册邮箱，我们将发送重置链接</p>
+                <p>输入您的注册邮箱，我们将发送重置验证码</p>
             </div>
             <div class="auth-input-group">
                 <span class="auth-icon"><i class="fa fa-envelope"></i></span>
                 <input type="email" id="forgotEmail" placeholder="注册邮箱">
             </div>
-            <button class="auth-btn primary" onclick="handleForgotPassword()">发送重置链接</button>
+            <button class="auth-btn primary" onclick="handleForgotPassword()">发送重置验证码</button>
             <div class="auth-error" id="forgotPasswordError"></div>
             <button class="auth-btn secondary" onclick="showLogin()">返回登录</button>
         </div>
@@ -71,7 +85,11 @@
         <div class="auth-form" id="resetPasswordForm" style="display:none;">
             <div class="auth-header">
                 <h2>重置密码</h2>
-                <p>设置新密码</p>
+                <p>输入邮箱中收到的验证码并设置新密码</p>
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-key"></i></span>
+                <input type="text" id="resetCode" placeholder="验证码（6位数字）" maxlength="6" oninput="this.value=this.value.replace(/\D/g,'')">
             </div>
             <div class="auth-input-group">
                 <span class="auth-icon"><i class="fa fa-lock"></i></span>
@@ -93,8 +111,6 @@
 </div>
 
 <script>
-var _resetToken = '';
-
 function showLogin() {
     document.querySelectorAll('.auth-form').forEach(function(form) {
         form.style.display = 'none';
@@ -106,6 +122,7 @@ function showLogin() {
     document.querySelector('[data-tab="login"]').classList.add('active');
     document.getElementById('loginError').textContent = '';
     document.getElementById('registerError').textContent = '';
+    document.getElementById('verifyCodeError').textContent = '';
     document.getElementById('forgotPasswordError').textContent = '';
     document.getElementById('resetPasswordError').textContent = '';
 }
@@ -120,12 +137,21 @@ function showForgotPassword() {
     });
 }
 
-function showResetPassword(token) {
-    _resetToken = token;
+function showResetPassword() {
     document.querySelectorAll('.auth-form').forEach(function(form) {
         form.style.display = 'none';
     });
     document.getElementById('resetPasswordForm').style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(function(tab) {
+        tab.classList.remove('active');
+    });
+}
+
+function showVerifyCodeForm() {
+    document.querySelectorAll('.auth-form').forEach(function(form) {
+        form.style.display = 'none';
+    });
+    document.getElementById('verifyCodeForm').style.display = 'block';
     document.querySelectorAll('.auth-tab').forEach(function(tab) {
         tab.classList.remove('active');
     });
@@ -182,7 +208,11 @@ function handleRegister() {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.success) {
-            window.location.href = '/';
+            document.getElementById('regName').value = '';
+            document.getElementById('regEmail').value = '';
+            document.getElementById('regPassword').value = '';
+            document.getElementById('regConfirmPassword').value = '';
+            showVerifyCodeForm();
         } else {
             document.getElementById('registerError').textContent = data.message || '注册失败';
         }
@@ -209,12 +239,11 @@ function handleForgotPassword() {
     .then(function(data) {
         if (data.success) {
             document.getElementById('forgotPasswordError').textContent = '';
+            document.getElementById('resetCode').value = '';
+            document.getElementById('resetPassword').value = '';
+            document.getElementById('resetConfirmPassword').value = '';
             alert(data.message);
-            if (data.token) {
-                showResetPassword(data.token);
-            } else {
-                showLogin();
-            }
+            showResetPassword();
         } else {
             document.getElementById('forgotPasswordError').textContent = data.message || '操作失败';
         }
@@ -225,9 +254,14 @@ function handleForgotPassword() {
 }
 
 function handleResetPassword() {
+    var code = document.getElementById('resetCode').value.trim();
     var password = document.getElementById('resetPassword').value;
     var confirmPassword = document.getElementById('resetConfirmPassword').value;
 
+    if (!code || code.length !== 6) {
+        document.getElementById('resetPasswordError').textContent = '请输入6位验证码';
+        return;
+    }
     if (!password || !confirmPassword) {
         document.getElementById('resetPasswordError').textContent = '请填写所有字段';
         return;
@@ -240,7 +274,7 @@ function handleResetPassword() {
     fetch('/api/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: _resetToken, password: password })
+        body: JSON.stringify({ token: code, password: password })
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {
@@ -253,6 +287,52 @@ function handleResetPassword() {
     })
     .catch(function(err) {
         document.getElementById('resetPasswordError').textContent = '网络错误';
+    });
+}
+
+function handleVerifyCode() {
+    var code = document.getElementById('verifyCode').value.trim();
+
+    if (!code || code.length !== 6) {
+        document.getElementById('verifyCodeError').textContent = '请输入6位验证码';
+        return;
+    }
+
+    fetch('/api/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: code })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('邮箱验证成功！');
+            window.location.href = '/';
+        } else {
+            document.getElementById('verifyCodeError').textContent = data.message || '验证失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('verifyCodeError').textContent = '网络错误';
+    });
+}
+
+function handleResendVerifyCode() {
+    fetch('/api/send-verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('verifyCodeError').textContent = '';
+            alert('验证码已重新发送，请查收邮件');
+        } else {
+            document.getElementById('verifyCodeError').textContent = data.message || '发送失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('verifyCodeError').textContent = '网络错误';
     });
 }
 
@@ -276,13 +356,5 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
-    var urlParams = new URLSearchParams(window.location.search);
-    var token = urlParams.get('token');
-    var mode = urlParams.get('mode');
-    
-    if (token && mode === 'reset') {
-        showResetPassword(token);
-    }
 });
 </script>

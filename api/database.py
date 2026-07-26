@@ -629,30 +629,34 @@ def update_user_last_login(user_id):
 
 
 def create_verify_token(user_id, token_type, expires_minutes=30):
-	"""创建验证token。
+	"""创建6位数字验证码。
 
     Args:
         user_id (str): 用户ID
-        token_type (str): token类型 ('email_verify', 'password_reset')
+        token_type (str): 验证码类型 ('email_verify', 'password_reset')
         expires_minutes (int): 过期时间（分钟）
 
     Returns:
         dict: {"success": True, "token": token}
     """
-	import uuid
+	import random
 	import time
-	token = str(uuid.uuid4())
-	expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + expires_minutes * 60))
-	
-	try:
-		execute_insert(
-			"INSERT INTO verify_tokens (user_id, token, token_type, expires_at) VALUES (%s, %s, %s, %s)",
-			(user_id, token, token_type, expires_at)
-		)
-		return {"success": True, "token": token}
-	except Exception as e:
-		print(f"[DB ERROR] create_verify_token: {e}")
-		return {"success": False, "error": "操作失败"}
+	# 生成6位数字验证码，碰撞时重试
+	max_attempts = 10
+	for attempt in range(max_attempts):
+		token = str(random.randint(100000, 999999))
+		expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + expires_minutes * 60))
+		try:
+			execute_insert(
+				"INSERT INTO verify_tokens (user_id, token, token_type, expires_at) VALUES (%s, %s, %s, %s)",
+				(user_id, token, token_type, expires_at)
+			)
+			return {"success": True, "token": token}
+		except Exception as e:
+			if attempt == max_attempts - 1:
+				print(f"[DB ERROR] create_verify_token: {e}")
+				return {"success": False, "error": "操作失败"}
+			continue
 
 
 def get_verify_token(token, token_type):

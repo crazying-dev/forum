@@ -89,15 +89,13 @@ def generate_verify_email_body(user_name, token, token_type):
 		str: 邮件正文HTML
 	"""
 	if token_type == 'email_verify':
-		verify_url = f"{request.host_url}verify-email?token={token}"
 		title = "邮箱验证"
-		description = "点击下方按钮完成邮箱验证"
-		button_text = "验证邮箱"
+		description = "请使用以下验证码完成邮箱验证"
+		action_text = "验证邮箱"
 	else:
-		verify_url = f"{request.host_url}reset-password?token={token}"
 		title = "重置密码"
-		description = "点击下方按钮重置密码"
-		button_text = "重置密码"
+		description = "请使用以下验证码重置密码"
+		action_text = "重置密码"
 
 	safe_user_name = str(html_escape(user_name))
 	return f"""<!DOCTYPE html>
@@ -106,27 +104,30 @@ def generate_verify_email_body(user_name, token, token_type):
     <meta charset="UTF-8">
     <title>{title}</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 0; }}
         .container {{ max-width: 480px; margin: 0 auto; padding: 20px; }}
         .card {{ background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
-        .logo {{ font-size: 24px; font-weight: bold; color: #333; margin-bottom: 16px; }}
+        .logo {{ font-size: 24px; font-weight: bold; color: #333; margin-bottom: 16px; text-align: center; }}
         .greeting {{ font-size: 18px; color: #333; margin-bottom: 12px; }}
         .description {{ font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.6; }}
-        .button {{ display: inline-block; padding: 12px 32px; background: #4f46e5; color: #fff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 500; }}
-        .button:hover {{ background: #4338ca; }}
-        .link {{ color: #4f46e5; text-decoration: none; }}
+        .code-box {{ background: #f0efff; border: 2px dashed #4f46e5; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }}
+        .code {{ font-size: 40px; font-weight: bold; letter-spacing: 8px; color: #4f46e5; font-family: 'Courier New', Consolas, monospace; }}
+        .code-hint {{ font-size: 12px; color: #888; margin-top: 12px; }}
         .footer {{ font-size: 12px; color: #999; margin-top: 24px; text-align: center; }}
-        .token-info {{ font-size: 12px; color: #999; margin-top: 16px; font-family: monospace; word-break: break-all; }}
+        .notice {{ font-size: 13px; color: #999; margin-top: 16px; text-align: center; }}
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <div class="logo">妖精论坛</div>
+            <div class="logo">🐱 妖精论坛</div>
             <div class="greeting">亲爱的 {safe_user_name}，</div>
-            <div class="description">{description}。<br><br>如果这不是您本人操作，请忽略此邮件。</div>
-            <a href="{verify_url}" class="button">{button_text}</a>
-            <div class="token-info">链接有效期：30分钟<br>链接地址：<a href="{verify_url}" class="link">{verify_url}</a></div>
+            <div class="description">{description}。<br>验证码有效期为30分钟，请勿泄露给他人。</div>
+            <div class="code-box">
+                <div class="code">{token}</div>
+                <div class="code-hint">{action_text}验证码（6位数字）</div>
+            </div>
+            <div class="notice">如果这不是您本人操作，请忽略此邮件。</div>
         </div>
         <div class="footer">© 2024 妖精论坛 - 粉丝公益创作</div>
     </div>
@@ -568,7 +569,7 @@ def api_send_verify_email():
 
 	token_result = db.create_verify_token(user['id'], 'email_verify')
 	if not token_result.get('success'):
-		return jsonify({'success': False, 'message': '生成验证链接失败'})
+		return jsonify({'success': False, 'message': '生成验证码失败'})
 
 	token = token_result['token']
 	subject = '【妖精论坛】邮箱验证'
@@ -587,11 +588,11 @@ def api_verify_email():
 	token = data.get('token') or ''
 
 	if not token:
-		return jsonify({'success': False, 'message': '验证链接无效'})
+		return jsonify({'success': False, 'message': '验证码无效'})
 
 	token_info = db.get_verify_token(token, 'email_verify')
 	if not token_info:
-		return jsonify({'success': False, 'message': '验证链接已过期或无效'})
+		return jsonify({'success': False, 'message': '验证码已过期或无效'})
 
 	db.update_user_email_verified(token_info['user_id'])
 	db.delete_verify_token(token)
@@ -612,11 +613,11 @@ def api_send_reset_password():
 	user = db.get_user_by_email(email)
 	if not user:
 		# 防止邮箱枚举：无论邮箱是否存在都返回相同信息
-		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置验证码已发送至邮箱'})
 
 	token_result = db.create_verify_token(user['id'], 'password_reset')
 	if not token_result.get('success'):
-		return jsonify({'success': False, 'message': '生成重置链接失败'})
+		return jsonify({'success': False, 'message': '生成重置验证码失败'})
 
 	token = token_result['token']
 	subject = '【妖精论坛】重置密码'
@@ -624,7 +625,7 @@ def api_send_reset_password():
 	
 	sent = send_email(email, subject, body)
 	if sent:
-		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置验证码已发送至邮箱'})
 	else:
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
@@ -636,7 +637,7 @@ def api_reset_password():
 	password = data.get('password') or ''
 
 	if not token:
-		return jsonify({'success': False, 'message': '重置链接无效'})
+		return jsonify({'success': False, 'message': '重置验证码无效'})
 	if len(password) < 8:
 		return jsonify({'success': False, 'message': '密码至少8位'})
 	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
@@ -644,7 +645,7 @@ def api_reset_password():
 
 	token_info = db.get_verify_token(token, 'password_reset')
 	if not token_info:
-		return jsonify({'success': False, 'message': '重置链接已过期或无效'})
+		return jsonify({'success': False, 'message': '重置验证码已过期或无效'})
 
 	hashed = generate_password_hash(password)
 	db.execute_query(
