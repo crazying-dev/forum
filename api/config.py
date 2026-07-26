@@ -147,6 +147,19 @@ CREATE TABLE IF NOT EXISTS post_reports (
 );
 """
 
+CREATE_VERIFY_CODES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS verify_codes (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    purpose VARCHAR(32) NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used INTEGER DEFAULT 0,
+    attempts INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
 CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);",
     "CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);",
@@ -158,6 +171,8 @@ CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id);",
     "CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_id);",
     "CREATE INDEX IF NOT EXISTS idx_post_reports_post_id ON post_reports(post_id);",
+    "CREATE INDEX IF NOT EXISTS idx_verify_codes_email_purpose ON verify_codes(email, purpose);",
+    "CREATE INDEX IF NOT EXISTS idx_verify_codes_expires ON verify_codes(expires_at);",
 ]
 
 # ========================

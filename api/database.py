@@ -220,6 +220,7 @@ def init_tables():
 		cursor.execute(config.CREATE_POST_FAVORITES_TABLE_SQL)
 		cursor.execute(config.CREATE_USER_FOLLOWS_TABLE_SQL)
 		cursor.execute(config.CREATE_VERIFY_TOKENS_TABLE_SQL)
+		cursor.execute(config.CREATE_VERIFY_CODES_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_REPORTS_TABLE_SQL)
 		for alter_sql in (
 			"ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)",
@@ -670,6 +671,103 @@ def update_user_email_verified(user_id):
 	execute_query(
 		"UPDATE users SET email_verified = 1 WHERE id = %s",
 		(user_id,)
+	)
+
+
+# ========================
+# 验证码 (verify_codes)
+# ========================
+
+
+def create_verify_code(email, code, purpose, expires_minutes=5):
+	"""创建验证码。
+
+	Args:
+		email (str): 邮箱地址
+		code (str): 验证码（如 6 位数字）
+		purpose (str): 用途 ('register', 'login', 'email_verify', 'password_reset')
+		expires_minutes (int): 过期时间（分钟）
+
+	Returns:
+		dict: {"success": True}
+	"""
+	import time
+	expires_at = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time() + expires_minutes * 60))
+
+	try:
+		execute_insert(
+			"INSERT INTO verify_codes (email, code, purpose, expires_at) VALUES (%s, %s, %s, %s)",
+			(email, code, purpose, expires_at)
+		)
+		return {"success": True}
+	except Exception as e:
+		print(f"[DB ERROR] create_verify_code: {e}")
+		return {"success": False, "error": "创建验证码失败"}
+
+
+def get_verify_code(email, code, purpose):
+	"""获取并验证验证码。
+
+	检查验证码是否存在、未使用、未过期。
+
+	Args:
+		email (str): 邮箱地址
+		code (str): 验证码
+		purpose (str): 用途
+
+	Returns:
+		dict: 验证码信息 {"email", "code", "purpose", "expires_at"}
+		None: 验证码不存在、已使用或已过期
+	"""
+	result = execute_query(
+		"SELECT email, code, purpose, expires_at FROM verify_codes "
+		"WHERE email = %s AND code = %s AND purpose = %s AND used = 0 AND expires_at > CURRENT_TIMESTAMP "
+		"ORDER BY created_at DESC LIMIT 1",
+		(email, code, purpose),
+		fetch=True
+	)
+	if result:
+		return {
+			"email": result[0],
+			"code": result[1],
+			"purpose": result[2],
+			"expires_at": str(result[3]) if result[3] else None,
+		}
+	return None
+
+
+def mark_verify_code_used(email, code, purpose):
+	"""将验证码标记为已使用。
+
+	Args:
+		email (str): 邮箱地址
+		code (str): 验证码
+		purpose (str): 用途
+	"""
+	execute_query(
+		"UPDATE verify_codes SET used = 1 WHERE email = %s AND code = %s AND purpose = %s",
+		(email, code, purpose)
+	)
+
+
+def increment_verify_code_attempts(email, purpose):
+	"""增加验证码的尝试次数，用于防爆破。
+
+	Args:
+		email (str): 邮箱地址
+		purpose (str): 用途
+	"""
+	execute_query(
+		"UPDATE verify_codes SET attempts = attempts + 1 "
+		"WHERE email = %s AND purpose = %s AND used = 0 AND expires_at > CURRENT_TIMESTAMP",
+		(email, purpose)
+	)
+
+
+def clean_expired_verify_codes():
+	"""清理已过期或已使用的验证码。"""
+	execute_query(
+		"DELETE FROM verify_codes WHERE expires_at < CURRENT_TIMESTAMP OR used = 1"
 	)
 
 
