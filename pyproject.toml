@@ -16,4 +16,5 @@ dependencies = [
     "bleach>=6.0.0",
     "markdown>=3.5.0",
     "cryptography>=41.0.0",
+    "pygments>=2.15.0",
 ]

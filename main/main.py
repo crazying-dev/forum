@@ -508,15 +508,20 @@ def api_register():
 
 	# 注册成功后自动发送邮箱验证邮件
 	token_result = db.create_verify_token(user_id, 'email_verify')
+	email_sent = False
 	if token_result.get('success'):
 		subject = '【妖精论坛】邮箱验证'
 		body = generate_verify_email_body(name, token_result['token'], 'email_verify')
-		send_email(email, subject, body)
+		email_sent = send_email(email, subject, body)
 
 	user = db.get_user_by_id(user_id)
 	if user:
 		login_user(UserWrapper(user), remember=True)
-	return jsonify({'success': True, 'id': user_id, 'message': '注册成功，验证邮件已发送至您的邮箱'})
+
+	if email_sent:
+		return jsonify({'success': True, 'id': user_id, 'message': '注册成功，验证邮件已发送至您的邮箱'})
+	else:
+		return jsonify({'success': True, 'id': user_id, 'message': '注册成功，但验证邮件发送失败，请稍后重试'})
 
 
 @app.route('/api/login', methods=['POST'])
