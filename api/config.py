@@ -1,23 +1,10 @@
-import os
-import dotenv
-
-dotenv.load_dotenv(override=False)
-
 # 用户相关变量
-USER_ID_PREFIX = 'RL'  # 用户ID前缀
-vip = "0"  # 用户默认为VIP
+USER_ID_PREFIX = 'YJ'  # 用户ID前缀
+vip = "1"  # 用户默认为VIP
 
 # 服务器相关全局变量
 POOL_ENABLED = False  # Vercel数据库不需要连接池，所以为False;传统服务器需要连接池进行优化，当使用传统服务器时改为True
 Image_father_URL = "https://img.crazying-dev.top/text/one"
-
-# 邮件相关配置
-SMTP_ENABLED = True
-SMTP_HOST = os.getenv('SMTP_HOST', 'smtpdm.aliyun.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '465'))
-SMTP_USER = os.getenv('SMTP_USER', 'maomi@email.yjlt.top')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', 'LiMingGe120615')
-SMTP_FROM_NAME = "妖精论坛(二创)"
 
 # 数据库相关变量
 allowed_search_keys = ['id', 'name', 'email']  # 用户查找可用键
@@ -34,9 +21,6 @@ CREATE TABLE IF NOT EXISTS users (
     age VARCHAR(32) DEFAULT '',
     intro TEXT DEFAULT '',
     vip VARCHAR(32) NOT NULL DEFAULT '0',
-    prefix VARCHAR(32) DEFAULT '',
-    is_banned INTEGER NOT NULL DEFAULT 0,
-    email_verified INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP
 );
@@ -121,18 +105,6 @@ CREATE TABLE IF NOT EXISTS user_follows (
 );
 """
 
-CREATE_VERIFY_TOKENS_TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS verify_tokens (
-    id SERIAL PRIMARY KEY,
-    user_id VARCHAR(64) NOT NULL,
-    token VARCHAR(255) NOT NULL UNIQUE,
-    token_type VARCHAR(32) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-"""
-
 CREATE_POST_REPORTS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS post_reports (
     id SERIAL PRIMARY KEY,
@@ -179,7 +151,7 @@ AUTH_NUM_REPLACEMENTS = {
 }
 
 AUTH_LETTER_VERSIONS = [
-    {  # 1 - 希腊字母为主
+    {  # 版本1：希腊字母为主
         "a": "α∀â", "b": "β∃b̃", "c": "γ∈ç", "d": "δ∉đ", "e": "ε∊ê",
         "f": "φ∴ƒ", "g": "η∵ĝ", "h": "θ∼ħ", "i": "ι↔î", "j": "κ⇔ĵ",
         "k": "λ∧ǩ", "l": "μ∨ł", "m": "ν¬m̃", "n": "ξ∩ñ", "o": "ο∪ô",
@@ -192,7 +164,7 @@ AUTH_LETTER_VERSIONS = [
         "T": "ΤŢT̄", "U": "ΥÛŨ", "V": "ΦṼV̄", "W": "ΩŴW̃", "X": "ΞX̂X̄",
         "Y": "ΨŶŸ", "Z": "ΖẐZ̄"
     },
-    {  # 2 - 数学符号为主
+    {  # 版本2：数学符号为主
         "a": "∀αå", "b": "∃βß", "c": "∈γç", "d": "∂δđ", "e": "∃εê",
         "f": "ƒϕƒ", "g": "∇ηĝ", "h": "ℏθħ", "i": "∫ιî", "j": "∮ȷĵ",
         "k": "κκǩ", "l": "ℓλł", "m": "µμṃ", "n": "ηνñ", "o": "∅οô",
@@ -205,7 +177,7 @@ AUTH_LETTER_VERSIONS = [
         "T": "𝕋ŢṪ", "U": "⋃ÛŪ", "V": "√ṼṾ", "W": "𝒲ŴẂ", "X": "𝕏X̂Ẋ",
         "Y": "ΨŶŸ", "Z": "ℤẐŻ"
     },
-    {  # 3 - 组合字符为主
+    {  # 版本3：组合字符为主
         "a": "ãāă", "b": "b̃b̄b̆", "c": "c̃c̄c̆", "d": "d̃d̄d̆", "e": "ẽēĕ",
         "f": "f̃f̄f̆", "g": "g̃ḡğ", "h": "h̃h̄h̆", "i": "ĩīĭ", "j": "j̃j̄j̆",
         "k": "k̃k̄k̆", "l": "l̃l̄l̆", "m": "m̃m̄m̆", "n": "ñn̄n̆", "o": "õōŏ",
@@ -221,7 +193,7 @@ AUTH_LETTER_VERSIONS = [
 ]
 
 AUTH_SYMBOL_VERSIONS = [
-    {  # 1
+    {  # 版本1
         "-": "–—−", "_": "‗_̲", "@": "＠@⃗", "/": "／⁄", "\\": "＼⧵",
         "|": "｜ǀ", ":": "：∶", ";": "；⁏", ",": "，‚", "?": "？¿",
         "!": "！¡", "(": "（〔", ")": "）〕", "[": "【〖", "]": "】〗",
@@ -229,7 +201,7 @@ AUTH_SYMBOL_VERSIONS = [
         '"': "＂¨", "`": "｀ˋ", "~": "～˜", "^": "＾ˆ", "&": "＆⅋",
         "*": "＊∗", "%": "％‰", "#": "＃♯", "+": "＋†", "=": "＝≂"
     },
-    {  # 2
+    {  # 版本2
         "-": "‐‑‒", "_": "﹍﹎﹏", "@": "©®™", "/": "÷⁄∕", "\\": "﹨∖",
         "|": "‖∣∤", ":": "∶∷⁝", ";": "⁏⁏", ",": "‚„", "?": "¿⁇",
         "!": "¡‼⁉", "(": "〈〈", ")": "〉〉", "[": "⟦⟬", "]": "⟧⟭",

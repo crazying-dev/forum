@@ -65,11 +65,6 @@ class VercelBlobCache:
         self.token = os.getenv('BLOB_READ_WRITE_TOKEN')
         self.enabled = enabled and bool(self.token) and requests is not None
         self._url_cache = {}
-        # 复用 HTTP 连接，减少 TCP 握手开销
-        self._session = requests.Session() if (requests and self.enabled) else None
-        if self._session:
-            adapter = requests.adapters.HTTPAdapter(pool_connections=5, pool_maxsize=10)
-            self._session.mount('https://', adapter)
 
     def _make_key(self, key):
         safe_key = hashlib.md5(key.encode('utf-8')).hexdigest()
@@ -82,13 +77,13 @@ class VercelBlobCache:
         }
 
     def get(self, key):
-        if not self.enabled or not self._session:
+        if not self.enabled:
             return None
         try:
             pathname = self._make_key(key)
             blob_url = self._url_cache.get(key)
             if blob_url:
-                resp = self._session.get(blob_url, timeout=5)
+                resp = requests.get(blob_url, timeout=5)
                 if resp.status_code == 200:
                     obj = resp.json()
                     if obj.get('expire_at') and time.time() > obj['expire_at']:
@@ -96,7 +91,7 @@ class VercelBlobCache:
                         return None
                     return obj.get('value')
             head_url = f'{self.BASE_URL}?url={pathname}'
-            resp = self._session.get(head_url, headers=self._headers(), timeout=5)
+            resp = requests.get(head_url, headers=self._headers(), timeout=5)
             if resp.status_code == 404:
                 return None
             if resp.status_code == 200:
@@ -104,7 +99,7 @@ class VercelBlobCache:
                 download_url = blob_info.get('url') or blob_info.get('downloadUrl')
                 if download_url:
                     self._url_cache[key] = download_url
-                    data_resp = self._session.get(download_url, timeout=5)
+                    data_resp = requests.get(download_url, timeout=5)
                     if data_resp.status_code == 200:
                         obj = data_resp.json()
                         if obj.get('expire_at') and time.time() > obj['expire_at']:
@@ -116,7 +111,7 @@ class VercelBlobCache:
         return None
 
     def set(self, key, value, ttl=3600):
-        if not self.enabled or not self._session:
+        if not self.enabled:
             return
         try:
             pathname = self._make_key(key)
@@ -128,7 +123,7 @@ class VercelBlobCache:
             put_url = f'{self.BASE_URL}/{pathname}'
             headers = self._headers()
             headers['x-content-type'] = 'application/json'
-            resp = self._session.put(put_url, data=data, headers=headers, timeout=10)
+            resp = requests.put(put_url, data=data, headers=headers, timeout=10)
             if resp.status_code == 200:
                 result = resp.json()
                 if result.get('url'):
@@ -137,12 +132,12 @@ class VercelBlobCache:
             pass
 
     def delete(self, key):
-        if not self.enabled or not self._session:
+        if not self.enabled:
             return
         try:
             pathname = self._make_key(key)
             delete_url = f'{self.BASE_URL}/delete'
-            resp = self._session.post(
+            resp = requests.post(
                 delete_url,
                 json={'urls': [pathname]},
                 headers=self._headers(),
@@ -159,15 +154,11 @@ class TwoLevelCache:
         self.l1 = LRUCache(capacity=lru_capacity, ttl=lru_ttl)
         self.l2 = VercelBlobCache(enabled=blob_enabled)
         self.blob_ttl = blob_ttl
-        # L1 TTL <= 10s 时跳过 Blob（网络延迟远超缓存收益）
-        self._skip_blob = (lru_ttl <= 10)
 
     def get(self, key):
         value = self.l1.get(key)
         if value is not None:
             return value
-        if self._skip_blob:
-            return None
         value = self.l2.get(key)
         if value is not None:
             self.l1.set(key, value)
@@ -176,8 +167,7 @@ class TwoLevelCache:
 
     def set(self, key, value, l1_ttl=None, l2_ttl=None):
         self.l1.set(key, value, ttl=l1_ttl)
-        if not self._skip_blob:
-            self.l2.set(key, value, ttl=l2_ttl if l2_ttl is not None else self.blob_ttl)
+        self.l2.set(key, value, ttl=l2_ttl if l2_ttl is not None else self.blob_ttl)
 
     def delete(self, key):
         self.l1.delete(key)

@@ -1,0 +1,415 @@
+<div class="wiki-page">
+    <div class="wiki-header">
+        <h2>罗小黑战记 电影 1</h2>
+        <p class="wiki-intro" style="color: red">因为部分技术限制导致视频文件无法向域名部署，所以此功能暂时暂停</p>
+    </div>
+
+    <div class="video-player-container">
+        <div class="video-player" id="videoPlayer">
+            <video id="mainVideo" preload="none" playsinline>
+                您的浏览器不支持视频播放
+            </video>
+
+            <div class="video-controls" id="videoControls">
+                <div class="video-progress" id="videoProgress">
+                    <div class="video-progress-buffer" id="videoProgressBuffer"></div>
+                    <div class="video-progress-played" id="videoProgressPlayed"></div>
+                    <div class="video-progress-thumb" id="videoProgressThumb"></div>
+                </div>
+
+                <div class="video-controls-row">
+                    <div class="video-controls-left">
+                        <button class="video-btn" id="playPauseBtn" title="播放/暂停">
+                            <i class="fa fa-play"></i>
+                        </button>
+
+                        <div class="video-volume">
+                            <button class="video-btn" id="muteBtn" title="静音">
+                                <i class="fa fa-volume-up"></i>
+                            </button>
+                            <div class="video-volume-slider" id="volumeSlider">
+                                <div class="video-volume-fill" id="volumeFill"></div>
+                                <div class="video-volume-thumb" id="volumeThumb"></div>
+                            </div>
+                        </div>
+
+                        <div class="video-time">
+                            <span id="currentTime">00:00</span>
+                            <span class="video-time-sep">/</span>
+                            <span id="duration">00:00</span>
+                        </div>
+
+                        <div class="video-segment-info">
+                            <span id="segmentInfo">片段 1/92</span>
+                        </div>
+                    </div>
+
+                    <div class="video-controls-right">
+                        <div class="video-preload-info" id="preloadInfo">
+                            <span id="preloadCount">0</span>/92 已缓存
+                        </div>
+                        <button class="video-btn" id="fullscreenBtn" title="全屏">
+                            <i class="fa fa-expand"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-loading" id="videoLoading">
+                <div class="video-loading-spinner"></div>
+            </div>
+
+            <div class="video-play-overlay" id="videoPlayOverlay">
+                <div class="video-play-icon">
+                    <i class="fa fa-play"></i>
+                </div>
+                <p>点击播放</p>
+            </div>
+        </div>
+
+        <div class="video-playlist">
+            <h3>电影分段</h3>
+            <div class="video-playlist-items" id="videoPlaylist">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    var videoBaseUrl = '//img.crazying-dev.top/test/one/%E7%BD%97%E6%88%981/';
+    var TOTAL_SEGMENTS = 92;
+
+    var videoFiles = [];
+    for (var i = 1; i <= TOTAL_SEGMENTS; i++) {
+        var num = i < 10 ? '00' + i : (i < 100 ? '0' + i : i);
+        videoFiles.push({ name: '片段 ' + num, file: num + '.mp4', loaded: false });
+    }
+
+    var currentVideoIndex = 0;
+    var isPlaying = false;
+    var preloadQueue = [];
+    var isPreloading = false;
+    var preloadedVideos = {};
+    var preloadCount = 0;
+
+    var video = document.getElementById('mainVideo');
+    var playPauseBtn = document.getElementById('playPauseBtn');
+    var muteBtn = document.getElementById('muteBtn');
+    var fullscreenBtn = document.getElementById('fullscreenBtn');
+    var videoPlayer = document.getElementById('videoPlayer');
+    var videoProgress = document.getElementById('videoProgress');
+    var videoProgressPlayed = document.getElementById('videoProgressPlayed');
+    var videoProgressBuffer = document.getElementById('videoProgressBuffer');
+    var videoProgressThumb = document.getElementById('videoProgressThumb');
+    var currentTimeEl = document.getElementById('currentTime');
+    var durationEl = document.getElementById('duration');
+    var volumeSlider = document.getElementById('volumeSlider');
+    var volumeFill = document.getElementById('volumeFill');
+    var volumeThumb = document.getElementById('volumeThumb');
+    var videoLoading = document.getElementById('videoLoading');
+    var videoPlayOverlay = document.getElementById('videoPlayOverlay');
+    var videoPlaylist = document.getElementById('videoPlaylist');
+    var segmentInfo = document.getElementById('segmentInfo');
+    var preloadInfo = document.getElementById('preloadInfo');
+    var preloadCountEl = document.getElementById('preloadCount');
+
+    initPlaylist();
+    loadVideo(0, false);
+
+    function initPlaylist() {
+        var fragment = document.createDocumentFragment();
+        for (var i = 0; i < videoFiles.length; i++) {
+            (function(index) {
+                var item = videoFiles[index];
+                var div = document.createElement('div');
+                div.className = 'video-playlist-item' + (index === 0 ? ' active' : '');
+                div.id = 'playlist-item-' + index;
+                var indexDiv = document.createElement('div');
+                indexDiv.className = 'playlist-item-index';
+                indexDiv.textContent = index + 1;
+                var nameDiv = document.createElement('div');
+                nameDiv.className = 'playlist-item-name';
+                nameDiv.textContent = item.name;
+                var statusDiv = document.createElement('div');
+                statusDiv.className = 'playlist-item-status';
+                statusDiv.id = 'playlist-status-' + index;
+                div.appendChild(indexDiv);
+                div.appendChild(nameDiv);
+                div.appendChild(statusDiv);
+                div.addEventListener('click', function() {
+                    loadVideo(index, true);
+                    var rect = div.offsetTop - videoPlaylist.offsetTop;
+                    videoPlaylist.scrollTop = rect - 60;
+                });
+                fragment.appendChild(div);
+            })(i);
+        }
+        videoPlaylist.appendChild(fragment);
+    }
+
+    function startBackgroundPreload(startIndex) {
+        if (isPreloading) return;
+        preloadQueue = [];
+        for (var i = startIndex + 1; i < videoFiles.length; i++) {
+            if (!videoFiles[i].loaded) {
+                preloadQueue.push(i);
+            }
+        }
+        if (preloadQueue.length > 0) {
+            isPreloading = true;
+            preloadNextInQueue();
+        }
+    }
+
+    function preloadNextInQueue() {
+        if (preloadQueue.length === 0) {
+            isPreloading = false;
+            return;
+        }
+
+        var index = preloadQueue.shift();
+        if (videoFiles[index].loaded) {
+            preloadNextInQueue();
+            return;
+        }
+
+        var preloadVideo = document.createElement('video');
+        preloadVideo.preload = 'auto';
+        preloadVideo.muted = true;
+        preloadVideo.playsInline = true;
+        preloadVideo.style.display = 'none';
+        preloadVideo.src = videoBaseUrl + videoFiles[index].file;
+
+        preloadVideo.addEventListener('canplaythrough', function() {
+            videoFiles[index].loaded = true;
+            preloadedVideos[index] = preloadVideo;
+            preloadCount++;
+            preloadCountEl.textContent = preloadCount;
+            var statusEl = document.getElementById('playlist-status-' + index);
+            if (statusEl) {
+                statusEl.classList.add('loaded');
+                statusEl.title = '已缓存';
+            }
+            preloadNextInQueue();
+        });
+
+        preloadVideo.addEventListener('error', function() {
+            preloadNextInQueue();
+        });
+
+        preloadVideo.load();
+        document.body.appendChild(preloadVideo);
+    }
+
+    function loadVideo(index, autoPlay) {
+        currentVideoIndex = index;
+
+        if (preloadedVideos[index] && preloadedVideos[index].src) {
+            video.src = preloadedVideos[index].src;
+        } else {
+            video.src = videoBaseUrl + videoFiles[index].file;
+        }
+        video.load();
+
+        var items = document.querySelectorAll('.video-playlist-item');
+        for (var i = 0; i < items.length; i++) {
+            if (i === index) {
+                items[i].classList.add('active');
+            } else {
+                items[i].classList.remove('active');
+            }
+        }
+
+        segmentInfo.textContent = '片段 ' + (index + 1) + '/' + videoFiles.length;
+
+        if (!autoPlay) {
+            isPlaying = false;
+            updatePlayPauseIcon();
+            videoPlayOverlay.style.display = 'flex';
+        }
+
+        startBackgroundPreload(index);
+    }
+
+    function formatTime(seconds) {
+        if (isNaN(seconds)) return '00:00';
+        var hours = Math.floor(seconds / 3600);
+        var mins = Math.floor((seconds % 3600) / 60);
+        var secs = Math.floor(seconds % 60);
+        if (hours > 0) {
+            return String(hours).padStart(2, '0') + ':' + String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        }
+        return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+
+    function updatePlayPauseIcon() {
+        var icon = playPauseBtn.querySelector('i');
+        if (isPlaying) {
+            icon.className = 'fa fa-pause';
+        } else {
+            icon.className = 'fa fa-play';
+        }
+    }
+
+    function togglePlay() {
+        if (video.paused) {
+            video.play();
+        } else {
+            video.pause();
+        }
+    }
+
+    playPauseBtn.addEventListener('click', togglePlay);
+    videoPlayOverlay.addEventListener('click', togglePlay);
+    video.addEventListener('click', togglePlay);
+
+    video.addEventListener('play', function() {
+        isPlaying = true;
+        updatePlayPauseIcon();
+        videoPlayOverlay.style.display = 'none';
+    });
+
+    video.addEventListener('pause', function() {
+        isPlaying = false;
+        updatePlayPauseIcon();
+    });
+
+    video.addEventListener('ended', function() {
+        if (currentVideoIndex < videoFiles.length - 1) {
+            var nextIndex = currentVideoIndex + 1;
+            loadVideo(nextIndex, false);
+            video.play();
+        } else {
+            isPlaying = false;
+            updatePlayPauseIcon();
+            videoPlayOverlay.style.display = 'flex';
+        }
+    });
+
+    video.addEventListener('loadedmetadata', function() {
+        durationEl.textContent = formatTime(video.duration);
+    });
+
+    video.addEventListener('timeupdate', function() {
+        if (video.duration) {
+            var percent = (video.currentTime / video.duration) * 100;
+            videoProgressPlayed.style.width = percent + '%';
+            videoProgressThumb.style.left = percent + '%';
+        }
+        currentTimeEl.textContent = formatTime(video.currentTime);
+    });
+
+    video.addEventListener('progress', function() {
+        if (video.buffered.length > 0 && video.duration) {
+            var bufferedEnd = video.buffered.end(video.buffered.length - 1);
+            var percent = (bufferedEnd / video.duration) * 100;
+            videoProgressBuffer.style.width = percent + '%';
+        }
+    });
+
+    video.addEventListener('waiting', function() {
+        videoLoading.style.display = 'flex';
+    });
+
+    video.addEventListener('playing', function() {
+        videoLoading.style.display = 'none';
+    });
+
+    video.addEventListener('canplay', function() {
+        videoLoading.style.display = 'none';
+    });
+
+    var isDraggingProgress = false;
+
+    videoProgress.addEventListener('mousedown', function(e) {
+        isDraggingProgress = true;
+        updateProgress(e);
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (isDraggingProgress) {
+            updateProgress(e);
+        }
+    });
+
+    document.addEventListener('mouseup', function() {
+        isDraggingProgress = false;
+    });
+
+    function updateProgress(e) {
+        if (!video.duration) return;
+        var rect = videoProgress.getBoundingClientRect();
+        var percent = (e.clientX - rect.left) / rect.width;
+        percent = Math.max(0, Math.min(1, percent));
+        video.currentTime = percent * video.duration;
+    }
+
+    muteBtn.addEventListener('click', function() {
+        video.muted = !video.muted;
+        updateVolumeIcon();
+        updateVolumeDisplay();
+    });
+
+    video.addEventListener('volumechange', function() {
+        updateVolumeIcon();
+        updateVolumeDisplay();
+    });
+
+    function updateVolumeIcon() {
+        var icon = muteBtn.querySelector('i');
+        if (video.muted || video.volume === 0) {
+            icon.className = 'fa fa-volume-off';
+        } else if (video.volume < 0.5) {
+            icon.className = 'fa fa-volume-down';
+        } else {
+            icon.className = 'fa fa-volume-up';
+        }
+    }
+
+    function updateVolumeDisplay() {
+        var volume = video.muted ? 0 : video.volume;
+        volumeFill.style.width = (volume * 100) + '%';
+        volumeThumb.style.left = (volume * 100) + '%';
+    }
+
+    var isDraggingVolume = false;
+
+    volumeSlider.addEventListener('mousedown', function(e) {
+        isDraggingVolume = true;
+        updateVolume(e);
+    });
+
+    document.addEventListener('mousemove', function(e) {
+        if (isDraggingVolume) {
+            updateVolume(e);
+        }
+    });
+
+    document.addEventListener('mouseup', function() {
+        isDraggingVolume = false;
+    });
+
+    function updateVolume(e) {
+        var rect = volumeSlider.getBoundingClientRect();
+        var percent = (e.clientX - rect.left) / rect.width;
+        percent = Math.max(0, Math.min(1, percent));
+        video.volume = percent;
+        video.muted = false;
+    }
+
+    fullscreenBtn.addEventListener('click', function() {
+        if (videoPlayer.requestFullscreen) {
+            videoPlayer.requestFullscreen();
+        } else if (videoPlayer.webkitRequestFullscreen) {
+            videoPlayer.webkitRequestFullscreen();
+        } else if (videoPlayer.msRequestFullscreen) {
+            videoPlayer.msRequestFullscreen();
+        }
+    });
+
+    video.volume = 0.7;
+    updateVolumeDisplay();
+    updateVolumeIcon();
+})();
+</script>
