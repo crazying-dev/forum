@@ -228,7 +228,9 @@ function handleRegister() {
     var email = document.getElementById('regEmail').value.trim();
     var password = document.getElementById('regPassword').value;
     var confirmPassword = document.getElementById('regConfirmPassword').value;
-    var code = document.getElementById('regCode').value.trim().replace(/\D/g, '');
+    var rawCode = document.getElementById('regCode').value;
+    var code = rawCode.trim().replace(/\D/g, '');
+    console.log('[DEBUG] 原始输入:', JSON.stringify(rawCode), '处理后:', JSON.stringify(code), '长度:', code.length);
 
     if (!name || !email || !password || !confirmPassword) {
         document.getElementById('registerError').textContent = '请填写所有字段';
