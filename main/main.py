@@ -14,6 +14,7 @@ from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user,
 from werkzeug.security import generate_password_hash, check_password_hash
 from markupsafe import escape as html_escape
 from api import database as db, config, cache as cache_api
+import markdown
 import gzip
 import hashlib as _hashlib
 from io import BytesIO as _BytesIO
@@ -180,6 +181,7 @@ def csrf_protect():
 # ── 速率限制（内存，按 IP 维度）───────────────────────────
 
 _rate_limit_store = {}
+_user_last_post_time = {}  # 用户发帖冷却：user_id → 上次发帖时间戳
 
 def rate_limit(key, max_count, window_seconds):
 	"""简易速率限制装饰器。
@@ -485,10 +487,18 @@ def api_register():
 		return jsonify({'success': False, 'message': result.get('message', '注册失败')})
 
 	user_id = result['id']
+
+	# 注册成功后自动发送邮箱验证邮件
+	token_result = db.create_verify_token(user_id, 'email_verify')
+	if token_result.get('success'):
+		subject = '【妖精论坛】邮箱验证'
+		body = generate_verify_email_body(name, token_result['token'], 'email_verify')
+		send_email(email, subject, body)
+
 	user = db.get_user_by_id(user_id)
 	if user:
 		login_user(UserWrapper(user), remember=True)
-	return jsonify({'success': True, 'id': user_id})
+	return jsonify({'success': True, 'id': user_id, 'message': '注册成功，验证邮件已发送至您的邮箱'})
 
 
 @app.route('/api/login', methods=['POST'])
@@ -965,6 +975,25 @@ def api_post_detail(post_id):
 def api_post_create():
 	if rate_limit('post_create', 10, 60):
 		return jsonify({'success': False, 'message': '发帖过于频繁，请稍后再试'}), 429
+	
+	# 用户级发帖冷却：同一用户两次发帖间隔至少 60 秒
+	now = time.time()
+	last_time = _user_last_post_time.get(current_user['id'], 0)
+	if now - last_time < 60:
+		remaining = int(60 - (now - last_time))
+		return jsonify({
+			'success': False,
+			'message': f'发帖过于频繁，请等待 {remaining} 秒后再试'
+		}), 429
+	
+	# 邮箱未验证用户禁止发帖，防止机器人刷屏
+	user_info = db.get_user_by_id(current_user['id'])
+	if user_info and not user_info.get('email_verified'):
+		return jsonify({
+			'success': False,
+			'message': '请先验证邮箱后再发帖'
+		}), 403
+	
 	data = request.get_json() or {}
 	title = data.get('title', '').strip()
 	content = data.get('content', '').strip()
@@ -975,8 +1004,11 @@ def api_post_create():
 		return jsonify({'success': False, 'message': '标题过长（最多100字）'}), 400
 	if not content:
 		return jsonify({'success': False, 'message': '内容不能为空'}), 400
+	# 将 Markdown 内容转换为 HTML，再经 safe_html 过滤后存储
+	content = markdown.markdown(content, extensions=['extra', 'codehilite'])
 	result = db.Send_Post(current_user['id'], title, content, category)
 	if result.get('success'):
+		_user_last_post_time[current_user['id']] = time.time()  # 记录成功发帖时间
 		cache_api.invalidate_post_cache()
 		cache_api.invalidate_user_cache(current_user['id'])
 	return jsonify(result)

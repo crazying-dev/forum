@@ -58,35 +58,67 @@ if not DATABASE_URL:
 POST_ID_PREFIX = 'PS'
 _table_checked = False
 
-DANGEROUS_TAGS = {'script', 'iframe', 'embed', 'object', 'applet', 'base', 'form', 'input', 'textarea',
-                  'select', 'option', 'button', 'link', 'meta', 'svg', 'math'}
+# 白名单：仅允许这些安全标签
+ALLOWED_TAGS = [
+    'p', 'br', 'hr',
+    'strong', 'em', 'u', 'del', 'ins', 'sub', 'sup',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'blockquote', 'code', 'pre',
+    'ul', 'ol', 'li',
+    'a', 'img',
+    'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption',
+    'span', 'div',
+    'dl', 'dt', 'dd',
+    'abbr', 'cite',
+]
+
+# 白名单：仅允许这些属性
+ALLOWED_ATTRS = {
+    '*': ['class', 'id', 'title', 'lang', 'dir', 'style'],
+    'a': ['href', 'target', 'rel', 'name'],
+    'img': ['src', 'alt', 'width', 'height', 'loading', 'style'],
+    'td': ['colspan', 'rowspan', 'align', 'valign'],
+    'th': ['colspan', 'rowspan', 'align', 'valign'],
+    'table': ['border', 'cellpadding', 'cellspacing'],
+    'ol': ['start', 'reversed'],
+    'abbr': ['title'],
+}
+
+# 允许的 URL 协议
+ALLOWED_PROTOCOLS = ['http:', 'https:', 'ftp:', 'mailto:']
+
+# 允许的 CSS 属性白名单
+ALLOWED_CSS_PROPERTIES = [
+    'color', 'background-color', 'background',
+    'font-size', 'font-weight', 'font-style', 'font-family',
+    'text-align', 'text-decoration', 'line-height',
+    'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+    'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
+    'border-color', 'border-style', 'border-width', 'border-radius',
+    'width', 'max-width', 'min-width', 'height', 'max-height', 'min-height',
+    'display', 'overflow',
+]
 
 
 def safe_html(content):
-	"""对用户提交的 HTML 内容进行净化（黑名单 + 事件属性移除）。
+	"""对用户提交的 HTML 内容进行净化（白名单 + bleach）。
 
-	注意：这是基础净化。更严格的场景应使用 bleach 等专用库。
+	使用 bleach 库进行白名单过滤，仅保留安全的标签、属性和 URL 协议。
 	"""
 	if not content:
 		return ''
-	import html as html_module
-	# 先反转义，确保实体编码的内容也能被检测到
-	content = html_module.unescape(content)
-	# 移除 HTML 注释（可藏恶意代码）
-	content = re.sub(r'<!--[\s\S]*?-->', '', content)
-	# 移除危险标签（开标签和自闭合）
-	tag_pattern = '|'.join(sorted(DANGEROUS_TAGS))
-	content = re.sub(rf'<(?:{tag_pattern})\b[^>]*>', '', content, flags=re.IGNORECASE)
-	content = re.sub(rf'</(?:{tag_pattern})\s*>', '', content, flags=re.IGNORECASE)
-	# 移除所有事件处理属性 onXxx=...
-	content = re.sub(r'\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)', '', content, flags=re.IGNORECASE)
-	# 移除 javascript: 伪协议
-	content = re.sub(r'(href|src|action|formaction)\s*=\s*("javascript:[^"]*"|\'javascript:[^\']*\'|javascript:[^\s>]+)',
-	                 '', content, flags=re.IGNORECASE)
-	# 移除 data: 伪协议中的非图片类型（防 HTML 注入）
-	content = re.sub(r'(href|src|action)\s*=\s*("data:text/html[^"]*"|\'data:text/html[^\']*\')',
-	                 '', content, flags=re.IGNORECASE)
-	return content
+	import bleach
+	from bleach.css_sanitizer import CSSSanitizer
+	css_sanitizer = CSSSanitizer(allowed_css_properties=ALLOWED_CSS_PROPERTIES)
+	return bleach.clean(
+		content,
+		tags=ALLOWED_TAGS,
+		attributes=ALLOWED_ATTRS,
+		protocols=ALLOWED_PROTOCOLS,
+		css_sanitizer=css_sanitizer,
+		strip=True,
+	)
 
 
 DEFAULT_AVATARS = [
@@ -1443,15 +1475,16 @@ def search_users(keyword, page=1, page_size=20):
 	if not keyword or not keyword.strip():
 		return []
 	offset = (page - 1) * page_size
+	like_pattern = f"%{keyword}%"
 	results = execute_query(
 		"""
         SELECT id, name, avatar, vip, prefix, is_banned, created_at
         FROM users
-        WHERE is_banned = 0 AND name ILIKE %s
+        WHERE is_banned = 0 AND (name ILIKE %s OR intro ILIKE %s)
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
-		(f"%{keyword}%", page_size, offset),
+		(like_pattern, like_pattern, page_size, offset),
 		fetch_all=True
 	)
 	users = []
