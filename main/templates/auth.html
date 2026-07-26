@@ -74,15 +74,28 @@
 
         <div class="auth-form" id="forgotPasswordForm" style="display:none;">
             <div class="auth-header">
-                <h2>忘记密码</h2>
-                <p>输入您的注册邮箱，我们将发送重置链接</p>
+                <h2>重置密码</h2>
+                <p>输入邮箱获取验证码，设置新密码</p>
             </div>
             <div class="auth-input-group">
                 <span class="auth-icon"><i class="fa fa-envelope"></i></span>
-                <input type="email" id="forgotEmail" placeholder="注册邮箱">
+                <input type="email" id="resetEmail" placeholder="注册邮箱">
             </div>
-            <button class="auth-btn primary" onclick="handleForgotPassword()">发送重置链接</button>
-            <div class="auth-error" id="forgotPasswordError"></div>
+            <div class="auth-input-group auth-code-group">
+                <span class="auth-icon"><i class="fa fa-shield"></i></span>
+                <input type="text" id="resetCode" placeholder="验证码（6位数字）" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+                <button class="auth-btn code-btn" id="sendResetCodeBtn" onclick="handleSendResetCode()">获取验证码</button>
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                <input type="password" id="resetNewPassword" placeholder="新密码（至少8位，含字母和数字）">
+            </div>
+            <div class="auth-input-group">
+                <span class="auth-icon"><i class="fa fa-lock"></i></span>
+                <input type="password" id="resetConfirmNewPassword" placeholder="确认新密码">
+            </div>
+            <button class="auth-btn primary" onclick="handleResetByCode()">重置密码</button>
+            <div class="auth-error" id="resetByCodeError"></div>
             <button class="auth-btn secondary" onclick="showLogin()">返回登录</button>
         </div>
 
@@ -124,7 +137,7 @@ function showLogin() {
     document.querySelector('[data-tab="login"]').classList.add('active');
     document.getElementById('loginError').textContent = '';
     document.getElementById('registerError').textContent = '';
-    document.getElementById('forgotPasswordError').textContent = '';
+    document.getElementById('resetByCodeError').textContent = '';
     document.getElementById('resetPasswordError').textContent = '';
 }
 
@@ -263,15 +276,20 @@ function handleRegister() {
     });
 }
 
-function handleForgotPassword() {
-    var email = document.getElementById('forgotEmail').value.trim();
+function handleSendResetCode() {
+    var email = document.getElementById('resetEmail').value.trim();
+    var btn = document.getElementById('sendResetCodeBtn');
 
-    if (!email) {
-        document.getElementById('forgotPasswordError').textContent = '请输入邮箱';
+    if (!email || email.indexOf('@') === -1) {
+        document.getElementById('resetByCodeError').textContent = '请先输入有效的邮箱';
         return;
     }
 
-    fetch('/api/send-reset-password', {
+    btn.disabled = true;
+    btn.textContent = '发送中...';
+    document.getElementById('resetByCodeError').textContent = '';
+
+    fetch('/api/send-code-reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email })
@@ -279,19 +297,71 @@ function handleForgotPassword() {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.success) {
-            document.getElementById('forgotPasswordError').textContent = '';
-            alert(data.message);
-            if (data.token) {
-                showResetPassword(data.token);
-            } else {
-                showLogin();
-            }
+            document.getElementById('resetByCodeError').textContent = '';
+            var countdown = 60;
+            btn.textContent = countdown + 's';
+            var timer = setInterval(function() {
+                countdown--;
+                btn.textContent = countdown + 's';
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    btn.textContent = '重新获取';
+                    btn.disabled = false;
+                }
+            }, 1000);
         } else {
-            document.getElementById('forgotPasswordError').textContent = data.message || '操作失败';
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+            document.getElementById('resetByCodeError').textContent = data.message || '发送失败';
         }
     })
     .catch(function(err) {
-        document.getElementById('forgotPasswordError').textContent = '网络错误';
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+        document.getElementById('resetByCodeError').textContent = '网络错误';
+    });
+}
+
+function handleResetByCode() {
+    var email = document.getElementById('resetEmail').value.trim();
+    var rawCode = document.getElementById('resetCode').value;
+    var code = rawCode.trim().replace(/\D/g, '');
+    var password = document.getElementById('resetNewPassword').value;
+    var confirmPassword = document.getElementById('resetConfirmNewPassword').value;
+
+    if (!email) {
+        document.getElementById('resetByCodeError').textContent = '请输入邮箱';
+        return;
+    }
+    if (!code || code.length !== 6) {
+        document.getElementById('resetByCodeError').textContent = '请输入6位数字验证码';
+        return;
+    }
+    if (!password || !confirmPassword) {
+        document.getElementById('resetByCodeError').textContent = '请填写密码';
+        return;
+    }
+    if (password !== confirmPassword) {
+        document.getElementById('resetByCodeError').textContent = '两次密码不一致';
+        return;
+    }
+
+    fetch('/api/reset-password-by-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, code: code, password: password })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('密码重置成功，请重新登录');
+            showLogin();
+        } else {
+            document.getElementById('resetByCodeError').textContent = data.message || '操作失败';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('resetByCodeError').textContent = '网络错误';
     });
 }
 
