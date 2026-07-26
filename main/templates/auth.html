@@ -228,7 +228,7 @@ function handleRegister() {
     var email = document.getElementById('regEmail').value.trim();
     var password = document.getElementById('regPassword').value;
     var confirmPassword = document.getElementById('regConfirmPassword').value;
-    var code = document.getElementById('regCode').value.trim();
+    var code = document.getElementById('regCode').value.trim().replace(/\D/g, '');
 
     if (!name || !email || !password || !confirmPassword) {
         document.getElementById('registerError').textContent = '请填写所有字段';
