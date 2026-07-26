@@ -986,14 +986,6 @@ def api_post_create():
 			'message': f'发帖过于频繁，请等待 {remaining} 秒后再试'
 		}), 429
 	
-	# 邮箱未验证用户禁止发帖，防止机器人刷屏
-	user_info = db.get_user_by_id(current_user['id'])
-	if user_info and not user_info.get('email_verified'):
-		return jsonify({
-			'success': False,
-			'message': '请先验证邮箱后再发帖'
-		}), 403
-	
 	data = request.get_json() or {}
 	title = data.get('title', '').strip()
 	content = data.get('content', '').strip()
