@@ -1126,6 +1126,10 @@ def RSS():
 def QQ_redirect():
 	return redirect("https://qm.qq.com/q/bLxr68HnUI")
 
+@app.route("/INFO")
+def INFO():
+	return """妖精论坛——一个充满神秘色彩的封闭区域，在此处，你会与聚灵而生的妖精，亦或者得到某种机遇而打开修行之路的人类，展开全新的相遇"""
+
 
 # ─────── 蓝溪拾遗用户头像返回API ───────
 subdomain_rule = re.compile(r"^https://[\w\-]+\.navifox\.net$")
