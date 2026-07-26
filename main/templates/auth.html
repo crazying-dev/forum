@@ -1,4 +1,17 @@
 <div class="auth-container">
+    <style>
+        .auth-code-group { display: flex; gap: 8px; padding-right: 4px; }
+        .auth-code-group .auth-icon { flex-shrink: 0; }
+        .auth-code-group input { flex: 1; min-width: 0; }
+        .code-btn {
+            flex-shrink: 0; padding: 0 12px; height: 44px; border: none;
+            border-radius: 8px; background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff; font-size: 13px; cursor: pointer; white-space: nowrap;
+            transition: opacity 0.3s, transform 0.2s; line-height: 44px;
+        }
+        .code-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .code-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    </style>
     <div class="auth-card">
         <div class="auth-tabs">
             <button class="auth-tab active" data-tab="login">登录</button>
@@ -49,6 +62,11 @@
             <div class="auth-input-group">
                 <span class="auth-icon"><i class="fa fa-lock"></i></span>
                 <input type="password" id="regConfirmPassword" placeholder="确认密码">
+            </div>
+            <div class="auth-input-group auth-code-group">
+                <span class="auth-icon"><i class="fa fa-shield"></i></span>
+                <input type="text" id="regCode" placeholder="验证码（6位数字）" maxlength="6" inputmode="numeric" pattern="[0-9]*">
+                <button class="auth-btn code-btn" id="sendCodeBtn" onclick="handleSendRegisterCode()">获取验证码</button>
             </div>
             <button class="auth-btn primary" onclick="handleRegister()">注册</button>
             <div class="auth-error" id="registerError"></div>
@@ -159,11 +177,58 @@ function handleLogin() {
     });
 }
 
+function handleSendRegisterCode() {
+    var email = document.getElementById('regEmail').value.trim();
+    var btn = document.getElementById('sendCodeBtn');
+
+    if (!email || email.indexOf('@') === -1) {
+        document.getElementById('registerError').textContent = '请先输入有效的邮箱';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '发送中...';
+    document.getElementById('registerError').textContent = '';
+
+    fetch('/api/send-register-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('registerError').textContent = '';
+            var countdown = 60;
+            btn.textContent = countdown + 's';
+            var timer = setInterval(function() {
+                countdown--;
+                btn.textContent = countdown + 's';
+                if (countdown <= 0) {
+                    clearInterval(timer);
+                    btn.textContent = '重新获取';
+                    btn.disabled = false;
+                }
+            }, 1000);
+        } else {
+            btn.disabled = false;
+            btn.textContent = '获取验证码';
+            document.getElementById('registerError').textContent = data.message || '发送失败';
+        }
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '获取验证码';
+        document.getElementById('registerError').textContent = '网络错误';
+    });
+}
+
 function handleRegister() {
     var name = document.getElementById('regName').value.trim();
     var email = document.getElementById('regEmail').value.trim();
     var password = document.getElementById('regPassword').value;
     var confirmPassword = document.getElementById('regConfirmPassword').value;
+    var code = document.getElementById('regCode').value.trim();
 
     if (!name || !email || !password || !confirmPassword) {
         document.getElementById('registerError').textContent = '请填写所有字段';
@@ -173,11 +238,15 @@ function handleRegister() {
         document.getElementById('registerError').textContent = '两次密码不一致';
         return;
     }
+    if (!code || code.length !== 6) {
+        document.getElementById('registerError').textContent = '请输入6位数字验证码';
+        return;
+    }
 
     fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name, email: email, password: password })
+        body: JSON.stringify({ name: name, email: email, password: password, code: code })
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {
