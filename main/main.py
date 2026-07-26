@@ -427,6 +427,43 @@ def EasterEgg():
 
 # ── 认证 API ──────────────────────────────────────────────
 
+@app.route('/api/send-register-code', methods=['POST'])
+def api_send_register_code():
+	"""发送6位验证码到邮箱用于注册（无需登录）。"""
+	if rate_limit('register_code', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
+	data = request.get_json() or {}
+	email = (data.get('email') or '').strip().lower()
+
+	if not email or '@' not in email:
+		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+
+	# 检查邮箱是否已被注册
+	existing_user = db.get_user_by_email(email)
+	if existing_user:
+		return jsonify({'success': False, 'message': '该邮箱已被注册'})
+
+	code = str(random.randint(100000, 999999))
+	result = db.create_verify_code(email, code, 'register')
+	if not result.get('success'):
+		return jsonify({'success': False, 'message': '生成验证码失败'})
+
+	subject = '【妖精论坛】注册验证码'
+	body = f"""感谢您注册妖精论坛！
+
+您的注册验证码为：{code}
+
+验证码有效期5分钟，请勿泄露给他人。
+如非本人操作，请忽略此邮件。
+
+© 2024 妖精论坛 - 粉丝公益创作"""
+	sent = send_email(subject, body, receiver_list=[email])
+	if sent:
+		return jsonify({'success': True, 'message': '验证码已发送至邮箱'})
+	else:
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
+
+
 @app.route('/api/register', methods=['POST'])
 def api_register():
 	if rate_limit('register', 5, 300):
@@ -446,11 +483,30 @@ def api_register():
 	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
 		return jsonify({'success': False, 'message': '密码需包含字母和数字'})
 
+	# 注册验证码校验
+	code = (data.get('code') or '').strip()
+	if not code or not code.isdigit() or len(code) != 6:
+		return jsonify({'success': False, 'message': '请输入6位数字验证码'})
+	code_info = db.get_verify_code(email, code, 'register')
+	if not code_info:
+		db.increment_verify_code_attempts(email, 'register')
+		return jsonify({'success': False, 'message': '验证码无效或已过期'})
+
 	hashed = generate_password_hash(password)
 	result = db.new_user(name, email, hashed)
 
 	if not result.get('success'):
 		return jsonify({'success': False, 'message': result.get('message', '注册失败')})
+
+	# 验证码校验通过，标记已使用
+	try:
+		db.mark_verify_code_used(email, code, 'register')
+		db.execute_query(
+			"DELETE FROM verify_codes WHERE email = %s AND purpose = %s AND (expires_at < CURRENT_TIMESTAMP OR used = 1)",
+			(email, 'register')
+		)
+	except Exception:
+		pass
 
 	user_id = result['id']
 	user = db.get_user_by_id(user_id)
@@ -594,6 +650,162 @@ def api_reset_password():
 	)
 	db.delete_verify_token(token)
 	
+	return jsonify({'success': True, 'message': '密码重置成功'})
+
+
+# ── 验证码 API ──────────────────────────────────────────────
+
+
+@app.route('/api/send-verify-code', methods=['POST'])
+@login_required
+def api_send_verify_code():
+	"""发送6位验证码到当前登录用户的邮箱（用于邮箱验证）。"""
+	if rate_limit('verify_code', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
+	user = db.get_user_by_id(current_user['id'])
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+	if user.get('email_verified'):
+		return jsonify({'success': False, 'message': '邮箱已验证，无需重复验证'})
+
+	code = str(random.randint(100000, 999999))
+	result = db.create_verify_code(user['email'], code, 'email_verify')
+	if not result.get('success'):
+		return jsonify({'success': False, 'message': '生成验证码失败'})
+
+	subject = '【妖精论坛】邮箱验证码'
+	body = f"""尊敬的 {user['name']}，您好！
+
+您的邮箱验证码为：{code}
+
+验证码有效期5分钟，请勿泄露给他人。
+如非本人操作，请忽略此邮件。
+
+© 2024 妖精论坛 - 粉丝公益创作"""
+	sent = send_email(subject, body, receiver_list=[user['email']])
+	if sent:
+		return jsonify({'success': True, 'message': '验证码已发送至邮箱'})
+	else:
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
+
+
+@app.route('/api/verify-code-email', methods=['POST'])
+@login_required
+def api_verify_code_email():
+	"""使用6位验证码验证邮箱。"""
+	if rate_limit('verify_code', 5, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请稍后再试'}), 429
+	user = db.get_user_by_id(current_user['id'])
+	if not user:
+		return jsonify({'success': False, 'message': '用户不存在'})
+
+	data = request.get_json() or {}
+	code = (data.get('code') or '').strip()
+
+	if not code or not code.isdigit() or len(code) != 6:
+		return jsonify({'success': False, 'message': '请输入6位数字验证码'})
+
+	code_info = db.get_verify_code(user['email'], code, 'email_verify')
+	if not code_info:
+		db.increment_verify_code_attempts(user['email'], 'email_verify')
+		return jsonify({'success': False, 'message': '验证码无效或已过期'})
+
+	db.update_user_email_verified(current_user['id'])
+	db.mark_verify_code_used(user['email'], code, 'email_verify')
+
+	# 清理该邮箱此用途的过期验证码
+	try:
+		db.execute_query(
+			"DELETE FROM verify_codes WHERE email = %s AND purpose = %s AND (expires_at < CURRENT_TIMESTAMP OR used = 1)",
+			(user['email'], 'email_verify')
+		)
+	except Exception:
+		pass
+
+	return jsonify({'success': True, 'message': '邮箱验证成功'})
+
+
+@app.route('/api/send-code-reset-password', methods=['POST'])
+def api_send_code_reset_password():
+	"""发送6位验证码到用户邮箱用于重置密码。"""
+	if rate_limit('reset_pwd_code', 3, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
+	data = request.get_json() or {}
+	email = (data.get('email') or '').strip().lower()
+
+	if not email or '@' not in email:
+		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+
+	user = db.get_user_by_email(email)
+	if not user:
+		# 防止邮箱枚举
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，验证码已发送至邮箱'})
+
+	code = str(random.randint(100000, 999999))
+	result = db.create_verify_code(email, code, 'password_reset')
+	if not result.get('success'):
+		return jsonify({'success': False, 'message': '生成验证码失败'})
+
+	subject = '【妖精论坛】重置密码验证码'
+	body = f"""尊敬的 {user['name']}，您好！
+
+您正在请求重置密码，验证码为：{code}
+
+验证码有效期5分钟，请勿泄露给他人。
+如非本人操作，请忽略此邮件。
+
+© 2024 妖精论坛 - 粉丝公益创作"""
+	sent = send_email(subject, body, receiver_list=[email])
+	if sent:
+		return jsonify({'success': True, 'message': '如果该邮箱已注册，验证码已发送至邮箱'})
+	else:
+		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
+
+
+@app.route('/api/reset-password-by-code', methods=['POST'])
+def api_reset_password_by_code():
+	"""使用6位验证码重置密码。"""
+	if rate_limit('reset_pwd_code', 5, 300):
+		return jsonify({'success': False, 'message': '请求过于频繁，请稍后再试'}), 429
+	data = request.get_json() or {}
+	email = (data.get('email') or '').strip().lower()
+	code = (data.get('code') or '').strip()
+	password = data.get('password') or ''
+
+	if not email or '@' not in email:
+		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+	if not code or not code.isdigit() or len(code) != 6:
+		return jsonify({'success': False, 'message': '请输入6位数字验证码'})
+	if len(password) < 8:
+		return jsonify({'success': False, 'message': '密码至少8位'})
+	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
+		return jsonify({'success': False, 'message': '密码需包含字母和数字'})
+
+	user = db.get_user_by_email(email)
+	if not user:
+		return jsonify({'success': False, 'message': '该邮箱未注册'})
+
+	code_info = db.get_verify_code(email, code, 'password_reset')
+	if not code_info:
+		db.increment_verify_code_attempts(email, 'password_reset')
+		return jsonify({'success': False, 'message': '验证码无效或已过期'})
+
+	hashed = generate_password_hash(password)
+	db.execute_query(
+		"UPDATE users SET password = %s WHERE id = %s",
+		(hashed, user['id'])
+	)
+	db.mark_verify_code_used(email, code, 'password_reset')
+
+	# 清理该邮箱此用途的过期验证码
+	try:
+		db.execute_query(
+			"DELETE FROM verify_codes WHERE email = %s AND purpose = %s AND (expires_at < CURRENT_TIMESTAMP OR used = 1)",
+			(email, 'password_reset')
+		)
+	except Exception:
+		pass
+
 	return jsonify({'success': True, 'message': '密码重置成功'})
 
 
