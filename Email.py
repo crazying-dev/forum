@@ -3,15 +3,10 @@ import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
+from api.config import *
 
-# 阿里云邮件推送配置
-SMTP_HOST = "smtpdm.aliyun.com"
-SMTP_PORT = 465
-SMTP_PASSWORD = "LiMingGe120615"
-SENDER = "maomi@email.yjlt.top"
+SENDER = SMTP_USER
 SENDER_NAME = "妖精论坛"
-RECEIVERALL = "3890320020@qq.com"
-post_ID = "PS17847825537000173568"
 
 
 def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER = RECEIVERALL) -> bool:
@@ -54,6 +49,3 @@ def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER 
         print(f"❌ 未知错误：{e}")
         return False
 
-
-if __name__ == "__main__":
-    send_email("论坛帖子违规警告", f"您的ID为 {post_ID} 的帖子包含违规行为，先将帖子下架并给予警告，平台将重点追踪后续行为    ───妖精论坛二创平台")

@@ -16,7 +16,7 @@ SMTP_ENABLED = True
 SMTP_HOST = os.getenv('SMTP_HOST', 'smtpdm.aliyun.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', '465'))
 SMTP_USER = os.getenv('SMTP_USER', 'maomi@email.yjlt.top')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD', 'LiMingGe120615')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 SMTP_FROM_NAME = "妖精论坛(二创)"
 
 # 数据库相关变量
