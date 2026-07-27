@@ -3,6 +3,7 @@ import time
 import json
 import hashlib
 import os
+from flask_cors import CORS
 
 from admin.admin import AdminKernel
 
@@ -11,7 +12,7 @@ app = flask.Flask(__name__)
 REQUEST_TIMEOUT = 120
 
 kernel = AdminKernel()
-
+CORS(kernel)
 
 def _error(msg, code=401):
 	return flask.jsonify({'success': False, 'message': msg}), code
