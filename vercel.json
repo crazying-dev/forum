@@ -6,6 +6,7 @@
       "use": "@vercel/python",
       "config": {
         "runtime": "python3.11",
+        "entrypoint": "main.main:app",
         "includeFiles": "**/*.{py,json,html,css,js,webp,png,svg}",
         "maxDuration": 60
       }
