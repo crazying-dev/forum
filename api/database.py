@@ -1493,6 +1493,58 @@ def delete_comment(comment_id, user_id):
 	return {"success": True, "post_id": post_id}
 
 
+def get_replies_to_my_comments(user_id, page=1, page_size=50):
+	"""获取回复了当前用户评论的回复列表（含对应的帖子标题）"""
+	offset = (page - 1) * page_size
+	results = execute_query(
+		"""
+        SELECT c.id, c.content, c.parent_id, c.created_at,
+               r.user_id AS replier_id, r.content AS reply_content, r.created_at AS reply_created_at,
+               u.name AS replier_name, u.avatar AS replier_avatar,
+               p.id AS post_id, p.title AS post_title
+        FROM comments c
+        JOIN comments r ON r.parent_id = c.id AND r.status = 1
+        JOIN users u ON r.user_id = u.id
+        JOIN posts p ON c.post_id = p.id
+        WHERE c.user_id = %s AND c.status = 1
+        ORDER BY r.created_at DESC
+        LIMIT %s OFFSET %s
+        """,
+		(user_id, page_size, offset),
+		fetch_all=True
+	)
+	replies = []
+	for r in results:
+		replies.append({
+			"comment_id": r[0],
+			"comment_content": r[1],
+			"parent_id": r[2],
+			"comment_created_at": str(r[3]) if r[3] else None,
+			"replier_id": r[4],
+			"reply_content": r[5],
+			"reply_created_at": str(r[6]) if r[6] else None,
+			"replier_name": r[7],
+			"replier_avatar": r[8],
+			"post_id": r[9],
+			"post_title": r[10],
+		})
+	
+	# Also get total count
+	count_result = execute_query(
+		"""
+        SELECT COUNT(*)
+        FROM comments c
+        JOIN comments r ON r.parent_id = c.id AND r.status = 1
+        WHERE c.user_id = %s AND c.status = 1
+        """,
+		(user_id,),
+		fetch=True
+	)
+	total = count_result[0] if count_result else 0
+	
+	return {"replies": replies, "total": total}
+
+
 def search_posts(keyword, page=1, page_size=20):
 	"""搜索帖子（按标题和内容匹配）。
 

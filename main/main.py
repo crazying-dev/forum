@@ -1170,6 +1170,15 @@ def api_post_like(post_id):
 	return jsonify(result)
 
 
+@app.route('/api/users/me/replies')
+@login_required
+def api_my_replies():
+	page = request.args.get('page', 1, type=int)
+	page_size = request.args.get('page_size', 50, type=int)
+	result = db.get_replies_to_my_comments(current_user['id'], page, page_size)
+	return jsonify({"success": True, **result})
+
+
 @app.route('/api/posts/<post_id>/comments')
 def api_post_comments(post_id):
 	page = request.args.get('page', 1, type=int)

@@ -38,7 +38,7 @@
                 </label>
                 <a href="#" class="forgot-password" onclick="showForgotPassword()">忘记密码？</a>
             </div>
-            <button class="auth-btn primary" onclick="handleLogin()">登录</button>
+            <button class="auth-btn primary" id="loginBtn">登录</button>
             <div class="auth-error" id="loginError"></div>
         </div>
 
@@ -68,7 +68,7 @@
                 <input type="text" id="regCode" placeholder="验证码（6位数字）" maxlength="6" inputmode="numeric" pattern="[0-9]*">
                 <button class="auth-btn code-btn" id="sendCodeBtn" onclick="handleSendRegisterCode()">获取验证码</button>
             </div>
-            <button class="auth-btn primary" onclick="handleRegister()">注册</button>
+            <button class="auth-btn primary" id="registerBtn">注册</button>
             <div class="auth-error" id="registerError"></div>
         </div>
 

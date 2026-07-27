@@ -127,6 +127,22 @@
                     <i class="fa fa-bars"></i>
                 </button>
             </li>
+            <li class="header-collapsible">
+                <button class="header-btn" id="notificationBtn">
+                    <i class="fa fa-bell"></i>
+                    <span>通知</span>
+                    <span id="notificationBadge" class="notification-badge" style="display:none">0</span>
+                </button>
+                <div class="notification-panel" id="notificationPanel">
+                    <div class="notification-header">
+                        <span>回复通知</span>
+                        <button id="notificationClose" class="notification-close">&times;</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-loading">加载中...</div>
+                    </div>
+                </div>
+            </li>
             <li>
                 <a id="UserInfo" href="#">
                     <div class="user-avatar" id="user-avatar">
