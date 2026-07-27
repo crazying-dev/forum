@@ -551,6 +551,23 @@ def api_login():
 
 	db.update_user_last_login(user['id'])
 	login_user(UserWrapper(user), remember=remember)
+
+	# 发送登录提醒邮件（异步，不阻塞登录）
+	user_email = user.get('email')
+	if user_email:
+		try:
+			now_str = time.strftime('%Y-%m-%d %H:%M:%S')
+			send_email(
+				'【妖精论坛】登录提醒',
+				f'尊敬的 {user["name"]}，您好！\n\n'
+				f'您的账号已于 {now_str} 登录妖精论坛。\n'
+				f'如非本人操作，请立即修改密码。\n\n'
+				f'© 2024 妖精论坛 - 粉丝公益创作',
+				receiver_list=[user_email]
+			)
+		except Exception:
+			pass  # 邮件发送失败不影响登录流程
+
 	return jsonify({'success': True, 'id': user['id']})
 
 
@@ -1232,6 +1249,37 @@ def api_comment_create(post_id):
 		cache_api.post_detail_cache.delete(f'post:{post_id}')
 		cache_api.comment_cache.delete(f'comments:{post_id}:page:1:size:50')
 		comment = result.get('comment')
+
+		# 如果是对评论的回复，发邮件通知原作者
+		if parent_id:
+			try:
+				parent_result = db.execute_query(
+					"SELECT c.user_id, p.title AS post_title, u2.name AS replier_name "
+					"FROM comments c "
+					"JOIN posts p ON c.post_id = p.id "
+					"JOIN users u2 ON c.user_id = u2.id "
+					"WHERE c.id = %s",
+					(parent_id,),
+					fetch=True
+				)
+				if parent_result:
+					parent_user_id = parent_result[0]
+					post_title = parent_result[1]
+					replier_name = parent_result[2]
+					parent_user = db.get_user_by_id(parent_user_id)
+					if parent_user and parent_user.get('email'):
+						send_email(
+							'【妖精论坛】回复通知',
+							f'尊敬的 {parent_user["name"]}，您好！\n\n'
+							f'用户 {replier_name} 回复了您在帖子《{post_title}》中的评论：\n'
+							f'"{content}"\n\n'
+							f'点击查看：{request.host_url}post/{post_id}\n\n'
+							f'© 2024 妖精论坛 - 粉丝公益创作',
+							receiver_list=[parent_user['email']]
+						)
+			except Exception:
+				pass  # 邮件发送失败不影响评论
+
 		return jsonify({'success': True, 'comment': comment})
 	return jsonify(result)
 
