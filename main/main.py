@@ -12,6 +12,7 @@ from flask import *
 from flask_cors import CORS, cross_origin
 from flask_login import LoginManager, UserMixin, AnonymousUserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from markupsafe import escape as html_escape
 from api import database as db, config, cache as cache_api
 from Email import send_email
@@ -78,7 +79,7 @@ def generate_verify_email_body(user_name, token, token_type):
             <a href="{verify_url}" class="button">{button_text}</a>
             <div class="token-info">链接有效期：30分钟<br>链接地址：<a href="{verify_url}" class="link">{verify_url}</a></div>
         </div>
-        <div class="footer">© 2024 妖精论坛 - 粉丝公益创作</div>
+        <div class="footer">© 2026 妖精论坛 - 粉丝公益创作</div>
     </div>
 </body>
 </html>"""
@@ -108,6 +109,10 @@ app.config.update(
 _allowed_origins = os.getenv('CORS_ORIGINS', '').split(',')
 _allowed_origins = [o.strip() for o in _allowed_origins if o.strip()]
 CORS(app, origins=_allowed_origins or True)
+
+# ProxyFix：解析反向代理传递的真实客户端 IP，防止 X-Forwarded-For 伪造
+# x_for=1 信任一层代理（Vercel Edge / Nginx），使 request.remote_addr 取到真实 IP
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
 base = 'PATH/base.html'
 
@@ -139,9 +144,8 @@ def csrf_protect():
 
 	if _is_allowed(origin) or _is_allowed(referer):
 		return
-	# 无 Origin 和 Referer 的纯 API 客户端请求（如 curl）放行，但浏览器请求必须带其中之一
-	if not origin and not referer:
-		return
+	# 所有 POST/PUT/DELETE/PATCH 请求都必须携带 Origin 或 Referer 中的至少一个。
+	# 拒绝 curl、Postman 等纯 API 客户端发起的无头请求，防止 CSRF 利用。
 	return jsonify({'success': False, 'message': '跨站请求已被拦截'}), 403
 
 
@@ -160,8 +164,9 @@ def rate_limit(key, max_count, window_seconds):
 		403 响应或 None
 	"""
 	now = time.time()
-	client_ip = request.headers.get('x-forwarded-for', '').split(',')[0].strip() or request.remote_addr or 'unknown'
-	rk = f"{key}:{client_ip}"
+	    # 使用 request.remote_addr 获取客户端 IP。
+	    # 生产环境启用 ProxyFix 后，remote_addr 自动为反向代理传递的真实 IP，不受 X-Forwarded-For 伪造影响。
+	    client_ip = request.remote_addr or 'unknown'	rk = f"{key}:{client_ip}"
 	bucket = _rate_limit_store.get(rk, [])
 	bucket = [t for t in bucket if t > now - window_seconds]
 	if len(bucket) >= max_count:
@@ -192,6 +197,21 @@ def performance_optimize(response):
 	if request.is_secure or request.headers.get('x-forwarded-proto') == 'https':
 		response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
 
+	# 在 gzip 压缩前计算 ETag（基于原始未压缩数据），保证 ETag 不受 Accept-Encoding 影响
+	if request.method == 'GET' and response.status_code == 200:
+		content_type = response.content_type or ''
+		if any(ct in content_type for ct in ('text/html', 'application/json')):
+			resp_data = response.get_data()
+			if resp_data:
+				etag = _hashlib.md5(resp_data).hexdigest()[:16]
+				response.headers['ETag'] = f'"{etag}"'
+				if response.headers.get('ETag') == request.headers.get('If-None-Match'):
+					response.status_code = 304
+					response.set_data(b'')
+					response.headers['Content-Length'] = '0'
+					response.headers.pop('Content-Encoding', None)
+					return response
+
 	# gzip 压缩文本类响应
 	accept_encoding = request.headers.get('Accept-Encoding', '')
 	if 'gzip' in accept_encoding and response.status_code < 500:
@@ -206,19 +226,6 @@ def performance_optimize(response):
 				response.headers['Content-Encoding'] = 'gzip'
 				response.headers['Content-Length'] = len(response.get_data())
 				response.headers['Vary'] = 'Accept-Encoding'
-
-	# 为 GET 请求的 HTML/JSON 响应添加 ETag
-	if request.method == 'GET' and response.status_code == 200:
-		content_type = response.content_type or ''
-		if any(ct in content_type for ct in ('text/html', 'application/json')):
-			resp_data = response.get_data()
-			if resp_data:
-				etag = _hashlib.md5(resp_data).hexdigest()[:16]
-				response.headers['ETag'] = f'"{etag}"'
-				if response.headers.get('ETag') == request.headers.get('If-None-Match'):
-					response.status_code = 304
-					response.set_data(b'')
-					response.headers['Content-Length'] = '0'
 
 	return response
 
@@ -458,13 +465,12 @@ def api_send_register_code():
 验证码有效期5分钟，请勿泄露给他人。
 如非本人操作，请忽略此邮件。
 
-© 2024 妖精论坛 - 粉丝公益创作"""
+© 2026 妖精论坛 - 粉丝公益创作"""
 	sent = send_email(subject, body, receiver_list=[email])
 	if sent:
 		return jsonify({'success': True, 'message': '验证码已发送至邮箱'})
 	else:
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
-
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
@@ -562,7 +568,7 @@ def api_login():
 				f'尊敬的 {user["name"]}，您好！\n\n'
 				f'您的账号已于 {now_str} 登录妖精论坛。\n'
 				f'如非本人操作，请立即修改密码。\n\n'
-				f'© 2024 妖精论坛 - 粉丝公益创作',
+				f'© 2026 妖精论坛 - 粉丝公益创作',
 				receiver_list=[user_email]
 			)
 		except Exception:
@@ -704,7 +710,7 @@ def api_send_verify_code():
 验证码有效期5分钟，请勿泄露给他人。
 如非本人操作，请忽略此邮件。
 
-© 2024 妖精论坛 - 粉丝公益创作"""
+© 2026 妖精论坛 - 粉丝公益创作"""
 	sent = send_email(subject, body, receiver_list=[user['email']])
 	if sent:
 		return jsonify({'success': True, 'message': '验证码已发送至邮箱'})
@@ -777,7 +783,7 @@ def api_send_code_reset_password():
 验证码有效期5分钟，请勿泄露给他人。
 如非本人操作，请忽略此邮件。
 
-© 2024 妖精论坛 - 粉丝公益创作"""
+© 2026 妖精论坛 - 粉丝公益创作"""
 	sent = send_email(subject, body, receiver_list=[email])
 	if sent:
 		return jsonify({'success': True, 'message': '如果该邮箱已注册，验证码已发送至邮箱'})
@@ -1274,7 +1280,7 @@ def api_comment_create(post_id):
 							f'用户 {replier_name} 回复了您在帖子《{post_title}》中的评论：\n'
 							f'"{content}"\n\n'
 							f'点击查看：{request.host_url}post/{post_id}\n\n'
-							f'© 2024 妖精论坛 - 粉丝公益创作',
+							f'© 2026 妖精论坛 - 粉丝公益创作',
 							receiver_list=[parent_user['email']]
 						)
 			except Exception:

@@ -178,7 +178,7 @@ CREATE_INDEX_SQLS = [
 # ========================
 # 加密算法配置
 # ========================
-AUTH_SALT = "120615"
+AUTH_SALT = os.getenv("AUTH_SALT", "120615")
 
 AUTH_NUM_REPLACEMENTS = {
     "0": ["¸ò"],

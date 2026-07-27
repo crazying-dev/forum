@@ -51,6 +51,7 @@ POST /api/register
 | name | string | 是 | 用户名（2-20字符，不含彩蛋） |
 | email | string | 是 | 邮箱地址 |
 | password | string | 是 | 密码（至少8位，需包含字母和数字） |
+| code | string | 是 | 6位注册验证码，通过 `/api/send_code` 获取 |
 
 **响应：**
 
