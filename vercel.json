@@ -2,11 +2,10 @@
   "version": 2,
   "builds": [
     {
-      "src": "main/main.py",
+      "src": "index.py",
       "use": "@vercel/python",
       "config": {
         "runtime": "python3.11",
-        "entrypoint": "main.main:app",
         "includeFiles": "**/*.{py,json,html,css,js,webp,png,svg}",
         "maxDuration": 60
       }
@@ -15,7 +14,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "main/main.py",
+      "dest": "index.py",
       "headers": {
         "Cache-Control": "public, max-age=0, must-revalidate",
         "X-Content-Type-Options": "nosniff",
