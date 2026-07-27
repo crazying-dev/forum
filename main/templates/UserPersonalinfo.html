@@ -227,11 +227,11 @@ function renderFollowUserItem(user) {
     
     return '<div class="follow-user-item">' +
         '<a href="/users/' + user.id + '" class="follow-user-avatar">' +
-            '<img src="' + user.avatar + '" alt="' + user.name + '">' +
+            '<img src="' + user.avatar + '" alt="' + escapeHtml(user.name) + '">' +
             vipBadge +
         '</a>' +
         '<div class="follow-user-info">' +
-            '<a href="/users/' + user.id + '" class="follow-user-name Username">' + user.name + '</a>' +
+            '<a href="/users/' + user.id + '" class="follow-user-name Username">' + sanitizeUsernameHtml(user.name) + '</a>' +
             '<p class="follow-user-intro">' + intro + '</p>' +
         '</div>' +
         actionBtn +
