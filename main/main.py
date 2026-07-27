@@ -27,6 +27,7 @@ except ImportError:
 	Image = None
 	_pil_available = False
 
+app = Flask(__name__)
 
 def generate_verify_email_body(user_name, token, token_type):
 	"""生成验证邮件正文。
@@ -83,8 +84,6 @@ def generate_verify_email_body(user_name, token, token_type):
     </div>
 </body>
 </html>"""
-
-app = Flask(__name__)
 
 # 安全配置：SECRET_KEY 必须由环境变量提供
 _secret = os.getenv('SECRET_KEY')
