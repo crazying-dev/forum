@@ -163,9 +163,10 @@ def rate_limit(key, max_count, window_seconds):
 		403 响应或 None
 	"""
 	now = time.time()
-	    # 使用 request.remote_addr 获取客户端 IP。
-	    # 生产环境启用 ProxyFix 后，remote_addr 自动为反向代理传递的真实 IP，不受 X-Forwarded-For 伪造影响。
-	    client_ip = request.remote_addr or 'unknown'	rk = f"{key}:{client_ip}"
+	# 使用 request.remote_addr 获取客户端 IP。
+	# 生产环境启用 ProxyFix 后，remote_addr 自动为反向代理传递的真实 IP，不受 X-Forwarded-For 伪造影响。
+	client_ip = request.remote_addr or 'unknown'
+	rk = f"{key}:{client_ip}"
 	bucket = _rate_limit_store.get(rk, [])
 	bucket = [t for t in bucket if t > now - window_seconds]
 	if len(bucket) >= max_count:
