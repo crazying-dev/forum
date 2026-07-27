@@ -19,6 +19,9 @@ SMTP_USER = os.getenv('SMTP_USER', 'maomi@email.yjlt.top')
 SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 SMTP_FROM_NAME = "妖精论坛(二创)"
 
+# 默认通知接收邮箱（所有通知的默认收件人）
+RECEIVERALL = os.getenv('RECEIVERALL', SMTP_USER)
+
 # 数据库相关变量
 allowed_search_keys = ['id', 'name', 'email']  # 用户查找可用键
 
