@@ -284,12 +284,14 @@ def load_user(user_id):
 # ── 工具函数 ──────────────────────────────────────────────
 
 def strip_easter_egg(name):
-	"""去除用户名中的彩蛋标签后返回纯文本，用于长度检查。
+	"""去除用户名中的彩蛋标签/标记后返回纯文本，用于长度检查。
 
-	彩蛋格式: <p...>...</p>
+	新格式: |[TIME]
+	旧格式（向后兼容）: <p...>...</p>
 	"""
-	name = re.sub(r'<p[^>]*>', '', name, flags=re.IGNORECASE)
-	name = re.sub(r'</p>', '', name, flags=re.IGNORECASE)
+	name = name.replace('|[TIME]', '')                              # 新格式
+	name = re.sub(r'<p[^>]*>', '', name, flags=re.IGNORECASE)      # 旧格式
+	name = re.sub(r'</p>', '', name, flags=re.IGNORECASE)           # 旧格式
 	return name
 
 
@@ -531,8 +533,12 @@ def api_login():
 	if '@' in name_or_email and '.' in name_or_email:
 		user = db.get_user_by_email(name_or_email.lower())
 	else:
-		name_or_email = name_or_email.replace("[TIME]", '<p class="TimeWithUserNameAPI"></p>')
+		# 新格式：|[TIME] 直接匹配（无需替换）
 		user = db.get_user_by_name(name_or_email)
+		if not user:
+			# 向后兼容：DB 中存的是旧 HTML 格式 "<p class=\"TimeWithUserNameAPI\"></p>"
+			legacy_name = name_or_email.replace("[TIME]", '<p class="TimeWithUserNameAPI"></p>')
+			user = db.get_user_by_name(legacy_name)
 
 	if not user:
 		return jsonify({'success': False, 'message': '账号或密码错误'})
