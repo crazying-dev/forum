@@ -12,7 +12,8 @@ app = flask.Flask(__name__)
 REQUEST_TIMEOUT = 120
 
 kernel = AdminKernel()
-CORS(kernel)
+
+CORS(app)
 
 def _error(msg, code=401):
 	return flask.jsonify({'success': False, 'message': msg}), code
