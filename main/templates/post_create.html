@@ -50,32 +50,9 @@
                 <button class="editor-tab active" id="tab-edit" onclick="switchPostEditorTab('edit')">编辑</button>
                 <button class="editor-tab" id="tab-preview" onclick="switchPostEditorTab('preview')">预览</button>
             </div>
-            <div class="form-editor-toolbar" id="post-editor-toolbar">
-                <button class="editor-tool" onclick="insertFormat('b')" title="加粗 ** **"><i class="fa fa-bold"></i></button>
-                <button class="editor-tool" onclick="insertFormat('i')" title="斜体 * *"><i class="fa fa-italic"></i></button>
-                <button class="editor-tool" onclick="insertFormat('s')" title="删除线 ~~ ~~"><i class="fa fa-strikethrough"></i></button>
-                <span class="editor-sep"></span>
-                <button class="editor-tool" onclick="insertFormat('h2')" title="标题 ##"><i class="fa fa-header"></i></button>
-                <button class="editor-tool" onclick="insertFormat('quote')" title="引用 >"><i class="fa fa-quote-left"></i></button>
-                <button class="editor-tool" onclick="insertFormat('code')" title="代码 `"><i class="fa fa-code"></i></button>
-                <span class="editor-sep"></span>
-                <button class="editor-tool" onclick="insertFormat('ul')" title="无序列表 -"><i class="fa fa-list-ul"></i></button>
-                <button class="editor-tool" onclick="insertFormat('ol')" title="有序列表 1."><i class="fa fa-list-ol"></i></button>
-                <span class="editor-sep"></span>
-                <button class="editor-tool" onclick="insertFormat('link')" title="链接 [text](url)"><i class="fa fa-link"></i></button>
-                <button class="editor-tool" onclick="insertFormat('image')" title="图片 ![alt](url)"><i class="fa fa-image"></i></button>
-                <span class="editor-sep"></span>
-                <button class="editor-tool" id="editor-source-mode-btn" onclick="toggleSourceMode()" title="Markdown源码模式"><i class="fa fa-file-text"></i></button>
-            </div>
             <div class="form-editor-container">
-                <div class="form-editor" id="post-content-editor" contenteditable="true" placeholder="写下你的想法..."></div>
-                <textarea class="form-editor-source" id="post-content-source" placeholder="在此直接输入 Markdown 源码..."></textarea>
+                <textarea class="form-editor" id="post-content-editor" placeholder="在此输入 Markdown 内容..."></textarea>
                 <div class="form-preview" id="post-content-preview"></div>
-            </div>
-            <div class="form-editor-tips">
-                <span style="color:var(--color-text-tertiary);">支持 Markdown 语法，HTML 标签会被自动转义</span>
-                <span style="color:var(--color-text-tertiary);margin:0 8px;">·</span>
-                <span style="color:var(--color-text-accent);">使用工具栏按钮快速插入 Markdown 格式</span>
             </div>
         </div>
 
