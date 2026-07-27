@@ -52,6 +52,11 @@ except Exception:
 	pass
 DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('POSTGRES_URL') or os.getenv('POSTGRES_PRISMA_URL')
 
+# 清理 Neon 等云数据库附加的非标准参数（psycopg2/libpq 可能不支持）
+if DATABASE_URL:
+	import re as _re
+	DATABASE_URL = _re.sub(r'[&?]channel_binding=[^&]*', '', DATABASE_URL)
+
 if not DATABASE_URL:
 	print("[DB] 警告: 未设置 DATABASE_URL 环境变量，数据库功能将不可用")
 

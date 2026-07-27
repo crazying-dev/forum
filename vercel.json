@@ -6,7 +6,7 @@
       "use": "@vercel/python",
       "config": {
         "runtime": "python3.12",
-        "includeFiles": "**/*.{py,json,html,css,js,webp,png,svg}",
+        "includeFiles": "**/*.{py,json,html,css,js,webp,png,svg,ico,txt,xml,jpg,jpeg,gif,woff,woff2,ttf,eot}",
         "maxDuration": 60
       }
     }
