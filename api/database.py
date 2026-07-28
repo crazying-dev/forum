@@ -56,6 +56,9 @@ DATABASE_URL = os.getenv('DATABASE_URL') or os.getenv('POSTGRES_URL') or os.gete
 if DATABASE_URL:
 	import re as _re
 	DATABASE_URL = _re.sub(r'[&?]channel_binding=[^&]*', '', DATABASE_URL)
+	# 修复：移除 channel_binding 后剩余参数可能以 & 开头，需将首个 & 改为 ?
+	if '&' in DATABASE_URL and '?' not in DATABASE_URL:
+		DATABASE_URL = DATABASE_URL.replace('&', '?', 1)
 
 if not DATABASE_URL:
 	print("[DB] 警告: 未设置 DATABASE_URL 环境变量，数据库功能将不可用")
