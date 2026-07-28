@@ -236,6 +236,19 @@ function handleSendRegisterCode() {
     });
 }
 
+function checkRegPasswordMatch() {
+    var password = document.getElementById('regPassword').value;
+    var confirmPassword = document.getElementById('regConfirmPassword').value;
+    var errorEl = document.getElementById('registerError');
+    if (confirmPassword && password !== confirmPassword) {
+        errorEl.textContent = '❌ 两次密码不一致';
+    } else if (confirmPassword && password === confirmPassword) {
+        errorEl.textContent = '✅ 密码一致';
+    } else {
+        errorEl.textContent = '';
+    }
+}
+
 function handleRegister() {
     var name = document.getElementById('regName').value.trim();
     var email = document.getElementById('regEmail').value.trim();
@@ -398,6 +411,54 @@ function handleResetPassword() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // 注册密码实时一致性检查
+    var regPwd = document.getElementById('regPassword');
+    var regConfirmPwd = document.getElementById('regConfirmPassword');
+    if (regPwd && regConfirmPwd) {
+        regPwd.addEventListener('input', checkRegPasswordMatch);
+        regConfirmPwd.addEventListener('input', checkRegPasswordMatch);
+    }
+
+    // 验证码重置密码实时一致性检查
+    var resetNewPwd = document.getElementById('resetNewPassword');
+    var resetConfirmNewPwd = document.getElementById('resetConfirmNewPassword');
+    if (resetNewPwd && resetConfirmNewPwd) {
+        function checkResetCodePwdMatch() {
+            var pwd = resetNewPwd.value;
+            var confirmPwd = resetConfirmNewPwd.value;
+            var errorEl = document.getElementById('resetByCodeError');
+            if (confirmPwd && pwd !== confirmPwd) {
+                errorEl.textContent = '❌ 两次密码不一致';
+            } else if (confirmPwd && pwd === confirmPwd) {
+                errorEl.textContent = '✅ 密码一致';
+            } else {
+                errorEl.textContent = '';
+            }
+        }
+        resetNewPwd.addEventListener('input', checkResetCodePwdMatch);
+        resetConfirmNewPwd.addEventListener('input', checkResetCodePwdMatch);
+    }
+
+    // Token重置密码实时一致性检查
+    var resetPwd = document.getElementById('resetPassword');
+    var resetConfirmPwd = document.getElementById('resetConfirmPassword');
+    if (resetPwd && resetConfirmPwd) {
+        function checkResetPwdMatch() {
+            var pwd = resetPwd.value;
+            var confirmPwd = resetConfirmPwd.value;
+            var errorEl = document.getElementById('resetPasswordError');
+            if (confirmPwd && pwd !== confirmPwd) {
+                errorEl.textContent = '❌ 两次密码不一致';
+            } else if (confirmPwd && pwd === confirmPwd) {
+                errorEl.textContent = '✅ 密码一致';
+            } else {
+                errorEl.textContent = '';
+            }
+        }
+        resetPwd.addEventListener('input', checkResetPwdMatch);
+        resetConfirmPwd.addEventListener('input', checkResetPwdMatch);
+    }
+
     document.querySelectorAll('.auth-tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
             var targetTab = this.dataset.tab;
