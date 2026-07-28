@@ -9,7 +9,12 @@ SENDER = SMTP_USER
 SENDER_NAME = "妖精论坛"
 
 
-def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER = RECEIVERALL) -> bool:
+def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER = RECEIVERALL):
+    """发送邮件。
+
+    Returns:
+        tuple: (success: bool, error_message: str or None)
+    """
     if receiver_list is None:
         receiver_list = [RECEIVER]
     try:
@@ -37,15 +42,18 @@ def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER 
         print(f"收件人: {receiver_list}")
         print(f"主题: {subject}")
         print(f"内容: {content}")
-        return True
+        return True, None
 
     except smtplib.SMTPAuthenticationError:
-        print("❌ 认证失败：SMTP账号或独立SMTP密码错误")
-        return False
+        msg = "SMTP认证失败：账号或独立SMTP密码错误"
+        print(f"❌ {msg}")
+        return False, msg
     except smtplib.SMTPException as e:
-        print(f"❌ SMTP发送异常: {e}")
-        return False
+        msg = f"SMTP发送异常: {e}"
+        print(f"❌ {msg}")
+        return False, msg
     except Exception as e:
-        print(f"❌ 未知错误：{e}")
-        return False
+        msg = f"邮件发送未知错误: {e}"
+        print(f"❌ {msg}")
+        return False, msg
 
