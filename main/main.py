@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# Ensure project root is on sys.path so 'api' module can be found
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import random
 import json
 import os

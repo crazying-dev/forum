@@ -26,11 +26,19 @@
     <link rel="stylesheet" href="//assets.crazying-dev.top/text/one/CSS/main.css">
 
     <script>
-    // 防闪屏：在 body 渲染前同步决定主题
+    // 防闪屏：优先读 localStorage，否则按时间判断
     (function() {
-        var h = new Date().getHours();
-        if (h < 6 || h >= 18) {
+        var theme = localStorage.getItem('forum-theme');
+        if (theme === 'day') {
+            // 亮色模式
+        } else if (theme === 'night') {
             document.documentElement.classList.add('night-mode');
+        } else {
+            // 默认或无记录：时间判断（6:00-18:00 亮色，其余暗色）
+            var h = new Date().getHours();
+            if (h < 6 || h >= 18) {
+                document.documentElement.classList.add('night-mode');
+            }
         }
     })();
     </script>
@@ -70,34 +78,6 @@
                     <span>彩蛋</span>
                 </button>
             </li>
-            <li class="header-collapsible header-setting">
-                <button class="header-btn" id="settingBtn">
-                    <i class="fa fa-cog"></i>
-                    <span>设置</span>
-                </button>
-                <div class="setting-dropdown" id="settingDropdown">
-                    <ul class="setting-dropdown-menu">
-                        <li class="setting-dropdown-title">主题</li>
-                        <li class="setting-dropdown-item" data-value="day">
-                            <span class="setting-item-icon"></span>
-                            <span class="setting-item-text">亮色</span>
-                        </li>
-                        <li class="setting-dropdown-item" data-value="night">
-                            <span class="setting-item-icon"></span>
-                            <span class="setting-item-text">暗色</span>
-                        </li>
-                        <li class="setting-dropdown-item active" data-value="default">
-                            <span class="setting-item-icon"></span>
-                            <span class="setting-item-text">默认</span>
-                        </li>
-                        <li class="setting-dropdown-divider"></li>
-                        <li class="setting-dropdown-item" id="logoutBtn" onclick="handleLogout()">
-                            <span class="setting-item-icon"><i class="fa fa-sign-out"></i></span>
-                            <span class="setting-item-text">退出登录</span>
-                        </li>
-                    </ul>
-                </div>
-            </li>
             <li class="header-collapsible">
                 <a class="header-btn" id="LuoXiaoHeiWIKI" href="/WIKI">
                     <img src="https://av.huijiwiki.com/site_avatar_luoxiaohei_l.png?1781282427" alt="" id="WIKIForIcon">
@@ -126,6 +106,35 @@
                 <button class="header-btn" type="button">
                     <i class="fa fa-bars"></i>
                 </button>
+            </li>
+
+            <li class="header-collapsible header-setting">
+                <button class="header-btn" id="settingBtn">
+                    <i class="fa fa-cog"></i>
+                    <span>设置</span>
+                </button>
+                <div class="setting-dropdown" id="settingDropdown">
+                    <ul class="setting-dropdown-menu">
+                        <li class="setting-dropdown-title">主题</li>
+                        <li class="setting-dropdown-item" data-value="day">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">亮色</span>
+                        </li>
+                        <li class="setting-dropdown-item" data-value="night">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">暗色</span>
+                        </li>
+                        <li class="setting-dropdown-item active" data-value="default">
+                            <span class="setting-item-icon"></span>
+                            <span class="setting-item-text">默认</span>
+                        </li>
+                        <li class="setting-dropdown-divider"></li>
+                        <li class="setting-dropdown-item" id="logoutBtn" onclick="handleLogout()" style="display:none">
+                            <span class="setting-item-icon"><i class="fa fa-sign-out"></i></span>
+                            <span class="setting-item-text">退出登录</span>
+                        </li>
+                    </ul>
+                </div>
             </li>
 
             <li>
@@ -165,7 +174,7 @@
                 <i class="fa fa-desktop"></i> 默认
             </button>
             <div class="mobile-menu-divider"></div>
-            <button class="mobile-menu-item" onclick="handleLogout()">
+            <button class="mobile-menu-item" onclick="handleLogout()" style="display:none">
                 <i class="fa fa-sign-out"></i> 退出登录
             </button>
         </div>
@@ -376,7 +385,94 @@ document.addEventListener('keydown', function(e) {
     font-size: 13px;
     color: var(--color-text-secondary);
 }
+
+/* 退出按钮不需要主题勾选框的外框 */
+#header #logoutBtn .setting-item-icon {
+    border: none;
+    width: auto;
+    height: auto;
+    background: none;
+}
+
 </style>
 <script src="//assets.crazying-dev.top/text/one/JS/AfterBody.js" defer></script>
+<script>
+// 主题持久化：监听主题按钮点击保存到 localStorage，并在 AfterBody.js 加载后重新应用
+(function() {
+    var THEME_KEY = 'forum-theme';
+    function saveTheme(value) {
+        try { localStorage.setItem(THEME_KEY, value); } catch(e) {}
+    }
+    // 桌面端设置菜单中的主题选项
+    document.addEventListener('click', function(e) {
+        var item = e.target.closest('.setting-dropdown-item');
+        if (item) {
+            var value = item.getAttribute('data-value');
+            if (value) saveTheme(value);
+        }
+    });
+    // 移动端菜单中的主题按钮
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.mobile-theme-btn');
+        if (btn) {
+            var value = btn.getAttribute('data-value');
+            if (value) saveTheme(value);
+        }
+    });
+
+    // AfterBody.js（defer）会在 DOMContentLoaded 前执行，并用时间覆盖主题。
+    // 这里在 DOMContentLoaded 后按 localStorage 重新修正，防止被覆盖。
+    function applyStoredTheme() {
+        var theme = localStorage.getItem(THEME_KEY);
+        if (!window.Theme) return;  // AfterBody.js 尚未加载
+        if (theme === 'day') {
+            window.Theme.setTimeControl(false);
+            window.Theme.setTheme('day');
+        } else if (theme === 'night') {
+            window.Theme.setTimeControl(false);
+            window.Theme.setTheme('night');
+        }
+        // 'default' 或无记录：不干预，保持 AfterBody.js 的时间控制
+
+        // 同步桌面端下拉菜单的选中态（updateActiveState 是内部函数，手动更新）
+        var items = document.querySelectorAll('.setting-dropdown-item');
+        items.forEach(function(item) { item.classList.remove('active'); });
+        var activeValue = theme || 'default';
+        var activeItem = document.querySelector('.setting-dropdown-item[data-value="' + activeValue + '"]');
+        if (activeItem) activeItem.classList.add('active');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            // setTimeout(0) 确保 AfterBody.js 的同步初始化代码已全部跑完
+            setTimeout(applyStoredTheme, 0);
+        });
+    } else {
+        applyStoredTheme();
+    }
+
+    // 登录状态检测：未登录时隐藏退出按钮
+    // AfterBody.js 的 loadUserInfo() 会异步更新 #UserInfo 的 href
+    function toggleLogoutButton() {
+        var userInfo = document.getElementById('UserInfo');
+        var logoutBtn = document.getElementById('logoutBtn');
+        var mobileLogout = document.querySelector('.mobile-menu-item[onclick*="handleLogout"]');
+        var href = userInfo ? userInfo.getAttribute('href') : '';
+        // href 为 /users/xxx 说明已登录，其余情况（#、/login）均隐藏退出按钮
+        var isLoggedIn = href && href.startsWith('/users/');
+        if (logoutBtn) logoutBtn.style.display = isLoggedIn ? '' : 'none';
+        if (mobileLogout) mobileLogout.style.display = isLoggedIn ? '' : 'none';
+    }
+
+    var userInfoEl = document.getElementById('UserInfo');
+    if (userInfoEl) {
+        // 监听 href 属性变化（loadUserInfo 完成后会改为 /login 或 /users/xxx）
+        var logoutObserver = new MutationObserver(toggleLogoutButton);
+        logoutObserver.observe(userInfoEl, { attributes: true, attributeFilter: ['href'] });
+        // 初始状态也检查一次
+        toggleLogoutButton();
+    }
+})();
+</script>
 </body>
 </html>
