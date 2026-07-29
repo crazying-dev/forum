@@ -1554,19 +1554,23 @@ def get_replies_to_my_comments(user_id, page=1, page_size=50):
 
 
 def search_posts(keyword, page=1, page_size=20):
-	"""搜索帖子（按标题和内容匹配）。
-
-    Args:
-        keyword (str): 搜索关键词
-        page (int): 页码，从1开始
-        page_size (int): 每页数量
+	"""搜索帖子（按标题和内容匹配，按相关性排序）。
 
     Returns:
-        list: 帖子列表
+        tuple: (posts: list, total: int)
     """
-	if not keyword or not keyword.strip():
-		return []
+	keyword = keyword.strip()
+	if not keyword or len(keyword) < 2:
+		return [], 0
 	offset = (page - 1) * page_size
+	like = f'%{keyword}%'
+
+	count_row = execute_query(
+		"SELECT COUNT(*) FROM posts p WHERE p.status = 1 AND (p.title ILIKE %s OR p.content ILIKE %s)",
+		(like, like), fetch=True
+	)
+	total = count_row[0] if count_row else 0
+
 	results = execute_query(
 		"""
         SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
@@ -1574,10 +1578,12 @@ def search_posts(keyword, page=1, page_size=20):
         FROM posts p
         JOIN users u ON p.user_id = u.id
         WHERE p.status = 1 AND (p.title ILIKE %s OR p.content ILIKE %s)
-        ORDER BY p.created_at DESC
+        ORDER BY
+            CASE WHEN p.title ILIKE %s THEN 0 ELSE 1 END,
+            p.created_at DESC
         LIMIT %s OFFSET %s
         """,
-		(f"%{keyword}%", f"%{keyword}%", page_size, offset),
+		(like, like, like, page_size, offset),
 		fetch_all=True
 	)
 	posts = []
@@ -1594,13 +1600,27 @@ def search_posts(keyword, page=1, page_size=20):
 			"user_name": r[8],
 			"user_avatar": r[9],
 		})
-	return posts
+	return posts, total
 
 
 def search_users(keyword, page=1, page_size=20):
-	if not keyword or not keyword.strip():
-		return []
+	"""搜索用户（按名称匹配）。
+
+    Returns:
+        tuple: (users: list, total: int)
+    """
+	keyword = keyword.strip()
+	if not keyword or len(keyword) < 2:
+		return [], 0
 	offset = (page - 1) * page_size
+	like = f'%{keyword}%'
+
+	count_row = execute_query(
+		"SELECT COUNT(*) FROM users WHERE is_banned = 0 AND name ILIKE %s",
+		(like,), fetch=True
+	)
+	total = count_row[0] if count_row else 0
+
 	results = execute_query(
 		"""
         SELECT id, name, avatar, vip, prefix, is_banned, created_at
@@ -1609,7 +1629,7 @@ def search_users(keyword, page=1, page_size=20):
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
         """,
-		(f"%{keyword}%", page_size, offset),
+		(like, page_size, offset),
 		fetch_all=True
 	)
 	users = []
@@ -1623,7 +1643,7 @@ def search_users(keyword, page=1, page_size=20):
 			"status": r[5],
 			"created_at": str(r[6]) if r[6] else None,
 		})
-	return users
+	return users, total
 
 
 def close_pool():
