@@ -4,12 +4,12 @@ from flask_login import login_required, current_user
 from api import database as db
 from api import cache as cache_api
 from main.main import app, base
-from app.中间件 import rate_limit
+from app.middleware import rate_limit
 
-帖子蓝图 = Blueprint('posts', __name__)
+posts_bp = Blueprint('posts', __name__)
 
 
-@帖子蓝图.route('/api/posts')
+@posts_bp.route('/api/posts')
 def api_post_list():
 	page = request.args.get('page', 1, type=int)
 	page_size = request.args.get('page_size', 20, type=int)
@@ -37,7 +37,7 @@ def api_post_list():
 	return resp
 
 
-@帖子蓝图.route('/api/posts/random')
+@posts_bp.route('/api/posts/random')
 def api_post_random():
 	user_id = current_user['id'] if current_user.is_authenticated else None
 	posts = db.get_random_posts(user_id)
@@ -49,7 +49,7 @@ def api_post_random():
 	return resp
 
 
-@帖子蓝图.route('/api/posts/<post_id>')
+@posts_bp.route('/api/posts/<post_id>')
 def api_post_detail(post_id):
 	cache_key = f'post:{post_id}'
 	cached = cache_api.post_detail_cache.get(cache_key)
@@ -78,7 +78,7 @@ def api_post_detail(post_id):
 	})
 
 
-@帖子蓝图.route('/api/posts/create', methods=['POST'])
+@posts_bp.route('/api/posts/create', methods=['POST'])
 @login_required
 def api_post_create():
 	if rate_limit('post_create', 10, 60):
@@ -100,7 +100,7 @@ def api_post_create():
 	return jsonify(result)
 
 
-@帖子蓝图.route('/api/posts/<post_id>/like', methods=['POST'])
+@posts_bp.route('/api/posts/<post_id>/like', methods=['POST'])
 @login_required
 def api_post_like(post_id):
 	result = db.like_post(post_id, current_user['id'])
@@ -108,7 +108,7 @@ def api_post_like(post_id):
 	return jsonify(result)
 
 
-@帖子蓝图.route('/api/posts/<post_id>/delete', methods=['POST'])
+@posts_bp.route('/api/posts/<post_id>/delete', methods=['POST'])
 @login_required
 def api_post_delete(post_id):
 	result = db.delete_post(post_id, current_user['id'])
@@ -119,14 +119,14 @@ def api_post_delete(post_id):
 	return jsonify(result)
 
 
-@帖子蓝图.route('/api/posts/<post_id>/favorite', methods=['POST'])
+@posts_bp.route('/api/posts/<post_id>/favorite', methods=['POST'])
 @login_required
 def api_post_favorite(post_id):
 	result = db.toggle_favorite(post_id, current_user['id'])
 	return jsonify(result)
 
 
-@帖子蓝图.route('/api/posts/<post_id>/report', methods=['POST'])
+@posts_bp.route('/api/posts/<post_id>/report', methods=['POST'])
 @login_required
 def api_post_report(post_id):
 	data = request.get_json() or {}

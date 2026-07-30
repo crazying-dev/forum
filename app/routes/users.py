@@ -9,7 +9,7 @@ import os
 import io
 import requests as http_requests
 
-用户蓝图 = Blueprint('users', __name__)
+users_bp = Blueprint('users', __name__)
 
 try:
 	from PIL import Image
@@ -19,7 +19,7 @@ except ImportError:
 	_pil_available = False
 
 
-@用户蓝图.route('/api/user/info')
+@users_bp.route('/api/user/info')
 def api_user_info():
 	if not current_user.is_authenticated:
 		return jsonify({'success': False, 'message': '未登录'})
@@ -35,7 +35,7 @@ def api_user_info():
 	})
 
 
-@用户蓝图.route('/api/users/<user_id>/info')
+@users_bp.route('/api/users/<user_id>/info')
 def api_user_profile_info(user_id):
 	cache_key = f'user:{user_id}'
 	cached = cache_api.user_info_cache.get(cache_key)
@@ -74,7 +74,7 @@ def api_user_profile_info(user_id):
 	return jsonify(result)
 
 
-@用户蓝图.route('/api/users/<user_id>/posts')
+@users_bp.route('/api/users/<user_id>/posts')
 def api_user_profile_posts(user_id):
 	page = request.args.get('page', 1, type=int)
 	page_size = request.args.get('page_size', 20, type=int)
@@ -96,7 +96,7 @@ def api_user_profile_posts(user_id):
 	return jsonify(result)
 
 
-@用户蓝图.route('/api/users/change', methods=['POST'])
+@users_bp.route('/api/users/change', methods=['POST'])
 @login_required
 def api_user_change():
 	data = request.get_json()
@@ -113,7 +113,7 @@ def api_user_change():
 	return jsonify({'success': result})
 
 
-@用户蓝图.route('/api/user/avatar/upload', methods=['POST'])
+@users_bp.route('/api/user/avatar/upload', methods=['POST'])
 @login_required
 def api_avatar_upload():
 	if not _pil_available:
@@ -160,7 +160,7 @@ def api_avatar_upload():
 		return jsonify({'success': False, 'message': '头像上传失败'}), 500
 
 
-@用户蓝图.route('/api/users/<user_id>/favorites')
+@users_bp.route('/api/users/<user_id>/favorites')
 def api_user_favorites(user_id):
 	page = request.args.get('page', 1, type=int)
 	page_size = request.args.get('page_size', 20, type=int)
@@ -173,7 +173,7 @@ def api_user_favorites(user_id):
 	})
 
 
-@用户蓝图.route('/api/users/<user_id>/follow', methods=['POST'])
+@users_bp.route('/api/users/<user_id>/follow', methods=['POST'])
 @login_required
 def api_user_follow(user_id):
 	result = db.toggle_follow(current_user['id'], user_id)
@@ -183,7 +183,7 @@ def api_user_follow(user_id):
 	return jsonify(result)
 
 
-@用户蓝图.route('/api/users/<user_id>/following')
+@users_bp.route('/api/users/<user_id>/following')
 def api_user_following(user_id):
 	page = request.args.get('page', 1, type=int)
 	page_size = request.args.get('page_size', 20, type=int)
@@ -212,7 +212,7 @@ def api_user_following(user_id):
 	return jsonify(result)
 
 
-@用户蓝图.route('/api/users/<user_id>/followers')
+@users_bp.route('/api/users/<user_id>/followers')
 def api_user_followers(user_id):
 	page = request.args.get('page', 1, type=int)
 	page_size = request.args.get('page_size', 20, type=int)
@@ -241,7 +241,7 @@ def api_user_followers(user_id):
 	return jsonify(result)
 
 
-@用户蓝图.route('/api/users/me/replies')
+@users_bp.route('/api/users/me/replies')
 @login_required
 def api_my_replies():
 	page = request.args.get('page', 1, type=int)

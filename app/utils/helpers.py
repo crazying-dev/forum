@@ -11,7 +11,7 @@ from email.header import Header
 from markupsafe import escape as html_escape
 from flask import request
 from flask_login import UserMixin, AnonymousUserMixin
-from app.配置 import *
+from app.config import *
 
 SENDER = SMTP_USER
 SENDER_NAME = "妖精论坛"

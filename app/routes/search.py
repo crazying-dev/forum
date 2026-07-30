@@ -4,10 +4,10 @@ from api import database as db
 from api import cache as cache_api
 from main.main import app, base
 
-搜索蓝图 = Blueprint('search', __name__)
+search_bp = Blueprint('search', __name__)
 
 
-@搜索蓝图.route('/api/search')
+@search_bp.route('/api/search')
 def api_search():
 	keyword = request.args.get('k', '').strip()
 	page = request.args.get('page', 1, type=int)

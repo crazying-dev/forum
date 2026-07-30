@@ -9,12 +9,12 @@ from main.main import app, base, generate_verify_email_body, strip_easter_egg, U
 import re
 import random
 import time
-from app.中间件 import rate_limit
+from app.middleware import rate_limit
 
-认证蓝图 = Blueprint('auth', __name__)
+auth_bp = Blueprint('auth', __name__)
 
 
-@认证蓝图.route('/api/send-register-code', methods=['POST'])
+@auth_bp.route('/api/send-register-code', methods=['POST'])
 def api_send_register_code():
 	"""发送6位验证码到邮箱用于注册（无需登录）。"""
 	if rate_limit('register_code', 3, 300):
@@ -51,7 +51,7 @@ def api_send_register_code():
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
-@认证蓝图.route('/api/register', methods=['POST'])
+@auth_bp.route('/api/register', methods=['POST'])
 def api_register():
 	if rate_limit('register', 5, 300):
 		return jsonify({'success': False, 'message': '注册过于频繁，请5分钟后再试'}), 429
@@ -102,7 +102,7 @@ def api_register():
 	return jsonify({'success': True, 'id': user_id})
 
 
-@认证蓝图.route('/api/login', methods=['POST'])
+@auth_bp.route('/api/login', methods=['POST'])
 def api_login():
 	if rate_limit('login', 10, 300):
 		return jsonify({'success': False, 'message': '登录尝试过于频繁，请5分钟后再试'}), 429
@@ -156,13 +156,13 @@ def api_login():
 	return jsonify({'success': True, 'id': user['id']})
 
 
-@认证蓝图.route('/api/logout', methods=['POST', 'GET'])
+@auth_bp.route('/api/logout', methods=['POST', 'GET'])
 def api_logout():
 	logout_user()
 	return jsonify({'success': True})
 
 
-@认证蓝图.route('/api/send-verify-email', methods=['POST'])
+@auth_bp.route('/api/send-verify-email', methods=['POST'])
 @login_required
 def api_send_verify_email():
 	if rate_limit('verify_email', 3, 300):
@@ -186,7 +186,7 @@ def api_send_verify_email():
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
-@认证蓝图.route('/api/verify-email', methods=['POST'])
+@auth_bp.route('/api/verify-email', methods=['POST'])
 def api_verify_email():
 	data = request.get_json() or {}
 	token = data.get('token') or ''
@@ -204,7 +204,7 @@ def api_verify_email():
 	return jsonify({'success': True, 'message': '邮箱验证成功'})
 
 
-@认证蓝图.route('/api/send-reset-password', methods=['POST'])
+@auth_bp.route('/api/send-reset-password', methods=['POST'])
 def api_send_reset_password():
 	if rate_limit('reset_pwd', 3, 300):
 		return jsonify({'success': False, 'message': '请求过于频繁，请5分钟后再试'}), 429
@@ -234,7 +234,7 @@ def api_send_reset_password():
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
-@认证蓝图.route('/api/reset-password', methods=['POST'])
+@auth_bp.route('/api/reset-password', methods=['POST'])
 def api_reset_password():
 	data = request.get_json() or {}
 	token = data.get('token') or ''
@@ -261,7 +261,7 @@ def api_reset_password():
 	return jsonify({'success': True, 'message': '密码重置成功'})
 
 
-@认证蓝图.route('/api/send-verify-code', methods=['POST'])
+@auth_bp.route('/api/send-verify-code', methods=['POST'])
 @login_required
 def api_send_verify_code():
 	"""发送6位验证码到当前登录用户的邮箱（用于邮箱验证）。"""
@@ -294,7 +294,7 @@ def api_send_verify_code():
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
-@认证蓝图.route('/api/verify-code-email', methods=['POST'])
+@auth_bp.route('/api/verify-code-email', methods=['POST'])
 @login_required
 def api_verify_code_email():
 	"""使用6位验证码验证邮箱。"""
@@ -330,7 +330,7 @@ def api_verify_code_email():
 	return jsonify({'success': True, 'message': '邮箱验证成功'})
 
 
-@认证蓝图.route('/api/send-code-reset-password', methods=['POST'])
+@auth_bp.route('/api/send-code-reset-password', methods=['POST'])
 def api_send_code_reset_password():
 	"""发送6位验证码到用户邮箱用于重置密码。"""
 	if rate_limit('reset_pwd_code', 3, 300):
@@ -367,7 +367,7 @@ def api_send_code_reset_password():
 		return jsonify({'success': False, 'message': '邮件服务暂不可用，请稍后重试或联系管理员'})
 
 
-@认证蓝图.route('/api/reset-password-by-code', methods=['POST'])
+@auth_bp.route('/api/reset-password-by-code', methods=['POST'])
 def api_reset_password_by_code():
 	"""使用6位验证码重置密码。"""
 	if rate_limit('reset_pwd_code', 5, 300):
