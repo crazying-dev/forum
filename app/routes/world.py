@@ -4,12 +4,12 @@ from flask_login import login_required, current_user
 from api import database as db
 from api import cache as cache_api
 from main.main import app, base
-from app.中间件 import rate_limit
+from app.middleware import rate_limit
 
-世界蓝图 = Blueprint('world', __name__)
+world_bp = Blueprint('world', __name__)
 
 
-@世界蓝图.route('/api/World/ALL')
+@world_bp.route('/api/World/ALL')
 def Api_World_all():
 	cache_key = 'world:all'
 	cached = cache_api.world_cache.get(cache_key)
@@ -26,7 +26,7 @@ def Api_World_all():
 	return resp
 
 
-@世界蓝图.route('/api/World/Send', methods=['POST'])
+@world_bp.route('/api/World/Send', methods=['POST'])
 @login_required
 def Api_World_send():
 	if rate_limit('world_send', 5, 60):

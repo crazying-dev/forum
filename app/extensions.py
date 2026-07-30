@@ -4,7 +4,7 @@ import os
 from flask_cors import CORS
 from flask_login import LoginManager
 from flask import Flask
-from app.配置 import *
+from app.config import *
 
 
 def register_extensions(app: Flask):

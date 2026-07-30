@@ -306,8 +306,8 @@ def strip_easter_egg(name):
 
 
 # ── Blueprint 注册 ───────────────────────────────
-from app.路由 import 注册路由
-注册路由(app)
+from app.routes import register_routes
+register_routes(app)
 
 if __name__ == '__main__':
 	app.run()

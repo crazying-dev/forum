@@ -5,12 +5,12 @@ from api import database as db
 from api import cache as cache_api
 from Email import send_email
 from main.main import app, base
-from app.中间件 import rate_limit
+from app.middleware import rate_limit
 
-评论蓝图 = Blueprint('comments', __name__)
+comments_bp = Blueprint('comments', __name__)
 
 
-@评论蓝图.route('/api/posts/<post_id>/comments')
+@comments_bp.route('/api/posts/<post_id>/comments')
 def api_post_comments(post_id):
 	page = request.args.get('page', 1, type=int)
 	page_size = request.args.get('page_size', 50, type=int)
@@ -29,7 +29,7 @@ def api_post_comments(post_id):
 	return jsonify(result)
 
 
-@评论蓝图.route('/api/posts/<post_id>/comments/create', methods=['POST'])
+@comments_bp.route('/api/posts/<post_id>/comments/create', methods=['POST'])
 @login_required
 def api_comment_create(post_id):
 	if rate_limit('comment', 20, 60):
@@ -81,7 +81,7 @@ def api_comment_create(post_id):
 	return jsonify(result)
 
 
-@评论蓝图.route('/api/comments/<comment_id>/delete', methods=['POST'])
+@comments_bp.route('/api/comments/<comment_id>/delete', methods=['POST'])
 @login_required
 def api_comment_delete(comment_id):
 	result = db.delete_comment(comment_id, current_user['id'])

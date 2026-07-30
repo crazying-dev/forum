@@ -9,27 +9,27 @@ import uuid
 from flask_cors import cross_origin
 from main.main import base, app
 
-页面蓝图 = Blueprint('pages', __name__)
+pages_bp = Blueprint('pages', __name__)
 
 
-@页面蓝图.route('/login')
+@pages_bp.route('/login')
 def login_page():
 	if current_user.is_authenticated:
 		return redirect('/')
 	return render_template(base, page_template='auth.html')
 
 
-@页面蓝图.route('/')
+@pages_bp.route('/')
 def index_page():
 	return render_template(base, page_template='index.html')
 
 
-@页面蓝图.route('/privacy')
+@pages_bp.route('/privacy')
 def privacy_page():
 	return render_template(base, page_template='privacy.html')
 
 
-@页面蓝图.route('/verify-email')
+@pages_bp.route('/verify-email')
 def verify_email_page():
 	token = request.args.get('token', '')
 	if token:
@@ -43,7 +43,7 @@ def verify_email_page():
 	return render_template(base, page_template='auth.html')
 
 
-@页面蓝图.route('/reset-password')
+@pages_bp.route('/reset-password')
 def reset_password_page():
 	token = request.args.get('token', '')
 	if token:
@@ -55,52 +55,52 @@ def reset_password_page():
 	return render_template(base, page_template='auth.html')
 
 
-@页面蓝图.route('/WIKI')
+@pages_bp.route('/WIKI')
 def WIKI():
 	return render_template(base, page_template='WIKI/WIKI.html')
 
 
-@页面蓝图.route("/World")
+@pages_bp.route("/World")
 def World():
 	return render_template(base, page_template='World.html')
 
 
-@页面蓝图.route('/WIKI/GuanFang')
+@pages_bp.route('/WIKI/GuanFang')
 def WIKIGuanFang():
 	return render_template(base, page_template='WIKI/GuanFang/GuanFang.html')
 
 
-@页面蓝图.route('/WIKI/Personal')
+@pages_bp.route('/WIKI/Personal')
 def WIKIPersonal():
 	return render_template(base, page_template='WIKI/Personal/Personal.html')
 
 
-@页面蓝图.route('/WIKI/Personal/mouse')
+@pages_bp.route('/WIKI/Personal/mouse')
 def WIKIPersonalMouse():
 	return render_template(base, page_template='WIKI/Personal/mouse/mouse.html')
 
 
-@页面蓝图.route('/WIKI/Personal/mouse/Liunx')
+@pages_bp.route('/WIKI/Personal/mouse/Liunx')
 def WIKIPersonalMouseLiunx():
 	return render_template(base, page_template='WIKI/Personal/mouse/Liunx.html')
 
 
-@页面蓝图.route('/forum')
+@pages_bp.route('/forum')
 def forum_page():
 	return render_template(base, page_template='forum.html')
 
 
-@页面蓝图.route('/post/create')
+@pages_bp.route('/post/create')
 def post_create_page():
 	return render_template(base, page_template='post_create.html')
 
 
-@页面蓝图.route('/WIKI/Personal/Live2D')
+@pages_bp.route('/WIKI/Personal/Live2D')
 def WIKIPersonalLive2D():
 	return render_template(base, page_template='WIKI/Personal/Live2D.html')
 
 
-@页面蓝图.route('/users/<ID>')
+@pages_bp.route('/users/<ID>')
 def users_page(ID):
 	UserInfo = db.get_user_by_id(ID)
 	if not UserInfo:
@@ -108,12 +108,12 @@ def users_page(ID):
 	return render_template(base, page_template='UserPersonalinfo.html')
 
 
-@页面蓝图.route('/huiguan')
+@pages_bp.route('/huiguan')
 def huiguan_page():
 	return render_template(base, page_template='huiguan.html')
 
 
-@页面蓝图.route('/api/huiguan')
+@pages_bp.route('/api/huiguan')
 def api_huiguan_list():
 	try:
 		with app.open_resource("huiguan.json", "r", encoding="utf-8") as f:
@@ -127,12 +127,12 @@ def api_huiguan_list():
 		return jsonify({'success': False, 'message': '服务器内部错误'}), 500
 
 
-@页面蓝图.route('/favicon.ico')
+@pages_bp.route('/favicon.ico')
 def favicon():
 	return redirect(config.Image_father_URL + '/favicon.png')
 
 
-@页面蓝图.route('/Easter-Egg')
+@pages_bp.route('/Easter-Egg')
 def EasterEgg():
 	try:
 		with app.open_resource("EasterEgg/1.json", "r", encoding="utf-8") as f:
@@ -143,39 +143,39 @@ def EasterEgg():
 		return jsonify({"error": "服务器内部错误"}), 500
 
 
-@页面蓝图.route('/search')
+@pages_bp.route('/search')
 def search_page():
 	return render_template(base, page_template='search.html')
 
 
-@页面蓝图.route('/post/<post_id>')
+@pages_bp.route('/post/<post_id>')
 def page_post_detail(post_id):
 	return render_template(base, page_template='post_detail.html')
 
 
-@页面蓝图.route('/rss.xml')
+@pages_bp.route('/rss.xml')
 def RSS():
 	return ""
 
 
-@页面蓝图.route('/QQ/redirect')
+@pages_bp.route('/QQ/redirect')
 def QQ_redirect():
 	return redirect("https://qm.qq.com/q/bLxr68HnUI")
 
 
-@页面蓝图.route("/INFO/")
-@页面蓝图.route("/INFO")
+@pages_bp.route("/INFO/")
+@pages_bp.route("/INFO")
 @cross_origin(origins="men.umrca.com")
 def INFO():
 	return random.choice(["妖精论坛——一个充满神秘色彩的封闭区域，在此处，你会与聚灵而生的妖精，亦或者得到某种机遇而打开修行之路的人类，展开全新的相遇"])
 
 
-@页面蓝图.route('/api/users/avatar/navifox/', methods=['GET'])
+@pages_bp.route('/api/users/avatar/navifox/', methods=['GET'])
 @cross_origin(origins="")
 def navifox_avatar():
 	return ""
 
 
-@页面蓝图.route("/TheDoorOfBings/UUID4/")
+@pages_bp.route("/TheDoorOfBings/UUID4/")
 def TheDoorOfBings_UUID():
 	return jsonify([str(uuid.uuid4())])
