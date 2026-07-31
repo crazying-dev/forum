@@ -177,7 +177,7 @@ def _cleanup_freq(now):
 
 
 def _report_ip(client_ip, reason):
-	"""记录恶意 IP：写日志 + 首次时通过宝塔 API 封禁。"""
+	"""记录恶意 IP：写日志 + 加入黑名单。"""
 	log_path = '/root/IP.txt'
 	entry = f"{client_ip}  # {time.strftime('%Y-%m-%d %H:%M:%S')}  {reason}"
 	try:
@@ -196,8 +196,8 @@ def _report_ip(client_ip, reason):
 				f.write(entry + '\n')
 			print(f"[SECURITY] 恶意 IP 已记录: {entry}")
 
-			# 加入黑名单
-			_add_ip_to_blacklist(client_ip, reason)
+		# 无论是否已在日志中，都要加入 JSON 黑名单
+		_add_ip_to_blacklist(client_ip, reason)
 	except Exception as e:
 		print(f"[SECURITY] 写入 IP 日志失败: {e}")
 
