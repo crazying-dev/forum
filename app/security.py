@@ -6,58 +6,40 @@
   2. 请求频率过高
 检测到恶意行为后：
   - 写入 /root/IP.txt 日志
-  - 通过宝塔面板 API 封禁 IP
+  - 通过 iptables 封禁 IP
 """
 import os
 import re
 import time
+import subprocess
 import threading
 from threading import Lock
 from flask import request, jsonify
 
-# ── 宝塔 API 客户端（延迟初始化）──────────────────────────
+# ── 命令行封禁 ──────────────────────────────────────────
 
-_bt_client = None
-_bt_lock = Lock()
 _blocked_cache = {}      # {ip: timestamp} 避免重复封禁
-_BLOCK_COOLDOWN = 600    # 同一 IP 10 分钟内不重复调用 API
+_BLOCK_COOLDOWN = 600    # 同一 IP 10 分钟内不重复
 
-def _get_bt_client():
-	"""获取宝塔客户端单例。"""
-	global _bt_client
-	if _bt_client is None:
-		with _bt_lock:
-			if _bt_client is None:
-				panel_url = os.getenv('BT_PANEL_URL', 'http://127.0.0.1:26460')
-				api_sk = os.getenv('BT_API_SK', '')
-				if api_sk:
-					from api.BaoTaAPI import BtFirewallBlackIp
-					_bt_client = BtFirewallBlackIp(panel_url, api_sk)
-	return _bt_client
+# 可通过环境变量自定义封禁命令，默认用 iptables
+BLOCK_CMD = os.getenv('BLOCK_CMD', 'iptables -A INPUT -s {ip} -j DROP -m comment --comment "{reason}"')
 
 
-def _block_ip_via_bt(client_ip, reason):
-	"""通过宝塔 API 封禁 IP（后台线程，不阻塞请求）。"""
+def _block_ip(client_ip, reason):
+	"""通过命令行封禁 IP（后台线程，不阻塞请求）。"""
 	now = time.time()
-	last_blocked = _blocked_cache.get(client_ip, 0)
-	if now - last_blocked < _BLOCK_COOLDOWN:
-		return  # 冷却期内跳过
+	if now - _blocked_cache.get(client_ip, 0) < _BLOCK_COOLDOWN:
+		return
 	_blocked_cache[client_ip] = now
 
 	def _do_block():
-		for retry in range(3):
-			try:
-				bt = _get_bt_client()
-				if bt is None:
-					return
-				result = bt.add_black_ip(client_ip, reason)
-				print(f"[SECURITY] 宝塔封禁 {client_ip}: {result}")
-				return
-			except Exception as e:
-				if retry < 2:
-					time.sleep(1)
-				else:
-					print(f"[SECURITY] 宝塔封禁失败(重试{3}次) {client_ip}: {e}")
+		cmd = BLOCK_CMD.format(ip=client_ip, reason=reason)
+		try:
+			subprocess.run(cmd, shell=True, check=True,
+			               capture_output=True, timeout=10)
+			print(f"[SECURITY] 命令行封禁 {client_ip}: OK")
+		except Exception as e:
+			print(f"[SECURITY] 命令行封禁失败 {client_ip}: {e}")
 
 	threading.Thread(target=_do_block, daemon=True).start()
 
@@ -188,7 +170,7 @@ def _report_ip(client_ip, reason):
 			print(f"[SECURITY] 恶意 IP 已记录: {entry}")
 
 			# 通过宝塔 API 封禁 IP
-			_block_ip_via_bt(client_ip, reason)
+			_block_ip(client_ip, reason)
 	except Exception as e:
 		print(f"[SECURITY] 写入 IP 日志失败: {e}")
 
