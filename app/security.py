@@ -4,45 +4,71 @@
 检测恶意 IP：
   1. 访问危险路径（.git/.env/常见漏洞扫描路径等）
   2. 请求频率过高
-检测到恶意行为后：
-  - 写入 /root/IP.txt 日志
-  - 通过 iptables 封禁 IP
+  3. 命中 /root/db/forum_IP.json 黑名单
+检测到恶意行为后写入黑名单，黑名单内 IP 直接返回 500。
 """
 import os
 import re
+import json
 import time
-import subprocess
-import threading
 from threading import Lock
 from flask import request, jsonify
 
-# ── 命令行封禁 ──────────────────────────────────────────
+# ── IP 黑名单 JSON 文件 ─────────────────────────────────
 
-_blocked_cache = {}      # {ip: timestamp} 避免重复封禁
-_BLOCK_COOLDOWN = 600    # 同一 IP 10 分钟内不重复
+IP_LIST_PATH = '/root/db/forum_IP.json'
+_ip_lock = Lock()
+_ip_blacklist = set()
+_ip_blacklist_loaded = False
 
-# 可通过环境变量自定义封禁命令，默认用 iptables
-BLOCK_CMD = os.getenv('BLOCK_CMD', 'iptables -I INPUT -s {ip} -j DROP -m comment --comment "{reason}"')
+
+def _load_blacklist():
+	"""加载 IP 黑名单 JSON 文件。"""
+	global _ip_blacklist, _ip_blacklist_loaded
+	with _ip_lock:
+		if _ip_blacklist_loaded:
+			return
+		try:
+			os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+			if os.path.exists(IP_LIST_PATH):
+				with open(IP_LIST_PATH, 'r', encoding='utf-8') as f:
+					data = json.load(f)
+					_ip_blacklist = set(data.get('blocked', []))
+			else:
+				_save_blacklist()
+			_ip_blacklist_loaded = True
+			print(f"[SECURITY] IP 黑名单已加载: {len(_ip_blacklist)} 个")
+		except Exception as e:
+			print(f"[SECURITY] 加载黑名单失败: {e}")
 
 
-def _block_ip(client_ip, reason):
-	"""通过命令行封禁 IP。"""
-	now = time.time()
-	if now - _blocked_cache.get(client_ip, 0) < _BLOCK_COOLDOWN:
-		return
-	_blocked_cache[client_ip] = now
-
-	cmd = BLOCK_CMD.format(ip=client_ip, reason=reason)
+def _save_blacklist():
+	"""保存 IP 黑名单到 JSON 文件。"""
 	try:
-		result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
-		if result.returncode == 0:
-			print(f"[SECURITY] iptables 封禁 {client_ip} OK")
-		else:
-			print(f"[SECURITY] iptables 失败 {client_ip}: {result.stderr.strip()}")
-	except subprocess.TimeoutExpired:
-		print(f"[SECURITY] iptables 超时 {client_ip}")
+		os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+		data = {
+			'blocked': sorted(_ip_blacklist),
+			'updated': time.strftime('%Y-%m-%d %H:%M:%S')
+		}
+		with open(IP_LIST_PATH, 'w', encoding='utf-8') as f:
+			json.dump(data, f, ensure_ascii=False, indent=2)
 	except Exception as e:
-		print(f"[SECURITY] iptables 异常 {client_ip}: {e}")
+		print(f"[SECURITY] 保存黑名单失败: {e}")
+
+
+def _is_ip_blocked(client_ip):
+	"""检查 IP 是否在黑名单中。"""
+	return client_ip in _ip_blacklist
+
+
+def _add_ip_to_blacklist(client_ip, reason):
+	"""将 IP 加入黑名单并写入文件。"""
+	with _ip_lock:
+		if client_ip in _ip_blacklist:
+			return
+		_ip_blacklist.add(client_ip)
+		_save_blacklist()
+	print(f"[SECURITY] IP 已加入黑名单: {client_ip} ({reason})")
 
 
 
@@ -170,8 +196,8 @@ def _report_ip(client_ip, reason):
 				f.write(entry + '\n')
 			print(f"[SECURITY] 恶意 IP 已记录: {entry}")
 
-			# 通过宝塔 API 封禁 IP
-			_block_ip(client_ip, reason)
+			# 加入黑名单
+			_add_ip_to_blacklist(client_ip, reason)
 	except Exception as e:
 		print(f"[SECURITY] 写入 IP 日志失败: {e}")
 
@@ -185,11 +211,15 @@ def detect_malicious():
 	记录 IP 并返回一个 404/403 响应阻断请求。
 
 	Returns:
-		None（安全）或 Flask Response（需立即返回阻断）
 	"""
+	_load_blacklist()
 	client_ip = request.remote_addr or 'unknown'
 	path = request.path or ''
 	now = time.time()
+
+	# ── 0. 黑名单优先检测 ──
+	if _is_ip_blocked(client_ip):
+		return jsonify({'error': 'Internal Server Error'}), 500
 
 	# ── 1. 危险路径检测 ──
 	for pattern in _compiled_patterns:
