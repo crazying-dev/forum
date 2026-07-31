@@ -45,20 +45,24 @@ def _block_ip_via_bt(client_ip, reason):
 	_blocked_cache[client_ip] = now
 
 	def _do_block():
-		try:
-			bt = _get_bt_client()
-			if bt is None:
-				print(f"[SECURITY] 宝塔 API 未配置，跳过封禁: {client_ip}")
+		for retry in range(3):
+			try:
+				bt = _get_bt_client()
+				if bt is None:
+					return
+				result = bt.add_black_ip(client_ip, reason)
+				print(f"[SECURITY] 宝塔封禁 {client_ip}: {result}")
 				return
-			result = bt.add_black_ip(client_ip, reason)
-			print(f"[SECURITY] 宝塔封禁 {client_ip}: {result}")
-		except Exception as e:
-			print(f"[SECURITY] 宝塔封禁失败 {client_ip}: {e}")
+			except Exception as e:
+				if retry < 2:
+					time.sleep(1)
+				else:
+					print(f"[SECURITY] 宝塔封禁失败(重试{3}次) {client_ip}: {e}")
 
 	threading.Thread(target=_do_block, daemon=True).start()
 
 
-# ── 危险路径模式 ──────────────────────────────────────────
+
 
 # ── 危险路径模式 ──────────────────────────────────────────
 
