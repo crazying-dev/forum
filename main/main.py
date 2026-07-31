@@ -122,6 +122,18 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 base = 'PATH/base.html'
 
 
+
+# IP Security: malicious path detection + rate limiting
+
+from app.security import detect_malicious
+
+@app.before_request
+def ip_security_check():
+	block = detect_malicious()
+	if block is not None:
+		return block
+
+
 # ── CSRF 保护：校验 Origin/Referer ─────────────────────────
 
 _ALLOWED_ORIGINS_SET = set(_allowed_origins) if _allowed_origins else set()
