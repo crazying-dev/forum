@@ -22,7 +22,7 @@ _blocked_cache = {}      # {ip: timestamp} 避免重复封禁
 _BLOCK_COOLDOWN = 600    # 同一 IP 10 分钟内不重复
 
 # 可通过环境变量自定义封禁命令，默认用 iptables
-BLOCK_CMD = os.getenv('BLOCK_CMD', 'iptables -A INPUT -s {ip} -j DROP -m comment --comment "{reason}"')
+BLOCK_CMD = os.getenv('BLOCK_CMD', 'iptables -I INPUT -s {ip} -j DROP -m comment --comment "{reason}"')
 
 
 def _block_ip(client_ip, reason):
