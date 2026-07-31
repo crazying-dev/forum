@@ -1,5 +1,5 @@
 """认证相关 API 路由。"""
-from flask import Blueprint, request, jsonify, redirect
+from flask import Blueprint, request, jsonify, redirect, Response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from api import database as db
@@ -12,6 +12,15 @@ import time
 from app.middleware import rate_limit
 
 auth_bp = Blueprint('auth', __name__)
+
+@app.route('/robots.txt')
+def robots():
+    txt = """User-agent: *
+Allow: /posts/*
+Allow: /users/*
+Disallow: /api/*"""
+
+    return Response(txt, mimetype="text/plain")
 
 
 @auth_bp.route('/api/send-register-code', methods=['POST'])
