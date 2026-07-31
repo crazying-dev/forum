@@ -164,13 +164,12 @@ def _cleanup_freq(now):
 
 
 def _report_ip(client_ip, reason):
-	"""将恶意 IP 写入 /root/IP.txt（去重追加，加时间戳）。"""
+	"""记录恶意 IP：写日志 + 首次时通过宝塔 API 封禁。"""
 	log_path = '/root/IP.txt'
 	entry = f"{client_ip}  # {time.strftime('%Y-%m-%d %H:%M:%S')}  {reason}"
 	try:
 		os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
-		# 读取已有 IP 列表去重
 		existing = set()
 		if os.path.exists(log_path):
 			with open(log_path, 'r', encoding='utf-8') as f:
@@ -183,8 +182,9 @@ def _report_ip(client_ip, reason):
 			with open(log_path, 'a', encoding='utf-8') as f:
 				f.write(entry + '\n')
 			print(f"[SECURITY] 恶意 IP 已记录: {entry}")
-				# Baota API auto-block
-				_block_ip_via_bt(client_ip, reason)
+
+			# 通过宝塔 API 封禁 IP
+			_block_ip_via_bt(client_ip, reason)
 	except Exception as e:
 		print(f"[SECURITY] 写入 IP 日志失败: {e}")
 
