@@ -15,12 +15,12 @@ auth_bp = Blueprint('auth', __name__)
 
 @app.route('/robots.txt')
 def robots():
-    txt = """User-agent: *
+	txt = """User-agent: *
 Allow: /posts/*
 Allow: /users/*
 Disallow: /api/*"""
 
-    return Response(txt, mimetype="text/plain")
+	return Response(txt, mimetype="text/plain")
 
 
 @auth_bp.route('/api/send-register-code', methods=['POST'])

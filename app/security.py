@@ -4,13 +4,61 @@
 检测恶意 IP：
   1. 访问危险路径（.git/.env/常见漏洞扫描路径等）
   2. 请求频率过高
-检测到恶意行为后立即记录到 /root/IP.txt。
+检测到恶意行为后：
+  - 写入 /root/IP.txt 日志
+  - 通过宝塔面板 API 封禁 IP
 """
 import os
 import re
 import time
+import threading
 from threading import Lock
 from flask import request, jsonify
+
+# ── 宝塔 API 客户端（延迟初始化）──────────────────────────
+
+_bt_client = None
+_bt_lock = Lock()
+_blocked_cache = {}      # {ip: timestamp} 避免重复封禁
+_BLOCK_COOLDOWN = 600    # 同一 IP 10 分钟内不重复调用 API
+
+def _get_bt_client():
+	"""获取宝塔客户端单例。"""
+	global _bt_client
+	if _bt_client is None:
+		with _bt_lock:
+			if _bt_client is None:
+				panel_url = os.getenv('BT_PANEL_URL', 'http://127.0.0.1:26460')
+				api_sk = os.getenv('BT_API_SK', '')
+				if api_sk:
+					from api.BaoTaAPI import BtFirewallBlackIp
+					_bt_client = BtFirewallBlackIp(panel_url, api_sk)
+	return _bt_client
+
+
+def _block_ip_via_bt(client_ip, reason):
+	"""通过宝塔 API 封禁 IP（后台线程，不阻塞请求）。"""
+	now = time.time()
+	last_blocked = _blocked_cache.get(client_ip, 0)
+	if now - last_blocked < _BLOCK_COOLDOWN:
+		return  # 冷却期内跳过
+	_blocked_cache[client_ip] = now
+
+	def _do_block():
+		try:
+			bt = _get_bt_client()
+			if bt is None:
+				print(f"[SECURITY] 宝塔 API 未配置，跳过封禁: {client_ip}")
+				return
+			result = bt.add_black_ip(client_ip, reason)
+			print(f"[SECURITY] 宝塔封禁 {client_ip}: {result}")
+		except Exception as e:
+			print(f"[SECURITY] 宝塔封禁失败 {client_ip}: {e}")
+
+	threading.Thread(target=_do_block, daemon=True).start()
+
+
+# ── 危险路径模式 ──────────────────────────────────────────
 
 # ── 危险路径模式 ──────────────────────────────────────────
 
@@ -135,6 +183,8 @@ def _report_ip(client_ip, reason):
 			with open(log_path, 'a', encoding='utf-8') as f:
 				f.write(entry + '\n')
 			print(f"[SECURITY] 恶意 IP 已记录: {entry}")
+				# Baota API auto-block
+				_block_ip_via_bt(client_ip, reason)
 	except Exception as e:
 		print(f"[SECURITY] 写入 IP 日志失败: {e}")
 
