@@ -26,22 +26,23 @@ BLOCK_CMD = os.getenv('BLOCK_CMD', 'iptables -A INPUT -s {ip} -j DROP -m comment
 
 
 def _block_ip(client_ip, reason):
-	"""通过命令行封禁 IP（后台线程，不阻塞请求）。"""
+	"""通过命令行封禁 IP。"""
 	now = time.time()
 	if now - _blocked_cache.get(client_ip, 0) < _BLOCK_COOLDOWN:
 		return
 	_blocked_cache[client_ip] = now
 
-	def _do_block():
-		cmd = BLOCK_CMD.format(ip=client_ip, reason=reason)
-		try:
-			subprocess.run(cmd, shell=True, check=True,
-			               capture_output=True, timeout=10)
-			print(f"[SECURITY] 命令行封禁 {client_ip}: OK")
-		except Exception as e:
-			print(f"[SECURITY] 命令行封禁失败 {client_ip}: {e}")
-
-	threading.Thread(target=_do_block, daemon=True).start()
+	cmd = BLOCK_CMD.format(ip=client_ip, reason=reason)
+	try:
+		result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+		if result.returncode == 0:
+			print(f"[SECURITY] iptables 封禁 {client_ip} OK")
+		else:
+			print(f"[SECURITY] iptables 失败 {client_ip}: {result.stderr.strip()}")
+	except subprocess.TimeoutExpired:
+		print(f"[SECURITY] iptables 超时 {client_ip}")
+	except Exception as e:
+		print(f"[SECURITY] iptables 异常 {client_ip}: {e}")
 
 
 
