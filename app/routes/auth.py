@@ -10,6 +10,7 @@ import re
 import random
 import time
 from app.middleware import rate_limit
+from app.utils.email_utils import validate_email
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -31,8 +32,9 @@ def api_send_register_code():
 	data = request.get_json() or {}
 	email = (data.get('email') or '').strip().lower()
 
-	if not email or '@' not in email:
-		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+	valid, err = validate_email(email)
+	if not valid:
+		return jsonify({'success': False, 'message': err})
 
 	# 检查邮箱是否已被注册
 	existing_user = db.get_user_by_email(email)
@@ -72,8 +74,9 @@ def api_register():
 	name_for_check = strip_easter_egg(name)
 	if len(name_for_check) < 2 or len(name_for_check) > 20:
 		return jsonify({'success': False, 'message': '用户名需要2-20个字符（不含彩蛋）'})
-	if not email or '@' not in email:
-		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+	valid, err = validate_email(email)
+	if not valid:
+		return jsonify({'success': False, 'message': err})
 	if len(password) < 8:
 		return jsonify({'success': False, 'message': '密码至少8位'})
 	if not re.search(r'[A-Za-z]', password) or not re.search(r'\d', password):
@@ -220,8 +223,9 @@ def api_send_reset_password():
 	data = request.get_json() or {}
 	email = (data.get('email') or '').strip().lower()
 
-	if not email or '@' not in email:
-		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+	valid, err = validate_email(email)
+	if not valid:
+		return jsonify({'success': False, 'message': err})
 
 	user = db.get_user_by_email(email)
 	if not user:
@@ -347,8 +351,9 @@ def api_send_code_reset_password():
 	data = request.get_json() or {}
 	email = (data.get('email') or '').strip().lower()
 
-	if not email or '@' not in email:
-		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+	valid, err = validate_email(email)
+	if not valid:
+		return jsonify({'success': False, 'message': err})
 
 	user = db.get_user_by_email(email)
 	if not user:
@@ -386,8 +391,9 @@ def api_reset_password_by_code():
 	code = (data.get('code') or '').strip()
 	password = data.get('password') or ''
 
-	if not email or '@' not in email:
-		return jsonify({'success': False, 'message': '请输入有效的邮箱'})
+	valid, err = validate_email(email)
+	if not valid:
+		return jsonify({'success': False, 'message': err})
 	if not code or not code.isdigit() or len(code) != 6:
 		return jsonify({'success': False, 'message': '请输入6位数字验证码'})
 	if len(password) < 8:
