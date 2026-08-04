@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 """邮箱验证工具。
 
-  邮箱格式正则校验 + 域名黑名单。
-  黑名单文件：/root/db/MailBreak.json
-  格式：{"blocked": ["tempmail.com", "disposable.org"]}
+  邮箱格式正则校验 + 临时邮箱域名检测（调用 mail-checker API）。
+  API：https://mail-checker.unknownmp.de5.net/api/v1/verify/domain/{domain}
 """
-import os
 import re
-import json
+import time
+import requests
 from threading import Lock
 
 # 邮箱格式正则（RFC 5322 简化版）
@@ -17,45 +16,44 @@ EMAIL_REGEX = re.compile(
 	r'(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'
 )
 
-BLACKLIST_PATH = '/root/db/MailBreak.json'
-_lock = Lock()
-_blacklist = None
+# 域名检测缓存
+_domain_lock = Lock()
+_domain_cache = {}       # {domain: (is_disposable, cached_at)}
+_CACHE_TTL = 3600        # 缓存 1 小时
+
+CHECK_API = 'https://mail-checker.unknownmp.de5.net/api/v1/verify/domain/{}'
 
 
-def _load_blacklist():
-	"""加载邮箱域名黑名单（懒加载 + 缓存）。"""
-	global _blacklist
-	with _lock:
-		if _blacklist is not None:
-			return _blacklist
-		try:
-			os.makedirs(os.path.dirname(BLACKLIST_PATH), exist_ok=True)
-			if os.path.exists(BLACKLIST_PATH):
-				with open(BLACKLIST_PATH, 'r', encoding='utf-8') as f:
-					data = json.load(f)
-					_blacklist = set(data.get('blocked', []))
-			else:
-				_save_blacklist(set())
-				_blacklist = set()
-			print(f"[EMAIL] 域名黑名单已加载: {len(_blacklist)} 个")
-		except Exception as e:
-			print(f"[EMAIL] 加载黑名单失败: {e}")
-			_blacklist = set()
-	return _blacklist
+def _check_domain(domain):
+	"""检测域名是否为临时邮箱（带缓存）。
 
+	Returns:
+		True  — 是临时邮箱（应拒绝）
+		False — 正常邮箱（允许）
+	"""
+	now = time.time()
+	with _domain_lock:
+		cached = _domain_cache.get(domain)
+		if cached and now - cached[1] < _CACHE_TTL:
+			return cached[0]
 
-def _save_blacklist(domains):
-	"""保存黑名单到 JSON 文件。"""
 	try:
-		os.makedirs(os.path.dirname(BLACKLIST_PATH), exist_ok=True)
-		with open(BLACKLIST_PATH, 'w', encoding='utf-8') as f:
-			json.dump({'blocked': sorted(domains)}, f, ensure_ascii=False, indent=2)
+		resp = requests.get(CHECK_API.format(domain), timeout=5)
+		if resp.status_code == 200:
+			data = resp.json()
+			is_disposable = data.get('is_disposable', False)
 	except Exception as e:
-		print(f"[EMAIL] 保存黑名单失败: {e}")
+		print(f"[EMAIL] API 检测失败 {domain}: {e}")
+		is_disposable = False  # API 不可用时不阻断
+
+	with _domain_lock:
+		_domain_cache[domain] = (is_disposable, now)
+
+	return is_disposable
 
 
 def validate_email(email):
-	"""校验邮箱格式并检查域名黑名单。
+	"""校验邮箱格式并检测临时邮箱域名。
 
     Args:
         email: 邮箱地址
@@ -73,17 +71,13 @@ def validate_email(email):
 	if not EMAIL_REGEX.match(email):
 		return False, '邮箱格式不正确'
 
-	# 提取域名部分
 	parts = email.split('@')
 	if len(parts) != 2:
 		return False, '邮箱格式不正确'
 
 	domain = parts[1]
 
-	# 检查黑名单
-	blacklist = _load_blacklist()
-	for blocked in blacklist:
-		if domain == blocked or domain.endswith('.' + blocked):
-			return False, '不支持的邮箱服务商，请使用其他邮箱'
+	if _check_domain(domain):
+		return False, '不支持的邮箱服务商，请使用其他邮箱'
 
 	return True, ''
