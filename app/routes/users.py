@@ -7,7 +7,6 @@ from main.main import app, base, strip_easter_egg
 import hashlib
 import os
 import io
-import requests as http_requests
 
 users_bp = Blueprint('users', __name__)
 
@@ -131,30 +130,18 @@ def api_avatar_upload():
 		buf = io.BytesIO()
 		img.save(buf, format='WEBP', quality=85)
 		buf.seek(0)
-		token = os.getenv('avatar_READ_WRITE_TOKEN')
-		if not token:
-			return jsonify({'success': False, 'message': '存储服务未配置'}), 500
-		filename = hashlib.md5(f"{current_user['id']}{os.urandom(8).hex()}".encode()).hexdigest()
-		pathname = f'avatars/{filename}.webp'
-		upload_url = f'https://blob.vercel-storage.com/{pathname}'
-		resp = http_requests.put(
-			upload_url,
-			data=buf.getvalue(),
-			headers={
-				'Authorization': f'Bearer {token}',
-				'Content-Type': 'image/webp',
-			},
-			timeout=30
-		)
-		if resp.status_code != 200:
-			return jsonify({'success': False, 'message': '上传失败'}), 500
-		blob_url = resp.json().get('url')
-		if not blob_url:
-			return jsonify({'success': False, 'message': '获取URL失败'}), 500
-		result = db.update_user_profile(current_user['id'], avatar=blob_url)
+		import uuid
+		avatar_id = str(uuid.uuid4())
+		avatar_dir = '/root/db/avatar'
+		os.makedirs(avatar_dir, exist_ok=True)
+		avatar_path = f'{avatar_dir}/{avatar_id}.webp'
+		with open(avatar_path, 'wb') as avatar_file:
+			avatar_file.write(buf.getvalue())
+		avatar_url = f'/avatar/{avatar_id}.webp'
+		result = db.update_user_profile(current_user['id'], avatar=avatar_url)
 		if result:
 			cache_api.invalidate_user_cache(current_user['id'])
-		return jsonify({'success': result, 'avatar': blob_url})
+		return jsonify({'success': result, 'avatar': avatar_url})
 	except Exception as e:
 		print(f"[ERROR] avatar upload: {e}")
 		return jsonify({'success': False, 'message': '头像上传失败'}), 500

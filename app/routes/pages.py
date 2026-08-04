@@ -1,5 +1,5 @@
 """页面路由。"""
-from flask import Blueprint, render_template, redirect, request, jsonify
+from flask import Blueprint, send_file, render_template, redirect, request, jsonify
 from flask_login import current_user
 from api import database as db
 from api import config
@@ -171,7 +171,6 @@ def INFO():
 
 
 @pages_bp.route('/api/users/avatar/navifox/', methods=['GET'])
-@cross_origin(origins="")
 def navifox_avatar():
 	return ""
 
@@ -179,3 +178,11 @@ def navifox_avatar():
 @pages_bp.route("/TheDoorOfBings/UUID4/")
 def TheDoorOfBings_UUID():
 	return jsonify([str(uuid.uuid4())])
+
+# /avatar/xxx.webp
+@pages_bp.route('/avatar/<filename>')
+def serve_avatar(filename):
+	try:
+		return send_file('/root/db/avatar/' + filename, mimetype='image/webp')
+	except Exception:
+		return '', 404
