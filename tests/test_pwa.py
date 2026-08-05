@@ -39,7 +39,8 @@ def main() -> int:
 
 	resp = client.get('/')
 	html = resp.get_data(as_text=True)
-	for needle in ('rel="manifest"', 'serviceWorker.register', 'apple-touch-icon'):
+	for needle in ('rel="manifest"', 'serviceWorker.register', 'apple-touch-icon',
+	               'install-modal', 'installApp', 'closeInstallCard', 'beforeinstallprompt'):
 		found = needle in html
 		print(f"{'PASS' if found else 'FAIL'} index contains {needle!r}")
 		ok = ok and found

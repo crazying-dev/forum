@@ -236,6 +236,30 @@
     </div>
 </div>
 
+<div id="install-modal" class="donate-modal" style="display:none;">
+    <div class="donate-overlay" onclick="closeInstallCard()"></div>
+    <div class="donate-card install-card">
+        <button class="donate-close" onclick="closeInstallCard()">&times;</button>
+        <div class="install-icon-wrap">
+            <img src="/static/pwa/icon-192.png" alt="妖精论坛">
+        </div>
+        <h3 class="donate-title">安装妖精论坛</h3>
+        <p class="donate-subtitle">添加到主屏幕，像 App 一样打开</p>
+        <div id="install-ios-steps" class="install-ios-steps" style="display:none;">
+            <p class="install-ios-title">iOS 请手动添加到主屏幕：</p>
+            <ol class="install-ios-list">
+                <li>点击底部 <b>分享</b> 按钮</li>
+                <li>选择 <b>添加到主屏幕</b></li>
+                <li>点击右上角 <b>添加</b></li>
+            </ol>
+        </div>
+        <div class="install-actions">
+            <button type="button" class="install-btn install-btn-ghost" onclick="closeInstallCard()">稍后再说</button>
+            <button type="button" class="install-btn install-btn-primary" id="install-confirm-btn" onclick="installApp()">立即安装</button>
+        </div>
+    </div>
+</div>
+
 <script>
 function showDonateCard() {
     var modal = document.getElementById('donate-modal');
@@ -255,8 +279,80 @@ document.addEventListener('keydown', function(e) {
         if (modal && modal.style.display === 'flex') {
             closeDonateCard();
         }
+        var installModal = document.getElementById('install-modal');
+        if (installModal && installModal.style.display === 'flex') {
+            closeInstallCard();
+        }
     }
 });
+</script>
+
+<script>
+// PWA 安装弹窗：beforeinstallprompt（Android/桌面 Chrome 系）+ iOS 手动引导
+(function() {
+    // 关闭只记录本次会话（sessionStorage）：不安装就每次访问都提示，直到安装成功
+    var CLOSED_KEY = 'forum-install-dismissed';
+    // 安装成功后永久记录（localStorage），配合 standalone 检测兜底
+    var INSTALLED_KEY = 'forum-install-installed';
+    var deferredPrompt = null;
+
+    function isIOS() {
+        return /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    function showInstallCard() {
+        var modal = document.getElementById('install-modal');
+        if (!modal || modal.style.display === 'flex') return;
+        var isIos = isIOS();
+        var iosSteps = document.getElementById('install-ios-steps');
+        var confirmBtn = document.getElementById('install-confirm-btn');
+        if (iosSteps) iosSteps.style.display = isIos ? '' : 'none';
+        if (confirmBtn) confirmBtn.style.display = isIos ? 'none' : '';
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    }
+
+    window.closeInstallCard = function() {
+        var modal = document.getElementById('install-modal');
+        if (modal) modal.style.display = 'none';
+        document.body.style.overflow = '';
+        // 本次会话内不再打扰；下次访问继续提示（直到安装）
+        try { sessionStorage.setItem(CLOSED_KEY, '1'); } catch(e) {}
+    };
+
+    window.installApp = function() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt = null;
+        }
+        closeInstallCard();
+    };
+
+    // 已安装（standalone App 模式）→ 不再提示
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    // 已安装成功 → 永久不再提示；本次会话已关闭 → 暂时不提示
+    try {
+        if (localStorage.getItem(INSTALLED_KEY)) return;
+        if (sessionStorage.getItem(CLOSED_KEY)) return;
+    } catch(e) {}
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallCard();
+    });
+
+    window.addEventListener('appinstalled', function() {
+        try { localStorage.setItem(INSTALLED_KEY, '1'); } catch(e) {}
+    });
+
+    // iOS Safari 无 beforeinstallprompt：加载后直接显示手动引导
+    if (isIOS()) {
+        window.addEventListener('load', showInstallCard);
+    }
+})();
 </script>
 
 <style>
@@ -399,6 +495,82 @@ document.addEventListener('keydown', function(e) {
     width: auto;
     height: auto;
     background: none;
+}
+
+/* ── 安装弹窗（复用 donate 体系，保持 UI 一致） ── */
+.install-icon-wrap {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 12px auto;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.install-icon-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.install-ios-steps {
+    margin: 12px 0 0 0;
+    padding: 12px 16px;
+    background: var(--color-bg-hover, rgba(128, 128, 128, 0.08));
+    border-radius: 10px;
+    text-align: left;
+}
+
+.install-ios-title {
+    margin: 0 0 6px 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.install-ios-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    line-height: 1.9;
+}
+
+.install-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.install-btn {
+    flex: 1;
+    padding: 10px 0;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font: inherit;
+}
+
+.install-btn-ghost {
+    background: none;
+    border: 1px solid var(--color-text-tertiary);
+    color: var(--color-text-secondary);
+}
+
+.install-btn-ghost:hover {
+    border-color: var(--color-text-secondary);
+    color: var(--color-text-primary);
+}
+
+.install-btn-primary {
+    background: #6A8C89;
+    border: 1px solid #6A8C89;
+    color: #fff;
+}
+
+.install-btn-primary:hover {
+    filter: brightness(1.1);
 }
 
 </style>
