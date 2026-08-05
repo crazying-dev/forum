@@ -1,6 +1,6 @@
 /* 妖精论坛 Service Worker —— 仅满足 PWA 可安装条件，不做离线缓存 */
-/* 升级时修改此版本号，配合路由侧 Cache-Control: no-cache 保证尽快接管 */
-const SW_VERSION = '1.0.0';
+/* 版本号由环境变量 SW_VERSION 接管（见 api/config.py），部署时修改即可强制更新 */
+const SW_VERSION = '__SW_VERSION__';
 
 self.addEventListener('install', (event) => {
   // 新版本立即激活，不等旧页面关闭

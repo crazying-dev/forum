@@ -32,6 +32,11 @@ def main() -> int:
 	print(f"{'PASS' if cc == 'no-cache' else 'FAIL'} /sw.js Cache-Control -> {cc!r}")
 	ok = ok and (cc == 'no-cache')
 
+	sw_body = resp.get_data(as_text=True)
+	default_ok = "const SW_VERSION = '1.0.0';" in sw_body and '__SW_VERSION__' not in sw_body
+	print(f"{'PASS' if default_ok else 'FAIL'} /sw.js 默认版本号替换（1.0.0，无残留占位符）")
+	ok = ok and default_ok
+
 	resp = client.get('/')
 	html = resp.get_data(as_text=True)
 	for needle in ('rel="manifest"', 'serviceWorker.register', 'apple-touch-icon'):

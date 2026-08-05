@@ -1,5 +1,5 @@
 """页面路由。"""
-from flask import Blueprint, send_file, render_template, redirect, request, jsonify
+from flask import Blueprint, send_file, render_template, redirect, request, jsonify, Response
 from flask_login import current_user
 from api import database as db
 from api import config
@@ -144,11 +144,10 @@ def pwa_manifest():
 
 @pages_bp.route('/sw.js')
 def pwa_service_worker():
-	"""Service Worker。显式 no-cache：防止 Nginx/浏览器缓存导致更新不及时。"""
-	resp = send_file(
-		Path(app.root_path) / 'static' / 'pwa' / 'sw.js',
-		mimetype='application/javascript; charset=utf-8',
-	)
+	"""Service Worker。版本号由环境变量 SW_VERSION 接管；no-cache 防止更新不及时。"""
+	content = (Path(app.root_path) / 'static' / 'pwa' / 'sw.js').read_text(encoding='utf-8')
+	content = content.replace('__SW_VERSION__', config.SW_VERSION)
+	resp = Response(content, mimetype='application/javascript; charset=utf-8')
 	resp.headers['Cache-Control'] = 'no-cache'
 	return resp
 
