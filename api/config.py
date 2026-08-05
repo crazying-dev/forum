@@ -11,9 +11,6 @@ vip = "0"  # 用户默认为VIP
 POOL_ENABLED = False  # Vercel数据库不需要连接池，所以为False;传统服务器需要连接池进行优化，当使用传统服务器时改为True
 Image_father_URL = "https://img.crazying-dev.top/text/one"
 
-# PWA Service Worker 版本号（升级时改环境变量即可，无需改代码）
-SW_VERSION = os.getenv('SW_VERSION', '1.0.0')
-
 # 邮件相关配置
 SMTP_ENABLED = True
 SMTP_HOST = os.getenv('SMTP_HOST', 'smtpdm.aliyun.com')
