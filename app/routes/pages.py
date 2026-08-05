@@ -6,6 +6,7 @@ from api import config
 import json
 import random
 import uuid
+from pathlib import Path
 from flask_cors import cross_origin
 from main.main import base, app
 
@@ -130,6 +131,26 @@ def api_huiguan_list():
 @pages_bp.route('/favicon.ico')
 def favicon():
 	return redirect(config.Image_father_URL + '/favicon.png')
+
+
+@pages_bp.route('/manifest.json')
+def pwa_manifest():
+	"""PWA Web App Manifest（application/manifest+json，绕过 Flask 默认的 json 推断）。"""
+	return send_file(
+		Path(app.root_path) / 'static' / 'pwa' / 'manifest.json',
+		mimetype='application/manifest+json; charset=utf-8',
+	)
+
+
+@pages_bp.route('/sw.js')
+def pwa_service_worker():
+	"""Service Worker。显式 no-cache：防止 Nginx/浏览器缓存导致更新不及时。"""
+	resp = send_file(
+		Path(app.root_path) / 'static' / 'pwa' / 'sw.js',
+		mimetype='application/javascript; charset=utf-8',
+	)
+	resp.headers['Cache-Control'] = 'no-cache'
+	return resp
 
 
 @pages_bp.route('/Easter-Egg')

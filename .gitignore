@@ -169,6 +169,7 @@ cython_debug/
 
 # AI
 .qoder/
+.yoyo/
 
 # Ruff stuff:
 .ruff_cache/

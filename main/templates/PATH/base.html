@@ -10,6 +10,13 @@
     <title>妖精论坛</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
+    <!-- PWA：Web App Manifest 与 iOS 安装兼容 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="妖精论坛">
+    <link rel="apple-touch-icon" href="/static/pwa/apple-touch-icon.png">
+
     <link rel="dns-prefetch" href="//assets.crazying-dev.top">
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="//img.crazying-dev.top">
@@ -396,6 +403,14 @@ document.addEventListener('keydown', function(e) {
 
 </style>
 <script src="//assets.crazying-dev.top/text/one/JS/AfterBody.js" defer></script>
+<script>
+// PWA：注册 Service Worker（满足可安装条件；不缓存，网络行为不变）
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').catch(function() {});
+    });
+}
+</script>
 <script>
 // 主题持久化：监听主题按钮点击保存到 localStorage，并在 AfterBody.js 加载后重新应用
 (function() {
