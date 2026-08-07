@@ -1,5 +1,5 @@
 """认证相关 API 路由。"""
-from flask import Blueprint, request, jsonify, redirect, Response
+from flask import Blueprint, request, jsonify, redirect, render_template, Response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from api import database as db
@@ -427,3 +427,13 @@ def api_reset_password_by_code():
 		pass
 
 	return jsonify({'success': True, 'message': '密码重置成功'})
+
+
+@auth_bp.route('/api/login/otherAPP')
+def api_login_other_app():
+	"""Third party app login page for TheDoorOfBings."""
+	app_id = request.args.get('app_id', '')
+	port = request.args.get('port', '')
+	if app_id != 'TheDoorOfBings':
+		return jsonify({'success': False, 'message': 'Unknown app'}), 400
+	return render_template('PATH/oauth.html', port=port)

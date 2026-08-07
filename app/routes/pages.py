@@ -108,11 +108,6 @@ def users_page(ID):
 	return render_template(base, page_template='UserPersonalinfo.html')
 
 
-@pages_bp.route('/huiguan')
-def huiguan_page():
-	return render_template(base, page_template='huiguan.html')
-
-
 @pages_bp.route('/api/huiguan')
 def api_huiguan_list():
 	try:
