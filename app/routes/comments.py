@@ -51,10 +51,9 @@ def api_comment_create(post_id):
 		if parent_id:
 			try:
 				parent_result = db.execute_query(
-					"SELECT c.user_id, p.title AS post_title, u2.name AS replier_name "
+					"SELECT c.user_id, p.title AS post_title "
 					"FROM comments c "
 					"JOIN posts p ON c.post_id = p.id "
-					"JOIN users u2 ON c.user_id = u2.id "
 					"WHERE c.id = %s",
 					(parent_id,),
 					fetch=True
@@ -62,7 +61,7 @@ def api_comment_create(post_id):
 				if parent_result:
 					parent_user_id = parent_result[0]
 					post_title = parent_result[1]
-					replier_name = parent_result[2]
+					replier_name = current_user['name']
 					parent_user = db.get_user_by_id(parent_user_id)
 					if parent_user and parent_user.get('email'):
 						send_email(
