@@ -175,8 +175,7 @@ def navifox_avatar():
 
 @pages_bp.route('/manifest.json')
 def manifest():
-	return send_file(os.path.join(app.root_path), 'templates/PATH/manifest.json', mimetype='application/manifest+json')
-
+	return send_file(os.path.join(app.root_path, 'templates', 'PATH', 'manifest.json'), mimetype='application/manifest+json')
 
 @pages_bp.route('/sw.js')
 def service_worker():
