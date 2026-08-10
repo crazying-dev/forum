@@ -36,67 +36,58 @@ except ImportError:
 app = Flask(__name__)
 
 def generate_verify_email_body(user_name, token, token_type):
-	"""生成验证邮件正文。
-
-	Args:
-		user_name (str): 用户名
-		token (str): 验证token
-		token_type (str): token类型
-
-	Returns:
-		str: 邮件正文HTML
-	"""
+	"""Generate verification email HTML."""
+	safe_name = str(html_escape(user_name))
+	safe_name = re.sub(r'<p[^>]*>', '', safe_name)
+	safe_name = re.sub(r'</p>', '', safe_name)
+	safe_name = safe_name.replace('|[TIME]', '')
 	if token_type == 'email_verify':
 		verify_url = f"{request.host_url}verify-email?token={token}"
-		title = "邮箱验证"
-		description = "点击下方按钮完成邮箱验证"
-		button_text = "验证邮箱"
+		title = "Verify Email"
+		body_title = "Verify your email address"
+		body_desc = "Click to verify and activate your account."
+		btn_text = "Verify"
 	else:
 		verify_url = f"{request.host_url}reset-password?token={token}"
-		title = "重置密码"
-		description = "点击下方按钮重置密码"
-		button_text = "重置密码"
-
-	safe_user_name = str(html_escape(user_name))
+		title = "Reset Password"
+		body_title = "Reset your password"
+		body_desc = "Click to set a new password."
+		btn_text = "Reset"
 	return f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>{title}</title>
-    <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }}
-        .container {{ max-width: 480px; margin: 0 auto; padding: 20px; }}
-        .card {{ background: #fff; border-radius: 12px; padding: 32px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }}
-        .logo {{ font-size: 24px; font-weight: bold; color: #333; margin-bottom: 16px; }}
-        .greeting {{ font-size: 18px; color: #333; margin-bottom: 12px; }}
-        .description {{ font-size: 14px; color: #666; margin-bottom: 24px; line-height: 1.6; }}
-        .button {{ display: inline-block; padding: 12px 32px; background: #4f46e5; color: #fff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 500; }}
-        .button:hover {{ background: #4338ca; }}
-        .link {{ color: #4f46e5; text-decoration: none; }}
-        .footer {{ font-size: 12px; color: #999; margin-top: 24px; text-align: center; }}
-        .token-info {{ font-size: 12px; color: #999; margin-top: 16px; font-family: monospace; word-break: break-all; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="card">
-            <div class="logo">妖精论坛</div>
-            <div class="greeting">亲爱的 {safe_user_name}，</div>
-            <div class="description">{description}。<br><br>如果这不是您本人操作，请忽略此邮件。</div>
-            <a href="{verify_url}" class="button">{button_text}</a>
-            <div class="token-info">链接有效期：30分钟<br>链接地址：<a href="{verify_url}" class="link">{verify_url}</a></div>
-        </div>
-        <div class="footer">© 2026 妖精论坛 - 粉丝公益创作</div>
-    </div>
-</body>
-</html>"""
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{title} - Forum</title>
+<style>
+body{{margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif}}
+.wrapper{{max-width:520px;margin:0 auto;padding:24px 16px}}
+.header{{text-align:center;padding:24px 0 16px}}
+.header .site{{font-size:13px;color:#8b949e;margin-top:4px}}
+.card{{background:#fff;border-radius:12px;padding:32px 28px;box-shadow:0 1px 3px rgba(0,0,0,.08)}}
+.card h2{{margin:0 0 8px;font-size:20px;color:#1a1a2e}}
+.card .desc{{margin:0 0 24px;font-size:14px;color:#666;line-height:1.6}}
+.btn{{display:inline-block;padding:14px 40px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;text-decoration:none;border-radius:8px;font-size:16px;font-weight:600}}
+.divider{{height:1px;background:#e5e7eb;margin:24px 0}}
+.link-box{{background:#f8f9fa;border-radius:8px;padding:14px;word-break:break-all}}
+.link-box .url{{font-size:13px;color:#6366f1}}
+.link-box .hint{{font-size:12px;color:#999;margin-top:6px}}
+.footer{{text-align:center;padding:20px 0}}
+.footer p{{font-size:12px;color:#999;margin:4px 0}}
+</style></head><body>
+<div class="wrapper">
+<div class="header"><div class="site">Forum</div></div>
+<div class="card">
+<h2>{body_title}</h2>
+<p class="desc">{body_desc}</p>
+<div style="text-align:center"><a href="{verify_url}" class="btn">{btn_text}</a></div>
+<div class="divider"></div>
+<div class="link-box">
+<div class="hint">Link valid for 30 minutes</div>
+<a href="{verify_url}" class="url">{verify_url}</a>
+</div></div>
+<div class="footer"><p>(c) 2026 Forum</p></div>
+</div></body></html>"""
 
-# 安全配置：SECRET_KEY 必须由环境变量提供
-_secret = os.getenv('SECRET_KEY')
-if not _secret:
-	import secrets as _secrets
-	_secret = _secrets.token_hex(32)
-	print("[SECURITY WARNING] SECRET_KEY 未设置，已生成临时密钥。生产环境请配置 SECRET_KEY 环境变量。")
+
 app.secret_key = _secret
 
 # Session/Cookie 安全加固
