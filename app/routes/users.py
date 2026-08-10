@@ -120,23 +120,39 @@ def api_avatar_upload():
 	file = request.files.get('avatar')
 	if not file or not file.filename:
 		return jsonify({'success': False, 'message': '请选择图片'}), 400
+	img = None
+	bg = None
+	buf = None
+	avatar_file = None
 	try:
 		img = Image.open(file.stream)
 		img = img.convert('RGBA')
 		bg = Image.new('RGBA', img.size, (255, 255, 255, 255))
 		bg.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else None)
+		# 释放原图（转换后原对象不再需要）
+		try:
+			img.close()
+		except Exception:
+			pass
 		img = bg.convert('RGB')
+		# 释放 bg
+		try:
+			bg.close()
+		except Exception:
+			pass
+		bg = None
 		img = img.resize((400, 400), Image.LANCZOS)
 		buf = io.BytesIO()
 		img.save(buf, format='WEBP', quality=85)
-		buf.seek(0)
+		img_data = buf.getvalue()
 		import uuid
 		avatar_id = str(uuid.uuid4())
 		avatar_dir = '/root/db/avatar'
 		os.makedirs(avatar_dir, exist_ok=True)
 		avatar_path = f'{avatar_dir}/{avatar_id}.webp'
 		with open(avatar_path, 'wb') as avatar_file:
-			avatar_file.write(buf.getvalue())
+			avatar_file.write(img_data)
+		avatar_file = None
 		avatar_url = f'/avatar/{avatar_id}.webp'
 		result = db.update_user_profile(current_user['id'], avatar=avatar_url)
 		if result:
@@ -145,6 +161,30 @@ def api_avatar_upload():
 	except Exception as e:
 		print(f"[ERROR] avatar upload: {e}")
 		return jsonify({'success': False, 'message': '头像上传失败'}), 500
+	finally:
+		# ── 显式释放 PIL / BytesIO / 文件句柄，减轻 GC 压力 ──
+		if img is not None:
+			try:
+				img.close()
+			except Exception:
+				pass
+		if bg is not None:
+			try:
+				bg.close()
+			except Exception:
+				pass
+		if buf is not None:
+			try:
+				buf.close()
+			except Exception:
+				pass
+		if avatar_file is not None:
+			try:
+				avatar_file.close()
+			except Exception:
+				pass
+		# 手动解除引用，便于 GC 立刻回收
+		img = bg = buf = avatar_file = None
 
 
 @users_bp.route('/api/users/<user_id>/favorites')

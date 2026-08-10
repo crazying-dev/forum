@@ -47,9 +47,11 @@ def api_comment_create(post_id):
 		cache_api.comment_cache.delete(f'comments:{post_id}:page:1:size:50')
 		comment = result.get('comment')
 
-		# 如果是对评论的回复，发邮件通知原作者
-		if parent_id:
-			try:
+		# ── 邮件通知 ──
+		try:
+			commenter_name = current_user['name']
+			if parent_id:
+				# 回复评论：通知被回复的评论作者
 				parent_result = db.execute_query(
 					"SELECT c.user_id, p.title AS post_title "
 					"FROM comments c "
@@ -61,20 +63,44 @@ def api_comment_create(post_id):
 				if parent_result:
 					parent_user_id = parent_result[0]
 					post_title = parent_result[1]
-					replier_name = current_user['name']
-					parent_user = db.get_user_by_id(parent_user_id)
-					if parent_user and parent_user.get('email'):
-						send_email(
-							'【妖精论坛】回复通知',
-							f'尊敬的 {parent_user["name"]}，您好！\n\n'
-							f'用户 {replier_name} 回复了您在帖子《{post_title}》中的评论：\n'
-							f'"{content}"\n\n'
-							f'点击查看：{request.host_url}post/{post_id}\n\n'
-							f'© 2026 妖精论坛 - 粉丝公益创作',
-							receiver_list=[parent_user['email']]
-						)
-			except Exception:
-				pass  # 邮件发送失败不影响评论
+					# 不通知自己
+					if parent_user_id != current_user['id']:
+						parent_user = db.get_user_by_id(parent_user_id)
+						if parent_user and parent_user.get('email'):
+							send_email(
+								'【妖精论坛】回复通知',
+								f'尊敬的 {parent_user["name"]}，您好！\n\n'
+								f'用户 {commenter_name} 回复了您在帖子《{post_title}》中的评论：\n'
+								f'"{content}"\n\n'
+								f'点击查看：{request.host_url}post/{post_id}\n\n'
+								f'© 2026 妖精论坛 - 粉丝公益创作',
+								receiver_list=[parent_user['email']]
+							)
+			else:
+				# 直接评论帖子：通知帖子作者
+				post_result = db.execute_query(
+					"SELECT user_id, title FROM posts WHERE id = %s AND status = 1",
+					(post_id,),
+					fetch=True
+				)
+				if post_result:
+					post_author_id = post_result[0]
+					post_title = post_result[1]
+					# 不通知自己
+					if post_author_id != current_user['id']:
+						post_author = db.get_user_by_id(post_author_id)
+						if post_author and post_author.get('email'):
+							send_email(
+								'【妖精论坛】评论通知',
+								f'尊敬的 {post_author["name"]}，您好！\n\n'
+								f'用户 {commenter_name} 评论了您的帖子《{post_title}》：\n'
+								f'"{content}"\n\n'
+								f'点击查看：{request.host_url}post/{post_id}\n\n'
+								f'© 2026 妖精论坛 - 粉丝公益创作',
+								receiver_list=[post_author['email']]
+							)
+		except Exception:
+			pass  # 邮件发送失败不影响评论
 
 		return jsonify({'success': True, 'comment': comment})
 	return jsonify(result)

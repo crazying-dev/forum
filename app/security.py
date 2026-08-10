@@ -21,9 +21,13 @@ _ip_lock = Lock()
 _ip_blacklist = set()
 _ip_blacklist_loaded = False
 
+# 黑名单容量上限：超过后只保留内存中最新的一半，并持久化到文件
+# （防止长期被扫描时 set 无限膨胀，超过 10 万条约占几 MB）
+_MAX_BLACKLIST_SIZE = 100000
+
 
 def _load_blacklist():
-	"""加载 IP 黑名单 JSON 文件。"""
+	"""加载 IP 黑名单 JSON 文件（加载时自动按容量上限截断，避免超大数据）。"""
 	global _ip_blacklist, _ip_blacklist_loaded
 	with _ip_lock:
 		if _ip_blacklist_loaded:
@@ -33,7 +37,11 @@ def _load_blacklist():
 			if os.path.exists(IP_LIST_PATH):
 				with open(IP_LIST_PATH, 'r', encoding='utf-8') as f:
 					data = json.load(f)
-					_ip_blacklist = set(data.get('blocked', []))
+					blocked = data.get('blocked', [])
+					# 超过上限时只保留末尾（最新）的部分
+					if len(blocked) > _MAX_BLACKLIST_SIZE:
+						blocked = blocked[-_MAX_BLACKLIST_SIZE:]
+					_ip_blacklist = set(blocked)
 			else:
 				_save_blacklist()
 			_ip_blacklist_loaded = True
@@ -43,11 +51,16 @@ def _load_blacklist():
 
 
 def _save_blacklist():
-	"""保存 IP 黑名单到 JSON 文件。"""
+	"""保存 IP 黑名单到 JSON 文件（超过上限时裁剪后再写入）。"""
 	try:
 		os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+		blocked_list = list(_ip_blacklist)
+		if len(blocked_list) > _MAX_BLACKLIST_SIZE:
+			# 超量时随机截断一部分（set 无顺序概念，简单切片即可）
+			blocked_list = blocked_list[-_MAX_BLACKLIST_SIZE:]
+			_ip_blacklist.intersection_update(blocked_list)
 		data = {
-			'blocked': sorted(_ip_blacklist),
+			'blocked': sorted(blocked_list),
 			'updated': time.strftime('%Y-%m-%d %H:%M:%S')
 		}
 		with open(IP_LIST_PATH, 'w', encoding='utf-8') as f:
@@ -62,11 +75,16 @@ def _is_ip_blocked(client_ip):
 
 
 def _add_ip_to_blacklist(client_ip, reason):
-	"""将 IP 加入黑名单并写入文件。"""
+	"""将 IP 加入黑名单并写入文件；超上限时先裁剪。"""
 	with _ip_lock:
 		if client_ip in _ip_blacklist:
 			return
 		_ip_blacklist.add(client_ip)
+		if len(_ip_blacklist) > _MAX_BLACKLIST_SIZE:
+			# 随机删除一批以回到上限（保持大约 80% 水位）
+			trim_target = int(_MAX_BLACKLIST_SIZE * 0.8)
+			extra = list(_ip_blacklist)[:len(_ip_blacklist) - trim_target]
+			_ip_blacklist.difference_update(extra)
 		_save_blacklist()
 	print(f"[SECURITY] IP 已加入黑名单: {client_ip} ({reason})")
 
@@ -162,39 +180,89 @@ _freq_cleanup_at = 0  # 上次清理时间
 GLOBAL_MAX_REQUESTS = 120   # 每窗口最大请求数
 GLOBAL_WINDOW = 60          # 窗口时长（秒）
 
+# _freq_store 硬上限：超过后立刻清理（避免短时间被大量IP打爆内存）
+_MAX_FREQ_STORE_SIZE = 50000
+
 
 def _cleanup_freq(now):
-	"""定期清理过期记录。"""
+	"""定期清理过期记录（按时间 + 按容量双重触发）。"""
 	global _freq_cleanup_at
-	if now - _freq_cleanup_at < 300:  # 每 5 分钟清一次
+	store_size = len(_freq_store)
+	need_clean = (
+		(now - _freq_cleanup_at) >= 300  # 每 5 分钟必清一次
+		or store_size > _MAX_FREQ_STORE_SIZE
+	)
+	if not need_clean:
 		return
 	_freq_cleanup_at = now
 	cutoff = now - GLOBAL_WINDOW
+	# 先删除完全过期的 IP
 	stale = [ip for ip, ts_list in _freq_store.items()
 	         if not any(t > cutoff for t in ts_list)]
 	for ip in stale:
 		_freq_store.pop(ip, None)
+	# 如果仍然过大，说明窗口内活跃 IP 超多，再按 LRU 风格清理（保留有最近时间戳的）
+	if len(_freq_store) > _MAX_FREQ_STORE_SIZE:
+		cutoff2 = now - 30  # 近 30 秒有活动的保留
+		stale2 = [ip for ip, ts_list in _freq_store.items()
+		          if not any(t > cutoff2 for t in ts_list)]
+		for ip in stale2:
+			_freq_store.pop(ip, None)
+		# 还大就粗暴砍一半
+		if len(_freq_store) > _MAX_FREQ_STORE_SIZE:
+			keys = list(_freq_store.keys())
+			drop = keys[:len(keys) - _MAX_FREQ_STORE_SIZE]
+			for ip in drop:
+				_freq_store.pop(ip, None)
+
+
+# ── 恶意 IP 日志写入去重缓存（避免每次都读整份日志文件） ──
+_reported_ip_lock = Lock()
+_reported_ip_set = set()   # 已写入日志的 IP，内存去重
+_REPORTED_SET_MAX = 100000  # 上限，超过后重置并在下一次写入时从文件同步一次
+
+
+def _ensure_reported_set_loaded(log_path):
+	"""确保内存中 _reported_ip_set 已从文件同步（懒加载 + 超限重置）。"""
+	global _reported_ip_set
+	if len(_reported_ip_set) >= _REPORTED_SET_MAX:
+		# 超过上限后重置，让下面重新从文件加载最新部分
+		_reported_ip_set.clear()
+	if _reported_ip_set:
+		return  # 已有内容，无需每次都读文件
+	try:
+		if os.path.exists(log_path):
+			# 只读取文件末尾的 _REPORTED_SET_MAX 行做去重（避免超日志文件时读爆内存）
+			lines = []
+			with open(log_path, 'r', encoding='utf-8') as f:
+				# 简单倒推：按行迭代但只保留最后 N 行
+				from collections import deque
+				lines = deque(f, maxlen=_REPORTED_SET_MAX)
+			for line in lines:
+				line = line.strip()
+				if line:
+					ip = line.split('#')[0].strip()
+					if ip:
+						_reported_ip_set.add(ip)
+	except Exception as e:
+		print(f"[SECURITY] 加载 IP 日志去重缓存失败: {e}")
 
 
 def _report_ip(client_ip, reason):
-	"""记录恶意 IP：写日志 + 加入黑名单。"""
+	"""记录恶意 IP：写日志 + 加入黑名单（用内存set去重，避免每次读全文件）。"""
 	log_path = '/root/IP.txt'
 	entry = f"{client_ip}  # {time.strftime('%Y-%m-%d %H:%M:%S')}  {reason}"
 	try:
 		os.makedirs(os.path.dirname(log_path), exist_ok=True)
 
-		existing = set()
-		if os.path.exists(log_path):
-			with open(log_path, 'r', encoding='utf-8') as f:
-				for line in f:
-					line = line.strip()
-					if line:
-						existing.add(line.split('#')[0].strip())
-
-		if client_ip not in existing:
-			with open(log_path, 'a', encoding='utf-8') as f:
-				f.write(entry + '\n')
-			print(f"[SECURITY] 恶意 IP 已记录: {entry}")
+		with _reported_ip_lock:
+			_ensure_reported_set_loaded(log_path)
+			already_written = client_ip in _reported_ip_set
+			if not already_written:
+				with open(log_path, 'a', encoding='utf-8') as f:
+					f.write(entry + '\n')
+				_reported_ip_set.add(client_ip)
+				print(f"[SECURITY] 恶意 IP 已记录: {entry}")
 
 		# 无论是否已在日志中，都要加入 JSON 黑名单
 		_add_ip_to_blacklist(client_ip, reason)

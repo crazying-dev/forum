@@ -163,42 +163,6 @@ def csrf_protect():
 	return jsonify({'success': False, 'message': '跨站请求已被拦截'}), 403
 
 
-# ── 速率限制（内存，按 IP 维度）───────────────────────────
-
-_rate_limit_store = {}
-
-def rate_limit(key, max_count, window_seconds):
-	"""简易速率限制装饰器。
-
-	Args:
-		key: 限流维度标识
-		max_count: 窗口内最大请求次数
-		window_seconds: 窗口时长（秒）
-	Returns:
-		403 响应或 None
-	"""
-	now = time.time()
-	# 使用 request.remote_addr 获取客户端 IP。
-	# 生产环境启用 ProxyFix 后，remote_addr 自动为反向代理传递的真实 IP，不受 X-Forwarded-For 伪造影响。
-	client_ip = request.remote_addr or 'unknown'
-	rk = f"{key}:{client_ip}"
-	bucket = _rate_limit_store.get(rk, [])
-	bucket = [t for t in bucket if t > now - window_seconds]
-	if len(bucket) >= max_count:
-		return True
-	bucket.append(now)
-	_rate_limit_store[rk] = bucket
-	# 清理过期条目，防止内存泄漏
-	if len(_rate_limit_store) > 10000:
-		cutoff = now - max(window_seconds, 3600)
-		_rate_limit_store.clear()
-		for k, v in list(_rate_limit_store.items()):
-			v_clean = [t for t in v if t > cutoff]
-			if v_clean:
-				_rate_limit_store[k] = v_clean
-	return False
-
-
 # ── 性能优化：gzip 压缩 + ETag ────────────────────────────
 @app.after_request
 def performance_optimize(response):
@@ -212,11 +176,17 @@ def performance_optimize(response):
 	if request.is_secure or request.headers.get('x-forwarded-proto') == 'https':
 		response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
 
-	# 在 gzip 压缩前计算 ETag（基于原始未压缩数据），保证 ETag 不受 Accept-Encoding 影响
+	# 只读一次响应体，避免 ETag + gzip 两次复制大对象内存
+	resp_data = None
 	if request.method == 'GET' and response.status_code == 200:
 		content_type = response.content_type or ''
-		if any(ct in content_type for ct in ('text/html', 'application/json')):
+		if any(ct in content_type for ct in ('text/html', 'application/json', 'text/', 'application/javascript', 'image/svg+xml')):
 			resp_data = response.get_data()
+
+	# ETag：在 gzip 压缩前计算（基于原始未压缩数据）
+	if resp_data is not None and response.status_code == 200:
+		content_type = response.content_type or ''
+		if any(ct in content_type for ct in ('text/html', 'application/json')):
 			if resp_data:
 				etag = _hashlib.md5(resp_data).hexdigest()[:16]
 				response.headers['ETag'] = f'"{etag}"'
@@ -227,19 +197,22 @@ def performance_optimize(response):
 					response.headers.pop('Content-Encoding', None)
 					return response
 
-	# gzip 压缩文本类响应
+	# gzip 压缩文本类响应（复用已读取的 resp_data）
 	accept_encoding = request.headers.get('Accept-Encoding', '')
 	if 'gzip' in accept_encoding and response.status_code < 500:
 		content_type = response.content_type or ''
 		if any(ct in content_type for ct in ('text/', 'application/json', 'application/javascript', 'image/svg+xml')):
-			resp_data = response.get_data()
+			if resp_data is None:
+				resp_data = response.get_data()
 			if len(resp_data) > 500:
 				buf = _BytesIO()
 				with gzip.GzipFile(fileobj=buf, mode='wb', compresslevel=6) as f:
 					f.write(resp_data)
-				response.set_data(buf.getvalue())
+				gz_data = buf.getvalue()
+				buf.close()
+				response.set_data(gz_data)
 				response.headers['Content-Encoding'] = 'gzip'
-				response.headers['Content-Length'] = len(response.get_data())
+				response.headers['Content-Length'] = len(gz_data)
 				response.headers['Vary'] = 'Accept-Encoding'
 
 	return response

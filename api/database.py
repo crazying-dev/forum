@@ -153,9 +153,8 @@ def _build_conn_params():
 
 @contextmanager
 def get_conn():
-	"""获取数据库连接的上下文管理器。
-    
-    每次请求新建连接，执行完立即关闭（Serverless 环境）。
+	"""获取数据库连接的上下文管理器（优先复用连接池）。
+
     使用方式:
         with get_conn() as (conn, cursor):
             cursor.execute(...)
@@ -165,26 +164,75 @@ def get_conn():
 	last_err = None
 	conn_params = _build_conn_params()
 	max_retries = 3
-	
+	from_pool = False
+
 	for attempt in range(1, max_retries + 1):
 		try:
 			if not DATABASE_URL:
 				raise RuntimeError("DATABASE_URL 环境变量未设置")
-			conn = psycopg2.connect(DATABASE_URL, **conn_params)
+			# ── 优先使用连接池 ──
+			if _connection_pool is not None:
+				try:
+					conn = _connection_pool.getconn()
+					from_pool = True
+				except Exception as pool_e:
+					print(f"[DB] 连接池取连接失败，降级直连: {pool_e}")
+					conn = None
+			if conn is None:
+				conn = psycopg2.connect(DATABASE_URL, **conn_params)
+				from_pool = False
 			cursor = conn.cursor()
-			yield conn, cursor
+			try:
+				yield conn, cursor
+			finally:
+				# ── 无论成功/异常，都要释放连接与游标 ──
+				if cursor:
+					try:
+						cursor.close()
+					except Exception:
+						pass
+					cursor = None
+				if conn is not None:
+					try:
+						conn.rollback()
+					except Exception:
+						pass
+					if from_pool and _connection_pool is not None:
+						try:
+							_connection_pool.putconn(conn)
+						except Exception:
+							try:
+								conn.close()
+							except Exception:
+								pass
+					else:
+						try:
+							conn.close()
+						except Exception:
+							pass
+					conn = None
 			return
 		except Exception as e:
 			last_err = e
-			if conn:
+			if conn is not None:
 				try:
 					conn.rollback()
 				except Exception:
 					pass
-				try:
-					conn.close()
-				except Exception:
-					pass
+				if from_pool and _connection_pool is not None:
+					try:
+						# 异常连接归还池前放入关闭列表，避免污染
+						_connection_pool.putconn(conn, close=True)
+					except Exception:
+						try:
+							conn.close()
+						except Exception:
+							pass
+				else:
+					try:
+						conn.close()
+					except Exception:
+						pass
 				conn = None
 			if cursor:
 				try:

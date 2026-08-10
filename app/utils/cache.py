@@ -60,11 +60,13 @@ class LRUCache:
 
 class VercelBlobCache:
     BASE_URL = 'https://blob.vercel-storage.com'
+    _MAX_URL_CACHE = 2000  # URL 映射的容量上限（LRU 淘汰）
 
     def __init__(self, enabled=True):
         self.token = os.getenv('BLOB_READ_WRITE_TOKEN')
         self.enabled = enabled and bool(self.token) and requests is not None
-        self._url_cache = {}
+        # 改用 OrderedDict 支持 LRU，控制内存上限
+        self._url_cache = OrderedDict()
         # 复用 HTTP 连接，减少 TCP 握手开销
         self._session = requests.Session() if (requests and self.enabled) else None
         if self._session:
@@ -74,6 +76,11 @@ class VercelBlobCache:
     def _make_key(self, key):
         safe_key = hashlib.md5(key.encode('utf-8')).hexdigest()
         return f'cache/{safe_key}.json'
+
+    def _trim_url_cache(self):
+        """LRU 裁剪 _url_cache，保证不超过容量上限。"""
+        while len(self._url_cache) > self._MAX_URL_CACHE:
+            self._url_cache.popitem(last=False)
 
     def _headers(self):
         return {
@@ -87,7 +94,9 @@ class VercelBlobCache:
         try:
             pathname = self._make_key(key)
             blob_url = self._url_cache.get(key)
-            if blob_url:
+            if blob_url is not None:
+                # LRU：命中移到末尾
+                self._url_cache.move_to_end(key)
                 resp = self._session.get(blob_url, timeout=5)
                 if resp.status_code == 200:
                     obj = resp.json()
@@ -104,6 +113,7 @@ class VercelBlobCache:
                 download_url = blob_info.get('url') or blob_info.get('downloadUrl')
                 if download_url:
                     self._url_cache[key] = download_url
+                    self._trim_url_cache()
                     data_resp = self._session.get(download_url, timeout=5)
                     if data_resp.status_code == 200:
                         obj = data_resp.json()
@@ -133,6 +143,7 @@ class VercelBlobCache:
                 result = resp.json()
                 if result.get('url'):
                     self._url_cache[key] = result['url']
+                    self._trim_url_cache()
         except:
             pass
 
