@@ -8,6 +8,7 @@ import random
 import uuid
 from flask_cors import cross_origin
 from main.main import base, app
+import os
 
 pages_bp = Blueprint('pages', __name__)
 
