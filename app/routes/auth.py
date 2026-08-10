@@ -1,4 +1,8 @@
 """认证相关 API 路由。"""
+import os
+import re
+import random
+import time
 from flask import Blueprint, request, jsonify, redirect, render_template, Response
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -6,9 +10,6 @@ from api import database as db
 from api import config
 from Email import send_email
 from main.main import app, base, generate_verify_email_body, strip_easter_egg, UserWrapper
-import re
-import random
-import time
 from app.middleware import rate_limit
 from app.utils.email_utils import validate_email
 
