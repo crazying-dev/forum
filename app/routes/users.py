@@ -63,10 +63,17 @@ def api_user_profile_info(user_id):
 			'stats': stats,
 			'follow_stats': follow_stats
 		}
+		# 缓存里只存「公开、不依赖当前访问者」的字段
 		cache_api.user_info_cache.set(cache_key, result, l1_ttl=300, l2_ttl=1800)
+
+	# ── 当前访问者视角字段，每次动态计算，避免缓存污染 A→B 的数据给 C ──
 	if current_user.is_authenticated:
-		result['is_following'] = db.is_following(current_user['id'], user_id)
-		result['is_self'] = current_user['id'] == user_id
+		try:
+			viewer_id = current_user['id']
+		except Exception:
+			viewer_id = None
+		result['is_following'] = bool(viewer_id) and db.is_following(viewer_id, user_id)
+		result['is_self'] = bool(viewer_id) and viewer_id == user_id
 	else:
 		result['is_following'] = False
 		result['is_self'] = False
@@ -210,6 +217,21 @@ def api_user_follow(user_id):
 	return jsonify(result)
 
 
+def _current_viewer_id():
+	"""安全获取当前登录者 ID；未登录 / 异常时返回 None，避免 500。"""
+	if not current_user.is_authenticated:
+		return None
+	try:
+		vid = current_user['id']
+		return vid if vid else None
+	except Exception:
+		try:
+			vid = current_user.get_id()
+			return vid if vid else None
+		except Exception:
+			return None
+
+
 @users_bp.route('/api/users/<user_id>/following')
 def api_user_following(user_id):
 	page = request.args.get('page', 1, type=int)
@@ -224,14 +246,21 @@ def api_user_following(user_id):
 		'page': page,
 		'page_size': page_size
 	}
-	if current_user.is_authenticated:
-		following_ids = [u['id'] for u in users]
-		is_following_map = {}
-		for uid in following_ids:
-			is_following_map[uid] = db.is_following(current_user['id'], uid)
-		for u in users:
-			u['is_following'] = is_following_map.get(u['id'], False)
-			u['is_self'] = current_user['id'] == u['id']
+	viewer_id = _current_viewer_id()
+	if viewer_id:
+		# 批量一次性查询当前登录者对这批人的关注关系（最多 page_size 条）
+		if users:
+			ids_in_page = [u['id'] for u in users]
+			is_following_map = {}
+			for uid in ids_in_page:
+				is_following_map[uid] = db.is_following(viewer_id, uid)
+			for u in users:
+				u['is_following'] = bool(is_following_map.get(u['id']))
+				u['is_self'] = viewer_id == u['id']
+		else:
+			for u in users:
+				u['is_following'] = False
+				u['is_self'] = False
 	else:
 		for u in users:
 			u['is_following'] = False
@@ -253,14 +282,20 @@ def api_user_followers(user_id):
 		'page': page,
 		'page_size': page_size
 	}
-	if current_user.is_authenticated:
-		following_ids = [u['id'] for u in users]
-		is_following_map = {}
-		for uid in following_ids:
-			is_following_map[uid] = db.is_following(current_user['id'], uid)
-		for u in users:
-			u['is_following'] = is_following_map.get(u['id'], False)
-			u['is_self'] = current_user['id'] == u['id']
+	viewer_id = _current_viewer_id()
+	if viewer_id:
+		if users:
+			ids_in_page = [u['id'] for u in users]
+			is_following_map = {}
+			for uid in ids_in_page:
+				is_following_map[uid] = db.is_following(viewer_id, uid)
+			for u in users:
+				u['is_following'] = bool(is_following_map.get(u['id']))
+				u['is_self'] = viewer_id == u['id']
+		else:
+			for u in users:
+				u['is_following'] = False
+				u['is_self'] = False
 	else:
 		for u in users:
 			u['is_following'] = False
