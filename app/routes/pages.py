@@ -170,6 +170,18 @@ def navifox_avatar():
 	return ""
 
 
+
+
+@pages_bp.route('/manifest.json')
+def manifest():
+	return send_file('main/templates/PATH/manifest.json', mimetype='application/manifest+json')
+
+
+@pages_bp.route('/sw.js')
+def service_worker():
+	return "// Service Worker\nself.addEventListener('fetch', function(e) {\n    e.respondWith(fetch(e.request));\n});\n", 200, {'Content-Type': 'application/javascript'}
+
+
 @pages_bp.route("/TheDoorOfBings/UUID4/")
 def TheDoorOfBings_UUID():
 	return jsonify([str(uuid.uuid4())])

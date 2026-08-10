@@ -1,0 +1,16 @@
+{
+  "name": "妖精论坛",
+  "short_name": "妖精论坛",
+  "description": "妖精论坛 - 罗小黑战记社区",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#161b22",
+  "theme_color": "#161b22",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}
