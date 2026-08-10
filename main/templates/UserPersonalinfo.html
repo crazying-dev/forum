@@ -86,6 +86,18 @@
 </div>
 
 <script>
+function apiFetch(url, options) {
+    var opts = Object.assign({ credentials: 'same-origin' }, options || {});
+    if (opts.body && !(opts.body instanceof FormData) && (!opts.headers || !opts.headers['Content-Type'])) {
+        opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    }
+    return fetch(url, opts);
+}
+function __getCookie(name) {
+    var m = document.cookie.match('(^|[^;]+)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? m.pop() : null;
+}
+var __myUserId = __getCookie('user_id');
 var _currentUserId = null;
 var _currentFollowType = 'following';
 var _followPage = 1;
@@ -159,7 +171,7 @@ function loadFollowList() {
     
     var url = '/api/users/' + _currentUserId + '/' + _currentFollowType + '?page=' + _followPage + '&page_size=20';
     
-    fetch(url)
+    apiFetch(url)
         .then(function(res) { return res.json(); })
         .then(function(data) {
             _followLoading = false;
@@ -239,9 +251,12 @@ function renderFollowUserItem(user) {
 }
 
 function toggleFollow(userId, btn) {
-    fetch('/api/users/' + userId + '/follow', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+    if (!__myUserId) {
+        window.location.href = '/login';
+        return;
+    }
+    apiFetch('/api/users/' + userId + '/follow', {
+        method: 'POST'
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {
@@ -256,10 +271,15 @@ function toggleFollow(userId, btn) {
             if (typeof loadUserProfileStats === 'function') {
                 loadUserProfileStats();
             }
+        } else if (data.message && data.message.indexOf('登录') !== -1) {
+            window.location.href = '/login';
+        } else {
+            alert(data.message || '操作失败');
         }
     })
     .catch(function(err) {
         console.error('关注操作失败:', err);
+        alert('网络错误');
     });
 }
 
@@ -273,9 +293,8 @@ document.addEventListener('keydown', function(e) {
 });
 
 function sendVerifyEmail() {
-    fetch('/api/send-verify-email', {
+    apiFetch('/api/send-verify-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
     })
     .then(function(res) { return res.json(); })
