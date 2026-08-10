@@ -251,14 +251,29 @@ function renderFollowUserItem(user) {
 }
 
 function toggleFollow(userId, btn) {
-    if (!__myUserId) {
-        window.location.href = '/login';
-        return;
-    }
+    // 真相以 session 为准：前端本地判断只是"跳过请求"的优化，失败时再由后端裁决
+    // 所以这里不再前置跳转 login — 直接发 API，后端返回 401/需要登录再跳
+    if (!btn) return;
+    var originalText = btn.textContent;
+    var disabledClass = 'disabled';
+    try {
+        btn.setAttribute('disabled', 'disabled');
+        btn.classList.add(disabledClass);
+        btn.style.opacity = '0.6';
+        btn.style.pointerEvents = 'none';
+    } catch (_) {}
+
     apiFetch('/api/users/' + userId + '/follow', {
         method: 'POST'
     })
-    .then(function(res) { return res.json(); })
+    .then(function(res) {
+        // 如果后端返回 401，session 确实失效了，这里直接跳登录（即便 res.json() 解析的 success=false）
+        var needLogin = res.status === 401;
+        return res.json().then(function(data) {
+            data.__needLogin = needLogin || (data.message && /登录/.test(data.message));
+            return data;
+        });
+    })
     .then(function(data) {
         if (data.success) {
             if (data.following) {
@@ -271,8 +286,22 @@ function toggleFollow(userId, btn) {
             if (typeof loadUserProfileStats === 'function') {
                 loadUserProfileStats();
             }
-        } else if (data.message && data.message.indexOf('登录') !== -1) {
+            if (typeof window.refreshHeaderUserAfterLogin === 'function') {
+                try { window.refreshHeaderUserAfterLogin(); } catch(_) {}
+            }
+        } else if (data.__needLogin) {
+            // 前端如果有 user_id cookie，清除一下，避免下次再误判
+            try {
+                document.cookie = 'user_id=; Path=/; Max-Age=0; SameSite=Lax;';
+                if (typeof sessionStorage !== 'undefined') {
+                    try { sessionStorage.removeItem('userInfo'); } catch(_) {}
+                }
+                if (typeof window.UserId !== 'undefined') {
+                    window.UserId = undefined;
+                }
+            } catch(_) {}
             window.location.href = '/login';
+            return;
         } else {
             alert(data.message || '操作失败');
         }
@@ -280,6 +309,18 @@ function toggleFollow(userId, btn) {
     .catch(function(err) {
         console.error('关注操作失败:', err);
         alert('网络错误');
+    })
+    .finally(function() {
+        try {
+            btn.removeAttribute('disabled');
+            btn.classList.remove(disabledClass);
+            btn.style.opacity = '';
+            btn.style.pointerEvents = '';
+            // 如果原文本没变并且按钮被点灰，恢复成原来的文案
+            if (btn.textContent === originalText || btn.textContent === '') {
+                // keep current
+            }
+        } catch (_) {}
     });
 }
 

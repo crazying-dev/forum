@@ -165,13 +165,29 @@ def api_login():
 		except Exception:
 			pass  # 邮件发送失败不影响登录流程
 
-	return jsonify({'success': True, 'id': user['id']})
+	# ── 写「前端可读」的 user_id cookie，让 JS 在 sessionStorage 加载失败时也能判断登录态 ──
+	# 注意：不要把敏感信息放这里；这个 cookie 仅用于前端做"是否已登录"的乐观判断，真相仍以 session 为准
+	resp = jsonify({'success': True, 'id': user['id']})
+	cookie_lifetime = 60 * 60 * 24 * 30 if remember else None  # 30 天 or session
+	resp.set_cookie(
+		'user_id',
+		str(user['id']),
+		path='/',
+		max_age=cookie_lifetime,
+		samesite='Lax',
+		httponly=False,           # 前端 JS 要读，所以 False
+		secure=os.getenv('FLASK_ENV') == 'production'
+	)
+	return resp
 
 
 @auth_bp.route('/api/logout', methods=['POST', 'GET'])
 def api_logout():
 	logout_user()
-	return jsonify({'success': True})
+	resp = jsonify({'success': True})
+	# 清除前端可读的 user_id cookie，避免"退出后仍显示已登录"
+	resp.set_cookie('user_id', '', path='/', max_age=0, expires=0, samesite='Lax', httponly=False)
+	return resp
 
 
 @auth_bp.route('/api/send-verify-email', methods=['POST'])
