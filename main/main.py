@@ -88,6 +88,12 @@ body{{margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSy
 </div></body></html>"""
 
 
+_secret = os.getenv(chr(39)+chr(83)+chr(69)+chr(67)+chr(82)+chr(69)+chr(84)+chr(95)+chr(75)+chr(69)+chr(89)+chr(39)+chr(41))
+if not _secret:
+	import secrets as _secrets
+	_secret = _secrets.token_hex(32)
+	print(chr(91)+chr(83)+chr(69)+chr(67)+chr(85)+chr(82)+chr(73)+chr(84)+chr(89)+chr(32)+chr(87)+chr(65)+chr(82)+chr(78)+chr(73)+chr(78)+chr(71)+chr(93)+chr(32)+chr(83)+chr(69)+chr(67)+chr(82)+chr(69)+chr(84)+chr(95)+chr(75)+chr(69)+chr(89)+chr(32)+chr(26410)+chr(35774)+chr(32622))
+
 app.secret_key = _secret
 
 # Session/Cookie 安全加固
