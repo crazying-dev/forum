@@ -177,7 +177,7 @@ _freq_store = {}     # {ip: [timestamps]}
 _freq_cleanup_at = 0  # 上次清理时间
 
 # 全局频率阈值（所有请求，不论路径）
-GLOBAL_MAX_REQUESTS = 120   # 每窗口最大请求数
+GLOBAL_MAX_REQUESTS = 300   # 每窗口最大请求数
 GLOBAL_WINDOW = 60          # 窗口时长（秒）
 
 # _freq_store 硬上限：超过后立刻清理（避免短时间被大量IP打爆内存）
