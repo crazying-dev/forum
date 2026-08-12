@@ -1,12 +1,84 @@
 """帖子相关 API 路由。"""
+import threading
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from api import database as db
 from api import cache as cache_api
 from main.main import app, base
 from app.middleware import rate_limit
+from Email import send_email, build_email_html
 
 posts_bp = Blueprint('posts', __name__)
+
+
+# ── 帖子发布 → 通知粉丝 ────────────────────────────────────
+_CATEGORY_NAME_MAP = {
+	'general': '综合讨论',
+	'叶羽': '叶羽',
+	'创意': '创意工坊',
+	'求助': '求助提问',
+}
+
+
+def _notify_fans_new_post_async(author_id, author_name, post_id, title, category, host_url):
+	"""后台线程：向粉丝群发「你关注的作者发了新帖」邮件。"""
+	try:
+		fans = db.get_follower_emails(author_id, limit=5000)
+		if not fans:
+			return
+		email_list = []
+		for f in fans:
+			if f.get('id') == author_id:
+				continue
+			if f.get('email'):
+				email_list.append(f['email'])
+		if not email_list:
+			return
+
+		category_name = _CATEGORY_NAME_MAP.get(category, category or '综合讨论')
+		post_url = f'{host_url.rstrip("/")}/post/{post_id}'
+		plain_title = (title or '').strip()
+
+		plain_body = (
+			f'亲爱的粉丝，您好！\n\n'
+			f'你关注的用户「{author_name}」刚刚发布了一篇新帖子：\n'
+			f'分类：{category_name}\n'
+			f'标题：{plain_title}\n\n'
+			f'点击链接立即查看：{post_url}\n\n'
+			f'© 2026 妖精论坛 - 粉丝公益创作'
+		)
+
+		html_body = build_email_html(
+			label='新帖通知',
+			title=f'你关注的 {author_name} 发布了新帖子',
+			body_lines=[
+				'亲爱的粉丝，您好！',
+				f'你关注的用户「<strong style="color:#a855f7;">{author_name}</strong>」刚刚发布了一篇新帖子。',
+				f'分类：{category_name}',
+				f'标题：<strong>{plain_title}</strong>',
+			],
+			action_text='点击查看新帖子',
+			action_url=post_url,
+			footer_note='这是由您关注的作者发帖触发的通知，您可以在「关注列表」中取消关注来停止接收。'
+		)
+
+		chunk_size = 100
+		total_sent = 0
+		for i in range(0, len(email_list), chunk_size):
+			chunk = email_list[i:i + chunk_size]
+			try:
+				send_email(
+					f'【妖精论坛】你关注的 {author_name} 发布了新帖子',
+					plain_body,
+					receiver_list=chunk,
+					html_content=html_body
+				)
+				total_sent += len(chunk)
+			except Exception:
+				continue
+		print(f"[EMAIL] 新帖通知已发送：author={author_id} post={post_id} recipients={total_sent}")
+	except Exception as e:
+		print(f"[EMAIL] 新帖通知粉丝失败（忽略）: {e}")
 
 
 @posts_bp.route('/api/posts')
@@ -97,6 +169,25 @@ def api_post_create():
 	if result.get('success'):
 		cache_api.invalidate_post_cache()
 		cache_api.invalidate_user_cache(current_user['id'])
+		# ── 邮件通知粉丝（异步线程，不阻塞发布响应）──
+		post_id = result.get('id')
+		if post_id:
+			try:
+				t = threading.Thread(
+					target=_notify_fans_new_post_async,
+					args=(
+						current_user['id'],
+						current_user['name'],
+						post_id,
+						title,
+						category,
+						request.host_url
+					),
+					daemon=True
+				)
+				t.start()
+			except Exception:
+				pass
 	return jsonify(result)
 
 

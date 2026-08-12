@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from api import database as db
 from api import cache as cache_api
-from Email import send_email
+from Email import send_email, build_email_html
 from main.main import app, base
 from app.middleware import rate_limit
 
@@ -67,14 +67,30 @@ def api_comment_create(post_id):
 					if parent_user_id != current_user['id']:
 						parent_user = db.get_user_by_id(parent_user_id)
 						if parent_user and parent_user.get('email'):
-							send_email(
-								'【妖精论坛】回复通知',
+							post_url = f'{request.host_url}post/{post_id}'
+							plain_body = (
 								f'尊敬的 {parent_user["name"]}，您好！\n\n'
 								f'用户 {commenter_name} 回复了您在帖子《{post_title}》中的评论：\n'
 								f'"{content}"\n\n'
-								f'点击查看：{request.host_url}post/{post_id}\n\n'
-								f'© 2026 妖精论坛 - 粉丝公益创作',
-								receiver_list=[parent_user['email']]
+								f'点击查看：{post_url}\n\n'
+								f'© 2026 妖精论坛 - 粉丝公益创作'
+							)
+							html_body = build_email_html(
+								label='回复通知',
+								title=f'{commenter_name} 回复了您的评论',
+								body_lines=[
+									f'尊敬的 {parent_user["name"]}，您好！',
+									f'用户「<strong style="color:#a855f7;">{commenter_name}</strong>」回复了您在帖子《{post_title}》中的评论：',
+									f'<div style="background:#f9fafb;border-left:3px solid #a855f7;padding:10px 14px;border-radius:4px;color:#374151;">{content}</div>',
+								],
+								action_text='查看回复',
+								action_url=post_url,
+							)
+							send_email(
+								'【妖精论坛】回复通知',
+								plain_body,
+								receiver_list=[parent_user['email']],
+								html_content=html_body
 							)
 			else:
 				# 直接评论帖子：通知帖子作者
@@ -90,14 +106,30 @@ def api_comment_create(post_id):
 					if post_author_id != current_user['id']:
 						post_author = db.get_user_by_id(post_author_id)
 						if post_author and post_author.get('email'):
-							send_email(
-								'【妖精论坛】评论通知',
+							post_url = f'{request.host_url}post/{post_id}'
+							plain_body = (
 								f'尊敬的 {post_author["name"]}，您好！\n\n'
 								f'用户 {commenter_name} 评论了您的帖子《{post_title}》：\n'
 								f'"{content}"\n\n'
-								f'点击查看：{request.host_url}post/{post_id}\n\n'
-								f'© 2026 妖精论坛 - 粉丝公益创作',
-								receiver_list=[post_author['email']]
+								f'点击查看：{post_url}\n\n'
+								f'© 2026 妖精论坛 - 粉丝公益创作'
+							)
+							html_body = build_email_html(
+								label='评论通知',
+								title=f'{commenter_name} 评论了您的帖子',
+								body_lines=[
+									f'尊敬的 {post_author["name"]}，您好！',
+									f'用户「<strong style="color:#a855f7;">{commenter_name}</strong>」评论了您的帖子《{post_title}》：',
+									f'<div style="background:#f9fafb;border-left:3px solid #a855f7;padding:10px 14px;border-radius:4px;color:#374151;">{content}</div>',
+								],
+								action_text='查看评论',
+								action_url=post_url,
+							)
+							send_email(
+								'【妖精论坛】评论通知',
+								plain_body,
+								receiver_list=[post_author['email']],
+								html_content=html_body
 							)
 		except Exception:
 			pass  # 邮件发送失败不影响评论

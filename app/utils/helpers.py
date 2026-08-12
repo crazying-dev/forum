@@ -13,6 +13,19 @@ from flask import request
 from flask_login import UserMixin, AnonymousUserMixin
 from app.config import *
 
+# 从 Email.py 导入统一的 HTML 邮件模板构建器，避免重复维护两份
+try:
+	from Email import build_email_html
+except ImportError:
+	# 如果 Email.py 不可用（跨项目复用场景），提供兜底
+	def build_email_html(label, title, body_lines, action_text=None, action_url=None, footer_note=None):
+		from html import escape as _h
+		lines = ''.join(f'<p>{_h(l)}</p>' for l in body_lines)
+		btn = ''
+		if action_text and action_url:
+			btn = f'<p><a href="{_h(action_url)}">{_h(action_text)}</a></p>'
+		return f'<html><body><h1>{_h(title)}</h1>{lines}{btn}</body></html>'
+
 SENDER = SMTP_USER
 SENDER_NAME = "妖精论坛"
 
@@ -124,8 +137,15 @@ class AnonymousUser(AnonymousUserMixin):
 		return None
 
 
-def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER=RECEIVERALL):
+def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER=RECEIVERALL, html_content=None):
 	"""发送邮件。
+
+	Args:
+		subject: 主题
+		content: 纯文本正文（兼容不支持 HTML 的客户端）
+		receiver_list: 收件人邮箱列表
+		RECEIVER: 默认收件人
+		html_content: 可选，HTML 格式正文（同时 attach，支持的客户端优先展示 HTML）
 
 	Returns:
 		tuple: (success: bool, error_message: str or None)
@@ -133,15 +153,20 @@ def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER=
 	if receiver_list is None:
 		receiver_list = [RECEIVER]
 	try:
-		msg = MIMEMultipart()
-		# 正确设置发件人，避免乱码
+		# 外容器 mixed（将来可加附件）
+		msg = MIMEMultipart("mixed")
 		msg["From"] = Header(SENDER_NAME, "utf-8").encode() + f" <{SENDER}>"
 		msg["To"] = ",".join(receiver_list)
 		msg["Subject"] = Header(subject, "utf-8").encode()
 
-		# 纯文本正文
+		# 正文容器 alternative：plain + html，客户端选最好的显示
+		body = MIMEMultipart("alternative")
 		text_part = MIMEText(content, "plain", "utf-8")
-		msg.attach(text_part)
+		body.attach(text_part)
+		if html_content:
+			html_part = MIMEText(html_content, "html", "utf-8")
+			body.attach(html_part)
+		msg.attach(body)
 
 		# SSL安全上下文
 		context = ssl.create_default_context()
@@ -156,7 +181,7 @@ def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER=
 		print(f"发件人: {SENDER}")
 		print(f"收件人: {receiver_list}")
 		print(f"主题: {subject}")
-		print(f"内容: {content}")
+		print(f"内容(纯文本): {content[:200]}{'...' if len(content) > 200 else ''}")
 		return True, None
 
 	except smtplib.SMTPAuthenticationError:

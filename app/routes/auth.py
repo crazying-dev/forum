@@ -8,10 +8,10 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from api import database as db
 from api import config
-from Email import send_email
 from main.main import app, base, generate_verify_email_body, strip_easter_egg, UserWrapper
 from app.middleware import rate_limit
 from app.utils.email_utils import validate_email
+from Email import send_email, build_email_html
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -56,7 +56,17 @@ def api_send_register_code():
 如非本人操作，请忽略此邮件。
 
 © 2026 妖精论坛 - 粉丝公益创作"""
-	sent = send_email(subject, body, receiver_list=[email])
+	html_body = build_email_html(
+		label='注册验证码',
+		title='感谢您注册妖精论坛',
+		body_lines=[
+			'您的注册验证码为：',
+			f'<div style="font-size:32px;font-weight:700;color:#a855f7;letter-spacing:6px;text-align:center;padding:12px 0;">{code}</div>',
+			'验证码有效期5分钟，请勿泄露给他人。',
+			'如非本人操作，请忽略此邮件。',
+		],
+	)
+	sent = send_email(subject, body, receiver_list=[email], html_content=html_body)
 	if sent:
 		return jsonify({'success': True, 'message': '验证码已发送至邮箱'})
 	else:
@@ -155,13 +165,26 @@ def api_login():
 	if user_email:
 		try:
 			now_str = time.strftime('%Y-%m-%d %H:%M:%S')
-			send_email(
-				'【妖精论坛】登录提醒',
+			plain_body = (
 				f'尊敬的 {user["name"]}，您好！\n\n'
 				f'您的账号已于 {now_str} 登录妖精论坛。\n'
 				f'如非本人操作，请立即修改密码。\n\n'
-				f'© 2026 妖精论坛 - 粉丝公益创作',
-				receiver_list=[user_email]
+				f'© 2026 妖精论坛 - 粉丝公益创作'
+			)
+			html_body = build_email_html(
+				label='登录提醒',
+				title='您的账号已登录',
+				body_lines=[
+					f'尊敬的 <strong style="color:#a855f7;">{user["name"]}</strong>，您好！',
+					f'您的账号已于 <strong>{now_str}</strong> 登录妖精论坛。',
+					'如非本人操作，请立即修改密码。',
+				],
+			)
+			send_email(
+				'【妖精论坛】登录提醒',
+				plain_body,
+				receiver_list=[user_email],
+				html_content=html_body
 			)
 		except Exception:
 			pass  # 邮件发送失败不影响登录流程
@@ -206,9 +229,27 @@ def api_send_verify_email():
 
 	token = token_result['token']
 	subject = '【妖精论坛】邮箱验证'
-	body = generate_verify_email_body(user['name'], token, 'email_verify')
-	
-	sent = send_email(subject, body, receiver_list=[user['email']])
+	verify_url = f"{request.host_url}verify-email?token={token}"
+	body = (
+		f'尊敬的 {user["name"]}，您好！\n\n'
+		f'请点击以下链接验证并激活您的邮箱地址：\n{verify_url}\n\n'
+		f'验证链接有效期为30分钟。\n'
+		f'© 2026 妖精论坛 - 粉丝公益创作'
+	)
+
+	html_body = build_email_html(
+		label='邮箱验证',
+		title='验证您的邮箱地址',
+		body_lines=[
+			f'尊敬的 <strong style="color:#a855f7;">{user["name"]}</strong>，您好！',
+			'请点击下方按钮验证并激活您的邮箱地址。',
+			'验证链接有效期为30分钟。',
+		],
+		action_text='验证邮箱',
+		action_url=verify_url,
+	)
+
+	sent = send_email(subject, body, receiver_list=[user['email']], html_content=html_body)
 	if sent:
 		return jsonify({'success': True, 'message': '验证邮件已发送，请查收邮箱'})
 	else:
@@ -255,9 +296,29 @@ def api_send_reset_password():
 
 	token = token_result['token']
 	subject = '【妖精论坛】重置密码'
-	body = generate_verify_email_body(user['name'], token, 'password_reset')
-	
-	sent = send_email(subject, body, receiver_list=[email])
+	reset_url = f"{request.host_url}reset-password?token={token}"
+	body = (
+		f'尊敬的 {user["name"]}，您好！\n\n'
+		f'请点击以下链接设置新的密码：\n{reset_url}\n\n'
+		f'重置链接有效期为30分钟。\n'
+		f'如非本人操作，请忽略此邮件。\n\n'
+		f'© 2026 妖精论坛 - 粉丝公益创作'
+	)
+
+	html_body = build_email_html(
+		label='重置密码',
+		title='重置您的密码',
+		body_lines=[
+			f'尊敬的 <strong style="color:#a855f7;">{user["name"]}</strong>，您好！',
+			'请点击下方按钮设置新的密码。',
+			'重置链接有效期为30分钟。',
+			'如非本人操作，请忽略此邮件。',
+		],
+		action_text='重置密码',
+		action_url=reset_url,
+	)
+
+	sent = send_email(subject, body, receiver_list=[email], html_content=html_body)
 	if sent:
 		return jsonify({'success': True, 'message': '如果该邮箱已注册，重置链接已发送至邮箱'})
 	else:
@@ -317,7 +378,18 @@ def api_send_verify_code():
 如非本人操作，请忽略此邮件。
 
 © 2026 妖精论坛 - 粉丝公益创作"""
-	sent = send_email(subject, body, receiver_list=[user['email']])
+	html_body = build_email_html(
+		label='邮箱验证码',
+		title='验证您的邮箱',
+		body_lines=[
+			f'尊敬的 <strong style="color:#a855f7;">{user["name"]}</strong>，您好！',
+			'您的邮箱验证码为：',
+			f'<div style="font-size:32px;font-weight:700;color:#a855f7;letter-spacing:6px;text-align:center;padding:12px 0;">{code}</div>',
+			'验证码有效期5分钟，请勿泄露给他人。',
+			'如非本人操作，请忽略此邮件。',
+		],
+	)
+	sent = send_email(subject, body, receiver_list=[user['email']], html_content=html_body)
 	if sent:
 		return jsonify({'success': True, 'message': '验证码已发送至邮箱'})
 	else:

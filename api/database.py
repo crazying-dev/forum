@@ -1400,6 +1400,35 @@ def get_follower_list(user_id, page=1, page_size=20):
 	return users
 
 
+def get_follower_emails(user_id, limit=5000):
+	"""批量获取某用户的粉丝邮箱（仅包含已绑定邮箱且邮箱非空的粉丝），用于邮件通知。
+
+    Args:
+        user_id (str): 被关注的用户ID
+        limit (int): 最大返回数量（防止超大账号一次性发送过多被邮件服务器限流）
+
+    Returns:
+        list[dict]: [{'id':..., 'name':..., 'email':...}]
+    """
+	results = execute_query(
+		"""
+		SELECT u.id, u.name, u.email
+		FROM user_follows uf
+		JOIN users u ON uf.follower_id = u.id
+		WHERE uf.following_id = %s
+		  AND u.email IS NOT NULL
+		  AND u.email <> ''
+		ORDER BY uf.created_at DESC
+		LIMIT %s
+		""",
+		(user_id, limit),
+		fetch_all=True
+	)
+	if not results:
+		return []
+	return [{"id": r[0], "name": r[1], "email": r[2]} for r in results]
+
+
 def report_post(post_id, reporter_id, reason, detail=''):
 	"""举报帖子。
 
