@@ -106,6 +106,12 @@
                     <span>赞赏</span>
                 </button>
             </li>
+            <li class="header-collapsible">
+                <button class="header-btn" id="BugReportBtn" onclick="showBugReportDialog()">
+                    <svg viewBox="64 64 896 896" focusable="false" data-icon="alert" width="1em" height="1em" fill="currentColor" aria-hidden="true" style="vertical-align:-1px;"><path d="M193 796c0 17.7 14.3 32 32 32h574c17.7 0 32-14.3 32-32V563c0-176.2-142.8-319-319-319S193 386.8 193 563v233zm72-233c0-136.4 110.6-247 247-247s247 110.6 247 247v193H404V585c0-5.5-4.5-10-10-10h-44c-5.5 0-10 4.5-10 10v171h-75V563zm-48.1-252.5l39.6-39.6c3.1-3.1 3.1-8.2 0-11.3l-67.9-67.9a8.03 8.03 0 00-11.3 0l-39.6 39.6a8.03 8.03 0 000 11.3l67.9 67.9c3.1 3.1 8.1 3.1 11.3 0zm669.6-79.2l-39.6-39.6a8.03 8.03 0 00-11.3 0l-67.9 67.9a8.03 8.03 0 000 11.3l39.6 39.6c3.1 3.1 8.2 3.1 11.3 0l67.9-67.9c3.1-3.2 3.1-8.2 0-11.3zM832 892H192c-17.7 0-32 14.3-32 32v24c0 4.4 3.6 8 8 8h688c4.4 0 8-3.6 8-8v-24c0-17.7-14.3-32-32-32zM484 180h56c4.4 0 8-3.6 8-8V76c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v96c0 4.4 3.6 8 8 8z"></path></svg>
+                    <span>Bug举报</span>
+                </button>
+            </li>
             <li class="header-menu-toggle" id="headerMenuToggle">
                 <button class="header-btn" type="button">
                     <i class="fa fa-bars"></i>
@@ -168,6 +174,9 @@
             </a>
             <button class="mobile-menu-item" onclick="showDonateCard()">
                 <i class="fa fa-heart"></i> 赞赏
+            </button>
+            <button class="mobile-menu-item" onclick="showBugReportDialog()">
+                <svg viewBox="64 64 896 896" focusable="false" data-icon="alert" width="1em" height="1em" fill="currentColor" aria-hidden="true" style="vertical-align:-1px;margin-right:4px;"><path d="M193 796c0 17.7 14.3 32 32 32h574c17.7 0 32-14.3 32-32V563c0-176.2-142.8-319-319-319S193 386.8 193 563v233zm72-233c0-136.4 110.6-247 247-247s247 110.6 247 247v193H404V585c0-5.5-4.5-10-10-10h-44c-5.5 0-10 4.5-10 10v171h-75V563zm-48.1-252.5l39.6-39.6c3.1-3.1 3.1-8.2 0-11.3l-67.9-67.9a8.03 8.03 0 00-11.3 0l-39.6 39.6a8.03 8.03 0 000 11.3l67.9 67.9c3.1 3.1 8.1 3.1 11.3 0zm669.6-79.2l-39.6-39.6a8.03 8.03 0 00-11.3 0l-67.9 67.9a8.03 8.03 0 000 11.3l39.6 39.6c3.1 3.1 8.2 3.1 11.3 0l67.9-67.9c3.1-3.2 3.1-8.2 0-11.3zM832 892H192c-17.7 0-32 14.3-32 32v24c0 4.4 3.6 8 8 8h688c4.4 0 8-3.6 8-8v-24c0-17.7-14.3-32-32-32zM484 180h56c4.4 0 8-3.6 8-8V76c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v96c0 4.4 3.6 8 8 8z"></path></svg>Bug举报
             </button>
             <button class="mobile-menu-item" onclick="Easter_Egg()">
                 <i class="fa fa-gift"></i> 彩蛋
@@ -260,6 +269,80 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+function showBugReportDialog() {
+    if (typeof WindowsCardWithCenterSreen === 'undefined' || !WindowsCardWithCenterSreen) return;
+    var content =
+        '<h3 style="margin-top:4px;">Bug 举报</h3>' +
+        '<div style="font-size:13px;color:var(--color-text-tertiary,#9ca3af);margin-bottom:8px;">感谢您帮助我们改进论坛</div>' +
+        '<div>' +
+            '<div class="bug-report-title">标题 <span style="color:#ef4444;">*</span></div>' +
+            '<input type="text" class="bug-report-input" id="bug-title" placeholder="请简要描述问题（如：登录按钮点击无反应）" maxlength="200">' +
+            '<div class="bug-report-title">详细描述 <span style="color:#ef4444;">*</span></div>' +
+            '<textarea class="bug-report-textarea" id="bug-detail" placeholder="请详细描述问题现象，包括您看到的错误信息、截图描述等" maxlength="5000"></textarea>' +
+            '<div class="bug-report-title">复现步骤</div>' +
+            '<textarea class="bug-report-textarea" id="bug-steps" placeholder="请描述如何复现这个问题（可选），例如：1. 打开首页 2. 点击登录 3. 输入密码后..." maxlength="3000"></textarea>' +
+            '<div class="bug-report-title">联系方式</div>' +
+            '<input type="text" class="bug-report-input" id="bug-contact" placeholder="邮箱或用户名（可选，方便我们跟进反馈）" maxlength="200">' +
+        '</div>' +
+        '<div class="report-actions">' +
+            '<button class="report-cancel" onclick="ShowOrhidenWindowsCardWithCenterSreen(0)">取消</button>' +
+            '<button class="report-submit" id="bug-submit-btn" onclick="submitBugReport()">提交</button>' +
+        '</div>';
+    var cardBody = WindowsCardWithCenterSreen.querySelector('.windows-card-body');
+    if (cardBody) {
+        cardBody.innerHTML = content;
+    } else if (typeof WindowsCardWithCenterSreenText !== 'undefined' && WindowsCardWithCenterSreenText) {
+        WindowsCardWithCenterSreenText.innerHTML = content;
+    }
+    ShowOrhidenWindowsCardWithCenterSreen(1);
+}
+
+function submitBugReport() {
+    var titleEl = document.getElementById('bug-title');
+    var detailEl = document.getElementById('bug-detail');
+    var stepsEl = document.getElementById('bug-steps');
+    var contactEl = document.getElementById('bug-contact');
+    var submitBtn = document.getElementById('bug-submit-btn');
+
+    var title = titleEl ? titleEl.value.trim() : '';
+    var detail = detailEl ? detailEl.value.trim() : '';
+    var steps = stepsEl ? stepsEl.value.trim() : '';
+    var contact = contactEl ? contactEl.value.trim() : '';
+
+    if (!title) { alert('请填写 Bug 标题'); return; }
+    if (!detail) { alert('请填写 Bug 详细描述'); return; }
+
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '提交中...'; }
+
+    if (typeof apiFetch === 'undefined') {
+        alert('页面初始化中，请稍后再试');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '提交'; }
+        return;
+    }
+
+    apiFetch('/api/report-bug', {
+        method: 'POST',
+        body: JSON.stringify({
+            title: title,
+            detail: detail,
+            steps: steps,
+            contact: contact,
+            page_url: window.location.href
+        })
+    }).then(function(res) { return res.json(); }).then(function(data) {
+        if (data.success) {
+            alert('Bug 已提交，感谢反馈');
+            ShowOrhidenWindowsCardWithCenterSreen(0);
+        } else {
+            alert(data.message || '提交失败');
+        }
+    }).catch(function() {
+        alert('网络错误，请稍后再试');
+    }).finally(function() {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '提交'; }
+    });
+}
 </script>
 
 <style>
@@ -402,6 +485,89 @@ document.addEventListener('keydown', function(e) {
     width: auto;
     height: auto;
     background: none;
+}
+
+/* Bug 举报弹窗表单样式 */
+.bug-report-title {
+    font-size: 14px;
+    margin: 10px 0 6px;
+    color: var(--color-text-secondary, #6b7280);
+    font-weight: 500;
+}
+.bug-report-input {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border: 1px solid var(--color-border-divider, #e5e7eb);
+    border-radius: 8px;
+    background: var(--color-bg-card, #fff);
+    color: var(--color-text-primary, #1f2937);
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.bug-report-input:focus {
+    border-color: var(--color-primary, #a855f7);
+}
+.bug-report-textarea {
+    width: 100%;
+    min-height: 90px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border: 1px solid var(--color-border-divider, #e5e7eb);
+    border-radius: 8px;
+    background: var(--color-bg-card, #fff);
+    color: var(--color-text-primary, #1f2937);
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.15s;
+}
+.bug-report-textarea:focus {
+    border-color: var(--color-primary, #a855f7);
+}
+.report-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+}
+.report-cancel {
+    padding: 9px 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    border: 1px solid var(--color-border-card, #d1d5db);
+    background: transparent;
+    color: var(--color-text-secondary, #6b7280);
+    transition: opacity 0.15s;
+    font-family: inherit;
+}
+.report-cancel:hover {
+    opacity: 0.8;
+}
+.report-submit {
+    padding: 9px 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    border: none;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    color: #fff;
+    font-weight: 600;
+    transition: opacity 0.15s;
+    font-family: inherit;
+}
+.report-submit:hover {
+    opacity: 0.9;
+}
+.report-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 </style>
