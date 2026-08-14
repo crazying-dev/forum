@@ -61,6 +61,12 @@ def _notify_admin_bug_async(report_id, title, detail, steps, contact, reporter_n
 @bug_bp.route('/api/report-bug', methods=['POST'])
 def api_report_bug():
 	"""提交 Bug 举报（游客可提交，登录用户自动记录身份）。"""
+	# 双保险：接口入口即触发懒加载建表，避免后续 UndefinedTable
+	try:
+		db.ensure_tables()
+	except Exception as e:
+		print(f"[BUG] ensure_tables 失败（忽略）: {e}")
+
 	if rate_limit('bug_report', 5, 300):
 		return jsonify({'success': False, 'message': '提交过于频繁，请5分钟后再试'}), 429
 
@@ -92,16 +98,21 @@ def api_report_bug():
 
 	user_agent = request.headers.get('User-Agent', '') or ''
 
-	result = db.report_bug(
-		title=title,
-		detail=detail,
-		steps=steps,
-		contact=contact,
-		reporter_id=reporter_id,
-		reporter_name=reporter_name,
-		user_agent=user_agent,
-		page_url=page_url,
-	)
+	try:
+		result = db.report_bug(
+			title=title,
+			detail=detail,
+			steps=steps,
+			contact=contact,
+			reporter_id=reporter_id,
+			reporter_name=reporter_name,
+			user_agent=user_agent,
+			page_url=page_url,
+		)
+	except Exception as e:
+		print(f"[BUG] report_bug 异常: {e}")
+		return jsonify({'success': False, 'message': '服务端处理失败，请稍后重试'}), 500
+
 	if not result.get('success'):
 		return jsonify(result), 400
 

@@ -1472,27 +1472,45 @@ def report_bug(title, detail, steps='', contact='', reporter_id=None, reporter_n
 	if len(title) > 200:
 		title = title[:200]
 
-	with get_conn() as (conn, cursor):
-		cursor.execute(
-			"""
-			INSERT INTO bug_reports (title, detail, steps, contact, reporter_id, reporter_name, user_agent, page_url)
-			VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-			RETURNING id
-			""",
-			(
-				title,
-				detail,
-				(steps or '').strip(),
-				(contact or '').strip()[:200],
-				reporter_id,
-				(reporter_name or '')[:64],
-				(user_agent or '')[:500],
-				(page_url or '')[:500]
+	# 先跑一次懒加载建表（空转不耗时）
+	ensure_tables()
+
+	def _do_insert():
+		with get_conn() as (conn, cursor):
+			cursor.execute(
+				"""
+				INSERT INTO bug_reports (title, detail, steps, contact, reporter_id, reporter_name, user_agent, page_url)
+				VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+				RETURNING id
+				""",
+				(
+					title,
+					detail,
+					(steps or '').strip(),
+					(contact or '').strip()[:200],
+					reporter_id,
+					(reporter_name or '')[:64],
+					(user_agent or '')[:500],
+					(page_url or '')[:500]
+				)
 			)
-		)
-		row = cursor.fetchone()
-		conn.commit()
-	report_id = row[0] if row else None
+			row = cursor.fetchone()
+			conn.commit()
+		return row[0] if row else None
+
+	try:
+		report_id = _do_insert()
+	except (psycopg2.errors.UndefinedTable, psycopg2.errors.UndefinedColumn) as e:
+		# 兜底 1：调用统一的 schema 修复（force=True 重跑 init_tables）
+		_handle_missing_schema(e)
+		# 兜底 2：直接单独执行 bug_reports 表与索引创建（最保险，避免 init_tables 遗漏）
+		with get_conn() as (conn, cursor):
+			cursor.execute(config.CREATE_BUG_REPORTS_TABLE_SQL)
+			cursor.execute("CREATE INDEX IF NOT EXISTS idx_bug_reports_created_at ON bug_reports(created_at DESC);")
+			cursor.execute("CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);")
+			conn.commit()
+		# 重试一次 INSERT
+		report_id = _do_insert()
 	return {"success": True, "id": report_id}
 
 
