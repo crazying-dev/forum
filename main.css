@@ -24,8 +24,12 @@
     --color-bg-card: rgba(255, 255, 255, 0.95);
     --color-bg-mask: rgba(0, 0, 0, 0.4);
     --color-bg-autofill: #fff;
+    --color-bg-item: rgba(255, 255, 255, 0.6);
+    --color-bg-input: rgba(255, 255, 255, 0.85);
+    --color-bg-secondary: rgba(255, 255, 255, 0.95);
 
     --color-border-primary: rgba(106, 140, 137, 0.2);
+    --color-border: rgba(106, 140, 137, 0.2);
     --color-border-search: rgba(106, 140, 137, 0.25);
     --color-border-search-hover: rgba(106, 140, 137, 0.5);
     --color-border-focus: #6A8C89;
@@ -69,8 +73,12 @@
     --color-bg-item-active: rgba(132, 168, 185, 0.2);
     --color-bg-checkbox-active: linear-gradient(135deg, #84A8B9 0%, #6A8C89 100%);
     --color-bg-card: rgba(26, 36, 35, 0.95);
+    --color-bg-item: rgba(26, 36, 35, 0.5);
+    --color-bg-input: rgba(26, 36, 35, 0.8);
+    --color-bg-secondary: rgba(26, 36, 35, 0.9);
 
     --color-border-primary: rgba(132, 168, 185, 0.15);
+    --color-border: rgba(132, 168, 185, 0.15);
     --color-border-search: rgba(132, 168, 185, 0.25);
     --color-border-search-hover: rgba(132, 168, 185, 0.5);
     --color-border-focus: #84A8B9;
