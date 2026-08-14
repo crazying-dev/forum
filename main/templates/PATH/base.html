@@ -276,14 +276,14 @@ function showBugReportDialog() {
         '<h3 style="margin-top:4px;">Bug 举报</h3>' +
         '<div style="font-size:13px;color:var(--color-text-tertiary,#9ca3af);margin-bottom:8px;">感谢您帮助我们改进论坛</div>' +
         '<div>' +
-            '<div class="bug-report-title">标题 <span style="color:#ef4444;">*</span></div>' +
-            '<input type="text" class="bug-report-input" id="bug-title" placeholder="请简要描述问题（如：登录按钮点击无反应）" maxlength="200">' +
-            '<div class="bug-report-title">详细描述 <span style="color:#ef4444;">*</span></div>' +
-            '<textarea class="bug-report-textarea" id="bug-detail" placeholder="请详细描述问题现象，包括您看到的错误信息、截图描述等" maxlength="5000"></textarea>' +
-            '<div class="bug-report-title">复现步骤</div>' +
-            '<textarea class="bug-report-textarea" id="bug-steps" placeholder="请描述如何复现这个问题（可选），例如：1. 打开首页 2. 点击登录 3. 输入密码后..." maxlength="3000"></textarea>' +
-            '<div class="bug-report-title">联系方式</div>' +
-            '<input type="text" class="bug-report-input" id="bug-contact" placeholder="邮箱或用户名（可选，方便我们跟进反馈）" maxlength="200">' +
+            '<label class="report-label" for="bug-title">标题</label>' +
+            '<input type="text" class="report-detail-input" id="bug-title" placeholder="请简要描述问题（如：登录按钮点击无反应）" maxlength="200">' +
+            '<label class="report-label" for="bug-detail">详细描述</label>' +
+            '<textarea class="report-detail-input textarea" id="bug-detail" placeholder="请详细描述问题现象，包括您看到的错误信息、截图描述等" maxlength="5000"></textarea>' +
+            '<label class="report-label" for="bug-steps">复现步骤（可选）</label>' +
+            '<textarea class="report-detail-input textarea" id="bug-steps" placeholder="请描述如何复现这个问题，例如：1. 打开首页 2. 点击登录 3. 输入密码后..." maxlength="3000"></textarea>' +
+            '<label class="report-label" for="bug-contact">联系方式（可选）</label>' +
+            '<input type="text" class="report-detail-input" id="bug-contact" placeholder="邮箱或用户名，方便我们跟进反馈" maxlength="200">' +
         '</div>' +
         '<div class="report-actions">' +
             '<button class="report-cancel" onclick="ShowOrhidenWindowsCardWithCenterSreen(0)">取消</button>' +
@@ -497,7 +497,7 @@ function submitBugReport() {
 }
 .report-detail-input {
     width: 100%;
-    min-height: 42px;
+    min-height: 60px;
     padding: 8px 12px;
     margin-bottom: 4px;
     border: 1px solid var(--color-border, #d1d5db);
