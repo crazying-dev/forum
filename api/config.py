@@ -150,6 +150,22 @@ CREATE TABLE IF NOT EXISTS post_reports (
 );
 """
 
+CREATE_BUG_REPORTS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS bug_reports (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    detail TEXT NOT NULL,
+    steps TEXT DEFAULT '',
+    contact VARCHAR(200) DEFAULT '',
+    reporter_id VARCHAR(64) DEFAULT NULL,
+    reporter_name VARCHAR(64) DEFAULT '',
+    user_agent TEXT DEFAULT '',
+    page_url TEXT DEFAULT '',
+    status INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
 CREATE_VERIFY_CODES_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS verify_codes (
     id SERIAL PRIMARY KEY,
@@ -174,6 +190,8 @@ CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id);",
     "CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_id);",
     "CREATE INDEX IF NOT EXISTS idx_post_reports_post_id ON post_reports(post_id);",
+    "CREATE INDEX IF NOT EXISTS idx_bug_reports_created_at ON bug_reports(created_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);",
     "CREATE INDEX IF NOT EXISTS idx_verify_codes_email_purpose ON verify_codes(email, purpose);",
     "CREATE INDEX IF NOT EXISTS idx_verify_codes_expires ON verify_codes(expires_at);",
 ]

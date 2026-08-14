@@ -278,6 +278,7 @@ def init_tables():
 		cursor.execute(config.CREATE_VERIFY_TOKENS_TABLE_SQL)
 		cursor.execute(config.CREATE_VERIFY_CODES_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_REPORTS_TABLE_SQL)
+		cursor.execute(config.CREATE_BUG_REPORTS_TABLE_SQL)
 		for alter_sql in (
 			"ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)",
 			"ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER",
@@ -1446,6 +1447,53 @@ def report_post(post_id, reporter_id, reason, detail=''):
 		(post_id, reporter_id, reason, detail)
 	)
 	return {"success": True}
+
+
+def report_bug(title, detail, steps='', contact='', reporter_id=None, reporter_name='', user_agent='', page_url=''):
+	"""提交 Bug 举报。
+
+    Args:
+        title (str): Bug 标题/一句话概述
+        detail (str): 详细描述
+        steps (str): 复现步骤（可选）
+        contact (str): 联系方式（可选，邮箱/用户名）
+        reporter_id (str|None): 登录用户ID（可选，游客时为空）
+        reporter_name (str): 登录用户名或填写的昵称
+        user_agent (str): 浏览器 UA
+        page_url (str): 发现 Bug 时的页面 URL
+
+    Returns:
+        dict: {"success": True, "id": report_id}
+    """
+	title = (title or '').strip()
+	detail = (detail or '').strip()
+	if not title or not detail:
+		return {"success": False, "message": "标题与详细描述不能为空"}
+	if len(title) > 200:
+		title = title[:200]
+
+	with get_conn() as (conn, cursor):
+		cursor.execute(
+			"""
+			INSERT INTO bug_reports (title, detail, steps, contact, reporter_id, reporter_name, user_agent, page_url)
+			VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+			RETURNING id
+			""",
+			(
+				title,
+				detail,
+				(steps or '').strip(),
+				(contact or '').strip()[:200],
+				reporter_id,
+				(reporter_name or '')[:64],
+				(user_agent or '')[:500],
+				(page_url or '')[:500]
+			)
+		)
+		row = cursor.fetchone()
+		conn.commit()
+	report_id = row[0] if row else None
+	return {"success": True, "id": report_id}
 
 
 def delete_post(post_id, user_id):
