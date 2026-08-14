@@ -487,48 +487,54 @@ function submitBugReport() {
     background: none;
 }
 
-/* Bug 举报弹窗表单样式 */
-.bug-report-title {
+/* 举报/反馈 弹窗通用表单样式（Bug举报、帖子举报 共用） */
+.report-label {
+    display: block;
     font-size: 14px;
     margin: 10px 0 6px;
     color: var(--color-text-secondary, #6b7280);
     font-weight: 500;
 }
-.bug-report-input {
+.report-detail-input {
     width: 100%;
-    padding: 10px 12px;
+    min-height: 42px;
+    padding: 8px 12px;
     margin-bottom: 4px;
-    border: 1px solid var(--color-border-divider, #e5e7eb);
-    border-radius: 8px;
-    background: var(--color-bg-card, #fff);
+    border: 1px solid var(--color-border, #d1d5db);
+    border-radius: 6px;
+    background: var(--color-bg-item, #fff);
     color: var(--color-text-primary, #1f2937);
+    font: inherit;
     font-size: 14px;
     box-sizing: border-box;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
-}
-.bug-report-input:focus {
-    border-color: var(--color-primary, #a855f7);
-}
-.bug-report-textarea {
-    width: 100%;
-    min-height: 90px;
-    padding: 10px 12px;
-    margin-bottom: 4px;
-    border: 1px solid var(--color-border-divider, #e5e7eb);
-    border-radius: 8px;
-    background: var(--color-bg-card, #fff);
-    color: var(--color-text-primary, #1f2937);
-    font-size: 14px;
-    box-sizing: border-box;
-    font-family: inherit;
-    outline: none;
     resize: vertical;
-    transition: border-color 0.15s;
+    outline: none;
+    font-family: inherit;
 }
-.bug-report-textarea:focus {
-    border-color: var(--color-primary, #a855f7);
+.report-detail-input:focus {
+    border-color: var(--color-border-primary, #6b7280);
+    background: var(--color-bg-secondary, #f9fafb);
+}
+.report-detail-input.textarea {
+    min-height: 90px;
+}
+.report-reason-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.report-reason-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 4px 0;
+    color: var(--color-text-primary, #1f2937);
+}
+.report-reason-item input {
+    cursor: pointer;
+    accent-color: var(--color-primary, #a855f7);
 }
 .report-actions {
     display: flex;
@@ -537,34 +543,29 @@ function submitBugReport() {
     margin-top: 16px;
 }
 .report-cancel {
-    padding: 9px 22px;
-    border-radius: 8px;
+    padding: 6px 18px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
-    border: 1px solid var(--color-border-card, #d1d5db);
-    background: transparent;
-    color: var(--color-text-secondary, #6b7280);
+    border: 1px solid var(--color-border, #d1d5db);
+    background: var(--color-bg-item, #fff);
+    color: var(--color-text-primary, #1f2937);
     transition: opacity 0.15s;
     font-family: inherit;
 }
-.report-cancel:hover {
-    opacity: 0.8;
-}
+.report-cancel:hover { opacity: 0.85; }
 .report-submit {
-    padding: 9px 22px;
-    border-radius: 8px;
+    padding: 6px 18px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
     border: none;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: var(--color-primary, #a855f7);
     color: #fff;
-    font-weight: 600;
     transition: opacity 0.15s;
     font-family: inherit;
 }
-.report-submit:hover {
-    opacity: 0.9;
-}
+.report-submit:hover { opacity: 0.9; }
 .report-submit:disabled {
     opacity: 0.5;
     cursor: not-allowed;
