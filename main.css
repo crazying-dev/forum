@@ -3945,14 +3945,6 @@ input {
     padding-right: 8px;
 }
 
-/* 主评论对齐规则：第1条保持帖子原始位置不动，从第2条起统一缩进并左对齐（后续评论不再逐级后移） */
-.comment-list > .comment-item:first-child {
-    margin-left: 0;
-}
-.comment-list > .comment-item:not(:first-child) {
-    margin-left: 36px;
-}
-
 .comment-empty {
     text-align: center;
     padding: 24px 0;
@@ -4097,8 +4089,8 @@ input {
 }
 
 .comment-replies {
-    /* 第2条评论（即第一条回复）开始统一缩进并左对齐；后续回复/主评论都与这一条对齐，不再逐级后移 */
-    margin-left: 36px;
+    /* 每条主评论下方的回复区整体向内缩进 8 空格深度；所有回复 1/2/3… 都在同一列左对齐，不再逐级后移 */
+    margin-left: 64px;
     padding-left: 0;
     border-left: none;
     margin-top: 8px;
