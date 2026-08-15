@@ -1,5 +1,7 @@
 import smtplib
 import ssl
+import threading
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.header import Header
@@ -7,6 +9,11 @@ from api.config import *
 
 SENDER = SMTP_USER
 SENDER_NAME = "妖精论坛"
+
+# 同一邮箱 1 秒内最多发一封邮件，避免短时间重复推送
+_EMAIL_MIN_INTERVAL = 1.0
+_email_send_lock = threading.Lock()
+_email_send_timestamps = {}
 
 
 def _esc(text):
@@ -109,6 +116,22 @@ def send_email(subject: str, content: str, receiver_list: list = None, RECEIVER 
     """
     if receiver_list is None:
         receiver_list = [RECEIVER]
+
+    # 同一邮箱 1 秒内去重：过滤掉刚刚发过的收件人
+    now = time.monotonic()
+    with _email_send_lock:
+        deduped = []
+        for addr in receiver_list:
+            last = _email_send_timestamps.get(addr)
+            if last is not None and (now - last) < _EMAIL_MIN_INTERVAL:
+                continue
+            deduped.append(addr)
+            _email_send_timestamps[addr] = now
+    if not deduped:
+        print(f"⏭️ 跳过发送：收件人 {receiver_list} 在 {_EMAIL_MIN_INTERVAL}s 内已发过邮件")
+        return True, None
+    receiver_list = deduped
+
     try:
         # 外容器：mixed（保留将来加附件的能力）
         msg = MIMEMultipart("mixed")
