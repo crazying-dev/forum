@@ -1396,8 +1396,7 @@ input {
     display: block;
 }
 
-.live2d-loading,
-.live2d-error {
+.live2d-loading {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1407,6 +1406,25 @@ input {
     align-items: center;
     gap: 12px;
     color: var(--color-text-tertiary);
+}
+
+/* error 默认不显示（显式独立定义，避免和 loading 共享导致自动出现）；
+   只有调用 showLive2DError() 将 display 设为 flex 时才显示，加载成功时要立即清除 */
+.live2d-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--color-text-tertiary);
+    z-index: 2;
+}
+/* z-index：加载进度和失败提示永远盖在画布上方；加载成功后它们被 display:none 隐藏，画布仍正常显示 */
+.live2d-loading {
+    z-index: 2;
 }
 
 .live2d-progress-container {
