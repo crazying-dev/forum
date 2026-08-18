@@ -3912,10 +3912,12 @@ input {
     display: flex;
     gap: 10px;
     margin-bottom: 20px;
+    width: 100%;
 }
 
 .comment-input-bar input {
     flex: 1;
+    min-width: 0;
     padding: 10px 16px;
     background: var(--color-bg-search);
     border: 1px solid var(--color-border-search);
@@ -3933,6 +3935,8 @@ input {
 }
 
 .comment-send-btn {
+    flex-shrink: 0;
+    white-space: nowrap;
     padding: 10px 20px;
     background: var(--color-primary);
     color: #fff;

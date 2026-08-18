@@ -5,13 +5,25 @@
   1. 访问危险路径（.git/.env/常见漏洞扫描路径等）
   2. 请求频率过高
   3. 命中 /root/db/forum_IP.json 黑名单
-检测到恶意行为后写入黑名单，黑名单内 IP 直接返回 500。
+检测到恶意行为后写入黑名单，命中黑名单的 IP 从 [250,500,502,666,888] 中随机返回一个码。
+
+持久化策略：
+  - 黑名单写入 = 异步批量 + 定时 flush 兜底。
+  - 每次封禁先写入内存 set + 待写缓冲，不再立即同步写盘。
+  - 每满 50 条缓冲 或 满 30s 或 进程退出 时统一 flush 到文件。
+
+黑名单有效期：
+  - 黑名单中的 IP 永久有效，不设过期。
 """
 import os
 import re
 import json
 import time
+import random
+import atexit
+import threading
 from threading import Lock
+from collections import deque
 from flask import request, jsonify
 
 # ── IP 黑名单 JSON 文件 ─────────────────────────────────
@@ -21,72 +33,168 @@ _ip_lock = Lock()
 _ip_blacklist = set()
 _ip_blacklist_loaded = False
 
-# 黑名单容量上限：超过后只保留内存中最新的一半，并持久化到文件
-# （防止长期被扫描时 set 无限膨胀，超过 10 万条约占几 MB）
-_MAX_BLACKLIST_SIZE = 100000
+# 黑名单永久有效：允许无限增长，不再按容量裁剪老条目。
+# 只在写盘时对文件格式做一次 sorted，便于人工阅读。
+
+# ── 异步批量写入 + 定时 flush 兜底 ────────────────────────
+
+_PENDING_FLUSH_THRESHOLD = 50    # 累计新增条数阈值，到了立刻触发异步 flush
+_FLUSH_INTERVAL_SECONDS = 30     # 兜底定时 flush 间隔
+
+_pending_lock = Lock()
+_pending_change_count = 0        # 自上次 flush 后新增/变更的条数（批量触发用）
+_pending_changed = False         # 自上次 flush 后是否有脏数据
+_flush_scheduler_thread = None   # 兜底 flush 线程，模块级启动一次
+_flush_scheduler_started = False
+_flush_worker_running = True
+
+
+def _mark_pending_changed(inc=1):
+    """封禁一个 IP 时调用。inc=1 表示增加 1 条脏数据。
+    累计达到阈值则立刻触发一次异步 flush，否则由定时线程兜底。"""
+    global _pending_changed, _pending_change_count
+    should_flush = False
+    with _pending_lock:
+        _pending_changed = True
+        _pending_change_count += max(inc, 1)
+        if _pending_change_count >= _PENDING_FLUSH_THRESHOLD:
+            _pending_change_count = 0
+            should_flush = True
+        _ensure_flush_scheduler_started()
+    if should_flush:
+        _async_flush()
+
+
+def _do_flush_to_disk():
+    """真正执行写盘的函数。写盘失败时保留脏数据，下次会重试。"""
+    global _pending_changed, _pending_change_count
+    # 先把 pending flag 摘出来
+    with _pending_lock:
+        if not _pending_changed:
+            return
+        _pending_changed = False
+        _pending_change_count = 0
+    try:
+        os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+        with _ip_lock:
+            snapshot = sorted(list(_ip_blacklist))
+        data = {
+            'blocked': snapshot,
+            'updated': time.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        tmp_path = IP_LIST_PATH + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, IP_LIST_PATH)
+    except Exception as e:
+        with _pending_lock:
+            _pending_changed = True
+        print(f"[SECURITY] 保存黑名单失败: {e}")
+
+
+def _async_flush():
+    """异步触发一次 flush（不阻塞请求线程）。"""
+    def _runner():
+        try:
+            _do_flush_to_disk()
+        except Exception as e:
+            print(f"[SECURITY] 异步 flush 黑名单异常: {e}")
+    t = threading.Thread(target=_runner, name='blacklist-flush', daemon=True)
+    t.start()
+
+
+def _flush_scheduler_loop():
+    """兜底定时线程：每 _FLUSH_INTERVAL_SECONDS 触发一次 flush。"""
+    while _flush_worker_running:
+        try:
+            time.sleep(_FLUSH_INTERVAL_SECONDS)
+            _do_flush_to_disk()
+        except Exception as e:
+            print(f"[SECURITY] 定时 flush 黑名单异常: {e}")
+
+
+def _ensure_flush_scheduler_started():
+    global _flush_scheduler_started, _flush_scheduler_thread
+    if _flush_scheduler_started:
+        return
+    with _pending_lock:
+        if _flush_scheduler_started:
+            return
+        _flush_scheduler_thread = threading.Thread(
+            target=_flush_scheduler_loop,
+            name='blacklist-flush-scheduler',
+            daemon=True,
+        )
+        _flush_scheduler_thread.start()
+        atexit.register(_flush_on_exit)
+        _flush_scheduler_started = True
+
+
+def _flush_on_exit():
+    """进程退出时强制把最后一次脏数据写盘。"""
+    global _flush_worker_running
+    _flush_worker_running = False
+    try:
+        _do_flush_to_disk()
+    except Exception:
+        pass
 
 
 def _load_blacklist():
-	"""加载 IP 黑名单 JSON 文件（加载时自动按容量上限截断，避免超大数据）。"""
-	global _ip_blacklist, _ip_blacklist_loaded
-	with _ip_lock:
-		if _ip_blacklist_loaded:
-			return
-		try:
-			os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
-			if os.path.exists(IP_LIST_PATH):
-				with open(IP_LIST_PATH, 'r', encoding='utf-8') as f:
-					data = json.load(f)
-					blocked = data.get('blocked', [])
-					# 超过上限时只保留末尾（最新）的部分
-					if len(blocked) > _MAX_BLACKLIST_SIZE:
-						blocked = blocked[-_MAX_BLACKLIST_SIZE:]
-					_ip_blacklist = set(blocked)
-			else:
-				_save_blacklist()
-			_ip_blacklist_loaded = True
-			print(f"[SECURITY] IP 黑名单已加载: {len(_ip_blacklist)} 个")
-		except Exception as e:
-			print(f"[SECURITY] 加载黑名单失败: {e}")
+    """加载 IP 黑名单 JSON 文件。
+    黑名单中的 IP 永久有效，不做任何过期/时间过滤。"""
+    global _ip_blacklist, _ip_blacklist_loaded
+    with _ip_lock:
+        if _ip_blacklist_loaded:
+            return
+        try:
+            os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+            if os.path.exists(IP_LIST_PATH):
+                with open(IP_LIST_PATH, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    blocked = data.get('blocked', []) or []
+                    _ip_blacklist = set(blocked)
+            else:
+                # 文件不存在时先写一次空文件，避免后续 flush 时目录缺失
+                with _pending_lock:
+                    _pending_changed = True
+                _do_flush_to_disk()
+            _ip_blacklist_loaded = True
+            print(f"[SECURITY] IP 黑名单已加载: {len(_ip_blacklist)} 个")
+        except Exception as e:
+            print(f"[SECURITY] 加载黑名单失败: {e}")
 
 
 def _save_blacklist():
-	"""保存 IP 黑名单到 JSON 文件（超过上限时裁剪后再写入）。"""
-	try:
-		os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
-		blocked_list = list(_ip_blacklist)
-		if len(blocked_list) > _MAX_BLACKLIST_SIZE:
-			# 超量时随机截断一部分（set 无顺序概念，简单切片即可）
-			blocked_list = blocked_list[-_MAX_BLACKLIST_SIZE:]
-			_ip_blacklist.intersection_update(blocked_list)
-		data = {
-			'blocked': sorted(blocked_list),
-			'updated': time.strftime('%Y-%m-%d %H:%M:%S')
-		}
-		with open(IP_LIST_PATH, 'w', encoding='utf-8') as f:
-			json.dump(data, f, ensure_ascii=False, indent=2)
-	except Exception as e:
-		print(f"[SECURITY] 保存黑名单失败: {e}")
+    """对外保留的兼容接口。现在语义 = 立即同步 flush 一次到磁盘。"""
+    _do_flush_to_disk()
 
 
 def _is_ip_blocked(client_ip):
-	"""检查 IP 是否在黑名单中。"""
-	return client_ip in _ip_blacklist
+    """检查 IP 是否在黑名单中。"""
+    return client_ip in _ip_blacklist
 
 
 def _add_ip_to_blacklist(client_ip, reason):
-	"""将 IP 加入黑名单并写入文件；超上限时先裁剪。"""
-	with _ip_lock:
-		if client_ip in _ip_blacklist:
-			return
-		_ip_blacklist.add(client_ip)
-		if len(_ip_blacklist) > _MAX_BLACKLIST_SIZE:
-			# 随机删除一批以回到上限（保持大约 80% 水位）
-			trim_target = int(_MAX_BLACKLIST_SIZE * 0.8)
-			extra = list(_ip_blacklist)[:len(_ip_blacklist) - trim_target]
-			_ip_blacklist.difference_update(extra)
-		_save_blacklist()
-	print(f"[SECURITY] IP 已加入黑名单: {client_ip} ({reason})")
+    """将 IP 加入黑名单（内存 set，异步批量持久化，永久有效）。"""
+    changed = False
+    with _ip_lock:
+        if client_ip not in _ip_blacklist:
+            _ip_blacklist.add(client_ip)
+            changed = True
+    if changed:
+        _mark_pending_changed(inc=1)
+    print(f"[SECURITY] IP 已加入黑名单: {client_ip} ({reason})")
+
+
+# 封禁命中时使用的随机返回码池（按用户要求不做含义解释，直接随机选用）
+_BAN_STATUS_POOL = (250, 500, 502, 666, 888)
+_BAN_STATUS_POOL_LEN = len(_BAN_STATUS_POOL)
+
+
+def _random_ban_status():
+    return _BAN_STATUS_POOL[random.randrange(_BAN_STATUS_POOL_LEN)]
+
 
 
 
@@ -287,7 +395,7 @@ def detect_malicious():
 
 	# ── 0. 黑名单优先检测 ──
 	if _is_ip_blocked(client_ip):
-		return jsonify({'error': 'Internal Server Error'}), 500
+		return jsonify({'error': 'Internal Server Error'}), _random_ban_status()
 
 	# ── 1. 危险路径检测 ──
 	for pattern in _compiled_patterns:
