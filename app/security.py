@@ -7,10 +7,13 @@
   3. 命中 /root/db/forum_IP.json 黑名单
 检测到恶意行为后写入黑名单，命中黑名单的 IP 从 [250,500,502,666,888] 中随机返回一个码。
 
-持久化策略：
-  - 黑名单写入 = 异步批量 + 定时 flush 兜底。
-  - 每次封禁先写入内存 set + 待写缓冲，不再立即同步写盘。
-  - 每满 50 条缓冲 或 满 30s 或 进程退出 时统一 flush 到文件。
+持久化策略（写进文件为前提，异步 + 批量/定时）：
+  - 每次封禁：先写入内存 set，**同时异步把这条 IP 追加写入 WAL 日志文件**（单行 append，
+    必定落盘，不是只放内存等定时）。
+  - 定时合并：每 30s 把 WAL + 内存快照合并到主 JSON（forum_IP.json 原子替换写盘），
+    合并完成后清空 WAL。
+  - 进程退出：强制合并一次。
+  - 启动加载：先读主 JSON，再回放 WAL 日志里的所有 IP 补齐，避免崩溃时 WAL 还没收尾。
 
 黑名单有效期：
   - 黑名单中的 IP 永久有效，不设过期。
@@ -23,59 +26,69 @@ import random
 import atexit
 import threading
 from threading import Lock
-from collections import deque
 from flask import request, jsonify
 
-# ── IP 黑名单 JSON 文件 ─────────────────────────────────
+# ── IP 黑名单文件路径 ────────────────────────────────────
 
 IP_LIST_PATH = '/root/db/forum_IP.json'
+IP_WAL_PATH = '/root/db/forum_IP.wal.log'
+
 _ip_lock = Lock()
+_wal_lock = Lock()
 _ip_blacklist = set()
 _ip_blacklist_loaded = False
 
-# 黑名单永久有效：允许无限增长，不再按容量裁剪老条目。
-# 只在写盘时对文件格式做一次 sorted，便于人工阅读。
+# 合并（写主 JSON）的定时兜底间隔
+_MERGE_INTERVAL_SECONDS = 30
 
-# ── 异步批量写入 + 定时 flush 兜底 ────────────────────────
-
-_PENDING_FLUSH_THRESHOLD = 50    # 累计新增条数阈值，到了立刻触发异步 flush
-_FLUSH_INTERVAL_SECONDS = 30     # 兜底定时 flush 间隔
-
-_pending_lock = Lock()
-_pending_change_count = 0        # 自上次 flush 后新增/变更的条数（批量触发用）
-_pending_changed = False         # 自上次 flush 后是否有脏数据
-_flush_scheduler_thread = None   # 兜底 flush 线程，模块级启动一次
-_flush_scheduler_started = False
-_flush_worker_running = True
+# 后台定时合并线程
+_merge_scheduler_thread = None
+_merge_scheduler_started = False
+_merge_worker_running = True
 
 
-def _mark_pending_changed(inc=1):
-    """封禁一个 IP 时调用。inc=1 表示增加 1 条脏数据。
-    累计达到阈值则立刻触发一次异步 flush，否则由定时线程兜底。"""
-    global _pending_changed, _pending_change_count
-    should_flush = False
-    with _pending_lock:
-        _pending_changed = True
-        _pending_change_count += max(inc, 1)
-        if _pending_change_count >= _PENDING_FLUSH_THRESHOLD:
-            _pending_change_count = 0
-            should_flush = True
-        _ensure_flush_scheduler_started()
-    if should_flush:
-        _async_flush()
+# ── WAL 追加写入（每条封禁必定落盘，不阻塞请求） ────────
+
+def _wal_append_async(client_ip: str):
+    """把一个 IP 异步 append 到 WAL 日志文件。
+    即使 30s 内进程崩溃，下次启动也能从 WAL 回放回来。"""
+    def _runner():
+        try:
+            os.makedirs(os.path.dirname(IP_WAL_PATH), exist_ok=True)
+            # 写 WAL 是单行 append，持锁范围很小
+            with _wal_lock:
+                with open(IP_WAL_PATH, 'a', encoding='utf-8') as f:
+                    f.write(client_ip.strip() + '\n')
+        except Exception as e:
+            print(f"[SECURITY] WAL 追加写入失败 ({client_ip}): {e}")
+    t = threading.Thread(target=_runner, name='blacklist-wal-append', daemon=True)
+    t.start()
 
 
-def _do_flush_to_disk():
-    """真正执行写盘的函数。写盘失败时保留脏数据，下次会重试。"""
-    global _pending_changed, _pending_change_count
-    # 先把 pending flag 摘出来
-    with _pending_lock:
-        if not _pending_changed:
-            return
-        _pending_changed = False
-        _pending_change_count = 0
+# ── 主 JSON + WAL 合并（定时 + 退出触发） ────────────────
+
+def _merge_wal_into_main(clear_wal_after: bool = True):
+    """把当前内存 set + WAL 日志合并到主 JSON。
+    合并采用原子替换写 tmp + os.replace。
+    """
     try:
         os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+        # 1) 先把 WAL 中可能的增量（比如启动前崩溃遗留 / 并发 append）并入内存
+        try:
+            if os.path.exists(IP_WAL_PATH):
+                with _wal_lock:
+                    with open(IP_WAL_PATH, 'r', encoding='utf-8') as f:
+                        lines = [ln.strip() for ln in f if ln.strip()]
+                if lines:
+                    with _ip_lock:
+                        for ip in lines:
+                            if ip:
+                                _ip_blacklist.add(ip)
+        except Exception as e:
+            print(f"[SECURITY] 读取 WAL 增量失败: {e}")
+            # 即使 WAL 读失败也继续，至少把内存快照写进去
+
+        # 2) 写主 JSON 快照（原子替换）
         with _ip_lock:
             snapshot = sorted(list(_ip_blacklist))
         data = {
@@ -86,114 +99,128 @@ def _do_flush_to_disk():
         with open(tmp_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         os.replace(tmp_path, IP_LIST_PATH)
+
+        # 3) 合并成功后清空 WAL
+        if clear_wal_after:
+            try:
+                with _wal_lock:
+                    if os.path.exists(IP_WAL_PATH):
+                        os.remove(IP_WAL_PATH)
+            except Exception as e:
+                print(f"[SECURITY] 清空 WAL 失败: {e}")
     except Exception as e:
-        with _pending_lock:
-            _pending_changed = True
-        print(f"[SECURITY] 保存黑名单失败: {e}")
+        print(f"[SECURITY] 合并黑名单到主文件失败: {e}")
 
 
-def _async_flush():
-    """异步触发一次 flush（不阻塞请求线程）。"""
-    def _runner():
+def _merge_scheduler_loop():
+    while _merge_worker_running:
         try:
-            _do_flush_to_disk()
+            time.sleep(_MERGE_INTERVAL_SECONDS)
+            _merge_wal_into_main(clear_wal_after=True)
         except Exception as e:
-            print(f"[SECURITY] 异步 flush 黑名单异常: {e}")
-    t = threading.Thread(target=_runner, name='blacklist-flush', daemon=True)
-    t.start()
+            print(f"[SECURITY] 定时合并黑名单异常: {e}")
 
 
-def _flush_scheduler_loop():
-    """兜底定时线程：每 _FLUSH_INTERVAL_SECONDS 触发一次 flush。"""
-    while _flush_worker_running:
-        try:
-            time.sleep(_FLUSH_INTERVAL_SECONDS)
-            _do_flush_to_disk()
-        except Exception as e:
-            print(f"[SECURITY] 定时 flush 黑名单异常: {e}")
-
-
-def _ensure_flush_scheduler_started():
-    global _flush_scheduler_started, _flush_scheduler_thread
-    if _flush_scheduler_started:
+def _ensure_merge_scheduler_started():
+    global _merge_scheduler_started, _merge_scheduler_thread
+    if _merge_scheduler_started:
         return
-    with _pending_lock:
-        if _flush_scheduler_started:
+    with _wal_lock:
+        if _merge_scheduler_started:
             return
-        _flush_scheduler_thread = threading.Thread(
-            target=_flush_scheduler_loop,
-            name='blacklist-flush-scheduler',
+        _merge_scheduler_thread = threading.Thread(
+            target=_merge_scheduler_loop,
+            name='blacklist-merge-scheduler',
             daemon=True,
         )
-        _flush_scheduler_thread.start()
-        atexit.register(_flush_on_exit)
-        _flush_scheduler_started = True
+        _merge_scheduler_thread.start()
+        atexit.register(_merge_on_exit)
+        _merge_scheduler_started = True
 
 
-def _flush_on_exit():
-    """进程退出时强制把最后一次脏数据写盘。"""
-    global _flush_worker_running
-    _flush_worker_running = False
+def _merge_on_exit():
+    global _merge_worker_running
+    _merge_worker_running = False
     try:
-        _do_flush_to_disk()
+        _merge_wal_into_main(clear_wal_after=True)
     except Exception:
         pass
 
 
+# ── 加载（主 JSON + WAL 回放，保证重启不漏 IP） ─────────
+
 def _load_blacklist():
-    """加载 IP 黑名单 JSON 文件。
-    黑名单中的 IP 永久有效，不做任何过期/时间过滤。"""
+    """加载 IP 黑名单。
+    先读主 JSON，再回放 WAL 日志里的 IP 合并进来（永久有效，不做任何过期过滤/容量裁剪）。"""
     global _ip_blacklist, _ip_blacklist_loaded
     with _ip_lock:
         if _ip_blacklist_loaded:
             return
         try:
             os.makedirs(os.path.dirname(IP_LIST_PATH), exist_ok=True)
+            os.makedirs(os.path.dirname(IP_WAL_PATH), exist_ok=True)
+            merged = set()
+            # 1) 主 JSON
             if os.path.exists(IP_LIST_PATH):
                 with open(IP_LIST_PATH, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     blocked = data.get('blocked', []) or []
-                    _ip_blacklist = set(blocked)
-            else:
-                # 文件不存在时先写一次空文件，避免后续 flush 时目录缺失
-                with _pending_lock:
-                    _pending_changed = True
-                _do_flush_to_disk()
+                    for ip in blocked:
+                        if ip:
+                            merged.add(ip)
+            # 2) WAL 回放（上次崩溃遗留的增量）
+            if os.path.exists(IP_WAL_PATH):
+                with open(IP_WAL_PATH, 'r', encoding='utf-8') as f:
+                    for ln in f:
+                        ip = ln.strip()
+                        if ip:
+                            merged.add(ip)
+            _ip_blacklist = merged
+            # 首次加载就尝试合并一次（把 WAL 里的遗留增量正式合并进主 JSON）
             _ip_blacklist_loaded = True
             print(f"[SECURITY] IP 黑名单已加载: {len(_ip_blacklist)} 个")
         except Exception as e:
             print(f"[SECURITY] 加载黑名单失败: {e}")
+    # 启动定时合并线程 + 先合并一次把刚才回放的 WAL 写进主 JSON
+    _ensure_merge_scheduler_started()
+    _merge_wal_into_main(clear_wal_after=True)
 
 
 def _save_blacklist():
-    """对外保留的兼容接口。现在语义 = 立即同步 flush 一次到磁盘。"""
-    _do_flush_to_disk()
+    """对外兼容接口：立即合并 + 落盘（主 JSON + 清空 WAL）。"""
+    _merge_wal_into_main(clear_wal_after=True)
 
 
 def _is_ip_blocked(client_ip):
-    """检查 IP 是否在黑名单中。"""
     return client_ip in _ip_blacklist
 
 
 def _add_ip_to_blacklist(client_ip, reason):
-    """将 IP 加入黑名单（内存 set，异步批量持久化，永久有效）。"""
+    """将 IP 加入黑名单：
+      1) 先写内存 set（立即生效，命中黑名单直接拦截）
+      2) 异步立刻 append 到 WAL 日志文件（每条必定落盘，不等定时）
+      3) 30s 定时/退出时，WAL 合并进主 JSON 并清空。
+    IP 永久有效，不做容量裁剪。
+    """
     changed = False
     with _ip_lock:
         if client_ip not in _ip_blacklist:
             _ip_blacklist.add(client_ip)
             changed = True
     if changed:
-        _mark_pending_changed(inc=1)
+        _ensure_merge_scheduler_started()
+        _wal_append_async(client_ip)
     print(f"[SECURITY] IP 已加入黑名单: {client_ip} ({reason})")
 
 
-# 封禁命中时使用的随机返回码池（按用户要求不做含义解释，直接随机选用）
+# 封禁命中时使用的随机返回码池
 _BAN_STATUS_POOL = (250, 500, 502, 666, 888)
 _BAN_STATUS_POOL_LEN = len(_BAN_STATUS_POOL)
 
 
 def _random_ban_status():
     return _BAN_STATUS_POOL[random.randrange(_BAN_STATUS_POOL_LEN)]
+
 
 
 
