@@ -26,7 +26,9 @@
     <link rel="preload" href="//assets.crazying-dev.top/text/one/CSS/main.css" as="style" fetchpriority="high">
     <link rel="preload" href="//assets.crazying-dev.top/text/one/JS/AfterBody.js" as="script" fetchpriority="high">
     <link rel="preload" href="//assets.crazying-dev.top/font/CEFFontsCJK.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
-
+    
+    <!-- Sentry Browser SDK -->
+    <script src="https://browser.sentry-cdn.com/latest/bundle.min.js" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="//assets.crazying-dev.top/text/one/CSS/main.css">
 
     <script>
@@ -44,6 +46,49 @@
                 document.documentElement.classList.add('night-mode');
             }
         }
+    })();
+    
+    // Sentry Browser SDK 初始化
+    (function() {
+        // 从 URL 参数获取环境标识
+        var urlParams = new URLSearchParams(window.location.search);
+        var environment = urlParams.get('env') || 'production';
+        
+        // 获取当前用户信息（从 cookie 或 localStorage）
+        var userId = null;
+        try {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.indexOf('user_id=') === 0) {
+                    userId = cookie.substring(8);
+                    break;
+                }
+            }
+        } catch (e) {
+            // 忽略 cookie 读取错误
+        }
+        
+        Sentry.init({
+            dsn: 'https://d64a5da032d04e1fa843f2bbc9f0bbc8@glitchtip.i-love-you.youhuge.site/2',
+            environment: environment,
+            release: 'latest',
+            debug: false,
+            // 自定义上下文
+            initialScope: {
+                user: userId ? { id: userId } : null
+            }
+        });
+        
+        // 捕获全局错误
+        window.addEventListener('error', function(event) {
+            Sentry.captureException(event.error);
+        });
+        
+        // 捕获未处理的 Promise rejection
+        window.addEventListener('unhandledrejection', function(event) {
+            Sentry.captureException(event.reason);
+        });
     })();
     </script>
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" media="print" onload="this.media='all'">
