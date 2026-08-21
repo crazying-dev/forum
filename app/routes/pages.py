@@ -144,6 +144,12 @@ def search_page():
 	return render_template(base, page_template='search.html')
 
 
+@pages_bp.route('/GoTo')
+def goto_page():
+	target = request.args.get('to', '').strip()
+	return render_template(base, page_template='goto.html', goto_target=target)
+
+
 @pages_bp.route('/post/<post_id>')
 def page_post_detail(post_id):
 	return render_template(base, page_template='post_detail.html')

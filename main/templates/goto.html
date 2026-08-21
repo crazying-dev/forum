@@ -1,0 +1,142 @@
+<div class="goto-container">
+    <div class="goto-card">
+        <div class="goto-icon">
+            <i class="fa fa-exclamation-triangle"></i>
+        </div>
+        <h2>即将离开妖精论坛</h2>
+        <p class="goto-tip">无法验证以下链接的安全性，是否确认跳转？</p>
+        <div class="goto-url" id="goto-url-box"></div>
+        <div class="goto-actions">
+            <button class="goto-btn goto-btn-cancel" onclick="window.history.back()">
+                <i class="fa fa-arrow-left"></i> 返回上一页
+            </button>
+            <a class="goto-btn goto-btn-confirm" id="goto-confirm" href="#" rel="nofollow noopener noreferrer" target="_blank">
+                <i class="fa fa-external-link"></i> 继续访问
+            </a>
+        </div>
+        <p class="goto-warn">提示：该链接由用户发布，请注意防范钓鱼、诈骗等风险。</p>
+    </div>
+</div>
+
+<script>
+(function() {
+    var target = {{ goto_target | tojson | safe }};
+    if (typeof target !== 'string') target = '';
+    target = target.trim();
+
+    var box = document.getElementById('goto-url-box');
+    var confirmBtn = document.getElementById('goto-confirm');
+
+    if (!target) {
+        box.textContent = '（未提供跳转目标）';
+        confirmBtn.style.display = 'none';
+        return;
+    }
+
+    // 仅允许 http/https 协议，防止 javascript:/data: 等协议绕过
+    var isHttp = /^https?:\/\//i.test(target);
+    if (!isHttp) {
+        box.textContent = target;
+        confirmBtn.style.display = 'none';
+        return;
+    }
+
+    box.textContent = target;
+    confirmBtn.href = target;
+})();
+</script>
+
+<style>
+.goto-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.goto-card {
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 520px;
+    width: 100%;
+}
+
+.goto-icon {
+    font-size: 56px;
+    color: #f0ad4e;
+    margin-bottom: 16px;
+}
+
+.goto-card h2 {
+    font-size: 22px;
+    margin: 0 0 8px 0;
+    color: var(--color-text-primary);
+}
+
+.goto-tip {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0 0 16px 0;
+}
+
+.goto-url {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-divider);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    margin-bottom: 24px;
+    font-family: monospace;
+}
+
+.goto-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.goto-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+    border: none;
+}
+
+.goto-btn-cancel {
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+}
+
+.goto-btn-cancel:hover {
+    background: var(--color-bg-icon-hover);
+}
+
+.goto-btn-confirm {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.goto-btn-confirm:hover {
+    opacity: 0.9;
+}
+
+.goto-warn {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin: 20px 0 0 0;
+}
+</style>

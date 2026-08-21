@@ -1696,8 +1696,22 @@ def get_replies_to_my_comments(user_id, page=1, page_size=50):
 	return {"replies": replies, "total": total}
 
 
+def _build_search_tokens(keyword):
+	"""将关键词按空白拆分为 token 列表，过滤空 token。
+
+	支持多关键词搜索（如「妖精 论坛」），各 token 之间为 AND 关系。
+	"""
+	return [t for t in keyword.strip().split() if t]
+
+
 def search_posts(keyword, page=1, page_size=20):
-	"""搜索帖子（按标题和内容匹配，按相关性排序）。
+	"""搜索帖子（按标题/内容/分类多字段匹配，按相关性评分排序）。
+
+	增强匹配能力：
+	- 支持空格分隔的多关键词（AND 关系，每个 token 都需命中）
+	- 扩展匹配字段：title / content / category
+	- 相关性评分：标题命中权重最高，内容次之，分类最低
+	- 排序：相关性 > 点赞数 > 创建时间
 
     Returns:
         tuple: (posts: list, total: int)
@@ -1705,30 +1719,48 @@ def search_posts(keyword, page=1, page_size=20):
 	keyword = keyword.strip()
 	if not keyword or len(keyword) < 2:
 		return [], 0
+	tokens = _build_search_tokens(keyword)
+	if not tokens:
+		tokens = [keyword]
 	offset = (page - 1) * page_size
-	like = f'%{keyword}%'
+	likes = [f'%{t}%' for t in tokens]
 
-	count_row = execute_query(
-		"SELECT COUNT(*) FROM posts p WHERE p.status = 1 AND (p.title ILIKE %s OR p.content ILIKE %s)",
-		(like, like), fetch=True
-	)
+	# 每个 token 都需在 title/content/category 任一字段命中（AND 关系）
+	token_clauses = []
+	where_params = []
+	for like in likes:
+		token_clauses.append(
+			"(p.title ILIKE %s OR p.content ILIKE %s OR p.category ILIKE %s)"
+		)
+		where_params.extend([like, like, like])
+	where_clause = " AND ".join(token_clauses)
+
+	count_sql = f"SELECT COUNT(*) FROM posts p WHERE p.status = 1 AND ({where_clause})"
+	count_row = execute_query(count_sql, tuple(where_params), fetch=True)
 	total = count_row[0] if count_row else 0
 
-	results = execute_query(
-		"""
+	# 相关性评分：标题命中 ×100，内容命中 ×10，分类命中 ×5
+	score_expr_parts = []
+	score_params = []
+	for like in likes:
+		score_expr_parts.append("(CASE WHEN p.title ILIKE %s THEN 100 ELSE 0 END)")
+		score_expr_parts.append("(CASE WHEN p.content ILIKE %s THEN 10 ELSE 0 END)")
+		score_expr_parts.append("(CASE WHEN p.category ILIKE %s THEN 5 ELSE 0 END)")
+		score_params.extend([like, like, like])
+	score_expr = " + ".join(score_expr_parts)
+
+	query_sql = f"""
         SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
-               p.created_at, u.name, u.avatar
+               p.created_at, u.name, u.avatar,
+               ({score_expr}) AS relevance
         FROM posts p
         JOIN users u ON p.user_id = u.id
-        WHERE p.status = 1 AND (p.title ILIKE %s OR p.content ILIKE %s)
-        ORDER BY
-            CASE WHEN p.title ILIKE %s THEN 0 ELSE 1 END,
-            p.created_at DESC
+        WHERE p.status = 1 AND ({where_clause})
+        ORDER BY relevance DESC, p.likes DESC, p.created_at DESC
         LIMIT %s OFFSET %s
-        """,
-		(like, like, like, page_size, offset),
-		fetch_all=True
-	)
+    """
+	query_params = tuple(score_params + where_params + [page_size, offset])
+	results = execute_query(query_sql, query_params, fetch_all=True)
 	posts = []
 	for r in results:
 		posts.append({
@@ -1747,7 +1779,12 @@ def search_posts(keyword, page=1, page_size=20):
 
 
 def search_users(keyword, page=1, page_size=20):
-	"""搜索用户（按名称匹配）。
+	"""搜索用户（按名称/称号/简介多字段匹配，按相关性评分排序）。
+
+	增强匹配能力：
+	- 支持空格分隔的多关键词（AND 关系，每个 token 都需命中）
+	- 扩展匹配字段：name / prefix（称号） / intro（简介）
+	- 相关性评分：名称命中权重最高，称号次之，简介最低
 
     Returns:
         tuple: (users: list, total: int)
@@ -1755,26 +1792,44 @@ def search_users(keyword, page=1, page_size=20):
 	keyword = keyword.strip()
 	if not keyword or len(keyword) < 2:
 		return [], 0
+	tokens = _build_search_tokens(keyword)
+	if not tokens:
+		tokens = [keyword]
 	offset = (page - 1) * page_size
-	like = f'%{keyword}%'
+	likes = [f'%{t}%' for t in tokens]
 
-	count_row = execute_query(
-		"SELECT COUNT(*) FROM users WHERE is_banned = 0 AND name ILIKE %s",
-		(like,), fetch=True
-	)
+	# 每个 token 都需在 name/prefix/intro 任一字段命中（AND 关系）
+	token_clauses = []
+	where_params = []
+	for like in likes:
+		token_clauses.append("(name ILIKE %s OR prefix ILIKE %s OR intro ILIKE %s)")
+		where_params.extend([like, like, like])
+	where_clause = " AND ".join(token_clauses)
+
+	count_sql = f"SELECT COUNT(*) FROM users WHERE is_banned = 0 AND ({where_clause})"
+	count_row = execute_query(count_sql, tuple(where_params), fetch=True)
 	total = count_row[0] if count_row else 0
 
-	results = execute_query(
-		"""
-        SELECT id, name, avatar, vip, prefix, is_banned, created_at
+	# 相关性评分：名称命中 ×100，称号命中 ×30，简介命中 ×5
+	score_expr_parts = []
+	score_params = []
+	for like in likes:
+		score_expr_parts.append("(CASE WHEN name ILIKE %s THEN 100 ELSE 0 END)")
+		score_expr_parts.append("(CASE WHEN prefix ILIKE %s THEN 30 ELSE 0 END)")
+		score_expr_parts.append("(CASE WHEN intro ILIKE %s THEN 5 ELSE 0 END)")
+		score_params.extend([like, like, like])
+	score_expr = " + ".join(score_expr_parts)
+
+	query_sql = f"""
+        SELECT id, name, avatar, vip, prefix, is_banned, created_at,
+               ({score_expr}) AS relevance
         FROM users
-        WHERE is_banned = 0 AND name ILIKE %s
-        ORDER BY created_at DESC
+        WHERE is_banned = 0 AND ({where_clause})
+        ORDER BY relevance DESC, created_at DESC
         LIMIT %s OFFSET %s
-        """,
-		(like, page_size, offset),
-		fetch_all=True
-	)
+    """
+	query_params = tuple(score_params + where_params + [page_size, offset])
+	results = execute_query(query_sql, query_params, fetch_all=True)
 	users = []
 	for r in results:
 		users.append({
