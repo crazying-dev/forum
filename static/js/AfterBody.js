@@ -155,6 +155,8 @@
           avatarHtml(u.avatar, 'avatar') +
           '<span class="user-chip-name">' + esc(u.name) + '</span>' +
           '</a>';
+        // navUser 是异步填充的，必须在写入后立即解析 data-src，否则头像不显示
+        resolveAvatarDeferred(navUser);
         var li = el('logoutItem'), ml = el('mobileLogout');
         if (li) li.style.display = '';
         if (ml) ml.style.display = '';
@@ -1505,24 +1507,32 @@
 
   // ── 全局浮动 Live2D（非 /Live2D 页面） + 全屏视角跟随 ──
   var _globalLive2DLoaded = false;
+  var _globalLive2DModel = null;   // 引擎加载完成后保存的 Live2DModel 实例
   var _globalLive2DFocus = { x: 0.5, y: 0.5 }; // 归一化 0-1，默认正前方
   // 全局 Live2D 共用上面定义的 _loadLpkScript / _loadLpkModel：本地优先 + CDN 回退
+  // 头部跟随：优先走 pixi-live2d-display 标准的 model.focus（引擎加载后可用），
+  // 同时兼容 Live2DLPK 可能暴露的 setFocus/setLookAt/updateFocus。
+  function _setGlobalLive2DFocus(x, y) {
+    var m = _globalLive2DModel;
+    if (m && m.focus) {
+      try { m.focus.x = x; m.focus.y = y; return; } catch (e) {}
+    }
+    try {
+      if (typeof Live2DLPK !== 'undefined') {
+        if (typeof Live2DLPK.setFocus === 'function') Live2DLPK.setFocus(x, y);
+        else if (typeof Live2DLPK.setLookAt === 'function') Live2DLPK.setLookAt(x, y);
+        else if (typeof Live2DLPK.updateFocus === 'function') Live2DLPK.updateFocus(x, y);
+      }
+    } catch (ee) {}
+  }
   function _applyEyeTracking() {
     // 全屏范围监听 mousemove，将鼠标位置归一化为 [0,1]，作为视角方向。
-    // 若 Live2DLPK 暴露 setFocus / setLookAt / updateFocus，则调用。
     document.addEventListener('mousemove', function (e) {
       var w = window.innerWidth || document.documentElement.clientWidth || 1;
       var h = window.innerHeight || document.documentElement.clientHeight || 1;
       _globalLive2DFocus.x = Math.max(0, Math.min(1, e.clientX / w));
       _globalLive2DFocus.y = Math.max(0, Math.min(1, e.clientY / h));
-      // 尝试调用常见的 Live2DLPK 焦点追踪 API
-      try {
-        if (typeof Live2DLPK !== 'undefined') {
-          if (typeof Live2DLPK.setFocus === 'function') Live2DLPK.setFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
-          else if (typeof Live2DLPK.setLookAt === 'function') Live2DLPK.setLookAt(_globalLive2DFocus.x, _globalLive2DFocus.y);
-          else if (typeof Live2DLPK.updateFocus === 'function') Live2DLPK.updateFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
-        }
-      } catch (ee) {}
+      _setGlobalLive2DFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
     }, { passive: true });
     // 触屏设备：touchmove
     document.addEventListener('touchmove', function (e) {
@@ -1532,13 +1542,7 @@
       var h = window.innerHeight || document.documentElement.clientHeight || 1;
       _globalLive2DFocus.x = Math.max(0, Math.min(1, t.clientX / w));
       _globalLive2DFocus.y = Math.max(0, Math.min(1, t.clientY / h));
-      try {
-        if (typeof Live2DLPK !== 'undefined') {
-          if (typeof Live2DLPK.setFocus === 'function') Live2DLPK.setFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
-          else if (typeof Live2DLPK.setLookAt === 'function') Live2DLPK.setLookAt(_globalLive2DFocus.x, _globalLive2DFocus.y);
-          else if (typeof Live2DLPK.updateFocus === 'function') Live2DLPK.updateFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
-        }
-      } catch (ee) {}
+      _setGlobalLive2DFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
     }, { passive: true });
   }
   function initGlobalLive2D() {
@@ -1550,7 +1554,11 @@
     _applyEyeTracking();
     _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
       // 传入 wrapper（含 canvas），按 wrapper 尺寸渲染；本地失败自动回退 CDN
-      _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).catch(function (err) {
+      _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).then(function (model) {
+        // 保存模型实例，供全屏鼠标跟随直接驱动 model.focus（头部跟随）
+        _globalLive2DModel = model || null;
+        try { if (model && model.focus) { model.focus.x = 0.5; model.focus.y = 0.5; } } catch (e) {}
+      }).catch(function (err) {
         console.error('[Global Live2D] load error:', err);
         // 静默失败：不影响页面其他功能
       });

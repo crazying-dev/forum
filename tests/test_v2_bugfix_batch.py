@@ -298,3 +298,29 @@ def test_batch_all_19_checkpoints_covered():
     missing = covered - present
     # B15/B16 由老测试承担
     assert not missing, f"缺失对应测试: {missing}"
+
+
+# ── 回归 1：默认随机头像列表恢复为 v1 原始列表 ──
+def test_default_avatars_restored_to_v1():
+    import config
+    expected = [
+        "https://img.crazying-dev.top/text/one/avatars/LaoJun.png",
+        "https://img.crazying-dev.top/text/one/avatars/LuoXiaoHei1.png",
+        "https://img.crazying-dev.top/text/one/avatars/LuoXiaoHei2.png",
+        "https://img.crazying-dev.top/text/one/avatars/MuXiZi.png",
+    ]
+    assert config.DEFAULT_AVATARS == expected, \
+        f"默认头像列表被改动: {config.DEFAULT_AVATARS}"
+
+
+# ── 回归 2：头部栏自身头像异步写入后立即解析 data-src ──
+def test_header_avatar_deferred_resolved():
+    assert "resolveAvatarDeferred(navUser)" in JS, \
+        "initAuth 写入 navUser.innerHTML 后未调用 resolveAvatarDeferred，头像不会显示"
+
+
+# ── 回归 3：全局 Live2D 头部跟随驱动 model.focus（引擎无 Live2DLPK.setFocus） ──
+def test_global_live2d_head_follows_via_model_focus():
+    assert "_globalLive2DModel" in JS, "未保存全局 Live2D 模型实例"
+    assert "m.focus.x" in JS and "m.focus.y" in JS, \
+        "缺少通过 model.focus 驱动头部跟随的逻辑"
