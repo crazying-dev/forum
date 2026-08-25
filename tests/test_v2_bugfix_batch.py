@@ -314,8 +314,10 @@ def test_default_avatars_restored_to_v1():
 
 # ── 回归 2：头部栏自身头像异步写入后立即解析 data-src ──
 def test_header_avatar_deferred_resolved():
-    assert "resolveAvatarDeferred(navUser)" in JS, \
-        "initAuth 写入 navUser.innerHTML 后未调用 resolveAvatarDeferred，头像不会显示"
+    assert "chips.forEach(resolveAvatarDeferred)" in JS, \
+        "initAuth 写入用户 chip 后未调用 resolveAvatarDeferred，头像不会显示"
+    assert "headerNavUser" in JS and "headerNavUser" in BASE_HTML, \
+        "顶部模式头部栏缺少用户 chip（headerNavUser）"
 
 
 # ── 回归 3：全局 Live2D 头部跟随驱动 model.focus（引擎 focus 是函数 + 全屏检测） ──
@@ -450,10 +452,11 @@ def test_posts_api_supports_sort():
     assert "comprehensive" in dbsrc, "缺少综合排序（comprehensive）实现"
 
 
-# ── 回归 13：头部除 logo/搜索框外的入口改为左侧边栏（避免右上角与搜索框重叠） ──
+# ── 回归 13：头部除 logo/搜索框外的入口改为左侧边栏（无汉堡按钮，避免右上角重叠） ──
 def test_mobile_header_collapse_like_v1():
-    # 模板：header 只保留 logo/搜索框/汉堡按钮；导航入口全部移入 .side-nav
-    assert 'id="menuToggle"' in BASE_HTML, "header 缺少汉堡展开按钮"
+    # 模板：header 只保留 logo/搜索框；导航入口移入 .side-nav，菜单按钮已删除
+    assert 'id="menuToggle"' not in BASE_HTML, "menuToggle 汉堡按钮未删除"
+    assert "header-menu-toggle" not in CSS, "menuToggle 的 CSS 残留"
     assert 'class="side-nav"' in BASE_HTML and 'id="sideNav"' in BASE_HTML, "缺少左侧边栏容器"
     assert "mobileMenu" not in BASE_HTML and "mobile-menu" not in BASE_HTML, "旧的移动菜单仍残留在模板"
     # 边栏默认仅图标（56px），可展开为图标+文字（180px）
@@ -461,9 +464,11 @@ def test_mobile_header_collapse_like_v1():
     assert "body.side-nav-expanded" in CSS, "缺少 side-nav-expanded 展开态样式"
     assert ".side-nav-item span { display: none; }" in CSS, "默认未隐藏文字只留图标"
     assert "body.side-nav-expanded .side-nav-item span" in CSS, "展开态未显示文字"
-    # 手机端：侧边栏变为抽屉（translateX 收起 / .open 展开）
-    assert ".side-nav { width: 240px; transform: translateX(-100%);" in CSS, "手机端侧边栏未变为收起抽屉"
-    assert ".side-nav.open { transform: translateX(0);" in CSS, "手机端抽屉缺少 .open 展开态"
+    # 手机端：侧边栏为常驻图标栏（52px），展开为 220px 浮层显示文字
+    assert "body { padding-left: 52px; }" in CSS, "手机端缺少常驻图标栏占位"
+    assert ".side-nav { width: 52px;" in CSS, "手机端图标栏宽度不是 52px"
+    assert "body.side-nav-expanded .side-nav {" in CSS and "220px" in CSS, \
+        "手机端展开态未变为 220px 浮层"
     # 设置下拉提供 侧边/顶部 两种导航位置模式切换
     assert 'data-navmode="side"' in BASE_HTML and 'data-navmode="top"' in BASE_HTML, \
         "设置下拉缺少 侧边/顶部 导航位置模式切换项"
@@ -482,8 +487,9 @@ def test_sidebar_mode_toggle_js():
     assert "side-nav-expanded" in JS, "JS 未切换 body.side-nav-expanded 展开态"
     assert "setSideNavExpanded" in JS, "缺少 setSideNavExpanded 展开/收起函数"
     assert "classList.toggle('open')" in JS, "缺少抽屉/下拉 open 切换"
-    # 手机端抽屉自动收起（点击外部）
-    assert "window.innerWidth <= 900" in JS, "缺少手机端抽屉处理（innerWidth 判断）"
+    # 手机端点击图标栏外部收起（innerWidth 判断）
+    assert "window.innerWidth <= 900" in JS, "缺少手机端处理（innerWidth 判断）"
+    assert "menuToggle" not in JS, "JS 仍引用已删除的 menuToggle"
     assert 'data-navmode' in BASE_HTML, "设置下拉缺少 data-navmode 模式按钮"
 
 
@@ -503,18 +509,25 @@ def test_static_assets_browser_cache():
     assert "AfterBody.js?v={{ static_version }}" in BASE_HTML, "JS 未使用版本号 URL"
 
 
-# ── 回归 18：侧边栏首个按钮为展开/收起 + 鼠标离开自动收起 + 顶部模式 ──
+# ── 回归 18：侧边栏首个按钮为展开/收起 + 鼠标离开自动收起 + 顶部模式并入头部栏 ──
 def test_sidebar_toggle_and_top_mode():
     # 侧边栏第一个按钮为展开/收起切换（默认仅图标）
     assert 'id="sideNavToggle"' in BASE_HTML, "侧边栏缺少展开/收起按钮"
     # 两种导航位置模式：侧边 / 顶部
     assert "body.nav-mode-top { padding-left: 0;" in CSS, "顶部模式未取消侧边栏占位"
-    assert "position: sticky; top: 56px;" in CSS, "顶部模式导航条未固定在 header 下方"
-    assert "body.nav-mode-top .side-nav-item span { display: inline; }" in CSS, \
-        "顶部模式未显示文字+图标"
+    # 顶部模式：隐藏侧边栏，导航与已有头部栏合并（header-nav）
+    assert 'id="headerNav"' in BASE_HTML, "顶部模式缺少与头部栏合并的 header-nav"
+    assert "body.nav-mode-top .side-nav { display: none;" in CSS, "顶部模式未隐藏左侧边栏"
+    assert "body.nav-mode-top .header-nav { display: flex;" in CSS, "顶部模式未显示 header-nav"
+    assert "data-egg" in BASE_HTML and "data-settings" in BASE_HTML, \
+        "header-nav 缺少彩蛋/设置入口（data-egg / data-settings）"
+    # 顶部模式头部栏默认隐藏（仅 nav-mode-top 时显示）
+    assert ".header-nav { display: none; }" in CSS, "header-nav 未默认隐藏"
     # 桌面鼠标离开侧边栏自动收起（移入设置下拉时除外）
     assert "mouseleave" in JS, "缺少鼠标离开侧边栏自动收起逻辑"
     assert "relatedTarget" in JS, "缺少鼠标离开时对设置下拉区域的排除判断"
+    # 侧边栏与头部栏的彩蛋/设置入口共用同一套绑定
+    assert "[data-egg]" in JS and "[data-settings]" in JS, "JS 未同时绑定 侧边栏+头部栏 的入口"
 
 
 # ── 回归 15：评论输入框高度（rows=2） ──

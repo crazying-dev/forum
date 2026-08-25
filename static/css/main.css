@@ -116,6 +116,8 @@ textarea { resize: vertical; }
   color: var(--color-text-secondary);
 }
 .header-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+/* 顶部模式导航条：默认隐藏，仅 body.nav-mode-top 时与头部栏合并显示 */
+.header-nav { display: none; }
 .nav-link {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 12px;
@@ -202,37 +204,33 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .side-setting-dropdown.open { display: block; }
 .setting-group-title { font-size: 12px; color: var(--color-text-tertiary); padding: 6px 10px 4px; }
 .setting-item.active { background: var(--color-bg-item-active); }
-/* 手机/窄屏：侧边栏改为抽屉，默认收起，汉堡按钮打开 */
+/* 手机/窄屏：侧边栏为常驻图标栏（52px），首个按钮展开为 220px 浮层显示文字 */
 @media (max-width: 900px) {
-  body { padding-left: 0; }
-  .side-nav { width: 240px; transform: translateX(-100%); padding-top: 56px; }
-  .side-nav.open { transform: translateX(0); }
-  .side-nav-item { justify-content: flex-start; }
-  .side-nav-item span { display: inline; }
-  .side-nav-user { justify-content: flex-start; }
-  .side-nav-user .user-chip-name { display: inline; }
-  /* 手机端抽屉内下拉改为横跨抽屉，避免在窄屏溢出屏幕 */
-  .side-setting-dropdown { left: 8px; right: 8px; bottom: 64px; }
+  body { padding-left: 52px; }
+  .side-nav { width: 52px; padding-top: 56px; transform: none; }
+  .side-nav-item { justify-content: center; }
+  .side-nav-item span { display: none; }
+  .side-nav-user { justify-content: center; }
+  .side-nav-user .user-chip-name { display: none; }
+  body.side-nav-expanded .side-nav {
+    width: 220px;
+    box-shadow: 2px 0 12px var(--color-shadow);
+  }
+  body.side-nav-expanded .side-nav-item { justify-content: flex-start; }
+  body.side-nav-expanded .side-nav-item span { display: inline; }
+  body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
+  body.side-nav-expanded .side-nav-user .user-chip-name { display: inline; }
+  /* 手机端设置下拉横跨图标栏右侧，避免窄屏溢出 */
+  .side-setting-dropdown { left: 60px; right: 8px; bottom: 64px; }
 }
 
-/* 顶部模式（桌面）：导航变为 header 下方横向条，侧边栏占位取消 */
+/* 顶部模式（桌面）：导航与头部栏合并（隐藏左侧边栏），显示 header-nav */
 @media (min-width: 901px) {
   body.nav-mode-top { padding-left: 0; }
-  body.nav-mode-top .side-nav {
-    position: sticky; top: 56px; left: 0; right: 0; bottom: auto;
-    width: auto; height: 44px;
-    flex-direction: row; align-items: center;
-    padding: 0 16px; gap: 2px;
-    border-right: none; border-bottom: 1px solid var(--color-border);
-    z-index: 99; overflow: visible;
-  }
-  body.nav-mode-top .side-nav-item { width: auto; margin-bottom: 0; padding: 8px 10px; }
-  body.nav-mode-top .side-nav-item span { display: inline; }
-  body.nav-mode-top #sideNavToggle { display: none; }
-  body.nav-mode-top .side-nav-user { margin: 0 4px 0 8px; }
-  body.nav-mode-top .side-nav-user .user-chip-name { display: inline; }
-  body.nav-mode-top #menuToggle { display: none; }
-  body.nav-mode-top .side-setting-dropdown { top: 100px; right: 12px; bottom: auto; left: auto; }
+  body.nav-mode-top .side-nav { display: none; }
+  body.nav-mode-top .header-nav { display: flex; }
+  body.nav-mode-top .nav-user { display: flex; }
+  body.nav-mode-top .side-setting-dropdown { top: 56px; right: 12px; bottom: auto; left: auto; }
 }
 
 /* ── Layout（主区 + 右侧世界频道）── */
@@ -665,11 +663,6 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
   .header-search { flex: 0 0 auto; max-width: 180px; }
   .header-logo-text { display: none; }
   .nav-link span { display: none; }
-  /* 与 V1 一致：其余导航按钮（论坛/WIKI/彩蛋/设置）折叠进汉堡菜单，
-     避免右上角按钮挤压/重叠搜索框；只保留汉堡菜单与用户入口 */
-  .nav-setting { display: none; }
-  .header-nav .nav-link:not(.header-menu-toggle) { display: none; }
-  .header-nav { gap: 2px; }
   /* 与 V1 一致：手机端隐藏用户名只留头像；收紧登录按钮，避免挤占搜索框 */
   .user-chip-name { display: none; }
   .nav-login { padding: 5px 10px; font-size: 12px; }
@@ -814,29 +807,6 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 }
 .setting-item:hover { background: var(--color-bg-hover); }
 .setting-divider { height: 1px; background: var(--color-border); margin: 6px 2px; }
-
-/* ── 汉堡菜单按钮：桌面用于展开/收起侧边栏，手机端开合抽屉 ── */
-.header-menu-toggle { display: inline-flex; }
-.mobile-menu {
-  display: none;
-  flex-direction: column;
-  padding: 8px 16px 16px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg-header);
-}
-.mobile-menu.open { display: flex; }
-.mobile-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 6px;
-  border: none;
-  background: none;
-  color: var(--color-text-primary);
-  font-size: 14px;
-  text-align: left;
-}
-.mobile-item:hover { color: var(--color-primary-hover); }
-.mobile-title { font-size: 12px; color: var(--color-text-tertiary); padding: 8px 6px 4px; }
-.mobile-divider { height: 1px; background: var(--color-border); margin: 6px 0; }
 
 /* ── Toast 提示（顶部：header 下方，第一时间可见） ── */
 .toast {
@@ -1032,12 +1002,6 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
   word-break: break-word;
 }
 .editor-preview img { max-width: 100%; border-radius: 8px; }
-
-/* ── 响应式：移动端显示汉堡菜单 ── */
-@media (max-width: 900px) {
-  .header-menu-toggle { display: inline-flex; }
-  .nav-link span { display: none; }
-}
 
 /* ── 响应式：≤600px 普通手机（紧凑布局、触摸达标、iOS 防缩放、刘海安全区）── */
 @media (max-width: 600px) {

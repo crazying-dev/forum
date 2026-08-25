@@ -141,27 +141,28 @@
     else { try { localStorage.removeItem('forum-theme'); } catch (e) {} var h = new Date().getHours(); if (h < 6 || h >= 18) root.classList.add('night-mode'); else root.classList.remove('night-mode'); }
   }
 
-  // ── 认证状态 → header ──
+  // ── 认证状态 → 侧边栏 / 顶部模式头部栏 ──
   async function initAuth() {
-    var navUser = el('navUser');
-    if (!navUser) return;
+    var chips = [el('navUser'), el('headerNavUser')].filter(Boolean);
+    if (!chips.length) return;
     try {
       var data = await apiFetch('/api/user/info', { noAuthRedirect: true });
       if (data && data.success) {
         currentUser = data.user;
         var u = data.user;
-        navUser.innerHTML =
+        var html =
           '<a href="/users/' + esc(u.id) + '" class="user-chip">' +
           avatarHtml(u.avatar, 'avatar') +
           '<span class="user-chip-name">' + esc(u.name) + '</span>' +
           '</a>';
-        // navUser 是异步填充的，必须在写入后立即解析 data-src，否则头像不显示
-        resolveAvatarDeferred(navUser);
+        chips.forEach(function (c) { c.innerHTML = html; });
+        // 用户 chip 是异步填充的，必须在写入后立即解析 data-src，否则头像不显示
+        chips.forEach(resolveAvatarDeferred);
         var li = el('logoutItem');
         if (li) li.style.display = '';
       }
     } catch (e) {
-      navUser.innerHTML = '<a href="/auth" class="nav-login">登录</a>';
+      chips.forEach(function (c) { c.innerHTML = '<a href="/auth" class="nav-login">登录</a>'; });
     }
   }
 
@@ -197,18 +198,14 @@
         b.classList.toggle('active', b.getAttribute('data-navmode') === mode);
       });
     }
-    // 侧边栏第一个按钮：展开/收起（桌面）；手机端点击收起抽屉
+    // 侧边栏第一个按钮：展开/收起（桌面 + 手机端统一）
     var sideToggle = el('sideNavToggle');
     if (sideToggle && sideNav) {
       sideToggle.addEventListener('click', function () {
-        if (window.innerWidth <= 900) {
-          sideNav.classList.remove('open'); // 手机端：收起抽屉
-        } else {
-          setSideNavExpanded(!isSideExpanded());
-        }
+        setSideNavExpanded(!isSideExpanded());
       });
     }
-    // 桌面：鼠标离开侧边栏自动收起（移入右侧设置下拉时除外）
+    // 桌面：鼠标离开侧边栏自动收起（移入右侧设置下拉时除外）；手机端：点击外部收起
     if (sideNav) {
       sideNav.addEventListener('mouseleave', function (e) {
         if (window.innerWidth <= 900) return;
@@ -217,33 +214,24 @@
         if (to && to.closest && to.closest('.side-setting-dropdown')) return;
         setSideNavExpanded(false);
       });
-    }
-    // 汉堡按钮：桌面切换展开/收起，手机端开合抽屉
-    var toggle = el('menuToggle');
-    if (toggle) {
-      toggle.addEventListener('click', function () {
-        if (window.innerWidth <= 900) {
-          if (sideNav) sideNav.classList.toggle('open');
-        } else {
-          setSideNavExpanded(!isSideExpanded());
-        }
-      });
-    }
-    // 手机端：点击抽屉外部自动收起
-    if (sideNav) {
       document.addEventListener('click', function (e) {
-        if (window.innerWidth <= 900 && sideNav.classList.contains('open') &&
-            !sideNav.contains(e.target) && !(toggle && toggle.contains(e.target))) {
-          sideNav.classList.remove('open');
+        if (window.innerWidth <= 900 && isSideExpanded() &&
+            !sideNav.contains(e.target) && !(sideToggle && sideToggle.contains(e.target))) {
+          setSideNavExpanded(false); // 手机端点击图标栏外部收起
         }
       });
     }
-    // 设置下拉（侧边栏底部右侧弹出；顶部模式在导航条下方）
-    var settingBtn = el('settingBtn'), dropdown = el('settingDropdown');
-    if (settingBtn && dropdown) {
-      settingBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        dropdown.classList.toggle('open');
+    // 设置下拉（侧边栏 + 顶部模式头部栏共用）
+    var dropdown = el('settingDropdown');
+    var settingTriggers = [el('settingBtn')].concat(
+      Array.prototype.slice.call(document.querySelectorAll('[data-settings]'))
+    ).filter(Boolean);
+    if (settingTriggers.length && dropdown) {
+      settingTriggers.forEach(function (b) {
+        b.addEventListener('click', function (e) {
+          e.stopPropagation();
+          dropdown.classList.toggle('open');
+        });
       });
       document.addEventListener('click', function () { dropdown.classList.remove('open'); });
       dropdown.addEventListener('click', function (e) { e.stopPropagation(); });
@@ -267,9 +255,11 @@
         location.href = '/';
       });
     }
-    // 彩蛋
-    var egg = el('eggBtn');
-    if (egg) {
+    // 彩蛋（侧边栏 + 顶部模式头部栏）
+    var eggTriggers = [el('eggBtn')].concat(
+      Array.prototype.slice.call(document.querySelectorAll('[data-egg]'))
+    ).filter(Boolean);
+    eggTriggers.forEach(function (egg) {
       egg.addEventListener('click', async function () {
         try {
           var d = await apiFetch('/Easter-Egg');
@@ -277,7 +267,7 @@
           else toast('🎁 彩蛋为空');
         } catch (e) { toast('彩蛋获取失败'); }
       });
-    }
+    });
   }
 
   // ── 侧边栏世界频道：拖拽调宽 / 收起 ──

@@ -38,7 +38,16 @@
       <input id="searchInput" placeholder="搜索帖子、用户..." maxlength="50">
       <button id="searchBtn" aria-label="搜索"><i class="fa fa-search"></i></button>
     </div>
-    <button class="nav-link nav-btn header-menu-toggle" id="menuToggle" title="菜单"><i class="fa fa-bars"></i></button>
+    <!-- 顶部模式导航：与头部栏合并（仅 nav-mode-top 时显示，默认隐藏） -->
+    <nav class="header-nav" id="headerNav">
+      <a class="nav-link" href="/forum"><i class="fa fa-list"></i><span>论坛</span></a>
+      <a class="nav-link" href="/WIKI" target="_blank" rel="noopener"><i class="fa fa-book"></i><span>WIKI</span></a>
+      <button class="nav-link nav-btn" data-egg title="彩蛋"><i class="fa fa-gift"></i><span>彩蛋</span></button>
+      <div class="nav-user" id="headerNavUser">
+        <a href="/auth" class="nav-login">登录</a>
+      </div>
+      <button class="nav-link nav-btn" data-settings title="设置"><i class="fa fa-cog"></i><span>设置</span></button>
+    </nav>
   </div>
 </header>
 

@@ -3,8 +3,8 @@ var CACHE_NAME = 'forum-new-v1';
 var CACHE_URLS = [
   '/',
   '/forum',
-  '/static/css/main.css?v=2',
-  '/static/js/AfterBody.js?v=2',
+  '/static/css/main.css?v=3',
+  '/static/js/AfterBody.js?v=3',
   '/static/manifest.json',
   'https://img.crazying-dev.top/text/one/favicon.png'
 ];
