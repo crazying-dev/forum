@@ -167,29 +167,65 @@
 
   // ── 设置菜单 / 左侧边栏 / 彩蛋 ──
   function initMenus() {
-    var SIDE_NAV_KEY = 'forum-sidenav'; // 'compact' 仅图标 / 'expanded' 图标+文字
+    var NAV_MODE_KEY = 'forum-navmode'; // 'side' 侧边模式 / 'top' 顶部模式
     var body = document.body;
     var sideNav = el('sideNav');
-    // 恢复上次的侧边栏模式
-    var currentMode = 'compact';
-    try { currentMode = localStorage.getItem(SIDE_NAV_KEY) || 'compact'; } catch (e) {}
-    function setSideNavMode(mode) {
-      currentMode = mode;
-      body.classList.toggle('side-nav-expanded', mode === 'expanded');
-      try { localStorage.setItem(SIDE_NAV_KEY, mode); } catch (e) {}
+    var isSideExpanded = function () { return body.classList.contains('side-nav-expanded'); };
+    // 展开（图标+文字）/ 收起（仅图标），并同步首个按钮的图标与文案
+    function setSideNavExpanded(expanded) {
+      body.classList.toggle('side-nav-expanded', !!expanded);
+      var tb = el('sideNavToggle');
+      if (tb) {
+        var ic = tb.querySelector('i');
+        if (ic) ic.className = 'fa ' + (expanded ? 'fa-angle-left' : 'fa-angle-right');
+        var tx = tb.querySelector('span');
+        // 手机端抽屉内恒显「收起」文字（点击即收起抽屉）；桌面仅展开时显示
+        if (tx) tx.textContent = expanded || window.innerWidth <= 900 ? '收起' : '';
+      }
+      return !!expanded;
+    }
+    // 恢复上次的导航位置模式（侧边/顶部）
+    var currentNavMode = 'side';
+    try { currentNavMode = localStorage.getItem(NAV_MODE_KEY) || 'side'; } catch (e) {}
+    function setNavMode(mode) {
+      currentNavMode = mode;
+      body.classList.toggle('nav-mode-top', mode === 'top');
+      if (mode === 'top') setSideNavExpanded(false); // 顶部模式无展开概念
+      try { localStorage.setItem(NAV_MODE_KEY, mode); } catch (e) {}
       var dd = el('settingDropdown');
-      if (dd) dd.querySelectorAll('[data-sidenav]').forEach(function (b) {
-        b.classList.toggle('active', b.getAttribute('data-sidenav') === mode);
+      if (dd) dd.querySelectorAll('[data-navmode]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-navmode') === mode);
       });
     }
-    // 汉堡按钮：桌面切换仅图标/图标+文字，手机端开合抽屉
+    // 侧边栏第一个按钮：展开/收起（桌面）；手机端点击收起抽屉
+    var sideToggle = el('sideNavToggle');
+    if (sideToggle && sideNav) {
+      sideToggle.addEventListener('click', function () {
+        if (window.innerWidth <= 900) {
+          sideNav.classList.remove('open'); // 手机端：收起抽屉
+        } else {
+          setSideNavExpanded(!isSideExpanded());
+        }
+      });
+    }
+    // 桌面：鼠标离开侧边栏自动收起（移入右侧设置下拉时除外）
+    if (sideNav) {
+      sideNav.addEventListener('mouseleave', function (e) {
+        if (window.innerWidth <= 900) return;
+        if (!isSideExpanded()) return;
+        var to = e.relatedTarget;
+        if (to && to.closest && to.closest('.side-setting-dropdown')) return;
+        setSideNavExpanded(false);
+      });
+    }
+    // 汉堡按钮：桌面切换展开/收起，手机端开合抽屉
     var toggle = el('menuToggle');
     if (toggle) {
       toggle.addEventListener('click', function () {
         if (window.innerWidth <= 900) {
           if (sideNav) sideNav.classList.toggle('open');
         } else {
-          setSideNavMode(body.classList.contains('side-nav-expanded') ? 'compact' : 'expanded');
+          setSideNavExpanded(!isSideExpanded());
         }
       });
     }
@@ -202,7 +238,7 @@
         }
       });
     }
-    // 设置下拉（侧边栏底部，右侧弹出）
+    // 设置下拉（侧边栏底部右侧弹出；顶部模式在导航条下方）
     var settingBtn = el('settingBtn'), dropdown = el('settingDropdown');
     if (settingBtn && dropdown) {
       settingBtn.addEventListener('click', function (e) {
@@ -214,14 +250,15 @@
       dropdown.querySelectorAll('[data-theme]').forEach(function (b) {
         b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme')); dropdown.classList.remove('open'); });
       });
-      dropdown.querySelectorAll('[data-sidenav]').forEach(function (b) {
+      dropdown.querySelectorAll('[data-navmode]').forEach(function (b) {
         b.addEventListener('click', function () {
-          setSideNavMode(b.getAttribute('data-sidenav'));
+          setNavMode(b.getAttribute('data-navmode'));
           dropdown.classList.remove('open');
         });
       });
-      setSideNavMode(currentMode); // 同步当前模式高亮
+      setNavMode(currentNavMode); // 同步当前模式高亮
     }
+    setSideNavExpanded(false); // 默认仅图标（展开为临时态，鼠标离开即收起）
     // 退出登录
     var li = el('logoutItem');
     if (li) {

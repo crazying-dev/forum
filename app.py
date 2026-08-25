@@ -23,6 +23,8 @@ def create_app() -> Flask:
     app.config["JSON_SORT_KEYS"] = False
     app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "TestKeyFor1")
     app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20MB 请求上限
+    # 静态资源浏览器强缓存 7 天（LPK/JS/CSS/图片等；ETag+Last-Modified 过期后 304 校验）
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 604800
 
     # ── 代理信任（X-Forwarded-For / X-Forwarded-Proto） ──
     # 线上环境部署在 Nginx/Caddy 后，需开启；注释掉表示不信任代理头。
@@ -43,6 +45,11 @@ def create_app() -> Flask:
                 "GET, POST, PUT, DELETE, OPTIONS, PATCH"
             )
         return resp
+
+    # ── 模板全局变量：静态资源缓存版本号（更新资源后改 config.STATIC_VERSION） ──
+    @app.context_processor
+    def _inject_static_version():
+        return {"static_version": getattr(config, "STATIC_VERSION", "1")}
 
     # ── 数据库初始化（首次请求兜底执行一次，替代被废弃的 before_first_request） ──
     def _ensure_db_once():
@@ -73,9 +80,10 @@ def create_app() -> Flask:
         return jsonify({"ok": True, "service": "forum-new"}), 200
 
     # ── 头像静态资源：/avatar/<file> → AVATAR_UPLOAD_DIR/<file> ──
+    # max_age=0：头像会被用户更新，不做强缓存（仍带 ETag/304 校验）
     @app.route("/avatar/<path:filename>")
     def serve_avatar(filename):
-        return send_from_directory(config.AVATAR_UPLOAD_DIR, filename)
+        return send_from_directory(config.AVATAR_UPLOAD_DIR, filename, max_age=0)
 
     # ── 根路径：由 pages_bp 渲染首页（JSON index 已移除）──
 

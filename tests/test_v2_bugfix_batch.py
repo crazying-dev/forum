@@ -464,9 +464,9 @@ def test_mobile_header_collapse_like_v1():
     # 手机端：侧边栏变为抽屉（translateX 收起 / .open 展开）
     assert ".side-nav { width: 240px; transform: translateX(-100%);" in CSS, "手机端侧边栏未变为收起抽屉"
     assert ".side-nav.open { transform: translateX(0);" in CSS, "手机端抽屉缺少 .open 展开态"
-    # 设置下拉提供 仅图标/图标+文字 两种模式切换
-    assert 'data-sidenav="compact"' in BASE_HTML and 'data-sidenav="expanded"' in BASE_HTML, \
-        "设置下拉缺少侧边栏模式切换项"
+    # 设置下拉提供 侧边/顶部 两种导航位置模式切换
+    assert 'data-navmode="side"' in BASE_HTML and 'data-navmode="top"' in BASE_HTML, \
+        "设置下拉缺少 侧边/顶部 导航位置模式切换项"
     # 搜索框仍可收缩（与 V1 一致），不被挤压覆盖
     assert "flex: 0 0 auto" in CSS, \
         "手机端搜索框仍会收缩（应固定宽度），空间不足时搜索按钮会被压缩覆盖"
@@ -474,15 +474,47 @@ def test_mobile_header_collapse_like_v1():
         "搜索输入框未设置 min-width:0，长占位符会把搜索按钮挤出容器被导航覆盖"
 
 
-# ── 回归 14：侧边栏模式切换逻辑（汉堡按钮 / 设置项 / localStorage 持久化） ──
+# ── 回归 14：导航模式切换逻辑（侧边/顶部 + 展开收起 + localStorage 持久化） ──
 def test_sidebar_mode_toggle_js():
-    assert "forum-sidenav" in JS, "缺少侧边栏模式的 localStorage 键"
-    assert "setSideNavMode" in JS, "缺少 setSideNavMode 切换函数"
+    assert "forum-navmode" in JS, "缺少导航位置模式的 localStorage 键"
+    assert "setNavMode" in JS, "缺少 setNavMode 切换函数"
+    assert "nav-mode-top" in JS, "JS 未切换 body.nav-mode-top 顶部模式"
     assert "side-nav-expanded" in JS, "JS 未切换 body.side-nav-expanded 展开态"
+    assert "setSideNavExpanded" in JS, "缺少 setSideNavExpanded 展开/收起函数"
     assert "classList.toggle('open')" in JS, "缺少抽屉/下拉 open 切换"
     # 手机端抽屉自动收起（点击外部）
     assert "window.innerWidth <= 900" in JS, "缺少手机端抽屉处理（innerWidth 判断）"
-    assert 'data-sidenav' in BASE_HTML, "设置下拉缺少 data-sidenav 模式按钮"
+    assert 'data-navmode' in BASE_HTML, "设置下拉缺少 data-navmode 模式按钮"
+
+
+# ── 回归 17：静态资源（LPK/JS/CSS）浏览器强缓存 + 版本号防陈旧 ──
+def test_static_assets_browser_cache():
+    src = (PROJECT / "app.py").read_text(encoding="utf-8")
+    assert "SEND_FILE_MAX_AGE_DEFAULT" in src and "604800" in src, \
+        "未为静态资源设置浏览器强缓存（7 天）"
+    assert "max_age=0" in src, \
+        "头像路由未关闭强缓存（用户头像会被更新，不能 7 天缓存）"
+    # 版本号缓存失效：更新静态资源后 bump config.STATIC_VERSION，?v= 自动变化
+    cfg = (PROJECT / "config.py").read_text(encoding="utf-8")
+    assert 'STATIC_VERSION = "' in cfg, "config 缺少 STATIC_VERSION 缓存版本号"
+    assert "static_version" in (PROJECT / "app.py").read_text(encoding="utf-8"), \
+        "app 未注入 static_version 模板变量"
+    assert "main.css?v={{ static_version }}" in BASE_HTML, "CSS 未使用版本号 URL"
+    assert "AfterBody.js?v={{ static_version }}" in BASE_HTML, "JS 未使用版本号 URL"
+
+
+# ── 回归 18：侧边栏首个按钮为展开/收起 + 鼠标离开自动收起 + 顶部模式 ──
+def test_sidebar_toggle_and_top_mode():
+    # 侧边栏第一个按钮为展开/收起切换（默认仅图标）
+    assert 'id="sideNavToggle"' in BASE_HTML, "侧边栏缺少展开/收起按钮"
+    # 两种导航位置模式：侧边 / 顶部
+    assert "body.nav-mode-top { padding-left: 0;" in CSS, "顶部模式未取消侧边栏占位"
+    assert "position: sticky; top: 56px;" in CSS, "顶部模式导航条未固定在 header 下方"
+    assert "body.nav-mode-top .side-nav-item span { display: inline; }" in CSS, \
+        "顶部模式未显示文字+图标"
+    # 桌面鼠标离开侧边栏自动收起（移入设置下拉时除外）
+    assert "mouseleave" in JS, "缺少鼠标离开侧边栏自动收起逻辑"
+    assert "relatedTarget" in JS, "缺少鼠标离开时对设置下拉区域的排除判断"
 
 
 # ── 回归 15：评论输入框高度（rows=2） ──

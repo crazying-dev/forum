@@ -215,6 +215,26 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
   .side-setting-dropdown { left: 8px; right: 8px; bottom: 64px; }
 }
 
+/* 顶部模式（桌面）：导航变为 header 下方横向条，侧边栏占位取消 */
+@media (min-width: 901px) {
+  body.nav-mode-top { padding-left: 0; }
+  body.nav-mode-top .side-nav {
+    position: sticky; top: 56px; left: 0; right: 0; bottom: auto;
+    width: auto; height: 44px;
+    flex-direction: row; align-items: center;
+    padding: 0 16px; gap: 2px;
+    border-right: none; border-bottom: 1px solid var(--color-border);
+    z-index: 99; overflow: visible;
+  }
+  body.nav-mode-top .side-nav-item { width: auto; margin-bottom: 0; padding: 8px 10px; }
+  body.nav-mode-top .side-nav-item span { display: inline; }
+  body.nav-mode-top #sideNavToggle { display: none; }
+  body.nav-mode-top .side-nav-user { margin: 0 4px 0 8px; }
+  body.nav-mode-top .side-nav-user .user-chip-name { display: inline; }
+  body.nav-mode-top #menuToggle { display: none; }
+  body.nav-mode-top .side-setting-dropdown { top: 100px; right: 12px; bottom: auto; left: auto; }
+}
+
 /* ── Layout（主区 + 右侧世界频道）── */
 .layout {
   max-width: 1100px;
