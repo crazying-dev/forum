@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="description" content="妖精论坛 - 罗小黑战记社区">
+<meta name="theme-color" content="#6A8C89">
+<title>{% block title %}妖精论坛{% endblock %}</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="manifest" href="/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="妖精论坛">
+<link rel="apple-touch-icon" href="https://img.crazying-dev.top/text/one/favicon.png">
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="/static/css/main.css">
+<script src="//cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+// 防闪屏：按 localStorage 或时间判断主题
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('forum-theme'); } catch (e) {}
+  if (t === 'night' || (!t && new Date().getHours() >= 18) || (!t && new Date().getHours() < 6)) {
+    document.documentElement.classList.add('night-mode');
+  }
+})();
+</script>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <a class="header-logo" href="/">
+      <img class="header-logo-img" src="//img.crazying-dev.top/text/one/favicon.png" alt="妖精论坛">
+      <span class="header-logo-text">妖精论坛</span>
+    </a>
+    <div class="header-search">
+      <input id="searchInput" placeholder="搜索帖子、用户..." maxlength="50">
+      <button id="searchBtn" aria-label="搜索"><i class="fa fa-search"></i></button>
+    </div>
+    <nav class="header-nav">
+      <a class="nav-link" href="/forum"><i class="fa fa-list"></i><span>论坛</span></a>
+      <a class="nav-link" href="/WIKI" target="_blank" rel="noopener"><i class="fa fa-book"></i><span>WIKI</span></a>
+      <button class="nav-link nav-btn" id="eggBtn" title="彩蛋"><i class="fa fa-gift"></i><span>彩蛋</span></button>
+      <div class="nav-setting" id="navSetting">
+        <button class="nav-link nav-btn" id="settingBtn"><i class="fa fa-cog"></i><span>设置</span></button>
+        <div class="setting-dropdown" id="settingDropdown">
+          <button class="setting-item" data-theme="day"><i class="fa fa-sun-o"></i> 亮色</button>
+          <button class="setting-item" data-theme="night"><i class="fa fa-moon-o"></i> 暗色</button>
+          <button class="setting-item" data-theme="default"><i class="fa fa-desktop"></i> 默认</button>
+          <div class="setting-divider"></div>
+          <button class="setting-item" id="logoutItem" style="display:none;"><i class="fa fa-sign-out"></i> 退出登录</button>
+        </div>
+      </div>
+      <button class="nav-link nav-btn header-menu-toggle" id="menuToggle" title="菜单"><i class="fa fa-bars"></i></button>
+      <div class="nav-user" id="navUser">
+        <a href="/auth" class="nav-login">登录</a>
+      </div>
+    </nav>
+  </div>
+  <div class="mobile-menu" id="mobileMenu">
+    <a class="mobile-item" href="/forum"><i class="fa fa-list"></i> 论坛</a>
+    <a class="mobile-item" href="/WIKI" target="_blank" rel="noopener"><i class="fa fa-book"></i> WIKI</a>
+    <button class="mobile-item" id="mobileEggBtn"><i class="fa fa-gift"></i> 彩蛋</button>
+    <div class="mobile-divider"></div>
+    <div class="mobile-title">主题</div>
+    <button class="mobile-item mobile-theme" data-theme="day"><i class="fa fa-sun-o"></i> 亮色</button>
+    <button class="mobile-item mobile-theme" data-theme="night"><i class="fa fa-moon-o"></i> 暗色</button>
+    <button class="mobile-item mobile-theme" data-theme="default"><i class="fa fa-desktop"></i> 默认</button>
+    <div class="mobile-divider"></div>
+    <button class="mobile-item" id="mobileLogout" style="display:none;"><i class="fa fa-sign-out"></i> 退出登录</button>
+  </div>
+</header>
+
+<div class="layout">
+  <main class="layout-main">{% block content %}{% endblock %}</main>
+  {% if show_world|default(true) %}
+  <aside class="world-panel" id="worldPanel">
+    <div class="world-resizer" id="worldResizer" title="拖拽调整宽度"></div>
+    <div class="world-header">
+      <span class="world-title"><i class="fa fa-globe"></i> 世界频道</span>
+      <span class="world-status" id="worldStatus">连接中…</span>
+      <button class="world-collapse" id="worldCollapseBtn" title="收起"><i class="fa fa-angle-right"></i></button>
+    </div>
+    <div class="world-messages" id="worldMessages"></div>
+    <div class="world-input">
+      <input id="worldInput" maxlength="500" placeholder="输入消息...（Enter 发送）">
+      <button id="worldSendBtn" title="发送"><i class="fa fa-paper-plane"></i></button>
+    </div>
+  </aside>
+  {% endif %}
+</div>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-links">
+      <a href="/privacy">隐私</a>
+      <a href="https://github.com/crazying-dev" target="_blank" rel="noopener">Github</a>
+      <a href="https://crazying-dev.top" target="_blank" rel="noopener">crazying-dev.top</a>
+    </div>
+    <div class="footer-meta">
+      邮箱：3890320020@qq.com · 本二创无官方授权，仅粉丝公益创作
+    </div>
+  </div>
+</footer>
+
+{% if show_global_live2d is not defined or show_global_live2d %}
+<div id="global-live2d" class="global-live2d">
+  <canvas id="global-live2d-canvas"></canvas>
+</div>
+{% endif %}
+
+<div class="toast" id="toast"></div>
+
+<!-- 自定义右键菜单（N2） -->
+<div class="ctx-menu" id="ctxMenu"></div>
+
+<!-- 自定义举报弹窗（N4：不再使用浏览器原生 prompt） -->
+<div class="modal-mask" id="reportModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa fa-flag-o"></i> 举报</h3>
+      <button class="modal-close" id="reportClose">&times;</button>
+    </div>
+    <input type="hidden" id="reportTargetType" value="post">
+    <input type="hidden" id="reportTargetId" value="">
+    <div class="form-group">
+      <label>举报原因</label>
+      <select id="reportReason">
+        <option value="">请选择原因</option>
+        <option value="违规内容">违规内容</option>
+        <option value="广告垃圾">广告垃圾</option>
+        <option value="人身攻击">人身攻击</option>
+        <option value="侵权">侵权</option>
+        <option value="其他">其他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>补充说明（可选）</label>
+      <textarea id="reportDetail" rows="3" maxlength="500" placeholder="补充说明（最多500字）"></textarea>
+    </div>
+    <p class="auth-error" id="reportError"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="reportCancel">取消</button>
+      <button class="btn btn-primary" id="reportSubmit">提交举报</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/AfterBody.js"></script>
+<script>
+// PWA：注册 Service Worker（仅 https 或 localhost）
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/static/sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>

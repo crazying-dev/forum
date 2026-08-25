@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}登录 / 注册 - 妖精论坛{% endblock %}
+{% block content %}
+<div class="page page-center">
+  <div class="card auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab{% if mode == 'login' %} active{% endif %}" data-mode="login" onclick="switchAuthMode('login')">登录</button>
+      <button class="auth-tab{% if mode == 'register' %} active{% endif %}" data-mode="register" onclick="switchAuthMode('register')">注册</button>
+      <button class="auth-tab{% if mode == 'reset' %} active{% endif %}" data-mode="reset" onclick="switchAuthMode('reset')">找回密码</button>
+    </div>
+    <form id="authForm" autocomplete="off">
+      <div class="form-group" id="authNameGroup" style="display:none;">
+        <label>用户名</label>
+        <input type="text" id="authName" maxlength="20" placeholder="2-20 个字符">
+      </div>
+      <div class="form-group" id="authEmailGroup">
+        <label id="authEmailLabel">用户名或邮箱</label>
+        <input type="text" id="authEmail" maxlength="255" placeholder="用户名或邮箱">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="authPassword" maxlength="64" placeholder="至少 8 位，含字母和数字">
+      </div>
+      <div class="form-group" id="authConfirmGroup" style="display:none;">
+        <label>确认密码</label>
+        <input type="password" id="authConfirm" maxlength="64">
+      </div>
+      <p class="auth-error" id="authError"></p>
+      <button type="submit" class="btn btn-primary btn-block" id="authSubmit">登录</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

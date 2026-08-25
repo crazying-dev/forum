@@ -1,0 +1,26 @@
+{
+  "name": "妖精论坛",
+  "short_name": "妖精论坛",
+  "description": "罗小黑战记社区 - 粉丝公益创作",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#D8E6E4",
+  "theme_color": "#6A8C89",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "https://img.crazying-dev.top/text/one/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://img.crazying-dev.top/text/one/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

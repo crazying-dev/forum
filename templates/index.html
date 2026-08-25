@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}首页 - 妖精论坛{% endblock %}
+{% block content %}
+<div class="page">
+  <section class="card home-hero">
+    <h1 class="home-hero-title">妖精论坛</h1>
+    <p class="home-hero-sub">分享你的想法与故事</p>
+    <div class="home-hero-actions">
+      <a href="/forum" class="btn btn-primary"><i class="fa fa-list"></i> 论坛广场</a>
+      <a href="/post/create" class="btn btn-outline"><i class="fa fa-pencil"></i> 发布帖子</a>
+    </div>
+  </section>
+
+  <section class="card" id="homeFavorites" style="display:none;">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fa fa-bookmark"></i> 我的收藏</h2>
+      <button class="btn btn-sm" id="homeFavToggle"><i class="fa fa-angle-up"></i> 收起</button>
+    </div>
+    <div id="homeFavoritesBody">
+      <div class="post-list" id="homeFavoritesList"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fa fa-random"></i> 随机推荐</h2>
+      <button class="btn btn-sm" id="homeRefreshBtn"><i class="fa fa-refresh"></i> 换一批</button>
+    </div>
+    <div class="post-list" id="homePostList"><div class="empty">加载中...</div></div>
+  </section>
+</div>
+{% endblock %}

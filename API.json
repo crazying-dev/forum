@@ -1,0 +1,2399 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "妖精论坛 API（forum-new）",
+    "description": "妖精论坛全新后端 API（forum-new）。认证方式：Cookie（仅 token 与 ID 两个字段）；所有响应均为 application/json；默认返回 {success, message, ...}。",
+    "version": "1.2.0"
+  },
+  "servers": [
+    {
+      "url": "https://www.yjlt.top",
+      "description": "生产环境"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "本地开发"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Account",
+      "description": "账户认证：登录 / 登出 / 注册"
+    },
+    {
+      "name": "User",
+      "description": "用户资料：当前用户读写与公开查询"
+    },
+    {
+      "name": "Post",
+      "description": "帖子：列表/详情/发布/点赞/收藏/举报/删除"
+    },
+    {
+      "name": "Comment",
+      "description": "评论：列表/发布/删除（支持楼中楼）"
+    },
+    {
+      "name": "World",
+      "description": "世界频道：消息列表/发送"
+    },
+    {
+      "name": "Search",
+      "description": "搜索：帖子/用户"
+    },
+    {
+      "name": "Email",
+      "description": "邮箱验证 / 找回密码（SMTP）"
+    },
+    {
+      "name": "Bug",
+      "description": "Bug 反馈"
+    },
+    {
+      "name": "Huiguan",
+      "description": "会馆列表"
+    },
+    {
+      "name": "Misc",
+      "description": "彩蛋 / RSS"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "token",
+        "description": "登录成功后服务端会通过 Set-Cookie 写入两个 HttpOnly Cookie：token 与 ID。两个 Cookie 均需同时存在并随请求自动携带方可通过鉴权。"
+      }
+    },
+    "schemas": {
+      "UserPublic": {
+        "type": "object",
+        "description": "对任意第三方可见的用户公开字段（不含 email）",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "用户 ID，RL 前缀 + 16 位 HEX（仅 HG / YJ / RL 三种前缀）",
+            "example": "RLF3B91C245AB789E"
+          },
+          "name": {
+            "type": "string",
+            "description": "昵称",
+            "example": "小黑"
+          },
+          "avatar": {
+            "type": "string",
+            "format": "uri",
+            "description": "头像 URL"
+          },
+          "gender": {
+            "type": "integer",
+            "enum": [
+              0,
+              1,
+              2
+            ],
+            "description": "0=未设置 1=男 2=女",
+            "default": 0
+          },
+          "age": {
+            "type": "string",
+            "description": "年龄文本，可为空",
+            "example": "20"
+          },
+          "intro": {
+            "type": "string",
+            "description": "个人简介，可为空"
+          },
+          "vip": {
+            "type": "string",
+            "description": "VIP 等级，默认 0",
+            "example": "0"
+          },
+          "prefix": {
+            "type": "string",
+            "description": "称号前缀，可为空",
+            "example": "妖精"
+          },
+          "email_verified": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "邮箱是否已验证"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "注册时间"
+          },
+          "last_login": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "最后登录时间"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/UserStats",
+            "description": "帖子/关注统计（公开查询接口返回）"
+          }
+        }
+      },
+      "UserSelf": {
+        "type": "object",
+        "description": "登录用户本人可见的资料（比 UserPublic 多一个 email 字段）",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/UserPublic"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "登录邮箱"
+              }
+            }
+          }
+        ]
+      },
+      "ErrorResp": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": false
+          },
+          "message": {
+            "type": "string",
+            "description": "人类可读的错误信息"
+          },
+          "error": {
+            "type": "string",
+            "description": "可选，机器可读的错误码（注册冲突等场景返回）"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "PostListItem": {
+        "type": "object",
+        "description": "帖子列表项（摘要）",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "帖子 ID（PS 前缀）"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "description": "正文前 200 字"
+          },
+          "category": {
+            "type": "string"
+          },
+          "likes": {
+            "type": "integer"
+          },
+          "views": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "user_avatar": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "PostDetail": {
+        "type": "object",
+        "description": "帖子详情（含作者信息）",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string",
+            "description": "HTML 内容（已 XSS 净化）"
+          },
+          "category": {
+            "type": "string"
+          },
+          "likes": {
+            "type": "integer"
+          },
+          "views": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "user_avatar": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "Comment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "评论 ID（CM 前缀）"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "父评论 ID（楼中楼）"
+          },
+          "likes": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "user_avatar": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "WorldMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "sender_id": {
+            "type": "string"
+          },
+          "sender_name": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "parent_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserStats": {
+        "type": "object",
+        "description": "用户统计（并入用户资料）",
+        "properties": {
+          "post_count": {
+            "type": "integer"
+          },
+          "total_likes": {
+            "type": "integer"
+          },
+          "total_views": {
+            "type": "integer"
+          },
+          "following_count": {
+            "type": "integer"
+          },
+          "follower_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "FollowUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string",
+            "format": "uri"
+          },
+          "vip": {
+            "type": "string"
+          },
+          "intro": {
+            "type": "string"
+          },
+          "followed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "is_following": {
+            "type": "boolean",
+            "description": "当前登录者是否已关注"
+          },
+          "is_self": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "根路径信息",
+        "description": "返回服务名与当前已挂载的 API 分组提示。",
+        "responses": {
+          "200": {
+            "description": "服务信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "service": {
+                      "type": "string"
+                    },
+                    "api": {
+                      "type": "object",
+                      "description": "各 API 分组的入口前缀"
+                    }
+                  }
+                },
+                "example": {
+                  "ok": true,
+                  "service": "forum-new",
+                  "api": {
+                    "user": "/api/user/*"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "健康检查",
+        "responses": {
+          "200": {
+            "description": "服务正常",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "service": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/login": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "用户登录",
+        "description": "使用「用户名或邮箱」+「密码」登录。成功后通过 Set-Cookie 写入 token 与 ID 两个 HttpOnly Cookie（Path=/，SameSite=Lax，默认有效期 7 天）。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "用户名（与 email 二选一）"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "邮箱（与 name 二选一）"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "密码（≥8 位，字母+数字）"
+                  }
+                },
+                "required": [
+                  "password"
+                ],
+                "anyOf": [
+                  {
+                    "required": [
+                      "name"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "email"
+                    ]
+                  }
+                ]
+              },
+              "examples": {
+                "byName": {
+                  "value": {
+                    "name": "小黑",
+                    "password": "Hello123"
+                  }
+                },
+                "byEmail": {
+                  "value": {
+                    "email": "xiaohei@yjlt.top",
+                    "password": "Hello123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "headers": {
+              "Set-Cookie-token": {
+                "description": "token=t---{md5}.{sig}---{ts}; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Set-Cookie-ID": {
+                "description": "ID=<用户ID>; HttpOnly; Path=/; SameSite=Lax; Max-Age=604800",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "登录成功"
+                    },
+                    "Token": {
+                      "type": "string",
+                      "example": "token---<md5hex>.<hmac64hex>---<sendTime>",
+                      "description": "与 Set-Cookie token 相同的完整串，前端如需本地存储可使用（推荐直接使用 Cookie）"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserSelf"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "Token",
+                    "user"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "用户名或密码错误 / 账号被封",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/logout": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "用户登出",
+        "description": "清除 token 与 ID 两个 Cookie。",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "登出成功，两个 Cookie 已过期删除",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "已退出登录"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/register": {
+      "post": {
+        "tags": [
+          "Account"
+        ],
+        "summary": "注册新用户",
+        "description": "创建新账号并自动登录（写 token + ID Cookie）。随机分配一个默认头像，ID 使用 UR 前缀。昵称全局唯一、邮箱全局唯一，任一冲突返回 400。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 20,
+                    "description": "昵称（2-20 字符）"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "邮箱"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "密码（≥8 位，必须同时含字母与数字）"
+                  }
+                },
+                "required": [
+                  "name",
+                  "email",
+                  "password"
+                ]
+              },
+              "example": {
+                "name": "小白",
+                "email": "xiaobai@yjlt.top",
+                "password": "Hello456"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功并自动登录（Set-Cookie 两个）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "注册成功"
+                    },
+                    "id": {
+                      "type": "string",
+                      "example": "URxxxxxxxxxxxxxxxx"
+                    },
+                    "avatar": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "分配到的默认头像"
+                    },
+                    "Token": {
+                      "type": "string",
+                      "description": "同登录接口的完整 token 串"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserSelf"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message",
+                    "id",
+                    "avatar"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数非法 / 昵称或邮箱重复",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ErrorResp"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "error": {
+                          "type": "string",
+                          "enum": [
+                            "name_exists",
+                            "email_exists",
+                            "integrity_error",
+                            "db_error"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                },
+                "examples": {
+                  "name_exists": {
+                    "value": {
+                      "success": false,
+                      "error": "name_exists",
+                      "message": "用户名已被占用"
+                    }
+                  },
+                  "email_exists": {
+                    "value": {
+                      "success": false,
+                      "error": "email_exists",
+                      "message": "邮箱已被注册"
+                    }
+                  },
+                  "short_pwd": {
+                    "value": {
+                      "success": false,
+                      "message": "密码至少8位"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/info": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "获取当前登录用户资料",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "当前用户资料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserSelf"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录 / Token 失效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "summary": "更新当前登录用户资料",
+        "description": "支持部分字段更新：avatar、gender、age、intro、name、prefix。其中 name 会做唯一性校验，冲突返回 400。POST 方法同样可用。",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "avatar": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "头像 URL"
+                  },
+                  "gender": {
+                    "type": "integer",
+                    "enum": [
+                      0,
+                      1,
+                      2
+                    ],
+                    "description": "0=未设置 1=男 2=女"
+                  },
+                  "age": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "description": "年龄文本"
+                  },
+                  "intro": {
+                    "type": "string",
+                    "description": "个人简介"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 20,
+                    "description": "新昵称"
+                  },
+                  "prefix": {
+                    "type": "string",
+                    "maxLength": 32,
+                    "description": "称号前缀"
+                  }
+                },
+                "minProperties": 1
+              },
+              "example": {
+                "intro": "我是小白，请多关照",
+                "gender": 1,
+                "age": "18"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功，返回更新后的最新资料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "更新成功"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserSelf"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "字段非法 / 昵称冲突等",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "更新当前登录用户资料（POST 别名）",
+        "description": "与 PUT /api/user/info 完全等价，方便老客户端 / 表单提交调用。",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/paths/~1api~1user~1info/put/requestBody"
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/paths/~1api~1user~1info/put/responses/200"
+          },
+          "400": {
+            "$ref": "#/paths/~1api~1user~1info/put/responses/400"
+          },
+          "401": {
+            "$ref": "#/paths/~1api~1user~1info/put/responses/401"
+          }
+        }
+      }
+    },
+    "/api/user/password": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "修改密码",
+        "description": "修改当前登录用户密码。必须提供正确的旧密码；新密码强度同注册。为安全起见，修改成功后立即清除 token / ID Cookie，要求重新登录。",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "old_password": {
+                    "type": "string",
+                    "description": "原密码"
+                  },
+                  "new_password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "新密码（≥8 位，含字母+数字，且不能与旧密码相同）"
+                  }
+                },
+                "required": [
+                  "old_password",
+                  "new_password"
+                ]
+              },
+              "example": {
+                "old_password": "Hello123",
+                "new_password": "World456"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "改密成功，Cookie 已清除，需重新登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "密码修改成功"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "原密码错误 / 新密码强度不够 / 新旧相同",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/{user_id}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "查询任意用户公开资料",
+        "description": "无需登录；返回字段不含 email；被封禁用户返回 404。",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "RLF3B91C245AB789E"
+            },
+            "description": "用户 ID（RL 前缀字符串；仅支持 HG / YJ / RL 三种前缀）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "用户公开资料",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/UserPublic"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "用户不存在或已被封禁",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts": {
+      "get": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "获取帖子列表",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "帖子列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostListItem"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts/random": {
+      "get": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "获取随机帖子（最多 200 条）",
+        "responses": {
+          "200": {
+            "description": "随机帖子列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostListItem"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}": {
+      "get": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "获取帖子详情",
+        "description": "返回帖子详情 + 最近 50 条评论 + 当前登录者的点赞/收藏状态；每次访问浏览量 +1。",
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "帖子详情",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "post": {
+                      "$ref": "#/components/schemas/PostDetail"
+                    },
+                    "comments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Comment"
+                      }
+                    },
+                    "liked": {
+                      "type": "boolean"
+                    },
+                    "favorited": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "帖子不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts/create": {
+      "post": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "发布帖子",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "HTML 内容，入库前 XSS 净化"
+                  },
+                  "category": {
+                    "type": "string",
+                    "default": "general",
+                    "enum": [
+                      "general",
+                      "叶羽",
+                      "创意",
+                      "求助"
+                    ]
+                  }
+                },
+                "required": [
+                  "title",
+                  "content"
+                ]
+              },
+              "example": {
+                "title": "标题",
+                "content": "<p>正文</p>",
+                "category": "general"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "发布成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数非法",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}/like": {
+      "post": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "点赞 / 取消点赞帖子（切换）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "liked": {
+                      "type": "boolean"
+                    },
+                    "likes": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "帖子不存在"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}/favorite": {
+      "post": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "收藏 / 取消收藏帖子（切换）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "favorited": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "帖子不存在"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}/report": {
+      "post": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "举报帖子",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "举报成功"
+          },
+          "400": {
+            "description": "参数非法"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "帖子不存在"
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}/delete": {
+      "post": {
+        "tags": [
+          "Post"
+        ],
+        "summary": "删除帖子（仅作者本人）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "403": {
+            "description": "无权删除"
+          },
+          "404": {
+            "description": "帖子不存在"
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}/comments": {
+      "get": {
+        "tags": [
+          "Comment"
+        ],
+        "summary": "获取帖子评论列表",
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "评论列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "comments": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Comment"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "帖子不存在"
+          }
+        }
+      }
+    },
+    "/api/posts/{post_id}/comments/create": {
+      "post": {
+        "tags": [
+          "Comment"
+        ],
+        "summary": "发表评论（parent_id 支持楼中楼）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "post_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "parent_id": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "评论成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "comment": {
+                      "$ref": "#/components/schemas/Comment"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数非法"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "帖子不存在"
+          }
+        }
+      }
+    },
+    "/api/comments/{comment_id}/delete": {
+      "post": {
+        "tags": [
+          "Comment"
+        ],
+        "summary": "删除评论（仅作者本人）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "comment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功"
+          },
+          "403": {
+            "description": "无权删除"
+          },
+          "404": {
+            "description": "评论不存在"
+          }
+        }
+      }
+    },
+    "/api/world/ALL": {
+      "get": {
+        "tags": [
+          "World"
+        ],
+        "summary": "获取世界频道最近消息（最多 100 条）",
+        "responses": {
+          "200": {
+            "description": "消息列表（数组）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorldMessage"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/world/Send": {
+      "post": {
+        "tags": [
+          "World"
+        ],
+        "summary": "发送世界频道消息（每用户 2 秒一条）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "parent_id": {
+                    "type": "integer",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "发送成功"
+          },
+          "400": {
+            "description": "内容为空或过长"
+          },
+          "429": {
+            "description": "发言过快"
+          },
+          "401": {
+            "description": "未登录"
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "搜索帖子和用户（关键词 ≥2 字符）",
+        "parameters": [
+          {
+            "name": "k",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "both",
+                "posts",
+                "users"
+              ],
+              "default": "both"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "搜索结果（多关键词 AND，按相关性排序）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "keyword": {
+                      "type": "string"
+                    },
+                    "posts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostListItem"
+                      }
+                    },
+                    "posts_total": {
+                      "type": "integer"
+                    },
+                    "posts_has_more": {
+                      "type": "boolean"
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/UserPublic"
+                      }
+                    },
+                    "users_total": {
+                      "type": "integer"
+                    },
+                    "users_has_more": {
+                      "type": "boolean"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "关键词太短"
+          }
+        }
+      }
+    },
+    "/api/email/send-verify-email": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "发送邮箱验证邮件（需登录）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "邮件已发送"
+          },
+          "400": {
+            "description": "邮箱已验证"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "503": {
+            "description": "SMTP 服务不可用"
+          }
+        }
+      }
+    },
+    "/api/email/verify-email": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "校验邮箱验证 token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "验证成功"
+          },
+          "400": {
+            "description": "token 无效或过期"
+          }
+        }
+      }
+    },
+    "/api/email/send-reset-password": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "发送重置密码邮件（防邮箱枚举）",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": [
+                  "email"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "统一返回相同提示（防枚举）"
+          },
+          "400": {
+            "description": "邮箱格式非法"
+          },
+          "503": {
+            "description": "SMTP 服务不可用"
+          }
+        }
+      }
+    },
+    "/api/email/reset-password": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "通过 token 重置密码",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  }
+                },
+                "required": [
+                  "token",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "密码重置成功"
+          },
+          "400": {
+            "description": "token 无效 / 密码强度不足"
+          }
+        }
+      }
+    },
+    "/api/report-bug": {
+      "post": {
+        "tags": [
+          "Bug"
+        ],
+        "summary": "提交 Bug 反馈（游客可提交，登录自动记录身份）",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "detail": {
+                    "type": "string",
+                    "maxLength": 5000
+                  },
+                  "steps": {
+                    "type": "string",
+                    "maxLength": 3000
+                  },
+                  "contact": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "page_url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "detail"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "提交成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "id": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数非法"
+          }
+        }
+      }
+    },
+    "/api/huiguan": {
+      "get": {
+        "tags": [
+          "Huiguan"
+        ],
+        "summary": "获取会馆列表（静态数据）",
+        "responses": {
+          "200": {
+            "description": "会馆列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "list": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Easter-Egg": {
+      "get": {
+        "tags": [
+          "Misc"
+        ],
+        "summary": "随机一条彩蛋",
+        "responses": {
+          "200": {
+            "description": "彩蛋 JSON（随机一条）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ID": {
+                      "type": "string"
+                    },
+                    "Name": {
+                      "type": "string"
+                    },
+                    "Text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rss.xml": {
+      "get": {
+        "tags": [
+          "Misc"
+        ],
+        "summary": "最新 20 条帖子 RSS 2.0",
+        "responses": {
+          "200": {
+            "description": "RSS XML",
+            "content": {
+              "application/rss+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "xml"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/avatar/upload": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "上传头像（裁剪压缩为 400×400 WebP，上传 Cloudflare Images）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "avatar": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "avatar"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上传成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "avatar": {
+                      "type": "string",
+                      "format": "uri"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "无文件 / 图片非法 / 超 5MB"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "502": {
+            "description": "Cloudflare 上传失败"
+          },
+          "503": {
+            "description": "存储服务未配置或不可用"
+          }
+        }
+      }
+    },
+    "/api/user/{user_id}/follow": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "关注 / 取消关注用户（切换）",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "操作结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "following": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "不能关注自己"
+          },
+          "401": {
+            "description": "未登录"
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        }
+      }
+    },
+    "/api/user/{user_id}/following": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "获取用户关注列表",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "关注列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FollowUser"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        }
+      }
+    },
+    "/api/user/{user_id}/followers": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "获取用户粉丝列表",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "粉丝列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FollowUser"
+                      }
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "page_size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "用户不存在"
+          }
+        }
+      }
+    }
+  }
+}

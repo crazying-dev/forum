@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}搜索 - 妖精论坛{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fa fa-search"></i> 搜索 <span id="searchKeyword"></span></h2>
+    </div>
+    <div class="search-type-tabs">
+      <button class="tab active" data-type="both">全部</button>
+      <button class="tab" data-type="posts">帖子</button>
+      <button class="tab" data-type="users">用户</button>
+    </div>
+    <div class="search-result" id="searchResult"><div class="empty">加载中...</div></div>
+    <div class="load-more" id="searchLoadMore" style="display:none;">
+      <button class="btn btn-outline" id="searchLoadMoreBtn">加载更多</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

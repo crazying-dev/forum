@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}用户 - 妖精论坛{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="card user-profile" id="userProfile">
+    <div class="empty">加载中...</div>
+  </div>
+  <div class="card" id="userFavCard" style="display:none;">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fa fa-bookmark-o"></i> 我的收藏</h2>
+      <button class="btn btn-sm" id="userFavToggle"><i class="fa fa-angle-up"></i> 收起</button>
+    </div>
+    <div id="userFavBody">
+      <div class="post-list" id="userFavList"></div>
+    </div>
+  </div>
+  <div class="card" id="userCommentCard" style="display:none;">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fa fa-comments-o"></i> 我的评论</h2>
+    </div>
+    <div class="user-comment-list" id="userCommentList"></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title"><i class="fa fa-file-text-o"></i> 发布的帖子</h2>
+    </div>
+    <div class="post-list" id="userPostList"></div>
+  </div>
+</div>
+
+<div class="modal-mask" id="userListModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="userListTitle">列表</h3>
+      <button class="modal-close" id="userListClose">&times;</button>
+    </div>
+    <div class="user-list-modal-body" id="userListBody">
+      <div class="empty">加载中...</div>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="editModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa fa-user"></i> 编辑资料</h3>
+      <button class="modal-close" id="editClose">&times;</button>
+    </div>
+    <div class="form-group">
+      <label>昵称</label>
+      <input type="text" id="editName" maxlength="20">
+    </div>
+    <div class="form-group">
+      <label>性别</label>
+      <select id="editGender">
+        <option value="0">未设置</option>
+        <option value="1">男</option>
+        <option value="2">女</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>年龄（生日）</label>
+      <input type="date" id="editAge" max="2100-12-31">
+    </div>
+    <div class="form-group">
+      <label>称号前缀</label>
+      <input type="text" id="editPrefix" maxlength="32" placeholder="如：妖精">
+    </div>
+    <div class="form-group">
+      <label>简介</label>
+      <textarea id="editIntro" rows="3" maxlength="200"></textarea>
+    </div>
+    <div class="form-group">
+      <label>头像</label>
+      <div class="avatar-upload">
+        <input type="file" id="editAvatarFile" accept="image/*">
+        <label class="avatar-pick" for="editAvatarFile"><i class="fa fa-image"></i> 选择图片</label>
+        <span class="avatar-file-name" id="editAvatarFileName">未选择文件</span>
+        <button type="button" class="btn btn-sm btn-outline" id="editAvatarBtn">上传头像</button>
+      </div>
+      <p class="auth-error" id="editError"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="editCancel">取消</button>
+      <button class="btn btn-primary" id="editSave">保存</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
