@@ -106,10 +106,19 @@
       }
     } catch (e) {}
   }
+  // 解析后端时间字符串为绝对时刻：已带时区的按原样解析；
+  // 未带时区的（如 "YYYY-MM-DD HH:MM:SS"）视为 UTC，交给 Date 自动按本地时区补齐时间差
+  function parseTime(t) {
+    var s = String(t).trim();
+    if (!s) return null;
+    if (/[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s)) return new Date(s);
+    var iso = s.replace(' ', 'T');
+    return new Date(/:\d{2}/.test(iso) ? iso + 'Z' : iso);
+  }
   function fmtTime(t) {
     if (!t) return '';
-    var d = new Date(t.indexOf('T') >= 0 ? t : t.replace(' ', 'T') + (t.length >= 19 ? '+08:00' : ''));
-    if (isNaN(d.getTime())) return t;
+    var d = parseTime(t);
+    if (!d || isNaN(d.getTime())) return t;
     var now = new Date();
     var diff = (now - d) / 1000;
     if (diff < 60) return '刚刚';
