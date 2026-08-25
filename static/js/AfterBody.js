@@ -157,18 +157,52 @@
           '</a>';
         // navUser 是异步填充的，必须在写入后立即解析 data-src，否则头像不显示
         resolveAvatarDeferred(navUser);
-        var li = el('logoutItem'), ml = el('mobileLogout');
+        var li = el('logoutItem');
         if (li) li.style.display = '';
-        if (ml) ml.style.display = '';
       }
     } catch (e) {
       navUser.innerHTML = '<a href="/auth" class="nav-login">登录</a>';
     }
   }
 
-  // ── 设置菜单 / 移动菜单 / 彩蛋 ──
+  // ── 设置菜单 / 左侧边栏 / 彩蛋 ──
   function initMenus() {
-    // 设置下拉
+    var SIDE_NAV_KEY = 'forum-sidenav'; // 'compact' 仅图标 / 'expanded' 图标+文字
+    var body = document.body;
+    var sideNav = el('sideNav');
+    // 恢复上次的侧边栏模式
+    var currentMode = 'compact';
+    try { currentMode = localStorage.getItem(SIDE_NAV_KEY) || 'compact'; } catch (e) {}
+    function setSideNavMode(mode) {
+      currentMode = mode;
+      body.classList.toggle('side-nav-expanded', mode === 'expanded');
+      try { localStorage.setItem(SIDE_NAV_KEY, mode); } catch (e) {}
+      var dd = el('settingDropdown');
+      if (dd) dd.querySelectorAll('[data-sidenav]').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-sidenav') === mode);
+      });
+    }
+    // 汉堡按钮：桌面切换仅图标/图标+文字，手机端开合抽屉
+    var toggle = el('menuToggle');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        if (window.innerWidth <= 900) {
+          if (sideNav) sideNav.classList.toggle('open');
+        } else {
+          setSideNavMode(body.classList.contains('side-nav-expanded') ? 'compact' : 'expanded');
+        }
+      });
+    }
+    // 手机端：点击抽屉外部自动收起
+    if (sideNav) {
+      document.addEventListener('click', function (e) {
+        if (window.innerWidth <= 900 && sideNav.classList.contains('open') &&
+            !sideNav.contains(e.target) && !(toggle && toggle.contains(e.target))) {
+          sideNav.classList.remove('open');
+        }
+      });
+    }
+    // 设置下拉（侧边栏底部，右侧弹出）
     var settingBtn = el('settingBtn'), dropdown = el('settingDropdown');
     if (settingBtn && dropdown) {
       settingBtn.addEventListener('click', function (e) {
@@ -180,34 +214,33 @@
       dropdown.querySelectorAll('[data-theme]').forEach(function (b) {
         b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme')); dropdown.classList.remove('open'); });
       });
-    }
-    // 移动菜单
-    var toggle = el('menuToggle'), mMenu = el('mobileMenu');
-    if (toggle && mMenu) {
-      toggle.addEventListener('click', function () { mMenu.classList.toggle('open'); });
-      mMenu.querySelectorAll('[data-theme]').forEach(function (b) {
-        b.addEventListener('click', function () { setTheme(b.getAttribute('data-theme')); mMenu.classList.remove('open'); });
+      dropdown.querySelectorAll('[data-sidenav]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          setSideNavMode(b.getAttribute('data-sidenav'));
+          dropdown.classList.remove('open');
+        });
       });
+      setSideNavMode(currentMode); // 同步当前模式高亮
     }
-    // 退出登录（设置菜单 + 移动菜单）
-    [el('logoutItem'), el('mobileLogout')].forEach(function (b) {
-      if (!b) return;
-      b.addEventListener('click', async function () {
+    // 退出登录
+    var li = el('logoutItem');
+    if (li) {
+      li.addEventListener('click', async function () {
         await apiFetch('/api/user/logout', { method: 'POST' });
         location.href = '/';
       });
-    });
+    }
     // 彩蛋
-    [el('eggBtn'), el('mobileEggBtn')].forEach(function (b) {
-      if (!b) return;
-      b.addEventListener('click', async function () {
+    var egg = el('eggBtn');
+    if (egg) {
+      egg.addEventListener('click', async function () {
         try {
           var d = await apiFetch('/Easter-Egg');
           if (d && (d.Name || d.Text)) toast('🎁 ' + (d.Name || '彩蛋') + (d.Text ? '：' + d.Text : ''));
           else toast('🎁 彩蛋为空');
         } catch (e) { toast('彩蛋获取失败'); }
       });
-    });
+    }
   }
 
   // ── 侧边栏世界频道：拖拽调宽 / 收起 ──
@@ -1568,20 +1601,32 @@
     }
   }
 
+  // 全屏头部跟随：把鼠标屏幕坐标转换为模型画布内坐标。
+  // 判定中心 = 模型画布中心（而非屏幕中心）：鼠标相对屏幕中心的偏移，
+  // 归一化到 [-1,1] 后映射为相对画布中心的偏移 —— 鼠标在模型左边时模型看左，
+  // 鼠标在模型右上方时模型看右上方，与真实方向一致。
+  function _focusFromScreen(model, wrapperEl, clientX, clientY) {
+    if (!model || !wrapperEl || typeof model.focus !== 'function') return false;
+    try {
+      var rect = wrapperEl.getBoundingClientRect();
+      var sw = window.innerWidth || document.documentElement.clientWidth || 1;
+      var sh = window.innerHeight || document.documentElement.clientHeight || 1;
+      var cx = rect.left + rect.width / 2;   // 画布中心（屏幕坐标）
+      var cy = rect.top + rect.height / 2;
+      var nx = Math.max(-1, Math.min(1, (clientX - cx) / (sw / 2)));
+      var ny = Math.max(-1, Math.min(1, (clientY - cy) / (sh / 2)));
+      model.focus(rect.width / 2 + nx * (rect.width / 2), rect.height / 2 + ny * (rect.height / 2));
+      return true;
+    } catch (e) { return false; }
+  }
+
   function initLive2D() {
     var wrapper = document.getElementById('live2d-canvas-wrapper');
     if (!wrapper) return;
-    // 独立页全屏头部跟随：鼠标在页面任意位置，头部都跟随（映射到模型画布坐标）
+    // 独立页全屏头部跟随：鼠标在页面任意位置，头部都跟随（以模型画布中心为判定中心）
     var _live2DPageModel = null;
     document.addEventListener('mousemove', function (e) {
-      var m = _live2DPageModel;
-      if (!m || typeof m.focus !== 'function') return;
-      try {
-        var rect = wrapper.getBoundingClientRect();
-        var sw = window.innerWidth || document.documentElement.clientWidth || 1;
-        var sh = window.innerHeight || document.documentElement.clientHeight || 1;
-        m.focus((e.clientX / sw) * (rect.width || 1), (e.clientY / sh) * (rect.height || 1));
-      } catch (ee) {}
+      _focusFromScreen(_live2DPageModel, wrapper, e.clientX, e.clientY);
     }, { passive: true });
     function loadModel() {
       hideLive2DStatus();
@@ -1619,17 +1664,8 @@
   function _setGlobalLive2DFocus(clientX, clientY) {
     var m = _globalLive2DModel;
     if (!m) return;
-    if (typeof m.focus === 'function') {
-      var wrapper = document.getElementById('global-live2d');
-      if (!wrapper) return;
-      var rect = wrapper.getBoundingClientRect();
-      var sw = window.innerWidth || document.documentElement.clientWidth || 1;
-      var sh = window.innerHeight || document.documentElement.clientHeight || 1;
-      // 全屏坐标 → canvas 内坐标：屏幕左/上边缘映射 canvas 左/上，屏幕右/下映射 canvas 右/下
-      var x = (clientX / sw) * (rect.width || 1);
-      var y = (clientY / sh) * (rect.height || 1);
-      try { m.focus(x, y); return; } catch (e) {}
-    }
+    // 以模型画布中心为判定中心的全屏映射（引擎 focus 是函数，接收画布内坐标）
+    if (_focusFromScreen(m, document.getElementById('global-live2d'), clientX, clientY)) return;
     // 兼容 focus 为对象属性的情况（老版本 pixi-live2d-display）
     if (m.focus && typeof m.focus === 'object') {
       try {

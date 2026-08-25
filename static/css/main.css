@@ -146,6 +146,75 @@ textarea { resize: vertical; }
 }
 .user-chip .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
+/* ── 左侧边栏导航（桌面常驻图标栏，可展开图标+文字；手机端为抽屉） ── */
+:root { --side-nav-w: 56px; }
+body { padding-left: var(--side-nav-w); transition: padding-left .25s ease; }
+body.side-nav-expanded { --side-nav-w: 180px; }
+.side-nav {
+  position: fixed; left: 0; top: 0; bottom: 0;
+  width: var(--side-nav-w);
+  display: flex; flex-direction: column; align-items: stretch;
+  padding: 64px 8px 12px;
+  box-sizing: border-box;
+  background: var(--color-bg-header);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid var(--color-border);
+  z-index: 98;
+  overflow: hidden;
+  transition: width .25s ease, transform .25s ease;
+}
+.side-nav-item {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px;
+  padding: 10px 6px;
+  margin-bottom: 4px;
+  border: none; background: none;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  width: 100%;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.side-nav-item i { width: 20px; text-align: center; flex: 0 0 auto; }
+.side-nav-item span { display: none; }
+.side-nav-item:hover { background: var(--color-bg-hover); color: var(--color-text-primary); }
+body.side-nav-expanded .side-nav-item { justify-content: flex-start; }
+body.side-nav-expanded .side-nav-item span { display: inline; }
+.side-nav-spacer { flex: 1; }
+.side-nav-user { display: flex; justify-content: center; margin: 8px 0; }
+.side-nav-user .user-chip { justify-content: center; }
+body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
+.side-nav-user .nav-login { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+.side-nav-user .user-chip-name { display: none; }
+/* 侧边栏设置下拉：fixed 在侧边栏右侧弹出（独立于 .side-nav，避免被 overflow:hidden 裁剪） */
+.side-setting-dropdown {
+  position: fixed; left: calc(var(--side-nav-w) + 8px); bottom: 12px;
+  min-width: 168px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--color-shadow);
+  padding: 6px;
+  display: none;
+  z-index: 99;
+}
+.side-setting-dropdown.open { display: block; }
+.setting-group-title { font-size: 12px; color: var(--color-text-tertiary); padding: 6px 10px 4px; }
+.setting-item.active { background: var(--color-bg-item-active); }
+/* 手机/窄屏：侧边栏改为抽屉，默认收起，汉堡按钮打开 */
+@media (max-width: 900px) {
+  body { padding-left: 0; }
+  .side-nav { width: 240px; transform: translateX(-100%); padding-top: 56px; }
+  .side-nav.open { transform: translateX(0); }
+  .side-nav-item { justify-content: flex-start; }
+  .side-nav-item span { display: inline; }
+  .side-nav-user { justify-content: flex-start; }
+  .side-nav-user .user-chip-name { display: inline; }
+  /* 手机端抽屉内下拉改为横跨抽屉，避免在窄屏溢出屏幕 */
+  .side-setting-dropdown { left: 8px; right: 8px; bottom: 64px; }
+}
+
 /* ── Layout（主区 + 右侧世界频道）── */
 .layout {
   max-width: 1100px;
@@ -726,8 +795,8 @@ textarea { resize: vertical; }
 .setting-item:hover { background: var(--color-bg-hover); }
 .setting-divider { height: 1px; background: var(--color-border); margin: 6px 2px; }
 
-/* ── 移动端汉堡菜单 ── */
-.header-menu-toggle { display: none; }
+/* ── 汉堡菜单按钮：桌面用于展开/收起侧边栏，手机端开合抽屉 ── */
+.header-menu-toggle { display: inline-flex; }
 .mobile-menu {
   display: none;
   flex-direction: column;

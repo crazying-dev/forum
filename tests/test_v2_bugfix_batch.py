@@ -321,14 +321,15 @@ def test_header_avatar_deferred_resolved():
 # ── 回归 3：全局 Live2D 头部跟随驱动 model.focus（引擎 focus 是函数 + 全屏检测） ──
 def test_global_live2d_head_follows_via_model_focus():
     assert "_globalLive2DModel" in JS, "未保存全局 Live2D 模型实例"
-    assert "typeof m.focus === 'function'" in JS, "未识别引擎 focus 为函数"
-    assert "m.focus(x, y)" in JS, "缺少通过 m.focus(x,y) 调用驱动头部跟随"
+    # 引擎 focus 是函数：_focusFromScreen 内按画布中心映射为 canvas 内坐标再调用
+    assert "typeof model.focus !== 'function'" in JS, "未识别引擎 focus 为函数"
+    assert "model.focus(" in JS, "缺少通过 model.focus(...) 调用驱动头部跟随"
     assert "m.focus.x" in JS and "m.focus.y" in JS, \
         "缺少 focus 为对象属性时的兼容兜底"
-    # 全屏检测：mousemove 绑定在 document 上，坐标按屏幕比例映射到 canvas
+    # 全屏检测：mousemove 绑定在 document 上，坐标按画布中心映射到 canvas
     assert "document.addEventListener('mousemove'" in JS, \
         "mousemove 未绑定到 document（全屏检测）"
-    assert "(clientX / sw)" in JS, \
+    assert "(clientX - cx) / (sw / 2)" in JS, \
         "缺少鼠标屏幕坐标 → canvas 内坐标的全屏映射"
     # 关键：Live2DLPK.load 返回 {model, app, destroy} 包装对象，必须解包取 .model
     # （否则 model.focus 不存在，全屏跟随只剩引擎 canvas 内的局部跟随）
@@ -449,20 +450,53 @@ def test_posts_api_supports_sort():
     assert "comprehensive" in dbsrc, "缺少综合排序（comprehensive）实现"
 
 
-# ── 回归 13：手机端导航按钮折叠进汉堡菜单（与 V1 一致，避免右上角与搜索框重叠） ──
+# ── 回归 13：头部除 logo/搜索框外的入口改为左侧边栏（避免右上角与搜索框重叠） ──
 def test_mobile_header_collapse_like_v1():
-    assert ".nav-setting { display: none; }" in CSS, \
-        "手机端未隐藏设置按钮（与 V1 的 header-collapsible 隐藏不一致）"
-    assert ".header-nav .nav-link:not(.header-menu-toggle) { display: none; }" in CSS, \
-        "手机端未折叠论坛/WIKI/彩蛋按钮，会导致右上角按钮与搜索框重叠"
-    assert ".user-chip-name { display: none; }" in CSS, \
-        "手机端未隐藏用户名（与 V1 一致，只留头像），长用户名会挤占搜索框"
-    assert ".nav-login { padding: 5px 10px; font-size: 12px; }" in CSS, \
-        "手机端登录按钮未收紧，仍会挤占搜索框"
-    # 搜索框固定宽度不收缩（与 V1 的 flex:0 0 auto 一致），输入框可收缩
+    # 模板：header 只保留 logo/搜索框/汉堡按钮；导航入口全部移入 .side-nav
+    assert 'id="menuToggle"' in BASE_HTML, "header 缺少汉堡展开按钮"
+    assert 'class="side-nav"' in BASE_HTML and 'id="sideNav"' in BASE_HTML, "缺少左侧边栏容器"
+    assert "mobileMenu" not in BASE_HTML and "mobile-menu" not in BASE_HTML, "旧的移动菜单仍残留在模板"
+    # 边栏默认仅图标（56px），可展开为图标+文字（180px）
+    assert "--side-nav-w: 56px" in CSS and "180px" in CSS, "侧边栏缺少 仅图标/图标+文字 两档宽度"
+    assert "body.side-nav-expanded" in CSS, "缺少 side-nav-expanded 展开态样式"
+    assert ".side-nav-item span { display: none; }" in CSS, "默认未隐藏文字只留图标"
+    assert "body.side-nav-expanded .side-nav-item span" in CSS, "展开态未显示文字"
+    # 手机端：侧边栏变为抽屉（translateX 收起 / .open 展开）
+    assert ".side-nav { width: 240px; transform: translateX(-100%);" in CSS, "手机端侧边栏未变为收起抽屉"
+    assert ".side-nav.open { transform: translateX(0);" in CSS, "手机端抽屉缺少 .open 展开态"
+    # 设置下拉提供 仅图标/图标+文字 两种模式切换
+    assert 'data-sidenav="compact"' in BASE_HTML and 'data-sidenav="expanded"' in BASE_HTML, \
+        "设置下拉缺少侧边栏模式切换项"
+    # 搜索框仍可收缩（与 V1 一致），不被挤压覆盖
     assert "flex: 0 0 auto" in CSS, \
         "手机端搜索框仍会收缩（应固定宽度），空间不足时搜索按钮会被压缩覆盖"
     assert re.search(r"\.header-search input\s*\{[^}]*min-width:\s*0", CSS), \
         "搜索输入框未设置 min-width:0，长占位符会把搜索按钮挤出容器被导航覆盖"
+
+
+# ── 回归 14：侧边栏模式切换逻辑（汉堡按钮 / 设置项 / localStorage 持久化） ──
+def test_sidebar_mode_toggle_js():
+    assert "forum-sidenav" in JS, "缺少侧边栏模式的 localStorage 键"
+    assert "setSideNavMode" in JS, "缺少 setSideNavMode 切换函数"
+    assert "side-nav-expanded" in JS, "JS 未切换 body.side-nav-expanded 展开态"
+    assert "classList.toggle('open')" in JS, "缺少抽屉/下拉 open 切换"
+    # 手机端抽屉自动收起（点击外部）
+    assert "window.innerWidth <= 900" in JS, "缺少手机端抽屉处理（innerWidth 判断）"
+    assert 'data-sidenav' in BASE_HTML, "设置下拉缺少 data-sidenav 模式按钮"
+
+
+# ── 回归 15：评论输入框高度（rows=2） ──
+def test_comment_textarea_rows_two():
+    assert 'id="commentContent" rows="2"' in POST_DETAIL_HTML, \
+        "评论输入框仍为 rows=3 过高，应改为 rows=2"
+
+
+# ── 回归 16：Live2D 判定中心为模型画布中心而非屏幕中心 ──
+def test_live2d_focus_uses_canvas_center():
+    # 鼠标屏幕坐标先按画布中心偏移归一化（除以半屏宽高），再映射回画布坐标
+    assert "_focusFromScreen" in JS, "缺少以画布中心为判定中心的 _focusFromScreen 函数"
+    assert "getBoundingClientRect" in JS, "缺少基于画布包围盒的坐标映射"
+    assert re.search(r"clientX\s*-\s*cx", JS), "缺少鼠标相对画布中心 X 偏移计算"
+    assert re.search(r"rect\.width\s*/\s*2", JS), "缺少映射回画布宽/2 的换算"
 
 

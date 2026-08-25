@@ -38,39 +38,34 @@
       <input id="searchInput" placeholder="搜索帖子、用户..." maxlength="50">
       <button id="searchBtn" aria-label="搜索"><i class="fa fa-search"></i></button>
     </div>
-    <nav class="header-nav">
-      <a class="nav-link" href="/forum"><i class="fa fa-list"></i><span>论坛</span></a>
-      <a class="nav-link" href="/WIKI" target="_blank" rel="noopener"><i class="fa fa-book"></i><span>WIKI</span></a>
-      <button class="nav-link nav-btn" id="eggBtn" title="彩蛋"><i class="fa fa-gift"></i><span>彩蛋</span></button>
-      <div class="nav-setting" id="navSetting">
-        <button class="nav-link nav-btn" id="settingBtn"><i class="fa fa-cog"></i><span>设置</span></button>
-        <div class="setting-dropdown" id="settingDropdown">
-          <button class="setting-item" data-theme="day"><i class="fa fa-sun-o"></i> 亮色</button>
-          <button class="setting-item" data-theme="night"><i class="fa fa-moon-o"></i> 暗色</button>
-          <button class="setting-item" data-theme="default"><i class="fa fa-desktop"></i> 默认</button>
-          <div class="setting-divider"></div>
-          <button class="setting-item" id="logoutItem" style="display:none;"><i class="fa fa-sign-out"></i> 退出登录</button>
-        </div>
-      </div>
-      <button class="nav-link nav-btn header-menu-toggle" id="menuToggle" title="菜单"><i class="fa fa-bars"></i></button>
-      <div class="nav-user" id="navUser">
-        <a href="/auth" class="nav-login">登录</a>
-      </div>
-    </nav>
-  </div>
-  <div class="mobile-menu" id="mobileMenu">
-    <a class="mobile-item" href="/forum"><i class="fa fa-list"></i> 论坛</a>
-    <a class="mobile-item" href="/WIKI" target="_blank" rel="noopener"><i class="fa fa-book"></i> WIKI</a>
-    <button class="mobile-item" id="mobileEggBtn"><i class="fa fa-gift"></i> 彩蛋</button>
-    <div class="mobile-divider"></div>
-    <div class="mobile-title">主题</div>
-    <button class="mobile-item mobile-theme" data-theme="day"><i class="fa fa-sun-o"></i> 亮色</button>
-    <button class="mobile-item mobile-theme" data-theme="night"><i class="fa fa-moon-o"></i> 暗色</button>
-    <button class="mobile-item mobile-theme" data-theme="default"><i class="fa fa-desktop"></i> 默认</button>
-    <div class="mobile-divider"></div>
-    <button class="mobile-item" id="mobileLogout" style="display:none;"><i class="fa fa-sign-out"></i> 退出登录</button>
+    <button class="nav-link nav-btn header-menu-toggle" id="menuToggle" title="菜单"><i class="fa fa-bars"></i></button>
   </div>
 </header>
+
+<!-- 左侧边栏导航：除 logo/标题/搜索框外的入口都在这里，默认仅图标，可展开/收起 -->
+<nav class="side-nav" id="sideNav">
+  <a class="side-nav-item" href="/forum" title="论坛"><i class="fa fa-list"></i><span>论坛</span></a>
+  <a class="side-nav-item" href="/WIKI" target="_blank" rel="noopener" title="WIKI"><i class="fa fa-book"></i><span>WIKI</span></a>
+  <button class="side-nav-item" id="eggBtn" title="彩蛋"><i class="fa fa-gift"></i><span>彩蛋</span></button>
+  <div class="side-nav-spacer"></div>
+  <div class="side-nav-user" id="navUser">
+    <a href="/auth" class="nav-login">登录</a>
+  </div>
+  <button class="side-nav-item" id="settingBtn" title="设置"><i class="fa fa-cog"></i><span>设置</span></button>
+</nav>
+<!-- 设置下拉：独立于 .side-nav（其 overflow:hidden 会裁剪右侧弹出），fixed 跟随侧边栏宽度 -->
+<div class="side-setting-dropdown" id="settingDropdown">
+  <div class="setting-group-title">主题</div>
+  <button class="setting-item" data-theme="day"><i class="fa fa-sun-o"></i> 亮色</button>
+  <button class="setting-item" data-theme="night"><i class="fa fa-moon-o"></i> 暗色</button>
+  <button class="setting-item" data-theme="default"><i class="fa fa-desktop"></i> 默认</button>
+  <div class="setting-divider"></div>
+  <div class="setting-group-title">侧边栏</div>
+  <button class="setting-item" data-sidenav="compact"><i class="fa fa-bars"></i> 仅图标</button>
+  <button class="setting-item" data-sidenav="expanded"><i class="fa fa-th-large"></i> 图标+文字</button>
+  <div class="setting-divider"></div>
+  <button class="setting-item" id="logoutItem" style="display:none;"><i class="fa fa-sign-out"></i> 退出登录</button>
+</div>
 
 <div class="layout">
   <main class="layout-main">{% block content %}{% endblock %}</main>
