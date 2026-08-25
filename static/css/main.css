@@ -581,6 +581,9 @@ textarea { resize: vertical; }
   .nav-setting { display: none; }
   .header-nav .nav-link:not(.header-menu-toggle) { display: none; }
   .header-nav { gap: 2px; }
+  /* 与 V1 一致：手机端隐藏用户名只留头像；收紧登录按钮，避免挤占搜索框 */
+  .user-chip-name { display: none; }
+  .nav-login { padding: 5px 10px; font-size: 12px; }
   /* 手机/窄屏：全局 Live2D 不显示（桌面/平板才常驻左下角） */
   #global-live2d.global-live2d { display: none !important; }
   .world-panel { position: fixed; right: 0; top: 56px; height: calc(100vh - 56px); z-index: 95; transition: transform .25s ease; }

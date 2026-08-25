@@ -1556,6 +1556,15 @@
     } catch (e) {}
   }
 
+  // 延迟到浏览器空闲时执行（requestIdleCallback 优先，兜底 setTimeout）：Live2D 全部文件异步加载，不阻塞页面
+  function _deferAsyncLoad(fn) {
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(function () { setTimeout(fn, 0); }, { timeout: 3000 });
+    } else {
+      setTimeout(fn, 0);
+    }
+  }
+
   function initLive2D() {
     var wrapper = document.getElementById('live2d-canvas-wrapper');
     if (!wrapper) return;
@@ -1576,8 +1585,12 @@
         showLive2DError();
       });
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadModel);
-    else loadModel();
+    // 页面完全加载后、浏览器空闲时再异步加载模型，不阻塞首屏
+    if (document.readyState === 'complete') {
+      _deferAsyncLoad(loadModel);
+    } else {
+      window.addEventListener('load', function () { _deferAsyncLoad(loadModel); });
+    }
   }
 
   // ── 全局浮动 Live2D（非 /Live2D 页面） + 全屏视角跟随 ──
@@ -1652,27 +1665,36 @@
       } catch (ee) {}
       setTimeout(function () { _clickBound = false; }, 600);  // 防抖
     });
-    _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
-      // 传入 wrapper（含 canvas），按 wrapper 尺寸渲染；本地失败自动回退 CDN
-      _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).then(function (model) {
-        // 保存模型实例，供全屏鼠标跟随直接驱动 model.focus（头部跟随）
-        _globalLive2DModel = model || null;
-        // 初始：视线回正（focus 为函数时传画布中心坐标，否则对象属性置 0.5）
-        try {
-          if (model && typeof model.focus === 'function') {
-            var _w = wrapper.clientWidth || 1, _h = wrapper.clientHeight || 1;
-            model.focus(_w / 2, _h / 2);
-          } else if (model && model.focus) {
-            model.focus.x = 0.5; model.focus.y = 0.5;
-          }
-        } catch (e) {}
+    // LPK 模型异步加载：等待页面完全加载后再启动（不拖慢首屏渲染、不与页面数据争抢带宽）。
+    // 引擎内部 loadScripts/downloadLPK/JSZip 解压均为异步；PIXI 初始化在最后阶段才同步执行。
+    function startLpkLoad() {
+      _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
+        // 传入 wrapper（含 canvas），按 wrapper 尺寸渲染；本地失败自动回退 CDN
+        _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).then(function (model) {
+          // 保存模型实例，供全屏鼠标跟随直接驱动 model.focus（头部跟随）
+          _globalLive2DModel = model || null;
+          // 初始：视线回正（focus 为函数时传画布中心坐标，否则对象属性置 0.5）
+          try {
+            if (model && typeof model.focus === 'function') {
+              var _w = wrapper.clientWidth || 1, _h = wrapper.clientHeight || 1;
+              model.focus(_w / 2, _h / 2);
+            } else if (model && model.focus) {
+              model.focus.x = 0.5; model.focus.y = 0.5;
+            }
+          } catch (e) {}
+        }).catch(function (err) {
+          console.error('[Global Live2D] load error:', err);
+          // 静默失败：不影响页面其他功能
+        });
       }).catch(function (err) {
-        console.error('[Global Live2D] load error:', err);
-        // 静默失败：不影响页面其他功能
+        console.error('[Global Live2D] bootstrap error:', err);
       });
-    }).catch(function (err) {
-      console.error('[Global Live2D] bootstrap error:', err);
-    });
+    }
+    if (document.readyState === 'complete') {
+      _deferAsyncLoad(startLpkLoad);
+    } else {
+      window.addEventListener('load', function () { _deferAsyncLoad(startLpkLoad); });
+    }
   }
 })();
 

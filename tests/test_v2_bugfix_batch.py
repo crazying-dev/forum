@@ -364,6 +364,18 @@ def test_global_live2d_clickable():
         "缺少点击模型触发动作的逻辑"
 
 
+# ── 回归 6b：LPK 模型异步加载（页面加载完成后 / 浏览器空闲时启动，不拖慢首屏） ──
+def test_global_live2d_lpk_async_load():
+    assert "requestIdleCallback" in JS, \
+        "LPK 未使用 requestIdleCallback 在浏览器空闲时异步加载"
+    assert "_deferAsyncLoad" in JS, \
+        "缺少 Live2D 异步加载封装（_deferAsyncLoad）"
+    assert "window.addEventListener('load', function () { _deferAsyncLoad(startLpkLoad); });" in JS, \
+        "全局 LPK 未等待页面 load 完成后才启动加载"
+    assert "window.addEventListener('load', function () { _deferAsyncLoad(loadModel); });" in JS, \
+        "独立 Live2D 页面（/Live2D）模型未异步加载"
+
+
 # ── 回归 7：首页「随机推荐」标题点击弹出排序下拉框（随机/时间/综合） ──
 def test_home_sort_dropdown_exists():
     assert 'id="homeSortToggle"' in INDEX_HTML, "首页缺少排序下拉触发按钮 homeSortToggle"
@@ -436,5 +448,9 @@ def test_mobile_header_collapse_like_v1():
         "手机端未隐藏设置按钮（与 V1 的 header-collapsible 隐藏不一致）"
     assert ".header-nav .nav-link:not(.header-menu-toggle) { display: none; }" in CSS, \
         "手机端未折叠论坛/WIKI/彩蛋按钮，会导致右上角按钮与搜索框重叠"
+    assert ".user-chip-name { display: none; }" in CSS, \
+        "手机端未隐藏用户名（与 V1 一致，只留头像），长用户名会挤占搜索框"
+    assert ".nav-login { padding: 5px 10px; font-size: 12px; }" in CSS, \
+        "手机端登录按钮未收紧，仍会挤占搜索框"
 
 
