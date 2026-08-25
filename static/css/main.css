@@ -195,15 +195,18 @@ textarea { resize: vertical; }
 }
 .home-sort-menu.open { display: block; }
 .home-sort-item {
-  display: block; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; text-align: left;
   padding: 8px 12px;
   border: none; background: none;
   border-radius: 8px;
   font-size: 14px; color: var(--color-text-primary);
   cursor: pointer;
 }
+.home-sort-item .fa { width: 16px; text-align: center; color: var(--color-text-tertiary); }
 .home-sort-item:hover { background: var(--color-bg-hover); }
 .home-sort-item.active { color: var(--color-primary); font-weight: 700; }
+.home-sort-item.active .fa { color: var(--color-primary); }
 .empty { color: var(--color-text-tertiary); text-align: center; padding: 24px 0; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px;

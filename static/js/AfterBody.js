@@ -538,6 +538,7 @@
     // 排序模式：random（随机推荐）/ time（时间顺序）/ comprehensive（综合排序）
     var sortMode = 'random';
     var sortLabels = { random: '随机推荐', time: '时间顺序', comprehensive: '综合排序' };
+    var sortIcons = { random: 'fa-random', time: 'fa-clock-o', comprehensive: 'fa-fire' };
     var sortUrls = {
       random: '/api/posts/random?limit=200',
       time: '/api/posts?sort=time&page_size=100',
@@ -569,6 +570,7 @@
     var sortToggle = el('homeSortToggle');
     var sortMenu = el('homeSortMenu');
     var sortLabel = el('homeSortLabel');
+    var sortIcon = el('homeSortIcon');
     if (sortToggle && sortMenu) {
       sortToggle.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -580,6 +582,9 @@
           sortMenu.querySelectorAll('.home-sort-item').forEach(function (x) { x.classList.remove('active'); });
           b.classList.add('active');
           if (sortLabel) sortLabel.textContent = sortLabels[sortMode] || sortLabels.random;
+          if (sortIcon) {
+            sortIcon.className = 'fa ' + (sortIcons[sortMode] || sortIcons.random);
+          }
           sortMenu.classList.remove('open');
           loadHome();
         });

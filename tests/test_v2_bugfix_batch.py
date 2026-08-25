@@ -365,6 +365,11 @@ def test_home_sort_dropdown_exists():
         "排序下拉菜单缺少三个选项（随机推荐/时间顺序/综合排序）"
     assert "data-sort=\"random\"" in INDEX_HTML and "data-sort=\"time\"" in INDEX_HTML \
         and "data-sort=\"comprehensive\"" in INDEX_HTML, "排序选项缺少 data-sort 值"
+    # 三个选项各自带 Font Awesome 图标，标题按钮图标随模式切换
+    assert "fa fa-random" in INDEX_HTML and "fa fa-clock-o" in INDEX_HTML and "fa fa-fire" in INDEX_HTML, \
+        "排序选项缺少图标（随机 fa-random / 时间 fa-clock-o / 综合 fa-fire）"
+    assert "homeSortIcon" in INDEX_HTML and "sortIcons" in JS, \
+        "标题图标未随排序模式切换"
     # JS：三种模式对应不同请求
     assert "/api/posts/random?limit=200" in JS, "随机推荐模式未请求 /api/posts/random"
     assert "sort=time" in JS and "sort=comprehensive" in JS, "时间/综合模式未带 sort 参数"
