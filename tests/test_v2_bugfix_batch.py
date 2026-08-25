@@ -355,3 +355,65 @@ def test_global_live2d_clickable():
     # JS：wrapper 上有点击处理（点击触发动作）
     assert "addEventListener('click'" in JS and "m.motion('Tap', 0)" in JS, \
         "缺少点击模型触发动作的逻辑"
+
+
+# ── 回归 7：首页「随机推荐」标题点击弹出排序下拉框（随机/时间/综合） ──
+def test_home_sort_dropdown_exists():
+    assert 'id="homeSortToggle"' in INDEX_HTML, "首页缺少排序下拉触发按钮 homeSortToggle"
+    assert 'id="homeSortMenu"' in INDEX_HTML, "首页缺少排序下拉菜单 homeSortMenu"
+    assert "随机推荐" in INDEX_HTML and "时间顺序" in INDEX_HTML and "综合排序" in INDEX_HTML, \
+        "排序下拉菜单缺少三个选项（随机推荐/时间顺序/综合排序）"
+    assert "data-sort=\"random\"" in INDEX_HTML and "data-sort=\"time\"" in INDEX_HTML \
+        and "data-sort=\"comprehensive\"" in INDEX_HTML, "排序选项缺少 data-sort 值"
+    # JS：三种模式对应不同请求
+    assert "/api/posts/random?limit=200" in JS, "随机推荐模式未请求 /api/posts/random"
+    assert "sort=time" in JS and "sort=comprehensive" in JS, "时间/综合模式未带 sort 参数"
+    assert "sortMenu.classList.toggle('open')" in JS, "缺少点击展开/收起下拉框的逻辑"
+
+
+# ── 回归 8：CATEGORY_MAP 兼容 V1 存量英文分类（全部汉化） ──
+def test_category_map_v1_compat():
+    m = re.search(r"var CATEGORY_MAP = \{([^}]+)\};", JS)
+    assert m, "AfterBody.js 未找到 CATEGORY_MAP"
+    body = m.group(1)
+    for v1_cat in ("'talk'", "'question'", "'share'", "'creative'"):
+        assert v1_cat in body, f"CATEGORY_MAP 缺少 V1 存量分类 {v1_cat}，会导致英文标签未汉化"
+    assert "'闲聊'" in body and "'分享'" in body and "'创作'" in body, \
+        "V1 存量分类缺少中文翻译"
+
+
+# ── 回归 9：「换一批」按钮 5 秒冷却（__homeRefreshLocked + disabled 视觉禁用） ──
+def test_refresh_button_5s_cooldown():
+    assert "homeRefreshLocked" in JS, "缺少 homeRefreshLocked 冷却标志"
+    assert "classList.add('disabled')" in JS, "冷却期间未对按钮做视觉禁用"
+    assert "setTimeout" in JS and "5000" in JS, "缺少 5 秒冷却计时"
+    assert ".btn.disabled" in CSS, "缺少 .btn.disabled 视觉禁用样式"
+
+
+# ── 回归 10：手机版内容占满宽度（修复内容靠左、右侧空白大） ──
+def test_mobile_layout_full_width():
+    # 这两条只存在于 ≤900px 媒体查询中（桌面端 .layout 是 flex-start、.layout-main 无 width:100%）
+    assert "align-items: stretch;" in CSS, "手机端 .layout 未设置 align-items: stretch，内容不会占满宽度"
+    assert ".layout-main { width: 100%; }" in CSS, "手机端 .layout-main 未占满宽度"
+
+
+# ── 回归 11：发帖页分类叫法与论坛 tab / 列表标签统一 ──
+def test_post_create_category_names_unified():
+    src = (PROJECT / "templates" / "post_create.html").read_text(encoding="utf-8")
+    assert "综合讨论" not in src, "发帖页仍使用旧叫法「综合讨论」，与论坛 tab「综合」不一致"
+    assert "创意工坊" not in src, "发帖页仍使用旧叫法「创意工坊」，与论坛 tab「创意」不一致"
+    assert "求助提问" not in src, "发帖页仍使用旧叫法「求助提问」，与论坛 tab「求助」不一致"
+    for label in ("综合", "叶羽", "创意", "求助"):
+        assert label in src, f"发帖页分类缺少统一叫法 {label}"
+
+
+# ── 回归 12：/api/posts 支持 sort 参数（time/comprehensive/random） ──
+def test_posts_api_supports_sort():
+    src = (PROJECT / "api" / "post" / "__init__.py").read_text(encoding="utf-8")
+    assert "request.args.get(\"sort\")" in src, "/api/posts 未解析 sort 参数"
+    assert "get_post_list(page, page_size, category, sort)" in src, "列表查询未传递 sort"
+    dbsrc = (PROJECT / "db" / "post.py").read_text(encoding="utf-8")
+    assert "def get_post_list(page=1, page_size=20, category=None, sort=\"time\"):" in dbsrc, \
+        "db.get_post_list 未支持 sort 参数"
+    assert "comprehensive" in dbsrc, "缺少综合排序（comprehensive）实现"
+

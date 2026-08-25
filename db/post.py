@@ -80,33 +80,31 @@ def get_post(post_id):
 
 
 # ── 帖子列表 ────────────────────────────────────
-def get_post_list(page=1, page_size=20, category=None):
+# sort: 'time'（默认，最新发布）| 'comprehensive'（综合热度）| 'random'（随机）
+_SORT_ORDER_SQL = {
+    "time": "ORDER BY p.created_at DESC",
+    "comprehensive": "ORDER BY (p.likes * 3 + p.views) DESC, p.created_at DESC",
+    "random": "ORDER BY RANDOM()",
+}
+
+
+def get_post_list(page=1, page_size=20, category=None, sort="time"):
     offset = (page - 1) * page_size
+    order_sql = _SORT_ORDER_SQL.get(sort, _SORT_ORDER_SQL["time"])
+    base_select = (
+        "SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,"
+        " p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar"
+        " FROM posts p JOIN users u ON p.user_id = u.id WHERE p.status = 1"
+    )
     if category:
         rows = execute_query(
-            """
-            SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
-                   p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar
-            FROM posts p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.status = 1 AND p.category = %s
-            ORDER BY p.created_at DESC
-            LIMIT %s OFFSET %s
-            """,
+            base_select + " AND p.category = %s " + order_sql + " LIMIT %s OFFSET %s",
             (category, page_size, offset),
             fetch_all=True,
         )
     else:
         rows = execute_query(
-            """
-            SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
-                   p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar
-            FROM posts p
-            JOIN users u ON p.user_id = u.id
-            WHERE p.status = 1
-            ORDER BY p.created_at DESC
-            LIMIT %s OFFSET %s
-            """,
+            base_select + " " + order_sql + " LIMIT %s OFFSET %s",
             (page_size, offset),
             fetch_all=True,
         )

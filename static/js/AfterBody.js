@@ -479,11 +479,17 @@
   var apiFetch = app.apiFetch, esc = app.esc, el = app.el, toast = app.toast, fmtTime = app.fmtTime, avatarHtml = app.avatarHtml, resolveAvatarDeferred = app.resolveAvatarDeferred;
 
   // ── 帖子分类汉化映射 ──
+  // 除 V2 现有分类外，兼容 V1 存量帖子的英文分类（talk/share/creative 等），保证统一显示中文
   var CATEGORY_MAP = {
     'general': '综合',
     '叶羽': '叶羽',
     '创意': '创意',
-    '求助': '求助'
+    '求助': '求助',
+    // V1 存量分类兼容
+    'talk': '闲聊',
+    'question': '求助',
+    'share': '分享',
+    'creative': '创作'
   };
   function categoryLabel(c) {
     var key = c || 'general';
@@ -529,9 +535,18 @@
   function initHome() {
     var list = el('homePostList');
     if (!list) return;
-    function loadRandom() {
+    // 排序模式：random（随机推荐）/ time（时间顺序）/ comprehensive（综合排序）
+    var sortMode = 'random';
+    var sortLabels = { random: '随机推荐', time: '时间顺序', comprehensive: '综合排序' };
+    var sortUrls = {
+      random: '/api/posts/random?limit=200',
+      time: '/api/posts?sort=time&page_size=100',
+      comprehensive: '/api/posts?sort=comprehensive&page_size=100'
+    };
+    var homeRefreshLocked = false;
+    function loadHome() {
       list.innerHTML = '<div class="empty">加载中...</div>';
-      apiFetch('/api/posts/random?limit=200').then(function (d) {
+      apiFetch(sortUrls[sortMode]).then(function (d) {
         if (!d || !d.success) { list.innerHTML = '<div class="empty">加载失败</div>'; return; }
         var posts = d.posts || [];
         if (!posts.length) { list.innerHTML = '<div class="empty">暂无帖子</div>'; return; }
@@ -540,8 +555,38 @@
       }).catch(function () { list.innerHTML = '<div class="empty">加载失败</div>'; });
     }
     var refresh = el('homeRefreshBtn');
-    if (refresh) refresh.addEventListener('click', loadRandom);
-    loadRandom();
+    if (refresh) refresh.addEventListener('click', function () {
+      if (homeRefreshLocked) return;
+      homeRefreshLocked = true;
+      refresh.classList.add('disabled');
+      loadHome();
+      setTimeout(function () {
+        homeRefreshLocked = false;
+        refresh.classList.remove('disabled');
+      }, 5000);
+    });
+    // 排序下拉框：点击标题展开「随机推荐 / 时间顺序 / 综合排序」
+    var sortToggle = el('homeSortToggle');
+    var sortMenu = el('homeSortMenu');
+    var sortLabel = el('homeSortLabel');
+    if (sortToggle && sortMenu) {
+      sortToggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        sortMenu.classList.toggle('open');
+      });
+      sortMenu.querySelectorAll('.home-sort-item').forEach(function (b) {
+        b.addEventListener('click', function () {
+          sortMode = b.getAttribute('data-sort') || 'random';
+          sortMenu.querySelectorAll('.home-sort-item').forEach(function (x) { x.classList.remove('active'); });
+          b.classList.add('active');
+          if (sortLabel) sortLabel.textContent = sortLabels[sortMode] || sortLabels.random;
+          sortMenu.classList.remove('open');
+          loadHome();
+        });
+      });
+      document.addEventListener('click', function () { sortMenu.classList.remove('open'); });
+    }
+    loadHome();
     // 首页「我的收藏」可折叠
     var favSection = el('homeFavorites');
     var favToggle = el('homeFavToggle');

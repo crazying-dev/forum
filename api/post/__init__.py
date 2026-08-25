@@ -22,10 +22,15 @@ from api.user import login_required
 post_bp = Blueprint("post", __name__)
 
 _CATEGORY_NAME_MAP = {
-    "general": "综合讨论",
+    "general": "综合",
     "叶羽": "叶羽",
-    "创意": "创意工坊",
-    "求助": "求助提问",
+    "创意": "创意",
+    "求助": "求助",
+    # V1 存量分类兼容
+    "talk": "闲聊",
+    "question": "求助",
+    "share": "分享",
+    "creative": "创作",
 }
 
 
@@ -76,7 +81,10 @@ def api_post_list():
     page = max(request.args.get("page", 1, type=int), 1)
     page_size = min(max(request.args.get("page_size", 20, type=int), 1), 100)
     category = request.args.get("category") or None
-    posts = db.post.get_post_list(page, page_size, category)
+    sort = request.args.get("sort") or "time"
+    if sort not in ("time", "comprehensive", "random"):
+        sort = "time"
+    posts = db.post.get_post_list(page, page_size, category, sort)
     return jsonify({"success": True, "posts": posts, "page": page, "page_size": page_size})
 
 

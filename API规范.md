@@ -275,7 +275,10 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 
 ### 9.1 帖子列表 —— GET /api/posts
 
-- 查询参数：`page`（默认 1）、`page_size`（默认 20，最大 100）、`category`（可选）
+- 查询参数：`page`（默认 1）、`page_size`（默认 20，最大 100）、`category`（可选）、`sort`（可选，默认 `time`）
+  - `sort=time`：按发布时间倒序（最新在前）
+  - `sort=comprehensive`：综合热度排序（likes×3 + views 降序）
+  - `sort=random`：随机排序
 - 成功 200：`{success, posts: [PostListItem], page, page_size}`
 - `PostListItem`：id / user_id / title / summary（正文前 200 字）/ category / likes / views / created_at / user_name / user_avatar
 
