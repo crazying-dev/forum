@@ -318,11 +318,18 @@ def test_header_avatar_deferred_resolved():
         "initAuth 写入 navUser.innerHTML 后未调用 resolveAvatarDeferred，头像不会显示"
 
 
-# ── 回归 3：全局 Live2D 头部跟随驱动 model.focus（引擎无 Live2DLPK.setFocus） ──
+# ── 回归 3：全局 Live2D 头部跟随驱动 model.focus（引擎 focus 是函数 + 全屏检测） ──
 def test_global_live2d_head_follows_via_model_focus():
     assert "_globalLive2DModel" in JS, "未保存全局 Live2D 模型实例"
+    assert "typeof m.focus === 'function'" in JS, "未识别引擎 focus 为函数"
+    assert "m.focus(x, y)" in JS, "缺少通过 m.focus(x,y) 调用驱动头部跟随"
     assert "m.focus.x" in JS and "m.focus.y" in JS, \
-        "缺少通过 model.focus 驱动头部跟随的逻辑"
+        "缺少 focus 为对象属性时的兼容兜底"
+    # 全屏检测：mousemove 绑定在 document 上，坐标按屏幕比例映射到 canvas
+    assert "document.addEventListener('mousemove'" in JS, \
+        "mousemove 未绑定到 document（全屏检测）"
+    assert "(clientX / sw)" in JS, \
+        "缺少鼠标屏幕坐标 → canvas 内坐标的全屏映射"
 
 
 # ── 回归 4：手机版（≤900px）不显示全局 Live2D ──

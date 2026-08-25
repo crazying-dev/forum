@@ -1583,41 +1583,46 @@
   // ── 全局浮动 Live2D（非 /Live2D 页面） + 全屏视角跟随 ──
   var _globalLive2DLoaded = false;
   var _globalLive2DModel = null;   // 引擎加载完成后保存的 Live2DModel 实例
-  var _globalLive2DFocus = { x: 0.5, y: 0.5 }; // 归一化 0-1，默认正前方
-  // 全局 Live2D 共用上面定义的 _loadLpkScript / _loadLpkModel：本地优先 + CDN 回退
-  // 头部跟随：优先走 pixi-live2d-display 标准的 model.focus（引擎加载后可用），
-  // 同时兼容 Live2DLPK 可能暴露的 setFocus/setLookAt/updateFocus。
-  function _setGlobalLive2DFocus(x, y) {
+  // 头部跟随：Live2DLPK 引擎的 model.focus 是「函数」，接收 canvas 内像素坐标
+  // （见 Live2DLPK.js 的 handleMove），且引擎只监听 canvas 自身的 mousemove ——
+  // 因此这里在全屏监听 mousemove，把鼠标屏幕位置按比例映射为 canvas 内坐标，
+  // 实现「全屏检测 + 平滑跟随」（此前误用 m.focus.x 赋值，函数对象上无效）。
+  function _setGlobalLive2DFocus(clientX, clientY) {
     var m = _globalLive2DModel;
-    if (m && m.focus) {
-      try { m.focus.x = x; m.focus.y = y; return; } catch (e) {}
+    if (!m) return;
+    if (typeof m.focus === 'function') {
+      var wrapper = document.getElementById('global-live2d');
+      if (!wrapper) return;
+      var rect = wrapper.getBoundingClientRect();
+      var sw = window.innerWidth || document.documentElement.clientWidth || 1;
+      var sh = window.innerHeight || document.documentElement.clientHeight || 1;
+      // 全屏坐标 → canvas 内坐标：屏幕左/上边缘映射 canvas 左/上，屏幕右/下映射 canvas 右/下
+      var x = (clientX / sw) * (rect.width || 1);
+      var y = (clientY / sh) * (rect.height || 1);
+      try { m.focus(x, y); return; } catch (e) {}
+    }
+    // 兼容 focus 为对象属性的情况（老版本 pixi-live2d-display）
+    if (m.focus && typeof m.focus === 'object') {
+      try {
+        m.focus.x = Math.max(0, Math.min(1, clientX / (window.innerWidth || 1)));
+        m.focus.y = Math.max(0, Math.min(1, clientY / (window.innerHeight || 1)));
+      } catch (e) {}
+      return;
     }
     try {
-      if (typeof Live2DLPK !== 'undefined') {
-        if (typeof Live2DLPK.setFocus === 'function') Live2DLPK.setFocus(x, y);
-        else if (typeof Live2DLPK.setLookAt === 'function') Live2DLPK.setLookAt(x, y);
-        else if (typeof Live2DLPK.updateFocus === 'function') Live2DLPK.updateFocus(x, y);
+      if (typeof Live2DLPK !== 'undefined' && typeof Live2DLPK.setFocus === 'function') {
+        Live2DLPK.setFocus(clientX, clientY);
       }
     } catch (ee) {}
   }
   function _applyEyeTracking() {
-    // 全屏范围监听 mousemove，将鼠标位置归一化为 [0,1]，作为视角方向。
+    // 全屏范围监听 mousemove/touchmove：鼠标在屏幕任意位置都能驱动头部跟随
     document.addEventListener('mousemove', function (e) {
-      var w = window.innerWidth || document.documentElement.clientWidth || 1;
-      var h = window.innerHeight || document.documentElement.clientHeight || 1;
-      _globalLive2DFocus.x = Math.max(0, Math.min(1, e.clientX / w));
-      _globalLive2DFocus.y = Math.max(0, Math.min(1, e.clientY / h));
-      _setGlobalLive2DFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
+      _setGlobalLive2DFocus(e.clientX, e.clientY);
     }, { passive: true });
-    // 触屏设备：touchmove
     document.addEventListener('touchmove', function (e) {
       if (!e.touches || !e.touches[0]) return;
-      var t = e.touches[0];
-      var w = window.innerWidth || document.documentElement.clientWidth || 1;
-      var h = window.innerHeight || document.documentElement.clientHeight || 1;
-      _globalLive2DFocus.x = Math.max(0, Math.min(1, t.clientX / w));
-      _globalLive2DFocus.y = Math.max(0, Math.min(1, t.clientY / h));
-      _setGlobalLive2DFocus(_globalLive2DFocus.x, _globalLive2DFocus.y);
+      _setGlobalLive2DFocus(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
   }
   function initGlobalLive2D() {
@@ -1652,7 +1657,15 @@
       _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).then(function (model) {
         // 保存模型实例，供全屏鼠标跟随直接驱动 model.focus（头部跟随）
         _globalLive2DModel = model || null;
-        try { if (model && model.focus) { model.focus.x = 0.5; model.focus.y = 0.5; } } catch (e) {}
+        // 初始：视线回正（focus 为函数时传画布中心坐标，否则对象属性置 0.5）
+        try {
+          if (model && typeof model.focus === 'function') {
+            var _w = wrapper.clientWidth || 1, _h = wrapper.clientHeight || 1;
+            model.focus(_w / 2, _h / 2);
+          } else if (model && model.focus) {
+            model.focus.x = 0.5; model.focus.y = 0.5;
+          }
+        } catch (e) {}
       }).catch(function (err) {
         console.error('[Global Live2D] load error:', err);
         // 静默失败：不影响页面其他功能
