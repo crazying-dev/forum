@@ -106,7 +106,7 @@ textarea { resize: vertical; }
   display: flex; align-items: center; justify-content: center;
 }
 .header-search { flex: 1; max-width: 420px; display: flex; }
-.header-search input { flex: 1; border-radius: 18px 0 0 18px; border-right: none; }
+.header-search input { flex: 1; min-width: 0; border-radius: 18px 0 0 18px; border-right: none; }
 .header-search button {
   border: 1px solid var(--color-border);
   border-left: none;
@@ -573,7 +573,7 @@ textarea { resize: vertical; }
   html, body { overflow-x: hidden; max-width: 100vw; }
   .layout { padding: 12px; flex-direction: column; align-items: stretch; }
   .layout-main { width: 100%; }
-  .header-search { max-width: 180px; }
+  .header-search { flex: 0 0 auto; max-width: 180px; }
   .header-logo-text { display: none; }
   .nav-link span { display: none; }
   /* 与 V1 一致：其余导航按钮（论坛/WIKI/彩蛋/设置）折叠进汉堡菜单，
@@ -970,7 +970,7 @@ textarea { resize: vertical; }
 
   /* 顶部：减小内边距与间距，搜索框进一步收缩 */
   .header-inner { height: 52px; padding: 0 12px; gap: 10px; }
-  .header-search { max-width: 140px; }
+  .header-search { flex: 0 0 auto; max-width: 140px; }
 
   /* 卡片紧凑 */
   .card { padding: 12px; margin-bottom: 12px; border-radius: 10px; }
@@ -1010,7 +1010,7 @@ textarea { resize: vertical; }
 /* ── 响应式：≤380px 超窄屏（iPhone SE 1/2/3 / 老安卓小屏）── */
 @media (max-width: 380px) {
   .header-inner { height: 50px; padding: 0 10px; gap: 8px; }
-  .header-search { max-width: 100px; }
+  .header-search { flex: 0 0 auto; max-width: 100px; }
   .header-nav { gap: 2px; }
   .header-logo-img { width: 28px; height: 28px; }
 

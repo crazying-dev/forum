@@ -459,5 +459,10 @@ def test_mobile_header_collapse_like_v1():
         "手机端未隐藏用户名（与 V1 一致，只留头像），长用户名会挤占搜索框"
     assert ".nav-login { padding: 5px 10px; font-size: 12px; }" in CSS, \
         "手机端登录按钮未收紧，仍会挤占搜索框"
+    # 搜索框固定宽度不收缩（与 V1 的 flex:0 0 auto 一致），输入框可收缩
+    assert "flex: 0 0 auto" in CSS, \
+        "手机端搜索框仍会收缩（应固定宽度），空间不足时搜索按钮会被压缩覆盖"
+    assert re.search(r"\.header-search input\s*\{[^}]*min-width:\s*0", CSS), \
+        "搜索输入框未设置 min-width:0，长占位符会把搜索按钮挤出容器被导航覆盖"
 
 
