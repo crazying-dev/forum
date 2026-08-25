@@ -28,16 +28,17 @@ def test_base_html_has_global_live2d_container():
 
 
 def test_global_live2d_css_position():
-    """全局 Live2D 容器必须 position:fixed 放在右下角，z-index 低（背景层上方）。"""
+    """全局 Live2D 容器必须 position:fixed 放在左下角，z-index 低（背景层上方）。"""
     css = _read(MAIN_CSS)
     # 必须有 #global-live2d 或 .global-live2d 样式
     assert re.search(r"[#\.]global-live2d", css), "main.css 缺少 global-live2d 样式"
-    # 固定定位 + 右下角
-    block_match = re.search(r"[#\.]global-live2d\s*\{[^}]*\}", css, re.S)
-    assert block_match, "main.css 中找不到 global-live2d 样式块"
-    block = block_match.group(0)
+    # 固定定位（选含 position:fixed 的主规则，避开媒体查询里的 display:none 块）
+    blocks = re.findall(r"[#\.]global-live2d\s*\{[^}]*\}", css, re.S)
+    block_match = next((b for b in blocks if "position" in b and "fixed" in b), None)
+    assert block_match, "main.css 中找不到含 position:fixed 的 global-live2d 样式块"
+    block = block_match
     assert "position" in block and "fixed" in block, "global-live2d 必须使用 position:fixed"
-    assert "bottom" in block or "right" in block, "global-live2d 必须定位在右下角（要有 bottom/right）"
+    assert "bottom" in block, "global-live2d 必须定位在左下角（要有 bottom）"
     # z-index：必须低（背景层上方，< 10，header z=100、world-panel z=95）
     z_match = re.search(r"z-index\s*:\s*(\d+)", block)
     assert z_match, "global-live2d 必须设置 z-index"

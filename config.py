@@ -271,6 +271,10 @@ CF_IMAGES_API_TOKEN = os.getenv("avatar_READ_WRITE_TOKEN", "")
 CF_IMAGES_WEBHOOK_PUBLIC_KEY = os.getenv("avatar_WEBHOOK_PUBLIC_KEY", "")
 CF_IMAGES_DELIVERY_HOST = os.getenv("avatar_DELIVERY_HOST", "https://imagedelivery.net")
 
+# 头像上传：保存到本地目录，通过 /avatar/<file> 静态路由访问（与 v1 一致）
+# 不用 Cloudflare Images API（store_xxx 是交付 hash，不是 Account ID，无法路由到 /images/v1）
+AVATAR_UPLOAD_DIR = os.getenv("AVATAR_UPLOAD_DIR", "/root/db/avatar")
+
 # ── 帖子分类白名单（非法分类回落 general）──
 ALLOWED_CATEGORIES = ["general", "叶羽", "创意", "求助"]
 

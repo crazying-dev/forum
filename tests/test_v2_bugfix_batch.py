@@ -208,11 +208,10 @@ def test_b14_comment_submit_small():
 
 # ── N1 Live2D 左下常驻 + 背景透明 + 全屏鼠标检测（无键盘控制） ──
 def test_n1_live2d_left_bottom_and_mouse_tracking():
-    m = re.search(r"#global-live2d(\.global-live2d)?\s*\{([^}]+)\}", CSS, re.S)
-    assert m, "未找到 #global-live2d 定位样式"
-    body = m.group(2)
-    assert re.search(r"left\s*:", body) or "left:0" in body or "left: 0" in body, \
-        "全局 Live2D 未 left 定位（应该左下）"
+    blocks = re.findall(r"#global-live2d(?:\.global-live2d)?\s*\{([^}]+)\}", CSS, re.S)
+    main = next((b for b in blocks if re.search(r"left\s*:", b)), None)
+    assert main, "未找到 #global-live2d 主定位样式（left 定位）"
+    body = main
     assert re.search(r"bottom\s*:", body), "全局 Live2D 未 bottom 定位"
     assert re.search(r"right\s*:\s*auto", body), \
         "仍在使用 right 定位，应改为 left（right:auto）"
@@ -324,3 +323,35 @@ def test_global_live2d_head_follows_via_model_focus():
     assert "_globalLive2DModel" in JS, "未保存全局 Live2D 模型实例"
     assert "m.focus.x" in JS and "m.focus.y" in JS, \
         "缺少通过 model.focus 驱动头部跟随的逻辑"
+
+
+# ── 回归 4：手机版（≤900px）不显示全局 Live2D ──
+def test_global_live2d_hidden_on_mobile():
+    # CSS：媒体查询中隐藏 #global-live2d（display:none !important）
+    assert "#global-live2d.global-live2d { display: none !important; }" in CSS, \
+        "≤900px 媒体查询未隐藏 #global-live2d"
+    # JS：移动端跳过模型加载（省流量）
+    assert "window.innerWidth <= 900" in JS, \
+        "initGlobalLive2D 未在移动端跳过加载"
+
+
+# ── 回归 5：头像上传保存本地（不再依赖 Cloudflare Images API） ──
+def test_avatar_upload_saves_locally():
+    src = (PROJECT / "api" / "user" / "__init__.py").read_text(encoding="utf-8")
+    assert "api.cloudflare.com" not in src, \
+        "头像上传仍依赖 Cloudflare Images API（store_xxx hash 无法路由，会 7003 报错）"
+    assert "config.AVATAR_UPLOAD_DIR" in src, "头像上传未使用本地保存目录 AVATAR_UPLOAD_DIR"
+    assert "/avatar/" in src, "头像上传未返回 /avatar/<file> 本地访问路径"
+
+
+# ── 回归 6：全局 Live2D 可点击（pointer-events 不再为 none，点击触发动作） ──
+def test_global_live2d_clickable():
+    main = next((b for b in re.findall(r"#global-live2d(?:\.global-live2d)?\s*\{([^}]+)\}", CSS, re.S)
+                 if "left:" in b), None)
+    assert main, "未找到 #global-live2d 主定位样式"
+    assert "pointer-events: none" not in main, \
+        "全局 Live2D 的 pointer-events 为 none，无法接收点击"
+    assert "cursor: pointer" in main, "全局 Live2D 未设置点击光标提示"
+    # JS：wrapper 上有点击处理（点击触发动作）
+    assert "addEventListener('click'" in JS and "m.motion('Tap', 0)" in JS, \
+        "缺少点击模型触发动作的逻辑"

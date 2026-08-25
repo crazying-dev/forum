@@ -360,12 +360,10 @@ def _build_user_stats(user_id):
     return {**stats, **follow_stats}
 
 
-# ── 8. 上传头像（Cloudflare Images，需登录）──
+# ── 8. 上传头像（保存本地 /root/db/avatar，经 /avatar/<file> 访问；与 v1 一致）──
 @user_bp.route("/avatar/upload", methods=["POST"])
 @login_required
 def api_user_avatar_upload():
-    if not config.CF_IMAGES_ACCOUNT_ID or not config.CF_IMAGES_API_TOKEN:
-        return jsonify({"success": False, "message": "服务器未配置图片存储服务"}), 503
     file = request.files.get("avatar")
     if not file or not file.filename:
         return jsonify({"success": False, "message": "请选择图片"}), 400
@@ -392,28 +390,19 @@ def api_user_avatar_upload():
     except Exception:
         return jsonify({"success": False, "message": "图片处理失败，请上传有效图片"}), 400
 
-    # 上传 Cloudflare Images
-    import requests as _requests
-    upload_url = (
-        f"https://api.cloudflare.com/client/v4/accounts/"
-        f"{config.CF_IMAGES_ACCOUNT_ID}/images/v1"
-    )
-    headers = {"Authorization": f"Bearer {config.CF_IMAGES_API_TOKEN}"}
+    # 保存到本地头像目录（/avatar/<file> 静态路由指向此处）
+    import uuid as _uuid
+    avatar_dir = config.AVATAR_UPLOAD_DIR
     try:
-        resp = _requests.post(
-            upload_url, headers=headers,
-            files={"file": ("avatar.webp", webp_data, "image/webp")},
-            timeout=30,
-        )
-        body = resp.json()
+        os.makedirs(avatar_dir, exist_ok=True)
+        avatar_id = str(_uuid.uuid4())
+        avatar_path = os.path.join(avatar_dir, f"{avatar_id}.webp")
+        with open(avatar_path, "wb") as f:
+            f.write(webp_data)
     except Exception as e:
-        return jsonify({"success": False, "message": f"图片上传服务不可用: {e}"}), 503
-    if not body.get("success"):
-        return jsonify({"success": False, "message": f"图片上传失败: {body.get('errors')}"}), 502
-    variants = (body.get("result") or {}).get("variants") or []
-    if not variants:
-        return jsonify({"success": False, "message": "图片上传失败：未返回可用地址"}), 502
-    avatar_url = variants[0]
+        return jsonify({"success": False, "message": f"头像保存失败: {e}"}), 500
+
+    avatar_url = f"/avatar/{avatar_id}.webp"
     ok, msg = db.user.update_user(g.user["id"], avatar=avatar_url)
     if not ok:
         return jsonify({"success": False, "message": msg}), 400

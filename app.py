@@ -6,6 +6,7 @@ import threading
 
 from flask import Flask, jsonify, request, send_from_directory
 
+import config
 import db
 import api
 from api.user import _authenticate_from_cookies
@@ -71,10 +72,10 @@ def create_app() -> Flask:
     def healthz():
         return jsonify({"ok": True, "service": "forum-new"}), 200
 
-    # ── 头像静态资源：/avatar/<file> → /root/db/avatar/<file> ──
+    # ── 头像静态资源：/avatar/<file> → AVATAR_UPLOAD_DIR/<file> ──
     @app.route("/avatar/<path:filename>")
     def serve_avatar(filename):
-        return send_from_directory("/root/db/avatar", filename)
+        return send_from_directory(config.AVATAR_UPLOAD_DIR, filename)
 
     # ── 根路径：由 pages_bp 渲染首页（JSON index 已移除）──
 

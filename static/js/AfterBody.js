@@ -1399,6 +1399,31 @@
     });
   }
 
+  // 预加载 JSZip 到全局：引擎内部固定从 cdn.jsdelivr.net 拉 JSZip，
+  // 国内手机网络经常无法访问 jsdelivr（挂起无报错 → 引擎永不初始化 → 模型不显示）。
+  // 只要 window.JSZip 已存在，引擎 loadScripts() 的 typeof 检查会直接跳过该依赖。
+  function _ensureJSZip() {
+    return new Promise(function (resolve) {
+      if (typeof JSZip !== 'undefined') { resolve(); return; }
+      var srcs = [
+        '/static/live2d/js/jszip.min.js',                                  // 同站本地（服务器可放）
+        'https://registry.npmmirror.com/jszip/3.10.1/files/dist/jszip.min.js',  // 国内镜像
+        'https://cdn.staticfile.org/jszip/3.10.1/jszip.min.js',            // 国内 staticfile
+        'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'                 // 兜底
+      ];
+      var i = 0;
+      function tryNext() {
+        if (i >= srcs.length) { resolve(); return; }   // 全部失败也不阻塞，交给引擎自身逻辑
+        var s = document.createElement('script');
+        s.src = srcs[i++];
+        s.onload = function () { resolve(); };
+        s.onerror = function () { tryNext(); };
+        document.head.appendChild(s);
+      }
+      tryNext();
+    });
+  }
+
   // 加载 LPK 模型：优先同站本地，失败回退 CDN（Live2DLPK.load Promise 失败时切换 URL 重试）
   function _loadLpkModel(localUrl, cdnUrl, wrapper, opts) {
     function doLoad(url, fallback) {
@@ -1546,12 +1571,32 @@
     }, { passive: true });
   }
   function initGlobalLive2D() {
+    // 手机/窄屏（≤900px）不加载全局 Live2D（CSS 已隐藏，这里再跳过加载省流量）
+    if (window.innerWidth <= 900) return;
     if (_globalLive2DLoaded) return;
     var wrapper = document.getElementById('global-live2d');
     if (!wrapper) return;
     _globalLive2DLoaded = true;
     // 立即启动视角跟随监听（全屏范围），即便模型还在加载
     _applyEyeTracking();
+    // 点击模型：触发一个动作（引擎 autoInteract 负责 hit 区域点击，这里兜底保证“点击有反应”）
+    var _clickBound = false;
+    wrapper.addEventListener('click', function () {
+      if (_clickBound) return;
+      _clickBound = true;
+      var m = _globalLive2DModel;
+      if (!m) { _clickBound = false; return; }
+      try {
+        if (typeof m.motion === 'function') {
+          m.motion('Tap', 0).catch(function () {
+            try { m.motion('Idle', 0); } catch (ee2) {}
+          });
+        } else if (typeof Live2DLPK !== 'undefined' && typeof Live2DLPK.motion === 'function') {
+          Live2DLPK.motion('Tap', 0);
+        }
+      } catch (ee) {}
+      setTimeout(function () { _clickBound = false; }, 600);  // 防抖
+    });
     _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
       // 传入 wrapper（含 canvas），按 wrapper 尺寸渲染；本地失败自动回退 CDN
       _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).then(function (model) {
