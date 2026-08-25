@@ -1480,9 +1480,12 @@
       // 引擎内部用 `new PIXI.Application(...)` 渲染，默认黑色背景。
       // 在其创建 Application 之前把 PIXI.Application 包装为透明版（backgroundAlpha=0）。
       _ensurePixiTransparent();
-      return Live2DLPK.load(url, wrapper, opts || {}).then(function (model) {
-        _makeTransparent(model, wrapper);
-        return model;
+      return Live2DLPK.load(url, wrapper, opts || {}).then(function (result) {
+        // 注意：Live2DLPK.load 返回的是 { model, app, destroy } 包装对象，
+        // 必须解包取真正的 Live2DModel 实例（否则 focus/motion 等方法不可用）。
+        var loaded = (result && result.model) || result;
+        _makeTransparent(loaded, wrapper);
+        return loaded;
       }).catch(function (err) {
         if (fallback) {
           console.warn('[Live2D] 本地模型加载失败(' + url + ')，回退 CDN: ' + fallback);
@@ -1568,11 +1571,24 @@
   function initLive2D() {
     var wrapper = document.getElementById('live2d-canvas-wrapper');
     if (!wrapper) return;
+    // 独立页全屏头部跟随：鼠标在页面任意位置，头部都跟随（映射到模型画布坐标）
+    var _live2DPageModel = null;
+    document.addEventListener('mousemove', function (e) {
+      var m = _live2DPageModel;
+      if (!m || typeof m.focus !== 'function') return;
+      try {
+        var rect = wrapper.getBoundingClientRect();
+        var sw = window.innerWidth || document.documentElement.clientWidth || 1;
+        var sh = window.innerHeight || document.documentElement.clientHeight || 1;
+        m.focus((e.clientX / sw) * (rect.width || 1), (e.clientY / sh) * (rect.height || 1));
+      } catch (ee) {}
+    }, { passive: true });
     function loadModel() {
       hideLive2DStatus();
       updateLive2DProgress('加载依赖库...', 0);
       _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
-        _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, { onProgress: updateLive2DProgress }).then(function () {
+        _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, { onProgress: updateLive2DProgress }).then(function (model) {
+          _live2DPageModel = model || null;
           var errorEl = document.getElementById('live2d-error');
           if (errorEl) errorEl.style.display = 'none';
           setTimeout(hideLive2DStatus, 300);

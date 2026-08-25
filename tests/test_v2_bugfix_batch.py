@@ -330,6 +330,13 @@ def test_global_live2d_head_follows_via_model_focus():
         "mousemove 未绑定到 document（全屏检测）"
     assert "(clientX / sw)" in JS, \
         "缺少鼠标屏幕坐标 → canvas 内坐标的全屏映射"
+    # 关键：Live2DLPK.load 返回 {model, app, destroy} 包装对象，必须解包取 .model
+    # （否则 model.focus 不存在，全屏跟随只剩引擎 canvas 内的局部跟随）
+    assert "result.model" in JS, \
+        "未解包 Live2DLPK.load 返回的 {model, app, destroy} 包装对象"
+    # 独立 Live2D 页同样全屏跟随
+    assert "_live2DPageModel" in JS, \
+        "独立 Live2D 页（/Live2D）缺少全屏头部跟随"
 
 
 # ── 回归 4：手机版（≤900px）不显示全局 Live2D ──
