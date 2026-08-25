@@ -422,3 +422,12 @@ def test_posts_api_supports_sort():
         "db.get_post_list 未支持 sort 参数"
     assert "comprehensive" in dbsrc, "缺少综合排序（comprehensive）实现"
 
+
+# ── 回归 13：手机端导航按钮折叠进汉堡菜单（与 V1 一致，避免右上角与搜索框重叠） ──
+def test_mobile_header_collapse_like_v1():
+    assert ".nav-setting { display: none; }" in CSS, \
+        "手机端未隐藏设置按钮（与 V1 的 header-collapsible 隐藏不一致）"
+    assert ".header-nav .nav-link:not(.header-menu-toggle) { display: none; }" in CSS, \
+        "手机端未折叠论坛/WIKI/彩蛋按钮，会导致右上角按钮与搜索框重叠"
+
+

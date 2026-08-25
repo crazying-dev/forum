@@ -576,6 +576,11 @@ textarea { resize: vertical; }
   .header-search { max-width: 180px; }
   .header-logo-text { display: none; }
   .nav-link span { display: none; }
+  /* 与 V1 一致：其余导航按钮（论坛/WIKI/彩蛋/设置）折叠进汉堡菜单，
+     避免右上角按钮挤压/重叠搜索框；只保留汉堡菜单与用户入口 */
+  .nav-setting { display: none; }
+  .header-nav .nav-link:not(.header-menu-toggle) { display: none; }
+  .header-nav { gap: 2px; }
   /* 手机/窄屏：全局 Live2D 不显示（桌面/平板才常驻左下角） */
   #global-live2d.global-live2d { display: none !important; }
   .world-panel { position: fixed; right: 0; top: 56px; height: calc(100vh - 56px); z-index: 95; transition: transform .25s ease; }
