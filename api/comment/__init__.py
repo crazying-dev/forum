@@ -68,3 +68,13 @@ def api_comment_report(comment_id):
         code = 404 if "不存在" in result.get("message", "") else 400
         return jsonify(result), code
     return jsonify(result)
+
+
+@comment_bp.route("/users/me/replies", methods=["GET"])
+@login_required
+def api_my_replies():
+    """我的回复：回复了我评论的回复列表（V1 迁移）。"""
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 50, type=int), 1), 100)
+    result = db.comment.get_replies_to_my_comments(g.user["id"], page, page_size)
+    return jsonify({"success": True, **result})

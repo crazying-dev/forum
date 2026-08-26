@@ -141,3 +141,54 @@ def report_comment(comment_id, reporter_id, reason, detail=""):
         return {"success": True}
     except Exception as e:
         return {"success": False, "message": f"举报失败: {e}"}
+
+
+def get_replies_to_my_comments(user_id, page=1, page_size=50):
+    """获取回复了当前用户评论的回复列表（含对应帖子标题）。"""
+    page = max(int(page or 1), 1)
+    page_size = min(max(int(page_size or 50), 1), 100)
+    offset = (page - 1) * page_size
+    rows = execute_query(
+        """
+        SELECT c.id, c.content, c.parent_id, c.created_at,
+               r.user_id AS replier_id, r.content AS reply_content, r.created_at AS reply_created_at,
+               u.name AS replier_name, u.avatar AS replier_avatar,
+               p.id AS post_id, p.title AS post_title
+        FROM comments c
+        JOIN comments r ON r.parent_id = c.id AND r.status = 1
+        JOIN users u ON r.user_id = u.id
+        JOIN posts p ON c.post_id = p.id
+        WHERE c.user_id = %s AND c.status = 1 AND p.status = 1
+        ORDER BY r.created_at DESC
+        LIMIT %s OFFSET %s
+        """,
+        (user_id, page_size, offset),
+        fetch_all=True,
+    )
+    count_row = execute_query(
+        """
+        SELECT COUNT(*) AS count
+        FROM comments c
+        JOIN comments r ON r.parent_id = c.id AND r.status = 1
+        WHERE c.user_id = %s AND c.status = 1
+        """,
+        (user_id,),
+        fetch=True,
+    )
+    replies = []
+    for r in rows:
+        replies.append({
+            "comment_id": r.get("id"),
+            "comment_content": r.get("content"),
+            "parent_id": r.get("parent_id"),
+            "comment_created_at": str(r.get("created_at")) if r.get("created_at") else None,
+            "replier_id": r.get("replier_id"),
+            "reply_content": r.get("reply_content"),
+            "reply_created_at": str(r.get("reply_created_at")) if r.get("reply_created_at") else None,
+            "replier_name": r.get("replier_name"),
+            "replier_avatar": r.get("replier_avatar"),
+            "post_id": r.get("post_id"),
+            "post_title": r.get("post_title"),
+        })
+    total = (count_row or {}).get("count", 0) or 0
+    return {"replies": replies, "total": total}

@@ -569,6 +569,11 @@
     return CATEGORY_MAP[key] || key;
   }
 
+  // 暴露外链安全工具给 Vue3 页面（utils.js 复用）
+  app.sanitizeHtml = _sanitizeHtml;
+  app.rewriteLinks = rewriteLinks;
+  app.isExternalLink = _isExternalLink;
+
   // ── Markdown 渲染（使用 marked.js）──
   // 配置：headerIds 关闭避免 id 冲突；mangle 关闭避免邮箱被转义；
   // 默认 marked 已对原始 HTML 做转义，这里再显式关闭内联 HTML 解析。
@@ -580,10 +585,81 @@
       gfm: true
     });
   }
+
+  // ── 外链安全：_isExternalLink 判定 + _sanitizeHtml 清洗（Markdown 渲染后调用）──
+  // 相对路径（/、#、? 开头）直接放行；协议非 http(s)（javascript:/data: 等）或
+  // hostname 非 yjlt.top / *.yjlt.top 一律视为外部链接 → 改写为 /GoTo?to=<encoded> 安全确认页。
+  function _isExternalLink(href) {
+    if (!href) return false;
+    var h = String(href).trim();
+    if (!h) return false;
+    if (h.charAt(0) === '/' || h.charAt(0) === '#' || h.charAt(0) === '?') return false;
+    var m = h.match(/^([a-zA-Z][a-zA-Z0-9+.\-]*):/);
+    if (m) {
+      var proto = m[1].toLowerCase();
+      if (proto !== 'http' && proto !== 'https') return true;
+      try {
+        var host = new URL(h).hostname;
+        if (host === 'yjlt.top' || host.slice(-9) === '.yjlt.top') return false;
+      } catch (e) { return true; }
+      return true;
+    }
+    // 无协议的非相对地址（如 www.example.com）→ 外部
+    return true;
+  }
+  function _sanitizeHtml(html) {
+    if (!html) return '';
+    var doc;
+    try { doc = new DOMParser().parseFromString(html, 'text/html'); }
+    catch (e) { return html; }
+    // 移除危险标签
+    ['script', 'iframe', 'embed', 'object', 'applet', 'base', 'form',
+     'input', 'textarea', 'select', 'option', 'button', 'link', 'meta',
+     'style', 'svg', 'math', 'frame', 'frameset', 'video', 'audio', 'source'].forEach(function (tag) {
+      var els = doc.querySelectorAll(tag);
+      for (var i = els.length - 1; i >= 0; i--) {
+        if (els[i].parentNode) els[i].parentNode.removeChild(els[i]);
+      }
+    });
+    // 移除所有事件属性 onXxx=...
+    var nodes = doc.body.querySelectorAll('*');
+    for (var j = 0; j < nodes.length; j++) {
+      var attrs = nodes[j].attributes;
+      for (var k = attrs.length - 1; k >= 0; k--) {
+        if (/^on/i.test(attrs[k].name)) nodes[j].removeAttribute(attrs[k].name);
+      }
+    }
+    // 外部链接 → /GoTo 安全确认；所有链接补 rel/target
+    var links = doc.body.querySelectorAll('a[href]');
+    for (var l = 0; l < links.length; l++) {
+      var a = links[l];
+      var href = a.getAttribute('href');
+      if (_isExternalLink(href)) {
+        a.setAttribute('href', '/GoTo?to=' + encodeURIComponent(href));
+      }
+      a.setAttribute('rel', 'nofollow noopener noreferrer');
+      a.setAttribute('target', '_blank');
+    }
+    return doc.body.innerHTML;
+  }
+  function rewriteLinks(container) {
+    if (!container) return;
+    var links = container.querySelectorAll('a[href]');
+    for (var l = 0; l < links.length; l++) {
+      var a = links[l];
+      var href = a.getAttribute('href');
+      if (_isExternalLink(href)) {
+        a.setAttribute('href', '/GoTo?to=' + encodeURIComponent(href));
+      }
+      a.setAttribute('rel', 'nofollow noopener noreferrer');
+      a.setAttribute('target', '_blank');
+    }
+  }
+
   function renderMarkdown(text) {
     if (!text) return '';
     if (typeof marked !== 'undefined' && marked.parse) {
-      try { return marked.parse(text); } catch (e) {}
+      try { return _sanitizeHtml(marked.parse(text)); } catch (e) {}
     }
     // 兜底：纯文本展示
     return '<p>' + esc(text) + '</p>';
@@ -602,6 +678,30 @@
       '<span>' + fmtTime(p.created_at) + '</span>' +
       '</div></div>'
     );
+  }
+
+  // ── 鼠标 Liunx 页：异步拉取 README.md / LICENSE 展示（全部同站本地资源）──
+  var MOUSE_BASE = '/static/mouse/Liunx/';
+  function initMouseLinuxPage() {
+    var markdownBox = el('Markdown');
+    if (!markdownBox) return;
+    var base = MOUSE_BASE;
+    var lang = (new URLSearchParams(location.search).get('l') || '').toUpperCase();
+    var readmeName = lang === 'EN' ? 'README_en-US.md' : 'README.md';
+    fetch(base + readmeName).then(function (r) { return r.text(); }).then(function (text) {
+      markdownBox.innerHTML = renderMarkdown(text);
+      enhanceContent(markdownBox);
+    }).catch(function () {
+      markdownBox.innerHTML = '<p class="wiki-intro">README 加载失败，请稍后重试。</p>';
+    });
+    var licenseBox = el('LICENSE');
+    if (licenseBox) {
+      fetch(base + 'LICENSE').then(function (r) { return r.text(); }).then(function (text) {
+        licenseBox.textContent = text;
+      }).catch(function () {
+        licenseBox.textContent = 'LICENSE 加载失败';
+      });
+    }
   }
 
   // ── 首页 ──
@@ -720,9 +820,11 @@
     load(true);
   }
 
-  // ── 内容后处理：懒加载 + 复制代码按钮 ──
+  // ── 内容后处理：懒加载 + 复制代码按钮 + 外链改写 ──
   function enhanceContent(container) {
     if (!container) return;
+    // 外部链接 → /GoTo 安全确认页；补 rel/target
+    rewriteLinks(container);
     // 图片懒加载（原生 loading=lazy）
     container.querySelectorAll('img').forEach(function (img) {
       if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy');
@@ -1364,6 +1466,51 @@
   }
   // 暴露给 Vue3 页面复用（举报弹窗）
   window.__yoyoApp.openReportModal = openReportModal;
+
+  // ── Bug 反馈弹窗（页脚「反馈 Bug」）──
+  function initBugModal() {
+    var modal = el('bugModal');
+    if (!modal) return;
+    var openBtn = el('bugReportBtn');
+    var close = el('bugClose'), cancel = el('bugCancel');
+    function show() {
+      el('bugTitle').value = '';
+      el('bugDetail').value = '';
+      el('bugSteps').value = '';
+      el('bugContact').value = '';
+      var err = el('bugError');
+      if (err) { err.textContent = ''; err.style.color = ''; }
+      modal.style.display = 'flex';
+    }
+    function hide() { modal.style.display = 'none'; }
+    if (openBtn) openBtn.addEventListener('click', show);
+    if (close) close.addEventListener('click', hide);
+    if (cancel) cancel.addEventListener('click', hide);
+    modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
+    var submit = el('bugSubmit');
+    if (submit) submit.addEventListener('click', function () {
+      var err = el('bugError');
+      var title = el('bugTitle').value.trim();
+      var detail = el('bugDetail').value.trim();
+      if (!title) { if (err) err.textContent = '请填写 Bug 标题'; return; }
+      if (!detail) { if (err) err.textContent = '请填写详细描述'; return; }
+      submit.disabled = true;
+      apiFetch('/api/report-bug', {
+        method: 'POST',
+        body: {
+          title: title,
+          detail: detail,
+          steps: el('bugSteps').value.trim(),
+          contact: el('bugContact').value.trim(),
+          page_url: location.pathname + location.search
+        }
+      }).then(function (d) {
+        if (d && d.success) { toast('Bug 已提交，感谢反馈'); hide(); }
+        else if (err) { err.textContent = (d && d.message) || '提交失败'; }
+      }).catch(function () { if (err) err.textContent = '网络错误'; })
+        .finally(function () { submit.disabled = false; });
+    });
+  }
   function initContextMenu() {
     var menu = el('ctxMenu');
     if (!menu) return;
@@ -1454,6 +1601,7 @@
     else if (path === '/search') initSearch();
     else if (/^\/users\//.test(path)) initUserPage();
     else if (/^\/(login|register|auth|reset-password)(\/|$)/.test(path)) initAuthPage();
+    else if (path === '/WIKI/Personal/mouse/Liunx') initMouseLinuxPage();
     else if (path === '/Live2D') initLive2D();
     // 非 Live2D 页面启用全局浮动 Live2D
     if (path !== '/Live2D') initGlobalLive2D();
@@ -1467,6 +1615,7 @@
     initEditModal();
     initUserListModal();
     initReportModal();
+    initBugModal();
     initContextMenu();
     // 解析页面已有（SSR/模板直接生成）的头像 img[data-src]，不等接口回来，立即异步触发加载。
     resolveAvatarDeferred(document);
@@ -1503,78 +1652,47 @@
       if (errorEl) errorEl.style.display = 'flex';
     } catch (e) {}
   }
-  // ── Live2D 常量（同站主路径 + CDN 兜底回退）──
+  // ── Live2D 常量（全部同站本地资源，无 CDN 依赖）──
   var LPK_LOCAL   = '/static/live2d/HEI.lpk';
-  var LPK_CDN     = 'https://assets.crazying-dev.top/text/one/Live2D/HEI.lpk';
   var LPKSCRIPT_LOCAL = '/static/live2d/js/Live2DLPK.js';
-  var LPKSCRIPT_CDN   = 'https://assets.crazying-dev.top/text/one/JS/Live2DLPK.js';
 
-  // 加载 Live2DLPK.js 引擎：优先同站本地，失败回退 CDN
-  function _loadLpkScript(localUrl, cdnUrl) {
+  // 加载 Live2DLPK.js 引擎（同站本地）
+  function _loadLpkScript(src) {
     return new Promise(function (resolve, reject) {
       if (typeof Live2DLPK !== 'undefined') { resolve(); return; }
-      var done = false;
-      function tryLoad(src, onFail) {
-        var s = document.createElement('script');
-        s.src = src;
-        s.onload = function () { if (!done) { done = true; resolve(); } };
-        s.onerror = function () {
-          if (done) return;
-          if (typeof onFail === 'function') onFail();
-          else { done = true; reject(new Error('Live2DLPK 加载失败: ' + src)); }
-        };
-        document.head.appendChild(s);
-      }
-      tryLoad(localUrl, function () { tryLoad(cdnUrl); });
+      var s = document.createElement('script');
+      s.src = src;
+      s.onload = function () { resolve(); };
+      s.onerror = function () { reject(new Error('Live2DLPK 加载失败: ' + src)); };
+      document.head.appendChild(s);
     });
   }
 
-  // 预加载 JSZip 到全局：引擎内部固定从 cdn.jsdelivr.net 拉 JSZip，
-  // 国内手机网络经常无法访问 jsdelivr（挂起无报错 → 引擎永不初始化 → 模型不显示）。
+  // 预加载 JSZip 到全局：引擎默认会自行拉取依赖，提前注入可避免网络依赖、加速初始化。
   // 只要 window.JSZip 已存在，引擎 loadScripts() 的 typeof 检查会直接跳过该依赖。
   function _ensureJSZip() {
     return new Promise(function (resolve) {
       if (typeof JSZip !== 'undefined') { resolve(); return; }
-      var srcs = [
-        '/static/live2d/js/jszip.min.js',                                  // 同站本地（服务器可放）
-        'https://registry.npmmirror.com/jszip/3.10.1/files/dist/jszip.min.js',  // 国内镜像
-        'https://cdn.staticfile.org/jszip/3.10.1/jszip.min.js',            // 国内 staticfile
-        'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'                 // 兜底
-      ];
-      var i = 0;
-      function tryNext() {
-        if (i >= srcs.length) { resolve(); return; }   // 全部失败也不阻塞，交给引擎自身逻辑
-        var s = document.createElement('script');
-        s.src = srcs[i++];
-        s.onload = function () { resolve(); };
-        s.onerror = function () { tryNext(); };
-        document.head.appendChild(s);
-      }
-      tryNext();
+      var s = document.createElement('script');
+      s.src = '/static/live2d/js/jszip.min.js';
+      s.onload = function () { resolve(); };
+      s.onerror = function () { resolve(); };  // 加载失败不阻塞，交给引擎自身逻辑
+      document.head.appendChild(s);
     });
   }
 
-  // 加载 LPK 模型：优先同站本地，失败回退 CDN（Live2DLPK.load Promise 失败时切换 URL 重试）
-  function _loadLpkModel(localUrl, cdnUrl, wrapper, opts) {
-    function doLoad(url, fallback) {
-      // 引擎内部用 `new PIXI.Application(...)` 渲染，默认黑色背景。
-      // 在其创建 Application 之前把 PIXI.Application 包装为透明版（backgroundAlpha=0）。
-      _ensurePixiTransparent();
-      return Live2DLPK.load(url, wrapper, opts || {}).then(function (result) {
-        // 注意：Live2DLPK.load 返回的是 { model, app, destroy } 包装对象，
-        // 必须解包取真正的 Live2DModel 实例（否则 focus/motion 等方法不可用）。
-        var loaded = (result && result.model) || result;
-        _makeTransparent(loaded, wrapper);
-        return loaded;
-      }).catch(function (err) {
-        if (fallback) {
-          console.warn('[Live2D] 本地模型加载失败(' + url + ')，回退 CDN: ' + fallback);
-          return doLoad(fallback, null);
-        }
-        throw err;
-      });
-    }
-    return doLoad(localUrl, cdnUrl);
+  // 加载 LPK 模型（同站本地）
+  function _loadLpkModel(url, wrapper, opts) {
+    // 引擎内部用 `new PIXI.Application(...)` 渲染，默认黑色背景。
+    // 在其创建 Application 之前把 PIXI.Application 包装为透明版（backgroundAlpha=0）。
+    _ensurePixiTransparent();
+    return Live2DLPK.load(url, wrapper, opts || {}).then(function (result) {
+      // 注意：Live2DLPK.load 返回的是 { model, app, destroy } 包装对象，
+      // 必须解包取真正的 Live2DModel 实例（否则 focus/motion 等方法不可用）。
+      var loaded = (result && result.model) || result;
+      _makeTransparent(loaded, wrapper);
+      return loaded;
+    });
   }
 
   // 把 PIXI.Application 替换为透明版：无论引擎传什么参数，都强制 backgroundAlpha=0（透明背景）。
@@ -1678,8 +1796,8 @@
     function loadModel() {
       hideLive2DStatus();
       updateLive2DProgress('加载依赖库...', 0);
-      _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
-        _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, { onProgress: updateLive2DProgress }).then(function (model) {
+      _loadLpkScript(LPKSCRIPT_LOCAL).then(function () {
+        _loadLpkModel(LPK_LOCAL, wrapper, { onProgress: updateLive2DProgress }).then(function (model) {
           _live2DPageModel = model || null;
           var errorEl = document.getElementById('live2d-error');
           if (errorEl) errorEl.style.display = 'none';
@@ -1767,9 +1885,9 @@
     // LPK 模型异步加载：等待页面完全加载后再启动（不拖慢首屏渲染、不与页面数据争抢带宽）。
     // 引擎内部 loadScripts/downloadLPK/JSZip 解压均为异步；PIXI 初始化在最后阶段才同步执行。
     function startLpkLoad() {
-      _loadLpkScript(LPKSCRIPT_LOCAL, LPKSCRIPT_CDN).then(function () {
-        // 传入 wrapper（含 canvas），按 wrapper 尺寸渲染；本地失败自动回退 CDN
-        _loadLpkModel(LPK_LOCAL, LPK_CDN, wrapper, {}).then(function (model) {
+      _loadLpkScript(LPKSCRIPT_LOCAL).then(function () {
+        // 传入 wrapper（含 canvas），按 wrapper 尺寸渲染
+        _loadLpkModel(LPK_LOCAL, wrapper, {}).then(function (model) {
           // 保存模型实例，供全屏鼠标跟随直接驱动 model.focus（头部跟随）
           _globalLive2DModel = model || null;
           // 初始：视线回正（focus 为函数时传画布中心坐标，否则对象属性置 0.5）

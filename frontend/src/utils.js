@@ -57,19 +57,37 @@ export function categoryLabel(c) {
 }
 
 // ── Markdown 渲染（复用 base.html 全局 marked，与 AfterBody renderMarkdown 一致） ──
+// 渲染结果经外链清洗（_sanitizeHtml）：危险标签/事件属性移除，外部链接改写为 /GoTo 安全确认页
+export function sanitizeHtml(html) {
+  return app.sanitizeHtml ? app.sanitizeHtml(html) : html
+}
+export function isExternalLink(href) {
+  return app.isExternalLink ? app.isExternalLink(href) : false
+}
+export function rewriteLinks(container) {
+  if (app.rewriteLinks) return app.rewriteLinks(container)
+  if (!container) return
+  container.querySelectorAll('a[href]').forEach((a) => {
+    const href = a.getAttribute('href')
+    if (isExternalLink(href)) a.setAttribute('href', '/GoTo?to=' + encodeURIComponent(href))
+    a.setAttribute('rel', 'nofollow noopener noreferrer')
+    a.setAttribute('target', '_blank')
+  })
+}
 export function renderMarkdown(text) {
   if (!text) return ''
   if (typeof marked !== 'undefined' && marked.parse) {
     try {
-      return marked.parse(text)
+      return sanitizeHtml(marked.parse(text))
     } catch (e) { /* 失败走兜底 */ }
   }
   return '<p>' + esc(text) + '</p>'
 }
 
-// 内容后处理：图片懒加载 + 代码块复制按钮（与 AfterBody enhanceContent 一致）
+// 内容后处理：图片懒加载 + 代码块复制按钮 + 外链改写（与 AfterBody enhanceContent 一致）
 export function enhanceContent(container) {
   if (!container) return
+  rewriteLinks(container)
   container.querySelectorAll('img').forEach(function (img) {
     if (!img.getAttribute('loading')) img.setAttribute('loading', 'lazy')
   })

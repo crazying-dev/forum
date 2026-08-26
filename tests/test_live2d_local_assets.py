@@ -30,18 +30,8 @@ TEMPLATE_FORBIDDEN_PATTERNS = [
     r"//img\.crazying-dev\.top.*(WIKI|wiki\.|fw658|R-C)",
 ]
 
-# 脚本中的 CDN 仅允许用于以下常量声明（白名单模式）：
-#   LPK_CDN = 'https://assets.crazying-dev.top/.../HEI.lpk'
-#   LPKSCRIPT_CDN = 'https://assets.crazying-dev.top/.../Live2DLPK.js'
-# 其他位置出现 crazying-dev 视为"直接调用 CDN 当主路径"的遗留残留，禁止。
-ALLOWED_CDN_LINES = [
-    "LPK_CDN",
-    "LPKSCRIPT_CDN",
-    # 以及控制台回退日志中可能出现的提示文本"crazying-dev...HEI.lpk"，用模式做白名单
-    r"console\.(warn|log|error)\([^)]*crazying",
-    r"回退 CDN:",
-    r"[^\w]fallback[^\w]",
-]
+# 脚本中也完全禁止任何外站 CDN（资源已全部复制到项目内，无白名单例外）
+ALLOWED_CDN_LINES = []
 
 
 def _read(path):
@@ -57,7 +47,7 @@ def _is_allowed_cdn_line(line):
 
 
 def test_no_cross_origin_cdn_references():
-    """模板文件中禁止任何 Live2D/WIKI 跨域 CDN 引用；脚本中仅允许 *_CDN 常量白名单。"""
+    """模板与脚本中均禁止任何 Live2D/WIKI 跨域 CDN 引用（完全本地化）。"""
     bad_lines = []
     for name, path in TARGET_FILES.items():
         if not os.path.exists(path):
@@ -85,27 +75,18 @@ def test_no_cross_origin_cdn_references():
 
 
 def test_afterbody_local_live2d_paths():
-    """AfterBody.js 中主路径必须用同站 /static/live2d/；CDN 只可存在于 *_CDN 兜底常量。"""
+    """AfterBody.js 中 Live2D 主路径必须用同站 /static/live2d/；完全禁止 CDN 兜底常量。"""
     js = _read(TARGET_FILES["AfterBody.js"])
     # Live2DLPK.js 至少 2 处（LPKSCRIPT_LOCAL 常量 + 主逻辑使用）
     assert EXPECTED_LIVE2D_JS in js, f"AfterBody.js 未使用同站 {EXPECTED_LIVE2D_JS}"
     # HEI.lpk 至少 2 处（LPK_LOCAL 常量 + 主逻辑使用）
     assert EXPECTED_LPK in js, f"AfterBody.js 未使用同站 {EXPECTED_LPK}"
-    # 白名单常量必须存在（保证 fallback 兜底可用）
-    assert "LPK_CDN" in js, "缺少 LPK_CDN 兜底常量"
-    assert "LPKSCRIPT_CDN" in js, "缺少 LPKSCRIPT_CDN 兜底常量"
-    # 任何 <script src="https://assets.crazying-dev.top/..."> 当主路径用的遗留写法禁止：
-    # 即除了 *_CDN = '...' 这一赋值行外，不能再有其它 crazying-dev.top/text/one/ 的字符串。
-    # 做法：剥离白名单行后，不应再匹配 Live2D/JS + crazying-dev
-    cleaned_lines = []
-    for line in js.splitlines():
-        if _is_allowed_cdn_line(line):
-            continue
-        cleaned_lines.append(line)
-    stripped = "\n".join(cleaned_lines)
-    assert "crazying-dev.top" not in stripped, (
-        "AfterBody.js 存在非白名单位置的 crazying-dev 引用（请确认仅 *_CDN 常量包含 CDN URL）"
-    )
+    # 不再允许任何 CDN 兜底常量 / 外站域名
+    assert "LPK_CDN" not in js, "AfterBody.js 不应再存在 LPK_CDN 兜底常量"
+    assert "LPKSCRIPT_CDN" not in js, "AfterBody.js 不应再存在 LPKSCRIPT_CDN 兜底常量"
+    assert "crazying-dev.top" not in js, "AfterBody.js 不应再引用 crazying-dev.top"
+    for host in ["jsdelivr.net", "unpkg.com", "staticfile.org", "npmmirror.com"]:
+        assert host not in js, f"AfterBody.js 不应再引用外站域名 {host}"
 
 
 def test_live2d_html_gif_local():

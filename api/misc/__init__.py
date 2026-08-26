@@ -12,7 +12,7 @@ import random
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, jsonify, Response, request, render_template
 
 import db
 
@@ -74,3 +74,20 @@ def api_rss():
 def request_url_root():
     from flask import request
     return request.host_url.rstrip("/")
+
+
+@misc_bp.route("/api/login/otherAPP", methods=["GET"])
+def api_login_other_app():
+    """第三方应用授权登录（TheDoorOfBings）。
+
+    校验 app_id 后渲染 oauth.html，页面读取当前登录用户并确认后
+    重定向到 http://localhost:<port>/callback?user=<JSON>。
+    """
+    app_id = (request.args.get("app_id") or "").strip()
+    port = (request.args.get("port") or "").strip()
+    if app_id != "TheDoorOfBings":
+        return jsonify({"success": False, "message": "Unknown app"}), 400
+    # 端口必须为数字，防止注入
+    if not port.isdigit() or not (1 <= int(port) <= 65535):
+        return jsonify({"success": False, "message": "Invalid port"}), 400
+    return render_template("oauth.html", port=port)

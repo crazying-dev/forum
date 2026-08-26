@@ -319,6 +319,9 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .form-group { margin-bottom: 14px; }
 .form-group label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .form-group input, .form-group textarea, .form-group select { width: 100%; }
+.code-row { display: flex; gap: 8px; }
+.code-row input { flex: 1; min-width: 0; }
+.code-row .btn { flex-shrink: 0; white-space: nowrap; }
 
 /* ── 帖子列表（v1 风格：无容器背景边框，纯内容流） ── */
 .post-list { display: flex; flex-direction: column; gap: 6px; }

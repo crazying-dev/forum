@@ -1,6 +1,5 @@
-"""验证 HEI.lpk 配套：Windows 下载脚本存在 + AfterBody.js fallback CDN 兜底逻辑。"""
+"""验证 HEI.lpk 配套：Windows 下载脚本存在 + AfterBody.js 完全本地化（无 CDN 兜底）。"""
 import os
-import re
 import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,37 +25,26 @@ def test_windows_powershell_download_script_exists():
     assert os.path.isfile(SH_SCRIPT), "缺失 Linux bash 下载脚本"
 
 
-def test_afterbody_lpk_fallback_cdn_on_missing_local():
-    """AfterBody.js 在本地 /static/live2d/HEI.lpk 下载失败时必须回退 CDN URL。"""
+def test_afterbody_lpk_local_only():
+    """AfterBody.js 的 HEI.lpk 主路径必须是同站，且不再有 CDN fallback。"""
     js = _read(AFTERBODY_JS)
-    # 主路径是同站 /static/live2d/HEI.lpk
     assert "/static/live2d/HEI.lpk" in js, "AfterBody.js 缺失同站 HEI.lpk 主路径"
-    # fallback CDN URL 必须存在（本地文件缺失时的兜底）
-    assert re.search(r"assets\.crazying-dev\.top.*HEI\.lpk", js), (
-        "AfterBody.js 未提供 HEI.lpk 的 CDN fallback 逻辑"
-    )
-    # 必须能看出"失败 → 回退"结构：.catch 或者 onError 里切换 URL 再重试
-    has_catch = "catch" in js and ("retry" in js.lower() or "fallback" in js.lower() or "cdn" in js.lower()
-                                     or "crazying-dev" in js)
-    assert has_catch, "AfterBody.js 未实现 catch/失败重试 → fallback 的结构"
+    assert "crazying-dev.top" not in js, "AfterBody.js 不应再引用外站 CDN"
 
 
-def test_afterbody_js_loader_fallback_cdn():
-    """AfterBody.js 在本地 /static/live2d/js/Live2DLPK.js 加载失败（onerror）时必须 fallback 到 CDN。"""
+def test_afterbody_js_loader_local_only():
+    """AfterBody.js 的 Live2DLPK.js 只从同站加载，无 CDN fallback。"""
     js = _read(AFTERBODY_JS)
     assert "/static/live2d/js/Live2DLPK.js" in js, "AfterBody.js 缺失同站 JS 主路径"
-    assert re.search(r"assets\.crazying-dev\.top.*Live2DLPK\.js", js), (
-        "AfterBody.js 未提供 Live2DLPK.js 的 CDN fallback"
-    )
-    # onerror 或 .catch 中触发 fallback
+    assert "assets.crazying-dev.top" not in js, "AfterBody.js 不应再引用外站 CDN"
     assert "onerror" in js or "catch" in js, "AfterBody.js 缺少 script.onerror / Promise.catch 错误处理"
 
 
 if __name__ == "__main__":
     tests = [
         ("test_windows_powershell_download_script_exists", test_windows_powershell_download_script_exists),
-        ("test_afterbody_lpk_fallback_cdn_on_missing_local", test_afterbody_lpk_fallback_cdn_on_missing_local),
-        ("test_afterbody_js_loader_fallback_cdn", test_afterbody_js_loader_fallback_cdn),
+        ("test_afterbody_lpk_local_only", test_afterbody_lpk_local_only),
+        ("test_afterbody_js_loader_local_only", test_afterbody_js_loader_local_only),
     ]
     passed = 0
     failed = 0

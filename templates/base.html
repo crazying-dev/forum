@@ -12,9 +12,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="妖精论坛">
 <link rel="apple-touch-icon" href="/static/img/favicon.png">
-<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="/static/css/font-awesome.min.css">
 <link rel="stylesheet" href="/static/css/main.css?v={{ static_version }}">
-<script src="//cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="/static/js/marked.min.js"></script>
 <script>
 // 防闪屏：按 localStorage 或时间判断主题
 (function () {
@@ -100,6 +100,7 @@
   <div class="footer-inner">
     <div class="footer-links">
       <a href="/privacy">隐私</a>
+      <a href="javascript:void(0)" id="bugReportBtn">反馈 Bug</a>
       <a href="https://github.com/crazying-dev" target="_blank" rel="noopener">Github</a>
       <a href="https://crazying-dev.top" target="_blank" rel="noopener">crazying-dev.top</a>
     </div>
@@ -148,6 +149,37 @@
     <div class="modal-actions">
       <button class="btn btn-outline" id="reportCancel">取消</button>
       <button class="btn btn-primary" id="reportSubmit">提交举报</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bug 反馈弹窗 -->
+<div class="modal-mask" id="bugModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa fa-bug"></i> 反馈 Bug</h3>
+      <button class="modal-close" id="bugClose">&times;</button>
+    </div>
+    <div class="form-group">
+      <label>标题</label>
+      <input id="bugTitle" type="text" maxlength="200" placeholder="一句话描述问题">
+    </div>
+    <div class="form-group">
+      <label>详细描述</label>
+      <textarea id="bugDetail" rows="4" maxlength="5000" placeholder="发生了什么？期望行为是什么？"></textarea>
+    </div>
+    <div class="form-group">
+      <label>复现步骤（可选）</label>
+      <textarea id="bugSteps" rows="3" maxlength="3000" placeholder="1. ... 2. ..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>联系方式（可选）</label>
+      <input id="bugContact" type="text" maxlength="200" placeholder="邮箱 / QQ，便于回复">
+    </div>
+    <p class="auth-error" id="bugError"></p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="bugCancel">取消</button>
+      <button class="btn btn-primary" id="bugSubmit">提交反馈</button>
     </div>
   </div>
 </div>

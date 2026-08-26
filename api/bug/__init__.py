@@ -8,12 +8,16 @@ from __future__ import annotations
 from flask import Blueprint, request, jsonify, g
 
 import db
+from api.ratelimit import rate_limit
 
 bug_bp = Blueprint("bug", __name__)
 
 
 @bug_bp.route("/report-bug", methods=["POST"])
 def api_report_bug():
+    if rate_limit("bug_report", 5, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     detail = (data.get("detail") or "").strip()

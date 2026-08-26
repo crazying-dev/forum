@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import os
+import threading
 import time
 from functools import wraps
 from typing import Callable
@@ -23,6 +24,7 @@ from flask import Blueprint, request, jsonify, g, make_response
 import config
 import db
 import tool
+from api.ratelimit import rate_limit
 from api.encrypt import (
     generate_login_token,
     verify_login_token,
@@ -30,6 +32,7 @@ from api.encrypt import (
     validate_username,
     is_valid_email,
 )
+from Email import send_email, build_email_html
 
 user_bp = Blueprint("user", __name__)
 
@@ -145,6 +148,9 @@ def api_user_login():
     data = request.get_json(silent=True) or {}
     tool.GETIP(_client_ip())
 
+    if rate_limit("login", 10, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+
     password = data.get("password")
     name = (data.get("name") or "").strip() or None
     email = (data.get("email") or "").strip() or None
@@ -173,6 +179,33 @@ def api_user_login():
         "user": public_user,
     }))
     _set_auth_cookies(resp, token_full, userinfo["id"])
+
+    # 登录提醒邮件（异步发送，不阻塞登录）
+    user_email = userinfo.get("email")
+    if user_email:
+        def _send_login_notice():
+            try:
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                plain = (
+                    f"尊敬的 {userinfo['name']}，您好！\n\n"
+                    f"您的账号已于 {now_str} 登录妖精论坛。\n"
+                    f"如非本人操作，请立即修改密码。\n\n"
+                    f"© 2026 妖精论坛 - 粉丝公益创作"
+                )
+                html = build_email_html(
+                    label="登录提醒",
+                    title="您的账号已登录",
+                    body_lines=[
+                        f"尊敬的 <strong style=\"color:#6A8C89;\">{userinfo['name']}</strong>，您好！",
+                        f"您的账号已于 <strong>{now_str}</strong> 登录妖精论坛。",
+                        "如非本人操作，请立即修改密码。",
+                    ],
+                )
+                send_email("【妖精论坛】登录提醒", plain, receiver_list=[user_email], html_content=html)
+            except Exception:
+                pass  # 邮件发送失败不影响登录流程
+        threading.Thread(target=_send_login_notice, daemon=True).start()
+
     return resp
 
 
@@ -200,9 +233,13 @@ def api_user_register():
     data = request.get_json(silent=True) or {}
     tool.GETIP(_client_ip())
 
+    if rate_limit("register", 5, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").strip()
     password = data.get("password") or ""
+    code = (data.get("code") or "").strip()
 
     ok, msg = validate_username(name)
     if not ok:
@@ -213,9 +250,28 @@ def api_user_register():
     if not ok:
         return jsonify({"success": False, "message": msg}), 400
 
+    # 注册验证码校验（V1 迁移：注册必须凭邮箱验证码）
+    if not code or not code.isdigit() or len(code) != 6:
+        return jsonify({"success": False, "message": "请输入6位数字验证码"}), 400
+    code_info = db.verify.get_verify_code(email, code, "register")
+    if not code_info:
+        db.verify.increment_verify_code_attempts(email, "register")
+        return jsonify({"success": False, "message": "验证码无效或已过期"}), 400
+
     result = db.user.create_user(name=name, email=email, raw_password=password)
     if not result.get("success"):
         return jsonify(result), 400
+
+    # 验证码校验通过，标记已使用并清理过期记录
+    db.verify.mark_verify_code_used(email, code, "register")
+    try:
+        db.execute_query(
+            "DELETE FROM verify_codes WHERE email = %s AND purpose = %s "
+            "AND (expires_at < CURRENT_TIMESTAMP OR used = 1)",
+            (email, "register"),
+        )
+    except Exception:
+        pass
 
     # 注册即登录：查回用户记录，生成 token 写 cookie
     user = db.user.get_user_by_id(result["id"])
