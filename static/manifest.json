@@ -11,13 +11,13 @@
   "lang": "zh-CN",
   "icons": [
     {
-      "src": "https://img.crazying-dev.top/text/one/favicon.png",
+      "src": "/static/img/favicon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "https://img.crazying-dev.top/text/one/favicon.png",
+      "src": "/static/img/favicon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

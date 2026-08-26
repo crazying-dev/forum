@@ -313,17 +313,20 @@ def test_batch_all_19_checkpoints_covered():
     assert not missing, f"缺失对应测试: {missing}"
 
 
-# ── 回归 1：默认随机头像列表恢复为 v1 原始列表 ──
+# ── 回归 1：默认随机头像列表恢复为 v1 原始列表（同站路径） ──
 def test_default_avatars_restored_to_v1():
     import config
     expected = [
-        "https://img.crazying-dev.top/text/one/avatars/LaoJun.png",
-        "https://img.crazying-dev.top/text/one/avatars/LuoXiaoHei1.png",
-        "https://img.crazying-dev.top/text/one/avatars/LuoXiaoHei2.png",
-        "https://img.crazying-dev.top/text/one/avatars/MuXiZi.png",
+        "/static/img/avatars/LaoJun.png",
+        "/static/img/avatars/LuoXiaoHei1.png",
+        "/static/img/avatars/LuoXiaoHei2.png",
+        "/static/img/avatars/MuXiZi.png",
     ]
     assert config.DEFAULT_AVATARS == expected, \
         f"默认头像列表被改动: {config.DEFAULT_AVATARS}"
+    # 同站请求：不允许再指向跨域 img.crazying-dev.top
+    for url in config.DEFAULT_AVATARS:
+        assert url.startswith("/static/"), f"默认头像应使用同站 /static/ 路径: {url}"
 
 
 # ── 回归 2：头部栏自身头像异步写入后立即解析 data-src ──

@@ -6,7 +6,7 @@ var CACHE_URLS = [
   '/static/css/main.css?v=6',
   '/static/js/AfterBody.js?v=6',
   '/static/manifest.json',
-  'https://img.crazying-dev.top/text/one/favicon.png'
+  '/static/img/favicon.png'
 ];
 
 // 安装：预缓存核心资源

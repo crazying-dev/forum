@@ -249,10 +249,10 @@ USER_ID_PREFIX = "RL"  # 新注册用户 ID 前缀（与旧库一致）
 ALLOWED_USER_PREFIXES = ["HG", "YJ", "RL"]  # 仅允许这三种 ID 前缀
 vip = "0"
 DEFAULT_AVATARS = [
-    "https://img.crazying-dev.top/text/one/avatars/LaoJun.png",
-    "https://img.crazying-dev.top/text/one/avatars/LuoXiaoHei1.png",
-    "https://img.crazying-dev.top/text/one/avatars/LuoXiaoHei2.png",
-    "https://img.crazying-dev.top/text/one/avatars/MuXiZi.png",
+    "/static/img/avatars/LaoJun.png",
+    "/static/img/avatars/LuoXiaoHei1.png",
+    "/static/img/avatars/LuoXiaoHei2.png",
+    "/static/img/avatars/MuXiZi.png",
 ]
 # ──────────────────────────────────────────────────────────────
 # 业务模块配置（forum-new 全量 API）

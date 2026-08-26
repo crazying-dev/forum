@@ -98,4 +98,4 @@ def live2d():
 
 @pages_bp.route("/favicon.ico")
 def favicon():
-    return redirect("https://img.crazying-dev.top/text/one/favicon.png")
+    return redirect(url_for("static", filename="img/favicon.png"))
