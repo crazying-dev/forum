@@ -530,6 +530,23 @@ def test_sidebar_toggle_and_top_mode():
     assert "[data-egg]" in JS and "[data-settings]" in JS, "JS 未同时绑定 侧边栏+头部栏 的入口"
 
 
+# ── 回归 18b：桌面端去除展开/收起按钮，改为鼠标悬浮展开、离开收起（手机端保留按钮） ──
+def test_sidebar_hover_expand_desktop():
+    # 按钮保留在 HTML（手机端需显示）
+    assert 'id="sideNavToggle"' in BASE_HTML, "展开/收起按钮不应从 HTML 移除（手机端需显示）"
+    # 桌面端（min-width: 901px）隐藏该按钮
+    m = re.search(
+        r"@media \(min-width: 901px\)\s*\{[^}]*#sideNavToggle\s*\{\s*display:\s*none",
+        CSS,
+    )
+    assert m, "桌面端未隐藏展开/收起按钮（@media 901px+ 内 #sideNavToggle 应为 display:none）"
+    # JS：鼠标悬浮侧边栏展开（仅桌面，innerWidth 判断）
+    assert "mouseenter" in JS, "缺少鼠标悬浮展开逻辑"
+    assert "setSideNavExpanded(true)" in JS, "缺少悬浮展开时的展开调用"
+    assert re.search(r"mouseenter[\s\S]{0,80}?window\.innerWidth <= 900", JS), \
+        "悬浮展开未限定桌面端（应跳过手机端）"
+
+
 # ── 回归 15：评论输入框高度（rows=2） ──
 def test_comment_textarea_rows_two():
     assert 'id="commentContent" rows="2"' in POST_DETAIL_HTML, \

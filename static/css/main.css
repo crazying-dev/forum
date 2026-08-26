@@ -226,6 +226,8 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 
 /* 顶部模式（桌面）：导航与头部栏合并（隐藏左侧边栏），显示 header-nav */
 @media (min-width: 901px) {
+  /* 桌面端去除展开/收起按钮：改为鼠标悬浮展开、离开收起 */
+  #sideNavToggle { display: none; }
   body.nav-mode-top { padding-left: 0; }
   body.nav-mode-top .side-nav { display: none; }
   body.nav-mode-top .header-nav { display: flex; }

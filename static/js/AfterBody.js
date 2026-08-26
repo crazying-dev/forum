@@ -207,15 +207,19 @@
         b.classList.toggle('active', b.getAttribute('data-navmode') === mode);
       });
     }
-    // 侧边栏第一个按钮：展开/收起（桌面 + 手机端统一）
+    // 展开/收起按钮：手机端点击切换（桌面端按钮已用 CSS 隐藏，改为悬浮展开）
     var sideToggle = el('sideNavToggle');
     if (sideToggle && sideNav) {
       sideToggle.addEventListener('click', function () {
         setSideNavExpanded(!isSideExpanded());
       });
     }
-    // 桌面：鼠标离开侧边栏自动收起（移入右侧设置下拉时除外）；手机端：点击外部收起
+    // 桌面：鼠标悬浮展开、离开自动收起（移入右侧设置下拉时除外）；手机端：点击外部收起
     if (sideNav) {
+      sideNav.addEventListener('mouseenter', function () {
+        if (window.innerWidth <= 900) return;
+        setSideNavExpanded(true);
+      });
       sideNav.addEventListener('mouseleave', function (e) {
         if (window.innerWidth <= 900) return;
         if (!isSideExpanded()) return;
