@@ -50,6 +50,16 @@ WIKI_PS = (PROJECT / "templates" / "wiki_personal.html").read_text(encoding="utf
 POST_DETAIL_HTML = (PROJECT / "templates" / "post_detail.html").read_text(encoding="utf-8")
 FORUM_HTML = (PROJECT / "templates" / "forum.html").read_text(encoding="utf-8")
 
+# Vue3 重写后的页面组件源码（渐进式增强：核心页面由 Vue 渲染，模板仅剩挂载点）
+VUE_SRC = PROJECT / "frontend" / "src"
+AUTH_VUE = (VUE_SRC / "views" / "AuthView.vue").read_text(encoding="utf-8")
+HOME_VUE = (VUE_SRC / "views" / "HomeView.vue").read_text(encoding="utf-8")
+POST_VUE = (VUE_SRC / "views" / "PostDetailView.vue").read_text(encoding="utf-8")
+USER_VUE = (VUE_SRC / "views" / "UserView.vue").read_text(encoding="utf-8")
+SEARCH_VUE = (VUE_SRC / "views" / "SearchView.vue").read_text(encoding="utf-8")
+FORUM_VUE = (VUE_SRC / "views" / "ForumView.vue").read_text(encoding="utf-8")
+UTILS_VUE = (VUE_SRC / "utils.js").read_text(encoding="utf-8")
+
 
 # ── B1 帖子类型完全汉化 ──
 def test_b1_category_map_full_localization():
@@ -112,7 +122,8 @@ def test_b6_auth_route_and_redirects():
         "缺少 /auth 路由"
     # /login → 302 到 /auth
     assert "redirect" in src and "/auth" in src
-    assert "switchAuthMode" in AUTH_HTML or "authMode" in AUTH_HTML
+    assert "switchAuthMode" in AUTH_HTML or "authMode" in AUTH_HTML or "switchMode" in AUTH_VUE, \
+        "缺少登录/注册/找回三种模式切换逻辑"
     # AfterBody.js 路由匹配必须包含 /auth
     assert "login|register|auth" in JS, \
         "AfterBody.js 路由需识别 /auth 页面"
@@ -169,11 +180,13 @@ def test_b11_layout_max_width_narrower():
 
 # ── B12 收藏可折叠（首页+个人页） ──
 def test_b12_favorites_collapsible():
-    # 首页收藏区含折叠按钮
-    assert "homeFavToggle" in INDEX_HTML, "首页收藏缺少折叠按钮"
-    assert "userFavToggle" in USERS_HTML, "个人主页收藏缺少折叠按钮"
+    # 首页收藏区含折叠按钮（Vue3 重写后检查 HomeView.vue）
+    assert ("homeFavToggle" in INDEX_HTML or ("我的收藏" in HOME_VUE and "toggleFav" in HOME_VUE)), \
+        "首页收藏缺少折叠按钮"
+    assert ("userFavToggle" in USERS_HTML or ("我的收藏" in USER_VUE and "toggleFav" in USER_VUE)), \
+        "个人主页收藏缺少折叠按钮"
     # JS 中含折叠逻辑
-    assert "favCard" in JS or "homeFavorites" in JS, "JS 中未处理收藏折叠"
+    assert "favCard" in JS or "homeFavorites" in JS or "toggleFav" in HOME_VUE, "JS 中未处理收藏折叠"
 
 
 # ── B13 /WIKI 无错字错类名 ──
@@ -187,7 +200,8 @@ def test_b13_wiki_no_typo():
 # ── B14 评论发送按钮尺寸缩小 ──
 def test_b14_comment_submit_small():
     assert "commentSubmit" in POST_DETAIL_HTML or "commentSubmit" in BASE_HTML \
-        or "comment-submit" in CSS, "缺失评论提交按钮"
+        or "comment-submit" in CSS or ("发表评论" in POST_VUE and "submitComment" in POST_VUE), \
+        "缺失评论提交按钮"
     # 若样式里存在 comment-input button / #commentSubmit 限制 padding 高度
     m = re.search(r"(#commentSubmit|\.comment-submit|\.comment-input\s+button)\s*\{([^}]+)\}",
                   CSS, re.S)
@@ -247,11 +261,11 @@ def test_n3_user_comments_api_and_anchor_scroll():
     assert "comments" in user_api_src, "用户 API 缺少 /<user_id>/comments 路由"
     db_src = (PROJECT / "db" / "comment.py").read_text(encoding="utf-8")
     assert "get_user_comments" in db_src, "db/comment.py 缺少 get_user_comments"
-    # 模板渲染容器
-    assert "userCommentList" in USERS_HTML or "我的评论" in USERS_HTML, \
+    # 模板/Vue 渲染容器
+    assert "userCommentList" in USERS_HTML or "我的评论" in USERS_HTML or "我的评论" in USER_VUE, \
         "个人主页未包含我的评论区块"
     # 跳转滚动：按 URL hash 的 comment 定位
-    assert "scrollIntoView" in JS or "#comment-" in JS or "location.hash" in JS, \
+    assert "scrollIntoView" in JS or "#comment-" in JS or "location.hash" in JS or "#comment-" in POST_VUE, \
         "缺少帖子详情页中定位到具体评论的滚动逻辑"
 
 
@@ -388,21 +402,31 @@ def test_global_live2d_lpk_async_load():
 
 # ── 回归 7：首页「随机推荐」标题点击弹出排序下拉框（随机/时间/综合） ──
 def test_home_sort_dropdown_exists():
-    assert 'id="homeSortToggle"' in INDEX_HTML, "首页缺少排序下拉触发按钮 homeSortToggle"
-    assert 'id="homeSortMenu"' in INDEX_HTML, "首页缺少排序下拉菜单 homeSortMenu"
-    assert "随机推荐" in INDEX_HTML and "时间顺序" in INDEX_HTML and "综合排序" in INDEX_HTML, \
+    # Vue3 重写后检查 HomeView.vue（模板仅剩挂载点）
+    assert 'id="homeSortToggle"' in INDEX_HTML or "home-sort-toggle" in HOME_VUE, \
+        "首页缺少排序下拉触发按钮 homeSortToggle"
+    assert 'id="homeSortMenu"' in INDEX_HTML or "home-sort-menu" in HOME_VUE, \
+        "首页缺少排序下拉菜单 homeSortMenu"
+    assert "随机推荐" in INDEX_HTML + HOME_VUE and "时间顺序" in INDEX_HTML + HOME_VUE \
+        and "综合排序" in INDEX_HTML + HOME_VUE, \
         "排序下拉菜单缺少三个选项（随机推荐/时间顺序/综合排序）"
-    assert "data-sort=\"random\"" in INDEX_HTML and "data-sort=\"time\"" in INDEX_HTML \
-        and "data-sort=\"comprehensive\"" in INDEX_HTML, "排序选项缺少 data-sort 值"
+    assert ("data-sort=\"random\"" in INDEX_HTML and "data-sort=\"time\"" in INDEX_HTML \
+        and "data-sort=\"comprehensive\"" in INDEX_HTML) or \
+        ("random" in HOME_VUE and "time" in HOME_VUE and "comprehensive" in HOME_VUE), \
+        "排序选项缺少 data-sort 值"
     # 三个选项各自带 Font Awesome 图标，标题按钮图标随模式切换
-    assert "fa fa-random" in INDEX_HTML and "fa fa-clock-o" in INDEX_HTML and "fa fa-fire" in INDEX_HTML, \
+    assert ("fa fa-random" in INDEX_HTML or "fa-random" in HOME_VUE) \
+        and ("fa fa-clock-o" in INDEX_HTML or "fa-clock-o" in HOME_VUE) \
+        and ("fa fa-fire" in INDEX_HTML or "fa-fire" in HOME_VUE), \
         "排序选项缺少图标（随机 fa-random / 时间 fa-clock-o / 综合 fa-fire）"
-    assert "homeSortIcon" in INDEX_HTML and "sortIcons" in JS, \
+    assert ("homeSortIcon" in INDEX_HTML and "sortIcons" in JS) or ("switchSort" in HOME_VUE), \
         "标题图标未随排序模式切换"
-    # JS：三种模式对应不同请求
-    assert "/api/posts/random?limit=200" in JS, "随机推荐模式未请求 /api/posts/random"
-    assert "sort=time" in JS and "sort=comprehensive" in JS, "时间/综合模式未带 sort 参数"
-    assert "sortMenu.classList.toggle('open')" in JS, "缺少点击展开/收起下拉框的逻辑"
+    # 三种模式对应不同请求
+    assert "/api/posts/random?limit=200" in JS + HOME_VUE, "随机推荐模式未请求 /api/posts/random"
+    assert ("sort=time" in JS and "sort=comprehensive" in JS) or ("sort=time" in HOME_VUE and "sort=comprehensive" in HOME_VUE), \
+        "时间/综合模式未带 sort 参数"
+    assert "sortMenu.classList.toggle('open')" in JS or "sortOpen" in HOME_VUE, \
+        "缺少点击展开/收起下拉框的逻辑"
 
 
 # ── 回归 8：CATEGORY_MAP 兼容 V1 存量英文分类（全部汉化） ──
@@ -549,7 +573,8 @@ def test_sidebar_hover_expand_desktop():
 
 # ── 回归 15：评论输入框高度（rows=2） ──
 def test_comment_textarea_rows_two():
-    assert 'id="commentContent" rows="2"' in POST_DETAIL_HTML, \
+    assert 'id="commentContent" rows="2"' in POST_DETAIL_HTML or \
+        re.search(r'id="commentContent"[^>]*rows="2"', POST_VUE), \
         "评论输入框仍为 rows=3 过高，应改为 rows=2"
 
 

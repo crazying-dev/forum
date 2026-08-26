@@ -1,23 +1,7 @@
 {% extends "base.html" %}
 {% block title %}论坛 - 妖精论坛{% endblock %}
+{% block body_attrs %} data-vue-page="forum"{% endblock %}
 {% block content %}
-<div class="page">
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title"><i class="fa fa-list"></i> 论坛广场</h2>
-      <a href="/post/create" class="btn btn-primary btn-sm"><i class="fa fa-pencil"></i> 发布帖子</a>
-    </div>
-    <div class="category-tabs" id="categoryTabs">
-      <button class="tab active" data-category="">全部</button>
-      <button class="tab" data-category="general">综合</button>
-      <button class="tab" data-category="叶羽">叶羽</button>
-      <button class="tab" data-category="创意">创意</button>
-      <button class="tab" data-category="求助">求助</button>
-    </div>
-    <div class="post-list" id="postList"><div class="empty">加载中...</div></div>
-    <div class="load-more" id="loadMore" style="display:none;">
-      <button class="btn btn-outline" id="loadMoreBtn">加载更多</button>
-    </div>
-  </div>
-</div>
+<div id="app"></div>
+<script type="module" src="/static/vue/forum.js?v={{ static_version }}"></script>
 {% endblock %}

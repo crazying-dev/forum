@@ -1362,6 +1362,8 @@
         .finally(function () { submit.disabled = false; });
     });
   }
+  // 暴露给 Vue3 页面复用（举报弹窗）
+  window.__yoyoApp.openReportModal = openReportModal;
   function initContextMenu() {
     var menu = el('ctxMenu');
     if (!menu) return;
@@ -1440,6 +1442,11 @@
 
   // ── 启动：先完成登录态探测，再渲染页面（避免竞态）──
   function route(path) {
+    // Vue3 重写页面：页面内容由 Vue 应用渲染，跳过旧的页面级初始化（全局能力仍在 init() 中）
+    if (document.body.getAttribute('data-vue-page')) {
+      if (path !== '/Live2D') initGlobalLive2D();
+      return;
+    }
     if (path === '/' || path === '') initHome();
     else if (path === '/forum') initForum();
     else if (/^\/post\/create/.test(path)) initPostCreate();

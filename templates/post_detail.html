@@ -1,23 +1,7 @@
 {% extends "base.html" %}
 {% block title %}帖子 - 妖精论坛{% endblock %}
+{% block body_attrs %} data-vue-page="post_detail"{% endblock %}
 {% block content %}
-<div class="page">
-  <div class="card" id="postCard">
-    <div class="empty">加载中...</div>
-  </div>
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title"><i class="fa fa-comments"></i> 评论 <span id="commentCount"></span></h2>
-    </div>
-    <div class="comment-list" id="commentList"></div>
-    <div class="comment-input">
-      <div class="reply-bar" id="replyBar" style="display:none;">
-        <span id="replyHint"></span>
-        <button type="button" id="cancelReplyBtn">取消回复</button>
-      </div>
-      <textarea id="commentContent" rows="2" maxlength="500" placeholder="写下你的评论..."></textarea>
-      <button class="btn btn-primary" id="commentSubmit">发表评论</button>
-    </div>
-  </div>
-</div>
+<div id="app"></div>
+<script type="module" src="/static/vue/post_detail.js?v={{ static_version }}"></script>
 {% endblock %}
