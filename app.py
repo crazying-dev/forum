@@ -1,10 +1,18 @@
 """Flask 应用工厂：创建、配置并返回 Flask app。"""
 from __future__ import annotations
 
+import mimetypes
 import os
 import threading
 
 from flask import Flask, jsonify, request, send_from_directory
+
+# Windows 系统 mimetypes 未注册字体类型，导致 Flask 静态服务返回
+# application/octet-stream，浏览器对 @font-face 严格校验 MIME 会拒绝加载字体。
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
+mimetypes.add_type("font/ttf", ".ttf")
+mimetypes.add_type("application/vnd.ms-fontobject", ".eot")
 
 import config
 import db
