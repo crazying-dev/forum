@@ -1247,3 +1247,19 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .world-page-input-bar { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-border-divider); }
 .world-page-input-bar input { flex: 1; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-secondary); color: var(--color-text-primary); }
 .world-page-input-bar button { padding: 8px 18px; border: none; border-radius: 8px; background: var(--color-primary); color: #fff; cursor: pointer; }
+
+/* ── 第三方授权登录页（oauth.html → OAuthView.vue） ── */
+.oauth-container { display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 20px; }
+.oauth-card { background: var(--color-bg-card); border: 1px solid var(--color-border-divider); border-radius: 12px; padding: 32px; width: 400px; max-width: 90vw; text-align: center; }
+.oauth-card h1 { font-size: 20px; margin-bottom: 16px; color: var(--color-text-primary); }
+.oauth-card p { font-size: 14px; color: var(--color-text-secondary); margin-bottom: 24px; line-height: 1.6; }
+.oauth-user-info { background: var(--color-bg-item-hover); border-radius: 8px; padding: 16px; margin-bottom: 24px; }
+.oauth-user-name { font-size: 18px; font-weight: bold; color: var(--color-primary); }
+.oauth-actions { display: flex; gap: 12px; justify-content: center; }
+.oauth-btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
+.oauth-btn-confirm { background: #238636; color: #fff; }
+.oauth-btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
+.oauth-btn-cancel { background: var(--color-bg-icon); color: var(--color-text-secondary); }
+.oauth-status { margin-top: 16px; font-size: 13px; min-height: 20px; }
+.oauth-status-ok { color: #3fb950; }
+.oauth-status-err { color: #ef4444; }

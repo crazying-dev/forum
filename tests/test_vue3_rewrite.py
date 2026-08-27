@@ -34,6 +34,7 @@ PAGES = {
     "mouse": ("mouse.html", "mouse.js", "MouseView.vue"),
     "mouse_liunx": ("mouse_liunx.html", "mouse_liunx.js", "MouseLinuxView.vue"),
     "live2d": ("live2d.html", "live2d.js", "Live2DView.vue"),
+    "oauth": ("oauth.html", "oauth.js", "OAuthView.vue"),
 }
 
 

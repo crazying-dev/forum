@@ -5,6 +5,11 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [vue()],
+  // 生产构建保留 Vue Devtools 连接（默认 false 会 tree-shake 掉 devtools hook，
+  // 导致 Vue Devtools / Unlocker 检测不到 Vue 应用）
+  define: {
+    __VUE_PROD_DEVTOOLS__: JSON.stringify(true),
+  },
   build: {
     // 输出到 Flask 静态目录（模板用 ?v={{ static_version }} 做缓存版本控制）
     outDir: fileURLToPath(new URL('../static/vue', import.meta.url)),
@@ -30,6 +35,7 @@ export default defineConfig({
         mouse: fileURLToPath(new URL('./src/entries/mouse.js', import.meta.url)),
         mouse_liunx: fileURLToPath(new URL('./src/entries/mouse_liunx.js', import.meta.url)),
         live2d: fileURLToPath(new URL('./src/entries/live2d.js', import.meta.url)),
+        oauth: fileURLToPath(new URL('./src/entries/oauth.js', import.meta.url)),
       },
       output: {
         // 文件名确定化：由 ?v= 版本号控制浏览器缓存失效
