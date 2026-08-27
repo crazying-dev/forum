@@ -179,6 +179,18 @@ CREATE TABLE IF NOT EXISTS verify_codes (
 );
 """
 
+CREATE_VERSION_VOTES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS version_votes (
+    id SERIAL PRIMARY KEY,
+    voter_key VARCHAR(128) NOT NULL UNIQUE,
+    voter_id VARCHAR(64) DEFAULT NULL,
+    voter_name VARCHAR(64) DEFAULT '',
+    choice VARCHAR(8) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
 CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);",
     "CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);",
