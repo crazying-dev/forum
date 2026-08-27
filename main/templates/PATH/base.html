@@ -354,6 +354,57 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+function showVersionVoteDialog() {
+    var modal = document.getElementById('version-vote-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    loadVersionVoteStats();
+}
+
+function closeVersionVoteDialog() {
+    var modal = document.getElementById('version-vote-modal');
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function loadVersionVoteStats() {
+    var statsEl = document.getElementById('version-vote-stats');
+    if (!statsEl) return;
+    statsEl.textContent = '加载中...';
+    fetch('/api/vote/version/stats', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.success && d.stats) {
+                statsEl.innerHTML = 'V1 旧版：<b>' + d.stats.v1 + '</b> 票 · V2 新版：<b>' + d.stats.v2 + '</b> 票';
+            } else {
+                statsEl.textContent = '统计加载失败';
+            }
+        })
+        .catch(function () { statsEl.textContent = '统计加载失败'; });
+}
+
+function submitVersionVote(choice) {
+    var statsEl = document.getElementById('version-vote-stats');
+    if (!statsEl) return;
+    fetch('/api/vote/version', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ choice: choice })
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.success && d.stats) {
+                statsEl.innerHTML = 'V1 旧版：<b>' + d.stats.v1 + '</b> 票 · V2 新版：<b>' + d.stats.v2 + '</b> 票';
+            } else {
+                alert(d && d.message ? d.message : '投票失败');
+                loadVersionVoteStats();
+            }
+        })
+        .catch(function () { alert('网络错误，请稍后再试'); });
+}
+
 function showBugReportDialog() {
     if (typeof WindowsCardWithCenterSreen === 'undefined' || !WindowsCardWithCenterSreen) return;
     var content =
