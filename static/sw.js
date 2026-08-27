@@ -1,11 +1,11 @@
 // 妖精论坛 Service Worker - 离线缓存静态资源
-var CACHE_NAME = 'forum-new-v5';
+var CACHE_NAME = 'forum-new-v6';
 var CACHE_URLS = [
   '/',
   '/forum',
-  '/static/css/main.css?v=9',
+  '/static/css/main.css?v=10',
   '/static/js/marked.min.js',
-  '/static/js/AfterBody.js?v=9',
+  '/static/js/AfterBody.js?v=10',
   '/static/manifest.json',
   '/static/img/favicon.png'
 ];

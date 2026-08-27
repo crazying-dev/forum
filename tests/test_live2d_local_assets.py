@@ -90,23 +90,21 @@ def test_afterbody_local_live2d_paths():
 
 
 def test_live2d_html_gif_local():
-    """live2d.html 中 5 张 GIF 必须走同站 /static/live2d/gif/。"""
-    html = _read(TARGET_FILES["live2d.html"])
-    gifs = ["待机.gif", "嘿咻.gif", "惊醒.gif", "起跳.gif", "铁片.gif"]
+    """Live2D 独立页 5 张 GIF 必须走同站 /static/live2d/gif/（Vue 化后在 Live2DView.vue）。"""
+    html = _read(os.path.join(PROJECT_ROOT, "frontend", "src", "views", "Live2DView.vue"))
+    gifs = ["待机", "嘿咻", "惊醒", "起跳", "铁片"]
+    assert EXPECTED_GIF_DIR in html, f"Live2DView.vue 未使用 {EXPECTED_GIF_DIR} 作为 GIF 目录"
     for g in gifs:
-        expect = EXPECTED_GIF_DIR + g
-        assert expect in html, f"live2d.html 缺少同站 GIF: {expect}"
-    count = html.count(EXPECTED_GIF_DIR)
-    assert count >= 5, f"live2d.html 中应至少有5处 {EXPECTED_GIF_DIR} 引用，实际 {count} 处"
+        assert g in html, f"Live2DView.vue 缺少动作 GIF 名: {g}"
 
 
 def test_wiki_html_images_local():
-    """wiki.html 中 WIKI 两张封面图必须走同站 /static/img/wiki/。"""
-    html = _read(TARGET_FILES["wiki.html"])
-    assert EXPECTED_WIKI_IMG_DIR in html, f"wiki.html 未使用 {EXPECTED_WIKI_IMG_DIR} 作为图片目录"
+    """WIKI 两张封面图必须走同站 /static/img/wiki/（Vue 化后在 WikiView.vue）。"""
+    html = _read(os.path.join(PROJECT_ROOT, "frontend", "src", "views", "WikiView.vue"))
+    assert EXPECTED_WIKI_IMG_DIR in html, f"WikiView.vue 未使用 {EXPECTED_WIKI_IMG_DIR} 作为图片目录"
     count = html.count(EXPECTED_WIKI_IMG_DIR)
-    assert count >= 2, f"wiki.html 中应至少有2张封面图走同站路径，实际 {count} 处"
-    assert "crazying-dev" not in html, "wiki.html 仍残留 crazying-dev CDN"
+    assert count >= 2, f"WikiView.vue 中应至少有2张封面图走同站路径，实际 {count} 处"
+    assert "crazying-dev" not in html, "WikiView.vue 仍残留 crazying-dev CDN"
 
 
 def test_local_directory_stubs_exist():

@@ -18,6 +18,18 @@ export default defineConfig({
         auth: fileURLToPath(new URL('./src/entries/auth.js', import.meta.url)),
         users: fileURLToPath(new URL('./src/entries/users.js', import.meta.url)),
         search: fileURLToPath(new URL('./src/entries/search.js', import.meta.url)),
+        post_create: fileURLToPath(new URL('./src/entries/post_create.js', import.meta.url)),
+        world_page: fileURLToPath(new URL('./src/entries/world_page.js', import.meta.url)),
+        goto: fileURLToPath(new URL('./src/entries/goto.js', import.meta.url)),
+        verify_success: fileURLToPath(new URL('./src/entries/verify_success.js', import.meta.url)),
+        verify_failed: fileURLToPath(new URL('./src/entries/verify_failed.js', import.meta.url)),
+        privacy: fileURLToPath(new URL('./src/entries/privacy.js', import.meta.url)),
+        wiki: fileURLToPath(new URL('./src/entries/wiki.js', import.meta.url)),
+        wiki_guanfang: fileURLToPath(new URL('./src/entries/wiki_guanfang.js', import.meta.url)),
+        wiki_personal: fileURLToPath(new URL('./src/entries/wiki_personal.js', import.meta.url)),
+        mouse: fileURLToPath(new URL('./src/entries/mouse.js', import.meta.url)),
+        mouse_liunx: fileURLToPath(new URL('./src/entries/mouse_liunx.js', import.meta.url)),
+        live2d: fileURLToPath(new URL('./src/entries/live2d.js', import.meta.url)),
       },
       output: {
         // 文件名确定化：由 ?v= 版本号控制浏览器缓存失效

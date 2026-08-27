@@ -1664,6 +1664,8 @@
     // 非 Live2D 页面启用全局浮动 Live2D
     if (path !== '/Live2D') initGlobalLive2D();
   }
+  // Live2D 独立页 Vue 化后由组件 onMounted 显式调用（route 的 data-vue-page 分支不再触发 initLive2D）
+  app.initLive2D = initLive2D;
   function init() {
     app.initMenus();
     app.initSearchBox();

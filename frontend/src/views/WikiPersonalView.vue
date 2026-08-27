@@ -1,0 +1,33 @@
+<template>
+  <div class="wiki-page">
+    <div class="wiki-header">
+      <h2>罗小黑战记个人开发</h2>
+      <h6 style="color:red;">未经授权禁止商用！！</h6>
+    </div>
+    <div class="wiki-container">
+      <a href="/WIKI/Personal/mouse" class="wiki-card">
+        <div class="wiki-card-image">
+          <img :src="'/static/img/mouse/Liunx/banner.png'" alt="罗小黑战记鼠标" class="WIKIWithBackground">
+        </div>
+        <div class="wiki-card-content">
+          <h3>罗小黑战记鼠标</h3>
+          <p>自定义鼠标指针包</p>
+          <span class="wiki-card-link">查看详情 &rarr;</span>
+        </div>
+      </a>
+      <a href="/WIKI/Personal/Live2D" class="wiki-card">
+        <div class="wiki-card-image">
+          <img alt="Live2D动作预览" class="WIKIWithBackground">
+        </div>
+        <div class="wiki-card-content">
+          <h3>罗小黑Live2D模型(不可下载)</h3>
+          <p></p>
+          <span class="wiki-card-link">查看详情 &rarr;</span>
+        </div>
+      </a>
+    </div>
+    <div class="wiki-footer">
+      <p>更多内容持续更新中...</p>
+    </div>
+  </div>
+</template>

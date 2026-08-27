@@ -22,6 +22,18 @@ PAGES = {
     "auth": ("auth.html", "auth.js", "AuthView.vue"),
     "users": ("users.html", "users.js", "UserView.vue"),
     "search": ("search.html", "search.js", "SearchView.vue"),
+    "post_create": ("post_create.html", "post_create.js", "PostCreateView.vue"),
+    "world_page": ("world_page.html", "world_page.js", "WorldPageView.vue"),
+    "goto": ("goto.html", "goto.js", "GotoView.vue"),
+    "verify_success": ("verify_success.html", "verify_success.js", "VerifySuccessView.vue"),
+    "verify_failed": ("verify_failed.html", "verify_failed.js", "VerifyFailedView.vue"),
+    "privacy": ("privacy.html", "privacy.js", "PrivacyView.vue"),
+    "wiki": ("wiki.html", "wiki.js", "WikiView.vue"),
+    "wiki_guanfang": ("wiki_guanfang.html", "wiki_guanfang.js", "WikiGuanfangView.vue"),
+    "wiki_personal": ("wiki_personal.html", "wiki_personal.js", "WikiPersonalView.vue"),
+    "mouse": ("mouse.html", "mouse.js", "MouseView.vue"),
+    "mouse_liunx": ("mouse_liunx.html", "mouse_liunx.js", "MouseLinuxView.vue"),
+    "live2d": ("live2d.html", "live2d.js", "Live2DView.vue"),
 }
 
 

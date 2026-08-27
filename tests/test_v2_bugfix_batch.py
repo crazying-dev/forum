@@ -460,7 +460,8 @@ def test_mobile_layout_full_width():
 
 # ── 回归 11：发帖页分类叫法与论坛 tab / 列表标签统一 ──
 def test_post_create_category_names_unified():
-    src = (PROJECT / "templates" / "post_create.html").read_text(encoding="utf-8")
+    # 发帖页已 Vue 化，分类选项在 PostCreateView.vue
+    src = (PROJECT / "frontend" / "src" / "views" / "PostCreateView.vue").read_text(encoding="utf-8")
     assert "综合讨论" not in src, "发帖页仍使用旧叫法「综合讨论」，与论坛 tab「综合」不一致"
     assert "创意工坊" not in src, "发帖页仍使用旧叫法「创意工坊」，与论坛 tab「创意」不一致"
     assert "求助提问" not in src, "发帖页仍使用旧叫法「求助提问」，与论坛 tab「求助」不一致"

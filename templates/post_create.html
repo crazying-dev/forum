@@ -1,37 +1,7 @@
 {% extends "base.html" %}
 {% block title %}发布帖子 - 妖精论坛{% endblock %}
+{% block body_attrs %} data-vue-page="post_create"{% endblock %}
 {% block content %}
-<div class="page">
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title"><i class="fa fa-pencil"></i> 发布帖子</h2>
-    </div>
-    <form id="postCreateForm">
-      <div class="form-group">
-        <label>标题</label>
-        <input type="text" id="postTitle" maxlength="100" placeholder="标题（最多 100 字）">
-      </div>
-      <div class="form-group">
-        <label>分类</label>
-        <select id="postCategory">
-          <option value="general">综合</option>
-          <option value="叶羽">叶羽</option>
-          <option value="创意">创意</option>
-          <option value="求助">求助</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>内容</label>
-        <div class="editor-tabs">
-          <button type="button" class="editor-tab active" data-mode="edit">编辑</button>
-          <button type="button" class="editor-tab" data-mode="preview">预览</button>
-        </div>
-        <textarea id="postContent" rows="12" placeholder="支持 Markdown 格式内容"></textarea>
-        <div class="editor-preview markdown-body" id="postPreview" style="display:none;"></div>
-      </div>
-      <p class="auth-error" id="postError"></p>
-      <button type="submit" class="btn btn-primary" id="postSubmit">发布</button>
-    </form>
-  </div>
-</div>
+<div id="app"></div>
+<script type="module" src="/static/vue/post_create.js?v={{ static_version }}"></script>
 {% endblock %}
