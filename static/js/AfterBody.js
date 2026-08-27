@@ -1467,11 +1467,11 @@
   // 暴露给 Vue3 页面复用（举报弹窗）
   window.__yoyoApp.openReportModal = openReportModal;
 
-  // ── Bug 反馈弹窗（页脚「反馈 Bug」）──
+  // ── Bug 反馈弹窗（页脚 / 顶部模式 / 侧边栏 [data-bug-report] 统一触发）──
   function initBugModal() {
     var modal = el('bugModal');
     if (!modal) return;
-    var openBtn = el('bugReportBtn');
+    var openBtns = Array.prototype.slice.call(document.querySelectorAll('[data-bug-report]'));
     var close = el('bugClose'), cancel = el('bugCancel');
     function show() {
       el('bugTitle').value = '';
@@ -1483,7 +1483,7 @@
       modal.style.display = 'flex';
     }
     function hide() { modal.style.display = 'none'; }
-    if (openBtn) openBtn.addEventListener('click', show);
+    openBtns.forEach(function (b) { b.addEventListener('click', show); });
     if (close) close.addEventListener('click', hide);
     if (cancel) cancel.addEventListener('click', hide);
     modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
@@ -1509,6 +1509,64 @@
         else if (err) { err.textContent = (d && d.message) || '提交失败'; }
       }).catch(function () { if (err) err.textContent = '网络错误'; })
         .finally(function () { submit.disabled = false; });
+    });
+  }
+
+  // ── PWA 安装：捕获 beforeinstallprompt，[data-pwa-install] 触发原生安装或降级提示 ──
+  var _deferredPrompt = null;
+  var _pwaInstallTriggered = false;
+  if (window.addEventListener) {
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      _deferredPrompt = e;
+    });
+    window.addEventListener('appinstalled', function () {
+      _deferredPrompt = null;
+      _pwaInstallTriggered = true;
+    });
+  }
+  function _isPWAInstalled() {
+    try {
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (('standalone' in window.navigator) && !!window.navigator.standalone) return true;
+      if (_pwaInstallTriggered) return true;
+      if (window.localStorage && localStorage.getItem('pwa_installed') === '1') return true;
+    } catch (e) {}
+    return false;
+  }
+  function _installPWA() {
+    // 已安装：提示从桌面/主屏幕打开（并尝试刷新为独立窗口参数）
+    if (_isPWAInstalled()) {
+      try { if (window.localStorage) localStorage.setItem('pwa_installed', '1'); } catch (e) {}
+      toast('客户端已安装，请从桌面或主屏幕点击「妖精论坛」图标打开');
+      return;
+    }
+    // 支持原生安装：弹出浏览器安装确认
+    if (_deferredPrompt && typeof _deferredPrompt.prompt === 'function') {
+      _deferredPrompt.prompt();
+      _deferredPrompt.userChoice.then(function (result) {
+        if (result && result.outcome === 'accepted') {
+          _pwaInstallTriggered = true;
+          try { if (window.localStorage) localStorage.setItem('pwa_installed', '1'); } catch (e) {}
+          toast('安装成功');
+        }
+        _deferredPrompt = null; // 一次只能调用一次 prompt
+      }).catch(function () {
+        toast('当前浏览器不支持安装，建议使用 Chrome / Edge / Safari 最新版');
+      });
+      return;
+    }
+    // 不支持：提示
+    toast('当前浏览器不支持安装客户端 (PWA)，建议使用 Chrome / Edge / Safari 最新版');
+  }
+  function initPWA() {
+    var btns = Array.prototype.slice.call(document.querySelectorAll('[data-pwa-install]'));
+    btns.forEach(function (b) {
+      b.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        _installPWA();
+      });
     });
   }
   function initContextMenu() {
@@ -1616,6 +1674,7 @@
     initUserListModal();
     initReportModal();
     initBugModal();
+    initPWA();
     initContextMenu();
     // 解析页面已有（SSR/模板直接生成）的头像 img[data-src]，不等接口回来，立即异步触发加载。
     resolveAvatarDeferred(document);
