@@ -194,6 +194,7 @@ CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);",
     "CREATE INDEX IF NOT EXISTS idx_verify_codes_email_purpose ON verify_codes(email, purpose);",
     "CREATE INDEX IF NOT EXISTS idx_verify_codes_expires ON verify_codes(expires_at);",
+    "CREATE INDEX IF NOT EXISTS idx_version_votes_choice ON version_votes(choice);",
 ]
 
 # ========================

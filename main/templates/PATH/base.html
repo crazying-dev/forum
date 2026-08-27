@@ -157,6 +157,12 @@
                     <span>Bug提交</span>
                 </button>
             </li>
+            <li class="header-collapsible">
+                <button class="header-btn" id="VersionVoteBtn" onclick="showVersionVoteDialog()">
+                    <i class="fa fa-random"></i>
+                    <span>V2新版本</span>
+                </button>
+            </li>
             <li class="header-menu-toggle" id="headerMenuToggle">
                 <button class="header-btn" type="button">
                     <i class="fa fa-bars"></i>
@@ -222,6 +228,9 @@
             </button>
             <button class="mobile-menu-item" onclick="showBugReportDialog()">
                 <i class="fa fa-bug"></i> Bug举报
+            </button>
+            <button class="mobile-menu-item" onclick="showVersionVoteDialog()">
+                <i class="fa fa-random"></i> V2新版本
             </button>
             <button class="mobile-menu-item" id="pwa-install-mobile" onclick="installPWA()">
                 <i class="fa fa-download"></i> 安装论坛客户端
@@ -297,6 +306,28 @@
     </div>
 </div>
 
+<div id="version-vote-modal" class="donate-modal" style="display:none;">
+    <div class="donate-overlay" onclick="closeVersionVoteDialog()"></div>
+    <div class="donate-card">
+        <button class="donate-close" onclick="closeVersionVoteDialog()">&times;</button>
+        <h3 class="donate-title"><i class="fa fa-random"></i> 版本选择</h3>
+        <p class="donate-subtitle">V2 新版本已上线，欢迎体验并投出你的一票</p>
+        <a class="version-vote-link" href="https://v2.yjlt.top" target="_blank" rel="noopener noreferrer">
+            <i class="fa fa-external-link"></i> 前往 V2 新版本 (v2.yjlt.top)
+        </a>
+        <div class="version-vote-options">
+            <button class="version-vote-btn v1" onclick="submitVersionVote('v1')">
+                <i class="fa fa-check-square-o"></i> V1 旧版
+            </button>
+            <button class="version-vote-btn v2" onclick="submitVersionVote('v2')">
+                <i class="fa fa-star"></i> V2 新版
+            </button>
+        </div>
+        <p class="version-vote-stats" id="version-vote-stats">加载中...</p>
+        <p class="version-vote-tip">已登录按账号记录，游客按 IP 记录，可随时改投</p>
+    </div>
+</div>
+
 <script>
 function showDonateCard() {
     var modal = document.getElementById('donate-modal');
@@ -315,6 +346,10 @@ document.addEventListener('keydown', function(e) {
         var modal = document.getElementById('donate-modal');
         if (modal && modal.style.display === 'flex') {
             closeDonateCard();
+        }
+        var voteModal = document.getElementById('version-vote-modal');
+        if (voteModal && voteModal.style.display === 'flex') {
+            closeVersionVoteDialog();
         }
     }
 });
@@ -538,6 +573,56 @@ function submitBugReport() {
     margin: 0;
     font-size: 13px;
     color: var(--color-text-secondary);
+}
+
+/* 版本选择投票弹窗（V1/V2） */
+.version-vote-link {
+    display: block;
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    background: var(--color-bg-hover);
+    border: 1px dashed var(--color-primary);
+    border-radius: 8px;
+    color: var(--color-primary);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+.version-vote-link:hover {
+    background: var(--color-primary);
+    color: #fff;
+}
+.version-vote-options {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+.version-vote-btn {
+    flex: 1;
+    max-width: 160px;
+    padding: 12px 0;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+.version-vote-btn:hover { opacity: 0.85; }
+.version-vote-btn.v1 { background: var(--color-bg-icon); color: var(--color-text-primary); }
+.version-vote-btn.v2 { background: var(--color-primary); color: #fff; }
+.version-vote-stats {
+    margin: 16px 0 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+.version-vote-stats b { color: var(--color-primary); }
+.version-vote-tip {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
 }
 
 /* 退出按钮不需要主题勾选框的外框 */

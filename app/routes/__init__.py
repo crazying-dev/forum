@@ -12,6 +12,7 @@ def register_routes(app: Flask):
 	from app.routes.world import world_bp
 	from app.routes.search import search_bp
 	from app.routes.bug import bug_bp
+	from app.routes.vote import vote_bp
 
 	app.register_blueprint(pages_bp)
 	app.register_blueprint(auth_bp)
@@ -21,3 +22,4 @@ def register_routes(app: Flask):
 	app.register_blueprint(world_bp)
 	app.register_blueprint(search_bp)
 	app.register_blueprint(bug_bp)
+	app.register_blueprint(vote_bp)

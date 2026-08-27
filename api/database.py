@@ -1514,6 +1514,66 @@ def report_bug(title, detail, steps='', contact='', reporter_id=None, reporter_n
 	return {"success": True, "id": report_id}
 
 
+def vote_version(voter_key, choice, voter_id=None, voter_name=''):
+	"""投票/改投：选择 V1 或 V2 版本。
+
+    同一 voter_key 重复投票时更新选择，始终反映用户最新倾向。
+
+    Args:
+        voter_key (str): 唯一投票者标识（登录: u:<user_id>；游客: ip:<ip>）
+        choice (str): 'v1' 或 'v2'
+        voter_id (str|None): 登录用户ID（游客为 None）
+        voter_name (str): 登录用户名
+
+    Returns:
+        dict: {"success": True}
+    """
+	choice = (choice or '').strip().lower()
+	if choice not in ('v1', 'v2'):
+		return {"success": False, "message": "无效的选项"}
+
+	# 先跑一次懒加载建表（空转不耗时）
+	ensure_tables()
+
+	with get_conn() as (conn, cursor):
+		cursor.execute(
+			"""
+			INSERT INTO version_votes (voter_key, voter_id, voter_name, choice)
+			VALUES (%s, %s, %s, %s)
+			ON CONFLICT (voter_key) DO UPDATE SET
+				choice = EXCLUDED.choice,
+				voter_id = EXCLUDED.voter_id,
+				voter_name = EXCLUDED.voter_name,
+				updated_at = CURRENT_TIMESTAMP
+			""",
+			(voter_key, voter_id, (voter_name or '')[:64], choice)
+		)
+		conn.commit()
+	return {"success": True}
+
+
+def get_version_vote_stats():
+	"""统计当前 V1/V2 票数。
+
+    Returns:
+        dict: {"v1": int, "v2": int}
+    """
+	# 先跑一次懒加载建表（空转不耗时）
+	ensure_tables()
+
+	stats = {"v1": 0, "v2": 0}
+	try:
+		with get_conn() as (conn, cursor):
+			cursor.execute("SELECT choice, COUNT(*) FROM version_votes GROUP BY choice")
+			rows = cursor.fetchall()
+		for choice, cnt in rows:
+			if choice in stats:
+				stats[choice] = int(cnt)
+	except Exception as e:
+		print(f"[VOTE] 统计失败（忽略）: {e}")
+	return stats
+
+
 def delete_post(post_id, user_id):
 	"""删除帖子（仅允许帖子作者删除）。
 
