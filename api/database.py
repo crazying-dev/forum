@@ -279,6 +279,7 @@ def init_tables():
 		cursor.execute(config.CREATE_VERIFY_CODES_TABLE_SQL)
 		cursor.execute(config.CREATE_POST_REPORTS_TABLE_SQL)
 		cursor.execute(config.CREATE_BUG_REPORTS_TABLE_SQL)
+		cursor.execute(config.CREATE_VERSION_VOTES_TABLE_SQL)
 		for alter_sql in (
 			"ALTER TABLE comments ADD COLUMN IF NOT EXISTS parent_id VARCHAR(64)",
 			"ALTER TABLE World ADD COLUMN IF NOT EXISTS parent_id INTEGER",
@@ -1558,8 +1559,8 @@ def get_version_vote_stats():
     Returns:
         dict: {"v1": int, "v2": int}
     """
-	# 先跑一次懒加载建表（空转不耗时）
-	ensure_tables()
+	# 先跑一次强制建表（force 忽略 _table_checked，确保热实例上新表也能补建）
+	ensure_tables(force=True)
 
 	stats = {"v1": 0, "v2": 0}
 	try:
