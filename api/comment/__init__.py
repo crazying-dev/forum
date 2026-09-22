@@ -3,6 +3,7 @@
 接口：
     GET  /api/posts/<post_id>/comments         获取帖子评论（page/page_size）
     POST /api/posts/<post_id>/comments/create  发表评论（需登录，parent_id 支持楼中楼）
+    POST /api/comments/<comment_id>/like        点赞/取消点赞评论（需登录）
     POST /api/comments/<comment_id>/delete     删除评论（作者本人，需登录）
 """
 from __future__ import annotations
@@ -21,7 +22,7 @@ def api_post_comments(post_id):
     page_size = min(max(request.args.get("page_size", 50, type=int), 1), 100)
     if not db.post.get_post(post_id):
         return jsonify({"success": False, "message": "帖子不存在"}), 404
-    comments = db.comment.get_post_comments(post_id, page, page_size)
+    comments = db.comment.get_post_comments(post_id, page, page_size, user_id=getattr(g, "user", None) and g.user.get("id"))
     return jsonify({"success": True, "comments": comments, "page": page, "page_size": page_size})
 
 
@@ -41,6 +42,16 @@ def api_comment_create(post_id):
     if not result.get("success"):
         return jsonify(result), 400
     return jsonify({"success": True, "comment": result["comment"]})
+
+
+@comment_bp.route("/comments/<comment_id>/like", methods=["POST"])
+@login_required
+def api_comment_like(comment_id):
+    """点赞/取消点赞评论，返回 {"success": True, "liked": bool, "likes": int}。"""
+    result = db.comment.like_comment(comment_id, g.user["id"])
+    if not result.get("success"):
+        return jsonify(result), 404
+    return jsonify(result)
 
 
 @comment_bp.route("/comments/<comment_id>/delete", methods=["POST"])

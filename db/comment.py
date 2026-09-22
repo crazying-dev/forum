@@ -38,8 +38,8 @@ def add_comment(post_id, user_id, content, parent_id=None):
         return {"success": False, "message": f"评论失败: {e}"}
 
 
-def get_post_comments(post_id, page=1, page_size=50):
-    """分页获取帖子评论列表。"""
+def get_post_comments(post_id, page=1, page_size=50, user_id=None):
+    """分页获取帖子评论列表。若传入 user_id，附带该用户是否已赞（liked）字段。"""
     offset = (page - 1) * page_size
     rows = execute_query(
         """
@@ -54,6 +54,19 @@ def get_post_comments(post_id, page=1, page_size=50):
         (post_id, page_size, offset),
         fetch_all=True,
     )
+    liked_map = {}
+    if user_id and rows:
+        ids = [r.get("id") for r in rows]
+        placeholders = ",".join(["%s"] * len(ids))
+        like_rows = execute_query(
+            f"""
+            SELECT comment_id FROM comment_likes
+            WHERE comment_id IN ({placeholders}) AND user_id = %s
+            """,
+            ids + [user_id],
+            fetch_all=True,
+        )
+        liked_map = {lr.get("comment_id"): True for lr in like_rows}
     comments = []
     for r in rows:
         comments.append({
@@ -62,6 +75,7 @@ def get_post_comments(post_id, page=1, page_size=50):
             "content": r.get("content"),
             "parent_id": r.get("parent_id"),
             "likes": r.get("likes") or 0,
+            "liked": bool(liked_map.get(r.get("id"))),
             "created_at": str(r.get("created_at")) if r.get("created_at") else None,
             "user_name": r.get("user_name"),
             "user_avatar": r.get("user_avatar"),
@@ -82,6 +96,54 @@ def delete_comment(comment_id, user_id):
         return {"success": False, "message": "无权删除此评论"}
     execute_query("UPDATE comments SET status = 0 WHERE id = %s", (comment_id,))
     return {"success": True, "post_id": row.get("post_id")}
+
+
+def like_comment(comment_id, user_id):
+    """切换评论点赞状态，返回 {"success": True, "liked": bool, "likes": int}。"""
+    row = execute_query(
+        "SELECT id FROM comments WHERE id = %s AND status = 1",
+        (comment_id,),
+        fetch=True,
+    )
+    if not row:
+        return {"success": False, "message": "评论不存在"}
+    existing = execute_query(
+        "SELECT id FROM comment_likes WHERE comment_id = %s AND user_id = %s",
+        (comment_id, user_id),
+        fetch=True,
+    )
+    if existing:
+        execute_query(
+            "DELETE FROM comment_likes WHERE comment_id = %s AND user_id = %s",
+            (comment_id, user_id),
+        )
+        execute_query(
+            "UPDATE comments SET likes = GREATEST(likes - 1, 0) WHERE id = %s",
+            (comment_id,),
+        )
+        liked = False
+    else:
+        execute_insert(
+            "INSERT INTO comment_likes (comment_id, user_id) VALUES (%s, %s)",
+            (comment_id, user_id),
+        )
+        execute_query("UPDATE comments SET likes = likes + 1 WHERE id = %s", (comment_id,))
+        liked = True
+    count = execute_query(
+        "SELECT likes FROM comments WHERE id = %s", (comment_id,), fetch=True
+    )
+    return {"success": True, "liked": liked, "likes": (count or {}).get("likes", 0) or 0}
+
+
+def has_liked_comment(comment_id, user_id):
+    if not user_id:
+        return False
+    row = execute_query(
+        "SELECT id FROM comment_likes WHERE comment_id = %s AND user_id = %s",
+        (comment_id, user_id),
+        fetch=True,
+    )
+    return row is not None
 
 
 def get_user_comments(user_id, page=1, page_size=20):

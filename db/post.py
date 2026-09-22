@@ -287,11 +287,25 @@ def report_post(post_id, reporter_id, reason, detail=""):
 
 
 def delete_post(post_id, user_id):
-    """删除帖子（仅作者本人）。"""
+    """删除帖子（仅作者本人）。
+
+    删除帖子时一并删除其相关数据：举报、点赞、收藏、评论，
+    以及这些评论的举报记录。各子表外键虽已声明 ON DELETE CASCADE，
+    此处仍显式清理，保证不依赖数据库级联也能完整清除。
+    """
     post = get_post(post_id)
     if not post:
         return {"success": False, "message": "帖子不存在"}
     if post.get("user_id") != user_id:
         return {"success": False, "message": "无权删除此帖子"}
+    # 一并清理相关数据（顺序：先子表，后评论，最后帖子）
+    execute_query("DELETE FROM post_reports WHERE post_id = %s", (post_id,))
+    execute_query("DELETE FROM post_likes WHERE post_id = %s", (post_id,))
+    execute_query("DELETE FROM post_favorites WHERE post_id = %s", (post_id,))
+    execute_query(
+        "DELETE FROM comment_reports WHERE comment_id IN (SELECT id FROM comments WHERE post_id = %s)",
+        (post_id,),
+    )
+    execute_query("DELETE FROM comments WHERE post_id = %s", (post_id,))
     execute_query("DELETE FROM posts WHERE id = %s", (post_id,))
     return {"success": True}

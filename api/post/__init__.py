@@ -100,11 +100,11 @@ def api_post_detail(post_id):
     post = db.post.get_post(post_id)
     if not post:
         return jsonify({"success": False, "message": "帖子不存在"}), 404
-    comments = db.comment.get_post_comments(post_id, 1, 50)
-    db.post.increment_post_views(post_id)
-    post["views"] = (post.get("views") or 0) + 1
     user = getattr(g, "user", None)
     uid = user.get("id") if user else None
+    comments = db.comment.get_post_comments(post_id, 1, 50, user_id=uid)
+    db.post.increment_post_views(post_id)
+    post["views"] = (post.get("views") or 0) + 1
     liked = db.post.has_liked_post(post_id, uid) if uid else False
     favorited = db.post.has_favorited_post(post_id, uid) if uid else False
     return jsonify({

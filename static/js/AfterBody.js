@@ -125,7 +125,38 @@
     if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
     if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    var wy = wuxianYear(d.getFullYear());
+    return (wy !== null ? '无限' + wy : d.getFullYear()) + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  // ── 无限年：无限年 = 公元年 − 1604（无限元年 = 公元 1604）──
+  // 公元年 ≥ 1604 时返回无限年；否则返回 null（尚未进入无限年）。
+  function wuxianYear(ce) {
+    ce = parseInt(ce, 10);
+    if (isNaN(ce) || ce < 1604) return null;
+    return ce - 1604;
+  }
+  // 无限年 → 公元年：返回公元年份字符串；输入非法时返回空串。
+  function wuxianToCE(wy) {
+    wy = parseInt(wy, 10);
+    if (isNaN(wy) || wy < 0) return '';
+    return String(wy + 1604);
+  }
+  // ── 剥离 Markdown 标记 → 纯文本（用于卡片摘要预览）──
+  function stripMarkdown(s) {
+    if (!s) return '';
+    return ('' + s)
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]*)`/g, '$1')
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^#{1,6}\s+/gm, '')
+      .replace(/(\*\*|__)(.*?)\1/g, '$2')
+      .replace(/([*_])([^*_]+)\1/g, '$2')
+      .replace(/^>\s?/gm, '')
+      .replace(/^\s*[-+*]\s+/gm, '')
+      .replace(/^\s*\d+\.\s+/gm, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ').trim();
   }
   function el(id) { return document.getElementById(id); }
 
@@ -268,17 +299,49 @@
         location.href = '/';
       });
     }
-    // 彩蛋（侧边栏 + 顶部模式头部栏）
+    // ── 每日一言：前端直连第三方 API，获取一句话（含作品与作者）──
+    // 依次尝试 JSON 接口；失败则返回 null。
+    async function fetchDailySentence() {
+      var url = 'https://dlystc.unknownmp.top/api/v2/sentence/text?format=full';
+      try {
+        var r = await fetch(url, { headers: { 'Accept': 'text/plain' } });
+        if (!r.ok) throw 0;
+        var text = (await r.text()).trim();
+        if (text) return text;
+      } catch (e) {}
+      try {
+        var rj = await fetch('https://dlystc.unknownmp.top/api/v2/sentence');
+        if (!rj.ok) throw 0;
+        var j = await rj.json();
+        var line = (j.content || '').trim();
+        if (!line) return null;
+        var extra = [];
+        if (j.author) extra.push(j.author);
+        if (j.source) extra.push('《' + j.source + '》');
+        if (extra.length) line += ' —— ' + extra.join(' ');
+        return line;
+      } catch (e) { return null; }
+    }
+    function showEasterEgg() {
+      return apiFetch('/Easter-Egg').then(function (d) {
+        if (d && (d.Name || d.Text)) toast('🎁 ' + (d.Name || '彩蛋') + (d.Text ? '：' + d.Text : ''));
+        else toast('🎁 彩蛋为空');
+      }).catch(function () { toast('彩蛋获取失败'); });
+    }
+    // 彩蛋（侧边栏 + 顶部模式头部栏）：随机展示 每日一言 或 彩蛋
     var eggTriggers = [el('eggBtn')].concat(
       Array.prototype.slice.call(document.querySelectorAll('[data-egg]'))
     ).filter(Boolean);
     eggTriggers.forEach(function (egg) {
       egg.addEventListener('click', async function () {
-        try {
-          var d = await apiFetch('/Easter-Egg');
-          if (d && (d.Name || d.Text)) toast('🎁 ' + (d.Name || '彩蛋') + (d.Text ? '：' + d.Text : ''));
-          else toast('🎁 彩蛋为空');
-        } catch (e) { toast('彩蛋获取失败'); }
+        if (Math.random() < 0.5) {
+          // 每日一言
+          var line = await fetchDailySentence();
+          if (line) toast(line);
+          else toast('每日一言获取失败');
+        } else {
+          await showEasterEgg();
+        }
       });
     });
   }
@@ -669,7 +732,7 @@
     return (
       '<div class="post-item" data-pid="' + esc(p.id) + '" data-uid="' + esc(p.user_id) + '" data-post-link="/post/' + esc(p.id) + '">' +
       '<a class="post-item-title" href="/post/' + esc(p.id) + '">' + esc(p.title) + '</a>' +
-      '<div class="post-item-summary">' + esc(p.summary || '') + '</div>' +
+      '<div class="post-item-summary">' + esc(stripMarkdown(p.summary || '')) + '</div>' +
       '<div class="post-item-meta">' +
       '<span class="tag">' + esc(categoryLabel(p.category)) + '</span>' +
       '<span>' + avatarHtml(p.user_avatar) + ' <a class="link-user" href="/users/' + esc(p.user_id) + '">' + esc(p.user_name) + '</a></span>' +
@@ -881,6 +944,8 @@
         '<div class="comment-content">' + esc(c.content) + '</div>' +
         '<div class="comment-actions">' +
         '<button class="comment-reply" data-reply="' + esc(c.id) + ':' + esc(c.user_name) + '">回复</button>' +
+        '<button class="comment-reply comment-like' + (c.liked ? ' liked' : '') + '" data-like-comment="' + esc(c.id) + '">' +
+        '<i class="fa fa-thumbs-o-up"></i> <span class="like-count">' + (c.likes || 0) + '</span></button>' +
         (app.currentUser && app.currentUser.id === c.user_id
           ? '<button class="comment-reply" data-del-comment="' + esc(c.id) + '">删除</button>' : '') +
         '</div>' +
@@ -1007,9 +1072,19 @@
     // 评论：回复 / 删除 / 折叠
     if (commentList) commentList.addEventListener('click', function (e) {
       var replyBtn = e.target.closest('[data-reply]');
+      var likeBtn2 = e.target.closest('[data-like-comment]');
       var delBtn2 = e.target.closest('[data-del-comment]');
       var foldBtn = e.target.closest('[data-fold]');
-      if (replyBtn) {
+      if (likeBtn2) {
+        if (needLogin()) return;
+        var cid = likeBtn2.getAttribute('data-like-comment');
+        apiFetch('/api/comments/' + encodeURIComponent(cid) + '/like', { method: 'POST' }).then(function (d) {
+          if (!d || !d.success) return;
+          likeBtn2.classList.toggle('liked', d.liked);
+          var cnt = likeBtn2.querySelector('.like-count');
+          if (cnt) cnt.textContent = d.likes;
+        });
+      } else if (replyBtn) {
         var parts = replyBtn.getAttribute('data-reply').split(':');
         replyTarget = { id: parts[0], name: parts.slice(1).join(':') };
         var bar = el('replyBar');
@@ -1512,6 +1587,32 @@
     });
   }
 
+  // ── 无限年 / 公元年换算组件：设置下拉「wuxianCalcBtn」打开，双向实时换算 ──
+  function initWuxianConverter() {
+    var modal = el('wuxianModal');
+    var trigger = el('wuxianCalcBtn');
+    if (!modal || !trigger) return;
+    var ceOut = el('wuxianCEOut'), wyOut = el('ceOut');
+    function show() { modal.style.display = 'flex'; }
+    function hide() { modal.style.display = 'none'; }
+    trigger.addEventListener('click', show);
+    var close = el('wuxianClose'), cancel = el('wuxianCancel');
+    if (close) close.addEventListener('click', hide);
+    if (cancel) cancel.addEventListener('click', hide);
+    modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
+    var wyInput = el('wuxianInput'), ceInput = el('ceInput');
+    wyInput.addEventListener('input', function () {
+      var wy = wyInput.value.trim();
+      var ce = wuxianToCE(wy);
+      if (ceOut) ceOut.textContent = ce ? (wy + ' 无限年 = ' + ce + ' 年（公元）') : '';
+    });
+    ceInput.addEventListener('input', function () {
+      var ce = parseInt(ceInput.value.trim(), 10);
+      var wy = wuxianYear(ce);
+      if (wyOut) wyOut.textContent = wy !== null ? (ce + ' 年（公元） = ' + wy + ' 无限年') : '';
+    });
+  }
+
   // ── PWA 安装：捕获 beforeinstallprompt，[data-pwa-install] 触发原生安装或降级提示 ──
   var _deferredPrompt = null;
   var _pwaInstallTriggered = false;
@@ -1676,6 +1777,7 @@
     initUserListModal();
     initReportModal();
     initBugModal();
+    initWuxianConverter();
     initPWA();
     initContextMenu();
     // 解析页面已有（SSR/模板直接生成）的头像 img[data-src]，不等接口回来，立即异步触发加载。

@@ -319,6 +319,7 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .form-group { margin-bottom: 14px; }
 .form-group label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .form-group input, .form-group textarea, .form-group select { width: 100%; }
+.form-hint { margin: 6px 0 0; font-size: 12px; color: var(--color-text-secondary); min-height: 16px; }
 .code-row { display: flex; gap: 8px; }
 .code-row input { flex: 1; min-width: 0; }
 .code-row .btn { flex-shrink: 0; white-space: nowrap; }
@@ -479,7 +480,7 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .comment-content { font-size: 14px; word-break: break-word; }
 .comment-reply { font-size: 12px; color: var(--color-text-tertiary); cursor: pointer; margin-top: 4px; background: none; border: none; }
 .comment-input { display: flex; gap: 10px; margin-top: 12px; align-items: flex-end; }
-.comment-input textarea { flex: 1; }
+.comment-input textarea { flex: 1; min-width: 0; }
 /* 评论发送按钮收窄：小尺寸，不再是一大块 */
 .comment-input button {
   flex-shrink: 0;
@@ -493,6 +494,11 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
   line-height: 1;
 }
 .comment-input button:hover { background: var(--color-primary-hover); }
+/* 窄屏下收紧评论输入区间距，避免发布按钮被挤出屏幕 */
+@media (max-width: 480px) {
+  .comment-input { gap: 6px; }
+  .comment-input button { padding: 7px 10px; font-size: 12px; }
+}
 
 /* ── 用户资料 ── */
 .user-profile { display: flex; gap: 16px; align-items: center; }

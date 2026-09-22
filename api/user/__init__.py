@@ -338,7 +338,8 @@ def api_user_update():
         else:
             payload["age"] = None  # 清空年龄（兼容线上 INTEGER 列）
     if "intro" in data and isinstance(data["intro"], str):
-        payload["intro"] = data["intro"].strip()
+        # 净化简介，防 XSS（移除危险标签/事件属性/javascript: 伪协议）
+        payload["intro"] = db.safe_html(data["intro"].strip())[:500]
     if "name" in data and isinstance(data["name"], str):
         name = data["name"].strip()
         ok, msg = validate_username(name)

@@ -103,6 +103,18 @@ CREATE TABLE IF NOT EXISTS user_follows (
 );
 """
 
+CREATE_COMMENT_LIKES_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS comment_likes (
+    id SERIAL PRIMARY KEY,
+    comment_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(comment_id, user_id),
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
 CREATE_VERIFY_TOKENS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS verify_tokens (
     id SERIAL PRIMARY KEY,
@@ -159,6 +171,20 @@ CREATE TABLE IF NOT EXISTS verify_codes (
 );
 """
 
+CREATE_COMMENT_REPORTS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS comment_reports (
+    id SERIAL PRIMARY KEY,
+    comment_id VARCHAR(64) NOT NULL,
+    reporter_id VARCHAR(64) NOT NULL,
+    reason VARCHAR(64) NOT NULL,
+    detail TEXT DEFAULT '',
+    status INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
 CREATE_INDEX_SQLS = [
     # pg_trgm 扩展：为 ILIKE '%关键词%' 模糊搜索提供 GIN 索引加速
     "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
@@ -198,10 +224,12 @@ ALL_TABLE_SQL = [
     CREATE_POST_LIKES_TABLE_SQL,
     CREATE_POST_FAVORITES_TABLE_SQL,
     CREATE_USER_FOLLOWS_TABLE_SQL,
+    CREATE_COMMENT_LIKES_TABLE_SQL,
     CREATE_VERIFY_TOKENS_TABLE_SQL,
     CREATE_POST_REPORTS_TABLE_SQL,
     CREATE_BUG_REPORTS_TABLE_SQL,
     CREATE_VERIFY_CODES_TABLE_SQL,
+    CREATE_COMMENT_REPORTS_TABLE_SQL,
     *CREATE_INDEX_SQLS
 ]
 
@@ -240,7 +268,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "11"
+STATIC_VERSION = "13"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
