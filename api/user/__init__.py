@@ -331,10 +331,12 @@ def api_user_update():
     if "age" in data and isinstance(data["age"], str):
         age_raw = data["age"].strip()
         if age_raw:
-            # 允许：纯数字年龄、YYYY-MM-DD 日期、YYYY/MM/DD（兼容不同前端组件输出）
+            # 允许：纯数字年龄、YYYY-MM-DD / YYYY/MM/DD 日期、
+            # YYYYMMDD（V1 存量格式，也是 V1 生日选择器（年-月-日）的存库格式）
             if not re.fullmatch(r"\d{1,3}", age_raw) and \
-               not re.fullmatch(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", age_raw):
-                return jsonify({"success": False, "message": "年龄格式不正确（数字或 YYYY-MM-DD）"}), 400
+               not re.fullmatch(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", age_raw) and \
+               not re.fullmatch(r"\d{8}", age_raw):
+                return jsonify({"success": False, "message": "年龄格式不正确（数字、YYYY-MM-DD 或 YYYYMMDD）"}), 400
             payload["age"] = age_raw[:32]
         else:
             payload["age"] = None  # 清空年龄（兼容线上 INTEGER 列）

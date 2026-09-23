@@ -1283,3 +1283,60 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .oauth-status { margin-top: 16px; font-size: 13px; min-height: 20px; }
 .oauth-status-ok { color: #3fb950; }
 .oauth-status-err { color: #ef4444; }
+
+/* ── 出生日期选择器（沿用 V1 组件样式：年-月-日，年份带 ± 步进） ── */
+.birthday-picker { display: flex; align-items: center; gap: 6px; width: 100%; }
+.birthday-picker .bp-arrow {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-input);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s;
+}
+.birthday-picker .bp-arrow:hover { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-bg-hover); }
+.birthday-picker .bp-arrow:active { transform: scale(.92); }
+.birthday-picker .bp-year-wrap { position: relative; width: 90px; height: 36px; overflow: hidden; flex-shrink: 0; }
+.birthday-picker .bp-year {
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.birthday-picker .bp-year::-webkit-inner-spin-button,
+.birthday-picker .bp-year::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.birthday-picker .bp-sep { color: var(--color-text-tertiary); font-size: 14px; flex-shrink: 0; }
+.birthday-picker .bp-month,
+.birthday-picker .bp-day {
+  width: 56px;
+  height: 36px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  outline: none;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.birthday-picker .bp-month::-webkit-inner-spin-button,
+.birthday-picker .bp-month::-webkit-outer-spin-button,
+.birthday-picker .bp-day::-webkit-inner-spin-button,
+.birthday-picker .bp-day::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.bp-year-anim { transition: transform .18s cubic-bezier(.4, 0, .2, 1), opacity .18s cubic-bezier(.4, 0, .2, 1); }

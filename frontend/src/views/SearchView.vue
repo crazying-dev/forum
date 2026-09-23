@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import PostCard from '../components/PostCard.vue'
 import { apiFetch, avatarHtml, esc, resolveAvatars } from '../utils.js'
 

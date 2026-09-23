@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import PostList from '../components/PostList.vue'
-import { apiFetch, avatarHtml, esc, fmtTime, getCurrentUser, toast } from '../utils.js'
+import { apiFetch, avatarHtml, esc, fmtTime, getCurrentUser, resolveAvatars, toast } from '../utils.js'
 
 const userId = computed(() => {
   const m = location.pathname.match(/^\/users\/([^/]+)/)
@@ -23,7 +23,13 @@ const myComments = ref([])
 const commentsVisible = ref(false)
 // 资料编辑弹窗
 const editOpen = ref(false)
-const editForm = ref({ name: '', gender: '0', age: '', prefix: '', intro: '' })
+const editForm = ref({ name: '', gender: '0', prefix: '', intro: '' })
+// 出生日期选择器（沿用 V1 组件：年 ± 步进 / 月 / 日，存库格式 YYYYMMDD）
+const bpYear = ref(new Date().getFullYear())
+const bpMonth = ref(1)
+const bpDay = ref(1)
+const bpYearEl = ref(null)
+const bpDirty = ref(false)
 const editError = ref('')
 const editErrorColor = ref('')
 const editAvatarFile = ref(null)
@@ -38,15 +44,44 @@ const me = getCurrentUser()
 const isSelf = computed(() => user.value && me && me.id === user.value.id)
 const followText = ref('关注')
 
-function toDateValue(age) {
-  if (!age) return ''
-  const s = String(age).trim()
-  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s) || /^\d{4}\/\d{1,2}\/\d{1,2}$/.test(s)) {
-    const parts = s.split(/[-/]/)
-    return parts[0] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[2]).slice(-2)
+// 解析已有生日：兼容 YYYYMMDD（V1 存量格式）、YYYY-MM-DD、YYYY/MM/DD
+function parseAgeToYmd(age) {
+  const s = String(age == null ? '' : age).trim()
+  if (/^\d{8}$/.test(s)) return { y: +s.slice(0, 4), m: +s.slice(4, 6), d: +s.slice(6, 8) }
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(s)) {
+    const p = s.split(/[-/]/)
+    return { y: +p[0], m: +p[1], d: +p[2] }
   }
-  if (/^\d{1,3}$/.test(s)) return ''
-  return s
+  return null
+}
+// 选择器 → YYYYMMDD（与 V1 存库格式一致）；非法日期返回空串
+function bpDateValue() {
+  const y = parseInt(bpYear.value, 10)
+  const m = parseInt(bpMonth.value, 10)
+  const d = parseInt(bpDay.value, 10)
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return ''
+  if (y < 100 || y > 9999 || m < 1 || m > 12 || d < 1 || d > 31) return ''
+  const dt = new Date(y, m - 1, d)
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return ''
+  return String(y).padStart(4, '0') + String(m).padStart(2, '0') + String(d).padStart(2, '0')
+}
+// 年份 ±1：带 V1 同款上滑/下滑过渡
+function bpYearStep(delta) {
+  const el = bpYearEl.value
+  const cur = el ? (parseInt(el.value, 10) || 0) : (parseInt(bpYear.value, 10) || 0)
+  const next = cur + delta
+  bpYear.value = String(next)
+  bpDirty.value = true
+  if (!el) return
+  const dir = delta > 0 ? -1 : 1
+  el.classList.remove('bp-year-anim')
+  el.style.transform = 'translateY(' + (dir * 12) + 'px)'
+  el.style.opacity = '0'
+  void el.offsetWidth // 强制回流，重播过渡
+  el.classList.add('bp-year-anim')
+  el.value = String(next)
+  el.style.transform = 'translateY(' + (-dir * 12) + 'px)'
+  requestAnimationFrame(() => { el.style.transform = ''; el.style.opacity = '' })
 }
 
 async function load() {
@@ -121,7 +156,12 @@ function closeList() { listModalOpen.value = false }
 // ── 编辑资料弹窗 ──
 function openEdit() {
   const u = user.value
-  editForm.value = { name: u.name || '', gender: String(u.gender == null ? 0 : u.gender), age: u.age == null ? '' : String(u.age), prefix: u.prefix || '', intro: u.intro || '' }
+  editForm.value = { name: u.name || '', gender: String(u.gender == null ? 0 : u.gender), prefix: u.prefix || '', intro: u.intro || '' }
+  const ymd = parseAgeToYmd(u.age)
+  bpYear.value = ymd ? String(ymd.y) : String(new Date().getFullYear())
+  bpMonth.value = ymd ? ymd.m : 1
+  bpDay.value = ymd ? ymd.d : 1
+  bpDirty.value = false
   pendingAvatar.value = ''
   editError.value = ''
   editErrorColor.value = ''
@@ -158,9 +198,18 @@ function saveEdit() {
   const body = {
     name: editForm.value.name.trim(),
     gender: parseInt(editForm.value.gender, 10) || 0,
-    age: editForm.value.age.trim(),
     prefix: editForm.value.prefix.trim(),
     intro: editForm.value.intro.trim(),
+  }
+  // 生日只在用户实际改动选择器时提交，格式 YYYYMMDD（与 V1 一致）
+  if (bpDirty.value) {
+    const bpDate = bpDateValue()
+    if (!bpDate) {
+      editError.value = '出生日期不正确，请检查年 / 月 / 日'
+      editErrorColor.value = ''
+      return
+    }
+    body.age = bpDate
   }
   if (pendingAvatar.value) body.avatar = pendingAvatar.value
   apiFetch('/api/user/info', { method: 'PUT', body }).then((d) => {
@@ -278,8 +327,18 @@ onMounted(load)
           </select>
         </div>
         <div class="form-group">
-          <label>年龄（生日）</label>
-          <input v-model="editForm.age" type="date" max="2100-12-31">
+          <label>出生日期</label>
+          <div class="birthday-picker">
+            <button type="button" class="bp-arrow" title="上一年" @click="bpYearStep(-1)"><i class="fa fa-chevron-left"></i></button>
+            <div class="bp-year-wrap">
+              <input ref="bpYearEl" v-model="bpYear" class="bp-year" type="number" @input="bpDirty = true">
+            </div>
+            <button type="button" class="bp-arrow" title="下一年" @click="bpYearStep(1)"><i class="fa fa-chevron-right"></i></button>
+            <span class="bp-sep">-</span>
+            <input v-model="bpMonth" class="bp-month" type="number" min="1" max="12" @input="bpDirty = true">
+            <span class="bp-sep">-</span>
+            <input v-model="bpDay" class="bp-day" type="number" min="1" max="31" @input="bpDirty = true">
+          </div>
         </div>
         <div class="form-group">
           <label>称号前缀</label>
