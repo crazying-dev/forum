@@ -10,6 +10,9 @@
         __yoyoApp 导出，Part 2 的 initWuxianConverter 调用即 ReferenceError。
   P4 Nginx 反向代理后后端日志拿不到真实客户端 IP（全是 127.0.0.1）
      —— app.py 的 ProxyFix 被注释掉；已启用并补上带真实 IP 的访问日志。
+  P5 资料页展示生日/年龄（照 V1：用户名下方，生日蛋糕图标 + 保密/xx 岁）
+     —— UserView.vue 新增 ageDisplay（兼容 YYYYMMDD 算周岁 / 纯数字），
+        main.css 新增 .user-profile-meta / .user-meta-item 样式。
 """
 from __future__ import annotations
 
@@ -158,3 +161,33 @@ def test_p4_access_log_contains_real_client_ip():
     assert "werkzeug.proxy_fix.orig" in APP_PY, \
         "访问日志未区分直连方（peer），无法确认请求经代理转发"
     assert "after_request" in APP_PY and "before_request" in APP_PY, "访问日志钩子未注册"
+
+
+# ── P5 资料页展示生日/年龄（照 V1 显示在用户名下方） ──
+def test_p5_profile_shows_age_meta_item():
+    # 模板：用户名下方一行 user-profile-meta，内含生日蛋糕图标 + 年龄
+    assert 'class="user-profile-meta"' in USER_VUE, "资料页缺少用户名下方的 .user-profile-meta 行"
+    assert 'class="user-meta-item"' in USER_VUE, "资料页缺少 .user-meta-item 元信息项"
+    assert "fa-birthday-cake" in USER_VUE, "年龄未使用 V1 的生日蛋糕图标 fa-birthday-cake"
+    assert re.search(r"\{\{\s*ageDisplay\s*\}\}", USER_VUE), "未渲染 ageDisplay 年龄文本"
+    # 位置：应排在名称之后、统计行之前（用户名下方）
+    assert USER_VUE.index("user-profile-meta") < USER_VUE.index('class="user-profile-stats"'), \
+        ".user-profile-meta 应在用户名（名称）下方、统计行之前"
+
+
+def test_p5_age_display_matches_v1_logic():
+    assert re.search(r"const\s+ageDisplay\s*=\s*computed\(", USER_VUE), "缺少年龄展示计算属性 ageDisplay"
+    # YYYYMMDD：按今天算周岁（月份/日期未到则减一），与 V1 __profileAgeDisplay 一致
+    assert re.search(r"now\.getFullYear\(\)\s*-\s*dt\.getFullYear\(\)", USER_VUE), \
+        "年龄未按年份差计算"
+    assert re.search(r"now\.getMonth\(\)\s*-\s*dt\.getMonth\(\)", USER_VUE), \
+        "年龄未考虑月份（未到生日不应进位）"
+    assert re.search(r"now\.getDate\(\)\s*<\s*dt\.getDate\(\)", USER_VUE), \
+        "年龄未考虑日期（当月未到生日不应进位）"
+    # 空 / 非法 → 保密，与 V1 一致
+    assert "'保密'" in USER_VUE, "年龄缺省值不是「保密」"
+
+
+def test_p5_age_meta_styles_present():
+    assert ".user-profile-meta" in CSS, "main.css 缺少 .user-profile-meta 样式"
+    assert ".user-meta-item" in CSS, "main.css 缺少 .user-meta-item 样式"

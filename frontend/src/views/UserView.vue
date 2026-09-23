@@ -44,6 +44,29 @@ const me = getCurrentUser()
 const isSelf = computed(() => user.value && me && me.id === user.value.id)
 const followText = ref('关注')
 
+// 生日/年龄展示（沿用 V1 __profileAgeDisplay 逻辑）：
+// 空 → 保密；YYYYMMDD → 由今天算周岁 xx 岁；纯数字 → xx 岁；其它 → 保密
+const ageDisplay = computed(() => {
+  const s = String((user.value && user.value.age) == null ? '' : user.value.age).trim()
+  if (!s) return '保密'
+  if (/^\d{8}$/.test(s)) {
+    const y = parseInt(s.slice(0, 4), 10)
+    const m = parseInt(s.slice(4, 6), 10) - 1
+    const d = parseInt(s.slice(6, 8), 10)
+    const dt = new Date(y, m, d)
+    if (!isNaN(dt.getTime())) {
+      const now = new Date()
+      let a = now.getFullYear() - dt.getFullYear()
+      const md = now.getMonth() - dt.getMonth()
+      if (md < 0 || (md === 0 && now.getDate() < dt.getDate())) a--
+      return a + ' 岁'
+    }
+  }
+  const n = parseInt(s, 10)
+  if (!isNaN(n)) return n + ' 岁'
+  return '保密'
+})
+
 // 解析已有生日：兼容 YYYYMMDD（V1 存量格式）、YYYY-MM-DD、YYYY/MM/DD
 function parseAgeToYmd(age) {
   const s = String(age == null ? '' : age).trim()
@@ -232,6 +255,9 @@ onMounted(load)
         <span v-html="avatarHtml(user.avatar, 'avatar-lg')"></span>
         <div class="user-profile-info-wrap">
           <div class="user-profile-name">{{ user.name }} <span v-if="user.prefix" class="tag">{{ user.prefix }}</span><span v-if="user.title" class="user-title">{{ user.title }}</span></div>
+          <div class="user-profile-meta">
+            <span class="user-meta-item"><i class="fa fa-birthday-cake"></i> {{ ageDisplay }}</span>
+          </div>
           <div class="user-profile-stats">
             <span>帖子 {{ (user.stats && user.stats.post_count) || 0 }}</span>
             <button class="stat-btn" @click="openUserList('followers', user.name)">粉丝 {{ (user.stats && user.stats.follower_count) || 0 }}</button>

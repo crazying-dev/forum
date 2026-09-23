@@ -526,6 +526,9 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
   color: var(--color-text-secondary);
   background: var(--color-bg-item-active);
 }
+/* 资料页元信息（生日/年龄，沿用 V1 布局） */
+.user-profile-meta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 6px; }
+.user-meta-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-tertiary); }
 .user-profile-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 13px; color: var(--color-text-tertiary); }
 .user-profile-intro { margin-top: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .user-profile-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
