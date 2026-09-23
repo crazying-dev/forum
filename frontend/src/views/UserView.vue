@@ -121,7 +121,7 @@ function closeList() { listModalOpen.value = false }
 // ── 编辑资料弹窗 ──
 function openEdit() {
   const u = user.value
-  editForm.value = { name: u.name || '', gender: String(u.gender == null ? 0 : u.gender), age: toDateValue(u.age), prefix: u.prefix || '', intro: u.intro || '' }
+  editForm.value = { name: u.name || '', gender: String(u.gender == null ? 0 : u.gender), age: u.age == null ? '' : String(u.age), prefix: u.prefix || '', intro: u.intro || '' }
   pendingAvatar.value = ''
   editError.value = ''
   editErrorColor.value = ''
@@ -182,7 +182,7 @@ onMounted(load)
       <div class="card user-profile">
         <span v-html="avatarHtml(user.avatar, 'avatar-lg')"></span>
         <div class="user-profile-info-wrap">
-          <div class="user-profile-name">{{ user.name }} <span v-if="user.prefix" class="tag">{{ user.prefix }}</span></div>
+          <div class="user-profile-name">{{ user.name }} <span v-if="user.prefix" class="tag">{{ user.prefix }}</span><span v-if="user.title" class="user-title">{{ user.title }}</span></div>
           <div class="user-profile-stats">
             <span>帖子 {{ (user.stats && user.stats.post_count) || 0 }}</span>
             <button class="stat-btn" @click="openUserList('followers', user.name)">粉丝 {{ (user.stats && user.stats.follower_count) || 0 }}</button>

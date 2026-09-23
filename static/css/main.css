@@ -512,6 +512,20 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .user-profile .avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
 .user-profile-info-wrap { flex: 1; min-width: 0; }
 .user-profile-name { font-size: 20px; font-weight: 700; }
+/* 用户头衔：用较背景色深一点的颜色包裹显示在名称后 */
+.user-title {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+  vertical-align: middle;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-item-active);
+}
 .user-profile-stats { display: flex; gap: 16px; margin-top: 6px; font-size: 13px; color: var(--color-text-tertiary); }
 .user-profile-intro { margin-top: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .user-profile-actions { display: flex; justify-content: flex-end; margin-top: 8px; }

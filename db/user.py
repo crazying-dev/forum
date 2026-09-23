@@ -35,6 +35,7 @@ def _row_to_user(row: Optional[dict]) -> Optional[dict]:
         "intro": row.get("intro") or "",
         "vip": row.get("vip") or "0",
         "prefix": row.get("prefix") or "",
+        "title": row.get("title") or "",
         "is_banned": row.get("is_banned", 0),
         "email_verified": row.get("email_verified", 0),
         "created_at": str(row["created_at"]) if row.get("created_at") else None,

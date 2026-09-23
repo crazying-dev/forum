@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     intro TEXT DEFAULT '',
     vip VARCHAR(32) NOT NULL DEFAULT '0',
     prefix VARCHAR(32) DEFAULT '',
+    title VARCHAR(64) DEFAULT '',
     is_banned INTEGER NOT NULL DEFAULT 0,
     email_verified INTEGER NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -230,6 +231,8 @@ ALL_TABLE_SQL = [
     CREATE_BUG_REPORTS_TABLE_SQL,
     CREATE_VERIFY_CODES_TABLE_SQL,
     CREATE_COMMENT_REPORTS_TABLE_SQL,
+    # 兼容既有库：新增 users.title 头衔列（幂等）
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS title VARCHAR(64) DEFAULT '';",
     *CREATE_INDEX_SQLS
 ]
 
@@ -268,7 +271,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "13"
+STATIC_VERSION = "14"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值

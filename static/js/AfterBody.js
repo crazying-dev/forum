@@ -136,10 +136,18 @@
     return ce - 1604;
   }
   // 无限年 → 公元年：返回公元年份字符串；输入非法时返回空串。
+  // 允许负数（表示「无限前」：公元年 = 无限年 + 1604）。
   function wuxianToCE(wy) {
     wy = parseInt(wy, 10);
-    if (isNaN(wy) || wy < 0) return '';
+    if (isNaN(wy)) return '';
     return String(wy + 1604);
+  }
+  // 公元年 → 无限年展示：≥1604 显示「无限xxx年」，<1604 显示「无限前xxx年」。
+  function wuxianYearLabel(ce) {
+    ce = parseInt(ce, 10);
+    if (isNaN(ce)) return null;
+    if (ce >= 1604) return '无限' + (ce - 1604) + '年';
+    return '无限前' + (1604 - ce) + '年';
   }
   // ── 剥离 Markdown 标记 → 纯文本（用于卡片摘要预览）──
   function stripMarkdown(s) {
@@ -194,6 +202,7 @@
           '<a href="/users/' + esc(u.id) + '" class="user-chip">' +
           avatarHtml(u.avatar, 'avatar') +
           '<span class="user-chip-name">' + esc(u.name) + '</span>' +
+          (u.title ? '<span class="user-title">' + esc(u.title) + '</span>' : '') +
           '</a>';
         chips.forEach(function (c) { c.innerHTML = html; });
         // 用户 chip 是异步填充的，必须在写入后立即解析 data-src，否则头像不显示
@@ -1587,7 +1596,7 @@
     });
   }
 
-  // ── 无限年 / 公元年换算组件：设置下拉「wuxianCalcBtn」打开，双向实时换算 ──
+  // ── 无限年 / 公元年换算组件：点「换算」按钮执行双向换算，支持「无限前」 ──
   function initWuxianConverter() {
     var modal = el('wuxianModal');
     var trigger = el('wuxianCalcBtn');
@@ -1596,20 +1605,25 @@
     function show() { modal.style.display = 'flex'; }
     function hide() { modal.style.display = 'none'; }
     trigger.addEventListener('click', show);
-    var close = el('wuxianClose'), cancel = el('wuxianCancel');
+    var close = el('wuxianClose'), cancel = el('wuxianCancel'), convert = el('wuxianConvert');
     if (close) close.addEventListener('click', hide);
     if (cancel) cancel.addEventListener('click', hide);
     modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
-    var wyInput = el('wuxianInput'), ceInput = el('ceInput');
-    wyInput.addEventListener('input', function () {
-      var wy = wyInput.value.trim();
-      var ce = wuxianToCE(wy);
-      if (ceOut) ceOut.textContent = ce ? (wy + ' 无限年 = ' + ce + ' 年（公元）') : '';
-    });
-    ceInput.addEventListener('input', function () {
-      var ce = parseInt(ceInput.value.trim(), 10);
-      var wy = wuxianYear(ce);
-      if (wyOut) wyOut.textContent = wy !== null ? (ce + ' 年（公元） = ' + wy + ' 无限年') : '';
+    if (convert) convert.addEventListener('click', function () {
+      var wyInput = el('wuxianInput'), ceInput = el('ceInput');
+      var wy = wyInput.value.trim(), ce = ceInput.value.trim();
+      if (!wy && !ce) return;
+      if (wy !== '') {
+        var c = wuxianToCE(wy);
+        var _wy = parseInt(wy, 10);
+        if (ceOut) ceOut.textContent = (isNaN(_wy) || _wy >= 0)
+          ? (wy + ' 无限年 = ' + c + ' 年（公元）')
+          : ('无限前' + (-_wy) + '年 = ' + c + ' 年（公元）');
+      }
+      if (ce !== '') {
+        var lb = wuxianYearLabel(ce);
+        if (wyOut) wyOut.textContent = lb !== null ? (ce + ' 年（公元） = ' + lb) : '';
+      }
     });
   }
 

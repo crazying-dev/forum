@@ -199,17 +199,17 @@
     </div>
     <div class="form-group">
       <label>无限年 → 公元年</label>
-      <input id="wuxianInput" type="number" min="0" placeholder="输入无限年年份（如 422）">
+      <input id="wuxianInput" type="number" placeholder="输入无限年年份（可输入负数表示无限前）">
       <p class="form-hint" id="wuxianCEOut"></p>
     </div>
     <div class="setting-divider"></div>
     <div class="form-group">
       <label>公元年 → 无限年</label>
-      <input id="ceInput" type="number" min="1604" placeholder="输入公元年份（如 2026，需 ≥1604）">
+      <input id="ceInput" type="number" placeholder="输入公元年份">
       <p class="form-hint" id="ceOut"></p>
     </div>
-    <p class="form-hint">规则：无限年 = 公元年 − 1604（无限元年 = 公元 1604）</p>
     <div class="modal-actions">
+      <button class="btn btn-outline" id="wuxianConvert"><i class="fa fa-exchange"></i> 换算</button>
       <button class="btn btn-outline" id="wuxianCancel">关闭</button>
     </div>
   </div>

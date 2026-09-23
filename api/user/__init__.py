@@ -118,6 +118,7 @@ def _strip_user_public(user: dict | None) -> dict | None:
         "intro": user.get("intro") or "",
         "vip": user.get("vip") or "0",
         "prefix": user.get("prefix") or "",
+        "title": user.get("title") or "",
         "email_verified": user.get("email_verified", 0),
         "created_at": user.get("created_at"),
         "last_login": user.get("last_login"),
