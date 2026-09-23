@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import os
 import threading
+import time
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, g, jsonify, request, send_from_directory
 
 import config
 import db
@@ -27,9 +28,43 @@ def create_app() -> Flask:
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 604800
 
     # ── 代理信任（X-Forwarded-For / X-Forwarded-Proto） ──
-    # 线上环境部署在 Nginx/Caddy 后，需开启；注释掉表示不信任代理头。
-    # from werkzeug.middleware.proxy_fix import ProxyFix
-    # app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    # 线上部署在 Nginx/Caddy 反向代理后：不开启时后端看到的连接方总是代理（127.0.0.1），
+    # request.remote_addr、Werkzeug 访问日志、限流用的客户端 IP 全部拿不到真实来访 IP。
+    # 开启后 REMOTE_ADDR 由 X-Forwarded-For 还原（x_for=1：只信任最近一跳代理，
+    # 因此客户端伪造的 X-Forwarded-For 前缀不会被采信）。
+    # 注意：仅当服务确实位于可信代理之后才可开启；可用环境变量 TRUST_PROXY=0 关闭。
+    if os.getenv("TRUST_PROXY", "1") != "0":
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    # ── 访问日志：显式打印真实客户端 IP ──
+    # 形如：[access] ip=1.2.3.4 peer=127.0.0.1 GET /api/posts?page=1 200 12ms
+    #   ip    = 真实来访 IP（经 ProxyFix 从 X-Forwarded-For 还原）
+    #   peer  = 直连方（Nginx 代理时为 127.0.0.1，便于确认请求确实经代理转发）
+    # 可用环境变量 ACCESS_LOG=0 关闭。
+    _access_log = os.getenv("ACCESS_LOG", "1") != "0"
+
+    @app.before_request
+    def _access_log_mark():
+        g._req_start = time.time()
+
+    @app.after_request
+    def _access_log_write(resp):
+        if not _access_log:
+            return resp
+        try:
+            real_ip = request.remote_addr or "-"
+            # ProxyFix 会把原始 REMOTE_ADDR 存在 environ["werkzeug.proxy_fix.orig"]
+            orig = request.environ.get("werkzeug.proxy_fix.orig") or {}
+            peer = orig.get("REMOTE_ADDR") if isinstance(orig, dict) else None
+            peer = peer or "-"
+            cost_ms = int((time.time() - getattr(g, "_req_start", time.time())) * 1000)
+            full = request.full_path
+            target = full[:-1] if full.endswith("?") else full
+            print(f"[access] ip={real_ip} peer={peer} {request.method} {target} {resp.status_code} {cost_ms}ms", flush=True)
+        except Exception:
+            pass
+        return resp
 
     # ── CORS（简化实现，生产建议装 flask-cors 包） ──
     @app.after_request
