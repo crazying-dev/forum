@@ -613,7 +613,13 @@
     initWorldPanel: initWorldPanel,
     connectWorld: connectWorld,
     initWorldChat: initWorldChat,
-    initSearchBox: initSearchBox
+    initSearchBox: initSearchBox,
+    // 跨 IIFE 暴露：以下工具函数定义在本 IIFE 内，Part 2 无法直接引用，
+    // 不经此处导出会报 ReferenceError（如「无限年换算」按钮点了没反应）。
+    wuxianYear: wuxianYear,
+    wuxianToCE: wuxianToCE,
+    wuxianYearLabel: wuxianYearLabel,
+    stripMarkdown: stripMarkdown
   };
 })();
 
@@ -622,6 +628,8 @@
   'use strict';
   var app = window.__yoyoApp;
   var apiFetch = app.apiFetch, esc = app.esc, el = app.el, toast = app.toast, fmtTime = app.fmtTime, avatarHtml = app.avatarHtml, resolveAvatarDeferred = app.resolveAvatarDeferred;
+  // Part 1 定义、Part 2 需要使用（经 __yoyoApp 传递，否则未定义）
+  var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, stripMarkdown = app.stripMarkdown;
 
   // ── 帖子分类汉化映射 ──
   // 除 V2 现有分类外，兼容 V1 存量帖子的英文分类（talk/share/creative 等），保证统一显示中文
