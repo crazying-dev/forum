@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { fmtTime as fmtTimeShared, getCurrentUser } from '../utils.js'
 
 const messages = ref([])
 const input = ref('')
@@ -7,21 +8,14 @@ const status = ref('连接中…')
 const statusCls = ref('')
 const myUserId = ref(null)
 const listEl = ref(null)
+const loggedIn = ref(!!getCurrentUser())
 
 let pollTimer = null
 let retry = 0
 
+// 时间戳复用全局 AfterBody 的 fmtTime：与全站一致（含「无限年 / 公元年」年制切换）
 function fmtTime(t) {
-  if (!t) return ''
-  const d = new Date(String(t).replace(' ', 'T') + 'Z')
-  if (isNaN(d.getTime())) return String(t)
-  const now = new Date()
-  const diff = (now - d) / 1000
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'
-  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
-  const pad = (n) => (n < 10 ? '0' + n : '' + n)
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+  return fmtTimeShared(t)
 }
 
 function setStatus(text, cls) {
@@ -71,9 +65,12 @@ async function send() {
     body: JSON.stringify({ content }),
   }).then((r) => r.json()).catch(() => null)
   if (!d) { setStatus('发送失败', 'offline'); return }
-  if (d.success) { input.value = ''; poll() }
-  else if (d.message) setStatus(d.message, 'offline')
-  else if (!d.success && !d.message) location.href = '/auth'
+  if (d.success) { input.value = ''; loggedIn.value = true; poll() }
+  else if (d.message) {
+    setStatus(d.message, 'offline')
+    // 未登录：给出明确指引，避免只报“发送失败”却无路可走
+    if (/登录/.test(d.message)) loggedIn.value = false
+  } else { loggedIn.value = false }
 }
 
 function onEnter() { send() }
@@ -117,6 +114,9 @@ onBeforeUnmount(() => {
     <div class="world-page-input-bar">
       <input v-model="input" type="text" placeholder="输入消息...（Enter 发送）" maxlength="500" @keydown.enter="onEnter">
       <button @click="send"><i class="fa fa-paper-plane"></i> 发送</button>
+    </div>
+    <div v-if="!loggedIn" class="world-page-login-tip">
+      <a class="btn btn-primary btn-sm" href="/auth">登录后即可发言</a>
     </div>
   </div>
 </template>

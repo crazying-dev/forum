@@ -18,18 +18,38 @@ const errorColor = ref('')
 const submitting = ref(false)
 const codeCooldown = ref(0)
 let codeTimer = null
+// 找回密码两步式：1 = 输入邮箱发验证码；2 = 填验证码 + 新密码
+// （用户确认口径：不用点邮件链接，直接在登录页完成）
+const resetStep = ref(1)
 
 // 重置密码且携带 token：进入设置新密码表单（不再显示邮箱输入）
 const isResetWithToken = computed(() => mode.value === 'reset' && !!token)
+const isCodeReset = computed(() => mode.value === 'reset' && !token)
+const isCodeResetStep2 = computed(() => isCodeReset.value && resetStep.value === 2)
 const showName = computed(() => mode.value === 'register')
-const showEmail = computed(() => !isResetWithToken.value)
-const showConfirm = computed(() => mode.value === 'register' || isResetWithToken.value)
-const showCode = computed(() => mode.value === 'register')
-const emailLabel = computed(() => (mode.value === 'register' ? '邮箱' : '用户名或邮箱'))
-const emailPlaceholder = computed(() => (mode.value === 'register' ? '邮箱' : '用户名或邮箱'))
+const showEmail = computed(() => !isResetWithToken.value && !isCodeResetStep2.value)
+const showConfirm = computed(() => mode.value === 'register' || isResetWithToken.value || isCodeResetStep2.value)
+const showCode = computed(() => mode.value === 'register' || isCodeResetStep2.value)
+const emailLabel = computed(() => (mode.value === 'login' ? '用户名或邮箱' : '邮箱'))
+const emailPlaceholder = computed(() => (mode.value === 'login' ? '用户名或邮箱' : '邮箱'))
+// 提交按钮文案（含找回密码两步式的两步差异）
+const submitIdleText = computed(() => {
+  if (mode.value === 'login') return '登录'
+  if (mode.value === 'register') return '注册'
+  if (isResetWithToken.value) return '设置新密码'
+  return resetStep.value === 1 ? '发送邮箱验证码' : '重置密码'
+})
+const submitBusyText = computed(() => {
+  if (mode.value === 'login') return '登录中…'
+  if (mode.value === 'register') return '注册中…'
+  if (isResetWithToken.value) return '提交中…'
+  return resetStep.value === 1 ? '发送中…' : '提交中…'
+})
 
 function switchMode(m) {
   mode.value = m
+  resetStep.value = 1
+  code.value = ''
   error.value = ''
   errorColor.value = ''
 }
@@ -49,7 +69,11 @@ function sendCode() {
   errorColor.value = ''
   const em = email.value.trim()
   if (!em) { error.value = '请先输入邮箱'; return }
-  apiFetch('/api/email/send-register-code', { method: 'POST', body: { email: em } })
+  // 注册用注册验证码；找回密码用重置验证码（同一 6 位数字形式）
+  const url = mode.value === 'register'
+    ? '/api/email/send-register-code'
+    : '/api/email/send-code-reset-password'
+  apiFetch(url, { method: 'POST', body: { email: em } })
     .then((d) => {
       if (!d) return
       if (d.success) { errorColor.value = '#2ecc71'; error.value = d.message || '验证码已发送'; startCodeCooldown() }
@@ -63,8 +87,12 @@ function submit() {
   errorColor.value = ''
   if (submitting.value) return
   const m = mode.value
-  if ((m === 'register' || isResetWithToken.value) && password.value !== confirm.value) {
+  if ((m === 'register' || isResetWithToken.value || isCodeResetStep2.value) && password.value !== confirm.value) {
     error.value = '两次密码不一致'
+    return
+  }
+  if (isCodeReset.value && resetStep.value === 2 && !code.value.trim()) {
+    error.value = '请填写邮箱验证码'
     return
   }
   submitting.value = true
@@ -81,25 +109,36 @@ function submit() {
       body: { name: name.value, email: email.value, password: password.value, code: code.value.trim() },
     })
   } else if (isResetWithToken.value) {
-    // 设置新密码：POST token + 新密码
+    // 邮件链接方式：POST token + 新密码
     p = apiFetch('/api/email/reset-password', {
       method: 'POST',
       body: { token, password: password.value },
     })
+  } else if (resetStep.value === 1) {
+    // 第一步：发送邮箱验证码
+    p = apiFetch('/api/email/send-code-reset-password', { method: 'POST', body: { email: email.value } })
   } else {
-    p = apiFetch('/api/email/send-reset-password', { method: 'POST', body: { email: email.value } })
+    // 第二步：验证码 + 新密码
+    p = apiFetch('/api/email/reset-password-by-code', {
+      method: 'POST',
+      body: { email: email.value, code: code.value.trim(), password: password.value },
+    })
   }
   p.then((d) => {
     if (!d) return
     if (d.success) {
       if (m === 'login' || m === 'register') location.href = '/'
-      else {
+      else if (isCodeReset.value && resetStep.value === 1) {
+        // 进入第二步：填验证码 + 新密码
+        resetStep.value = 2
+        startCodeCooldown()
         errorColor.value = '#2ecc71'
-        error.value = d.message || '已发送'
-        // 设置新密码成功后跳回登录
-        if (isResetWithToken.value) {
-          setTimeout(() => { location.href = '/auth?mode=login' }, 1500)
-        }
+        error.value = d.message || '验证码已发送至邮箱'
+      } else {
+        errorColor.value = '#2ecc71'
+        error.value = d.message || '已提交'
+        // 重置成功后跳回登录
+        setTimeout(() => { location.href = '/auth?mode=login' }, 1500)
       }
     } else {
       error.value = d.message || '操作失败'
@@ -118,6 +157,9 @@ function submit() {
         <button class="auth-tab" :class="{ active: mode === 'reset' }" @click="switchMode('reset')">找回密码</button>
       </div>
       <form @submit.prevent="submit" autocomplete="off">
+        <p v-if="isCodeResetStep2" class="auth-hint">
+          <i class="fa fa-envelope-o"></i> 验证码已发送至 {{ email }}（5 分钟内有效），请填入下方验证码并设置新密码。
+        </p>
         <div v-show="showName" class="form-group">
           <label>用户名</label>
           <input v-model="name" type="text" maxlength="20" placeholder="2-20 个字符">
@@ -136,7 +178,7 @@ function submit() {
           </div>
         </div>
         <div class="form-group">
-          <label>{{ isResetWithToken ? '新密码' : '密码' }}</label>
+          <label>{{ (isResetWithToken || isCodeResetStep2) ? '新密码' : '密码' }}</label>
           <input v-model="password" type="password" maxlength="64" placeholder="至少 8 位，含字母和数字">
         </div>
         <div v-show="showConfirm" class="form-group">
@@ -145,7 +187,7 @@ function submit() {
         </div>
         <p class="auth-error" :style="errorColor ? { color: errorColor } : {}">{{ error }}</p>
         <button type="submit" class="btn btn-primary btn-block" :disabled="submitting">
-          {{ submitting ? (mode === 'login' ? '登录中…' : (mode === 'register' ? '注册中…' : (isResetWithToken ? '提交中…' : '发送中…'))) : (mode === 'login' ? '登录' : (mode === 'register' ? '注册' : (isResetWithToken ? '设置新密码' : '发送重置邮件'))) }}
+          {{ submitting ? submitBusyText : submitIdleText }}
         </button>
       </form>
     </div>

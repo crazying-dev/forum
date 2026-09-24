@@ -85,7 +85,15 @@
 <!-- 左侧边栏导航：除 logo/标题/搜索框外的入口都在这里，默认仅图标，可展开/收起 -->
 <nav class="side-nav" id="sideNav">
   <button class="side-nav-item" id="sideNavToggle" title="展开/收起侧边栏"><i class="fa fa-angle-right"></i><span>收起</span></button>
+  <!-- 手机端底部标签栏（≤900px 显示；桌面端由 .nav-tab{display:none} 隐藏） -->
+  <a class="side-nav-item nav-tab" href="/" data-navtab="/"><i class="fa fa-home"></i><span>首页</span></a>
+  <a class="side-nav-item nav-tab" href="/forum" data-navtab="/forum"><i class="fa fa-list"></i><span>论坛</span></a>
+  <a class="side-nav-item nav-tab" href="/World" data-navtab="/World"><i class="fa fa-globe"></i><span>世界</span></a>
+  <a class="side-nav-item nav-tab" href="/post/create" data-navtab="/post/create"><i class="fa fa-pencil"></i><span>发帖</span></a>
+  <button class="side-nav-item nav-tab" data-settings title="设置"><i class="fa fa-cog"></i><span>设置</span></button>
+  <!-- 桌面端竖排入口 -->
   <a class="side-nav-item" href="/forum" title="论坛"><i class="fa fa-list"></i><span>论坛</span></a>
+  <a class="side-nav-item" href="/World" title="世界频道"><i class="fa fa-globe"></i><span>世界频道</span></a>
   <a class="side-nav-item" href="/WIKI" target="_blank" rel="noopener" title="WIKI"><i class="fa fa-book"></i><span>WIKI</span></a>
   <button class="side-nav-item" id="eggBtn" title="彩蛋"><i class="fa fa-gift"></i><span>彩蛋</span></button>
   <button class="side-nav-item" data-bug-report title="反馈 Bug"><i class="fa fa-bug"></i><span>反馈 Bug</span></button>
@@ -106,6 +114,10 @@
   <div class="setting-group-title">导航位置</div>
   <button class="setting-item" data-navmode="side"><i class="fa fa-columns"></i> 侧边</button>
   <button class="setting-item" data-navmode="top"><i class="fa fa-bars"></i> 顶部</button>
+  <div class="setting-divider"></div>
+  <div class="setting-group-title">年制显示</div>
+  <button class="setting-item" data-yearmode="wuxian"><i class="fa fa-clock-o"></i> 无限年</button>
+  <button class="setting-item" data-yearmode="ce"><i class="fa fa-calendar-o"></i> 公元年</button>
   <div class="setting-divider"></div>
   <button class="setting-item" id="wuxianCalcBtn"><i class="fa fa-calendar"></i> 无限年换算</button>
   <div class="setting-divider"></div>
@@ -237,6 +249,7 @@
       <input id="ceInput" type="number" placeholder="输入公元年份">
       <p class="form-hint" id="ceOut"></p>
     </div>
+    <p class="form-hint" id="wuxianModeHint"></p>
     <div class="modal-actions">
       <button class="btn btn-outline" id="wuxianConvert"><i class="fa fa-exchange"></i> 换算</button>
       <button class="btn btn-outline" id="wuxianCancel">关闭</button>

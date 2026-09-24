@@ -186,6 +186,12 @@ function openEdit() {
   bpDay.value = ymd ? ymd.d : 1
   bpDirty.value = false
   pendingAvatar.value = ''
+  // 改密码区默认清空（验证码一次性，不保留上次输入）
+  pwCode.value = ''
+  pwNew.value = ''
+  pwConfirm.value = ''
+  pwMsg.value = ''
+  pwMsgColor.value = ''
   editError.value = ''
   editErrorColor.value = ''
   editOpen.value = true
@@ -242,6 +248,64 @@ function saveEdit() {
   })
 }
 function toggleFav() { favCollapsed.value = !favCollapsed.value }
+
+// ── 修改密码（需邮箱验证码；用户确认口径：不要求旧密码）──
+const pwCode = ref('')
+const pwNew = ref('')
+const pwConfirm = ref('')
+const pwCooldown = ref(0)
+const pwMsg = ref('')
+const pwMsgColor = ref('')
+let pwTimer = null
+function startPwCooldown() {
+  pwCooldown.value = 60
+  clearInterval(pwTimer)
+  pwTimer = setInterval(() => {
+    pwCooldown.value -= 1
+    if (pwCooldown.value <= 0) { clearInterval(pwTimer); pwTimer = null }
+  }, 1000)
+}
+function sendPwCode() {
+  if (pwCooldown.value > 0) return
+  pwMsg.value = ''
+  pwMsgColor.value = ''
+  apiFetch('/api/email/send-change-password-code', { method: 'POST', body: {} })
+    .then((d) => {
+      if (!d) return
+      if (d.success) {
+        pwMsgColor.value = '#2ecc71'
+        pwMsg.value = d.message || '验证码已发送至邮箱'
+        startPwCooldown()
+      } else {
+        pwMsgColor.value = ''
+        pwMsg.value = d.message || '发送失败'
+      }
+    })
+    .catch(() => { pwMsg.value = '网络错误' })
+}
+function changePassword() {
+  pwMsg.value = ''
+  pwMsgColor.value = ''
+  if (!pwCode.value.trim()) { pwMsg.value = '请填写邮箱验证码'; return }
+  if (!pwNew.value) { pwMsg.value = '请输入新密码'; return }
+  if (pwNew.value !== pwConfirm.value) { pwMsg.value = '两次新密码不一致'; return }
+  apiFetch('/api/user/password', {
+    method: 'POST',
+    body: { code: pwCode.value.trim(), new_password: pwNew.value },
+  }).then((d) => {
+    if (!d) return
+    if (d.success) {
+      pwMsgColor.value = '#2ecc71'
+      pwMsg.value = d.message || '密码修改成功'
+      toast('密码修改成功，请重新登录')
+      // 后端已清理登录 cookie，回到登录页重新登录
+      setTimeout(() => { location.href = '/auth?mode=login' }, 1500)
+    } else {
+      pwMsgColor.value = ''
+      pwMsg.value = d.message || '修改失败'
+    }
+  }).catch(() => { pwMsg.value = '网络错误' })
+}
 
 onMounted(load)
 </script>
@@ -384,6 +448,29 @@ onMounted(load)
           </div>
           <p class="auth-error" :style="editErrorColor ? { color: editErrorColor } : {}">{{ editError }}</p>
         </div>
+        <div class="setting-divider"></div>
+        <div class="form-group">
+          <label>修改密码（需邮箱验证）</label>
+          <div class="form-hint">系统会向你的绑定邮箱发送 6 位验证码，验证后即可设置新密码（无需旧密码）。</div>
+          <div class="code-row" style="margin-top:8px;">
+            <input v-model="pwCode" type="text" maxlength="6" placeholder="6 位数字验证码">
+            <button type="button" class="btn btn-outline btn-sm" :disabled="pwCooldown > 0" @click="sendPwCode">
+              {{ pwCooldown > 0 ? pwCooldown + 's' : '获取验证码' }}
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>新密码</label>
+          <input v-model="pwNew" type="password" maxlength="64" placeholder="至少 8 位，含字母和数字">
+        </div>
+        <div class="form-group">
+          <label>确认新密码</label>
+          <input v-model="pwConfirm" type="password" maxlength="64">
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start; margin-bottom:4px;">
+          <button type="button" class="btn btn-outline" @click="changePassword"><i class="fa fa-key"></i> 修改密码</button>
+        </div>
+        <p class="auth-error" :style="pwMsgColor ? { color: pwMsgColor } : {}">{{ pwMsg }}</p>
         <div class="modal-actions">
           <button class="btn btn-outline" @click="closeEdit">取消</button>
           <button class="btn btn-primary" @click="saveEdit">保存</button>

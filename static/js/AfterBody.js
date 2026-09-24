@@ -115,6 +115,42 @@
     var iso = s.replace(' ', 'T');
     return new Date(/:\d{2}/.test(iso) ? iso + 'Z' : iso);
   }
+  // ── 年制显示（无限年 / 公元年）：cookie 存储，全站时间显示统一口径 ──
+  // 用 cookie 而非 localStorage：Vue 打包产物与 AfterBody.js 都要读到同一份偏好。
+  var YEAR_MODE_COOKIE = 'forum-year-mode';
+  function readCookie(name) {
+    try {
+      var parts = document.cookie ? document.cookie.split('; ') : [];
+      for (var i = 0; i < parts.length; i++) {
+        var idx = parts[i].indexOf('=');
+        if (idx > -1 && parts[i].slice(0, idx) === name) return decodeURIComponent(parts[i].slice(idx + 1));
+      }
+    } catch (e) {}
+    return '';
+  }
+  function writeCookie(name, value, days) {
+    try {
+      var d = new Date();
+      d.setTime(d.getTime() + (days || 365) * 86400000);
+      document.cookie = name + '=' + encodeURIComponent(value) +
+        '; expires=' + d.toUTCString() + '; path=/; SameSite=Lax';
+    } catch (e) {}
+  }
+  // 当前年制：'wuxian' 无限年（默认）/ 'ce' 公元年
+  function getYearMode() { return readCookie(YEAR_MODE_COOKIE) === 'ce' ? 'ce' : 'wuxian'; }
+  function setYearMode(mode) {
+    writeCookie(YEAR_MODE_COOKIE, mode === 'ce' ? 'ce' : 'wuxian');
+    // 全站时间戳口径随之改变：Vue 页面无法局部重渲染，整页刷新最稳
+    location.reload();
+  }
+  // 按当前年制格式化「年」部分（无限年 / 无限前 / 公元年）
+  function yearText(ce) {
+    ce = parseInt(ce, 10);
+    if (isNaN(ce)) return '';
+    if (getYearMode() === 'ce') return String(ce);
+    var wy = wuxianYear(ce);
+    return wy !== null ? '无限' + wy : '无限前' + (1604 - ce);
+  }
   function fmtTime(t) {
     if (!t) return '';
     var d = parseTime(t);
@@ -125,8 +161,7 @@
     if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前';
     if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前';
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
-    var wy = wuxianYear(d.getFullYear());
-    return (wy !== null ? '无限' + wy : d.getFullYear()) + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return yearText(d.getFullYear()) + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
   // ── 无限年：无限年 = 公元年 − 1604（无限元年 = 公元 1604）──
   // 公元年 ≥ 1604 时返回无限年；否则返回 null（尚未进入无限年）。
@@ -298,7 +333,29 @@
         });
       });
       setNavMode(currentNavMode); // 同步当前模式高亮
+      // 年制显示（无限年 / 公元年）：cookie 持久化，点击后整页重渲染
+      function syncYearButtons() {
+        var cur = getYearMode();
+        dropdown.querySelectorAll('[data-yearmode]').forEach(function (b) {
+          b.classList.toggle('active', b.getAttribute('data-yearmode') === cur);
+        });
+      }
+      dropdown.querySelectorAll('[data-yearmode]').forEach(function (b) {
+        b.addEventListener('click', function () { setYearMode(b.getAttribute('data-yearmode')); });
+      });
+      syncYearButtons();
     }
+    // 手机端底部标签栏：高亮当前页面
+    (function markActiveTab() {
+      var path = location.pathname;
+      document.querySelectorAll('.nav-tab[data-navtab]').forEach(function (a) {
+        var target = a.getAttribute('data-navtab');
+        var on = target === '/'
+          ? (path === '/' || path === '')
+          : (path === target || path.indexOf(target + '/') === 0);
+        a.classList.toggle('active', on);
+      });
+    })();
     setSideNavExpanded(false); // 默认仅图标（展开为临时态，鼠标离开即收起）
     // 退出登录
     var li = el('logoutItem');
@@ -604,6 +661,9 @@
     el: el,
     toast: toast,
     fmtTime: fmtTime,
+    getYearMode: getYearMode,
+    setYearMode: setYearMode,
+    yearText: yearText,
     avatarHtml: avatarHtml,
     resolveAvatarDeferred: resolveAvatarDeferred,
     setTheme: setTheme,
@@ -630,6 +690,7 @@
   var apiFetch = app.apiFetch, esc = app.esc, el = app.el, toast = app.toast, fmtTime = app.fmtTime, avatarHtml = app.avatarHtml, resolveAvatarDeferred = app.resolveAvatarDeferred;
   // Part 1 定义、Part 2 需要使用（经 __yoyoApp 传递，否则未定义）
   var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, stripMarkdown = app.stripMarkdown;
+  var getYearMode = app.getYearMode, yearText = app.yearText;
 
   // ── 帖子分类汉化映射（口径对照 V1，与论坛分区 tab / 发帖选项一一对应）──
   // 分区 key：general/talk/question/share/creative → 综合/闲聊/求助/分享/创作
@@ -1614,22 +1675,35 @@
     if (close) close.addEventListener('click', hide);
     if (cancel) cancel.addEventListener('click', hide);
     modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
-    if (convert) convert.addEventListener('click', function () {
+    if (convert) convert.addEventListener('click', run);
+    // 输入即时换算：不必先点按钮（旧版“点了没反应”的体感主要来自此）
+    [el('wuxianInput'), el('ceInput')].forEach(function (inp) {
+      if (inp) inp.addEventListener('input', run);
+    });
+    function run() {
       var wyInput = el('wuxianInput'), ceInput = el('ceInput');
+      if (!wyInput || !ceInput) return;
       var wy = wyInput.value.trim(), ce = ceInput.value.trim();
-      if (!wy && !ce) return;
-      if (wy !== '') {
+      if (wy === '') { if (ceOut) ceOut.textContent = ''; }
+      else {
         var c = wuxianToCE(wy);
         var _wy = parseInt(wy, 10);
         if (ceOut) ceOut.textContent = (isNaN(_wy) || _wy >= 0)
           ? (wy + ' 无限年 = ' + c + ' 年（公元）')
           : ('无限前' + (-_wy) + '年 = ' + c + ' 年（公元）');
       }
-      if (ce !== '') {
+      if (ce === '') { if (wyOut) wyOut.textContent = ''; }
+      else {
         var lb = wuxianYearLabel(ce);
         if (wyOut) wyOut.textContent = lb !== null ? (ce + ' 年（公元） = ' + lb) : '';
       }
-    });
+    }
+    // 提示当前全站年制（设置中可切换）
+    var hint = el('wuxianModeHint');
+    if (hint) {
+      hint.textContent = '当前全站年制：' + (getYearMode() === 'ce' ? '公元年' : '无限年') +
+        '（基准：无限元年 = 公元 1604 年，可在设置中切换）';
+    }
   }
 
   // ── PWA 安装：捕获 beforeinstallprompt，[data-pwa-install] 触发原生安装或降级提示 ──

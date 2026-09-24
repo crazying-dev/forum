@@ -6,7 +6,7 @@
     POST /api/user/register   注册
     GET  /api/user/info       获取当前登录用户信息
     PUT  /api/user/info       更新当前用户基础资料
-    POST /api/user/password   修改密码
+    POST /api/user/password   修改密码（邮箱验证码 code + new_password；也兼容旧密码校验）
     GET  /api/user/<id>       公开查询某个用户资料
 """
 from __future__ import annotations
@@ -364,21 +364,55 @@ def api_user_update():
 
 
 # ──────────────────────────────────────────────
-# 6. 修改密码（需登录，需验证原密码）
+# 6. 修改密码（需登录，需邮箱验证码）
+#    用户确认的口径：先向绑定邮箱发送 6 位验证码，凭验证码改密（不需旧密码）。
+#    同时保留「旧密码」校验分支，便于其他调用方兼容。
 # ──────────────────────────────────────────────
 @user_bp.route("/password", methods=["POST"])
 @login_required
 def api_user_change_password():
+    """修改密码。
+
+    body 两种形式：
+      * {code, new_password}         —— 邮箱验证码校验（个人资料页默认走此路）
+      * {old_password, new_password} —— 旧密码校验（兼容保留）
+    """
     data = request.get_json(silent=True) or {}
+    code = (data.get("code") or "").strip()
     old_raw = data.get("old_password") or ""
     new_raw = data.get("new_password") or ""
 
     ok, msg = validate_password(new_raw)
     if not ok:
         return jsonify({"success": False, "message": msg}), 400
+
+    if code:
+        # —— 邮箱验证码分支 ——
+        # 局部导入：api.email 又依赖本模块的 login_required，顶层互导会形成循环
+        from api.email import verify_change_password_code, consume_change_password_code
+
+        user = db.user.get_user_by_id(g.user["id"])
+        email = ((user or {}).get("email") or "").strip().lower()
+        if not email:
+            return jsonify(
+                {"success": False, "message": "当前账号未绑定邮箱，无法通过邮箱验证修改密码"}
+            ), 400
+        ok, msg = verify_change_password_code(email, code)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        ok, msg = db.user.reset_password(g.user["id"], new_raw)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        consume_change_password_code(email, code)
+        resp = make_response(
+            jsonify({"success": True, "message": "密码修改成功，请用新密码重新登录"})
+        )
+        _clear_auth_cookies(resp)  # 改密后重登更安全
+        return resp
+
+    # —— 旧密码分支（兼容）——
     if old_raw == new_raw:
         return jsonify({"success": False, "message": "新密码不能与旧密码相同"}), 400
-
     ok, msg = db.user.change_password(g.user["id"], old_raw, new_raw)
     if not ok:
         return jsonify({"success": False, "message": msg}), 400

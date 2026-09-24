@@ -16,6 +16,15 @@
   --color-primary: #6A8C89;
   --color-primary-hover: #579491;
   --color-shadow: rgba(58, 95, 107, 0.15);
+  /* 以下令牌对齐 V1：世界频道独立页 / 外链确认页 / OAuth 页 / 设置高亮等复用。
+     缺省会导致背景变透明、分隔线消失（手机端尤其明显），故在此补齐。 */
+  --color-bg-secondary: rgba(255, 255, 255, 0.95);
+  --color-bg-icon: rgba(106, 140, 137, 0.15);
+  --color-bg-icon-hover: rgba(106, 140, 137, 0.3);
+  --color-bg-item-hover: rgba(106, 140, 137, 0.1);
+  --color-bg-item-active: rgba(106, 140, 137, 0.15);
+  --color-border-divider: rgba(106, 140, 137, 0.1);
+  --color-text-muted: #D8E6E4;
   --world-width: 320px;
 }
 .night-mode {
@@ -35,6 +44,13 @@
   --color-primary: #84A8B9;
   --color-primary-hover: #6A8C89;
   --color-shadow: rgba(0, 0, 0, 0.3);
+  --color-bg-secondary: rgba(26, 36, 35, 0.9);
+  --color-bg-icon: rgba(132, 168, 185, 0.2);
+  --color-bg-icon-hover: rgba(132, 168, 185, 0.4);
+  --color-bg-item-hover: rgba(132, 168, 185, 0.15);
+  --color-bg-item-active: rgba(132, 168, 185, 0.2);
+  --color-border-divider: rgba(132, 168, 185, 0.15);
+  --color-text-muted: #B4D2D8;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -209,30 +225,71 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .side-setting-dropdown.open { display: block; }
 .setting-group-title { font-size: 12px; color: var(--color-text-tertiary); padding: 6px 10px 4px; }
 .setting-item.active { background: var(--color-bg-item-active); }
-/* 手机/窄屏：侧边栏为常驻图标栏（52px），首个按钮展开为 220px 浮层显示文字 */
+/* ── 手机/窄屏：左侧竖排图标栏 → 底部标签栏（Apple 风格）──
+   原左侧 52px 常驻竖条会把正文压成很窄一条，手机端体验极差；
+   改为底部标签栏后正文全宽，且图标落在拇指热区。 */
 @media (max-width: 900px) {
-  body { padding-left: 52px; }
-  .side-nav { width: 52px; padding-top: 56px; transform: none; }
-  .side-nav-item { justify-content: center; }
-  .side-nav-item span { display: none; }
-  .side-nav-user { justify-content: center; }
-  .side-nav-user .user-chip-name { display: none; }
-  body.side-nav-expanded .side-nav {
-    width: 220px;
-    box-shadow: 2px 0 12px var(--color-shadow);
+  /* 正文全宽：去掉左侧预留；底部为标签栏留高（含 iPhone 安全区） */
+  body {
+    padding-left: 0;
+    padding-bottom: calc(58px + env(safe-area-inset-bottom));
   }
-  body.side-nav-expanded .side-nav-item { justify-content: flex-start; }
-  body.side-nav-expanded .side-nav-item span { display: inline; }
-  body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
-  body.side-nav-expanded .side-nav-user .user-chip-name { display: inline; }
-  /* 手机端设置下拉横跨图标栏右侧，避免窄屏溢出 */
-  .side-setting-dropdown { left: 60px; right: 8px; bottom: 64px; }
+  body.side-nav-expanded { --side-nav-w: 0px; }
+  .side-nav {
+    left: 0; right: 0; top: auto; bottom: 0;
+    width: auto;
+    height: calc(58px + env(safe-area-inset-bottom));
+    flex-direction: row;
+    align-items: stretch;
+    padding: 0 4px env(safe-area-inset-bottom);
+    border-right: none;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    overflow: visible;
+    transform: none !important;
+    box-shadow: 0 -2px 12px var(--color-shadow);
+  }
+  /* 竖排专属项（展开按钮 / 占位 / 桌面图标项）在底部标签栏中隐藏 */
+  .side-nav #sideNavToggle,
+  .side-nav-spacer,
+  .side-nav-item:not(.nav-tab) { display: none; }
+  .side-nav .nav-tab {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    min-height: 48px;
+    width: auto;
+    margin: 0;
+    padding: 4px 2px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .side-nav .nav-tab span { display: inline; white-space: nowrap; }
+  .side-nav .nav-tab i { width: auto; font-size: 18px; }
+  .side-nav .nav-tab:active { background: var(--color-bg-hover); }
+  .side-nav .nav-tab.active { color: var(--color-primary); }
+  /* 设置下拉在手机端改为贴标签栏上方弹出的面板，避免窄屏溢出 */
+  .side-setting-dropdown {
+    left: 10px; right: 10px;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    min-width: 0;
+    max-height: calc(100vh - 150px);
+    overflow-y: auto;
+  }
+  /* 手机端世界频道走独立页 /World，收起原右侧浮层（避免遮挡正文） */
+  .world-panel { display: none !important; }
 }
 
 /* 顶部模式（桌面）：导航与头部栏合并（隐藏左侧边栏），显示 header-nav */
 @media (min-width: 901px) {
   /* 桌面端去除展开/收起按钮：改为鼠标悬浮展开、离开收起 */
   #sideNavToggle { display: none; }
+  /* 底部标签栏专属项：桌面端不显示（桌面用左侧竖排图标栏 / 顶部导航） */
+  .nav-tab { display: none; }
   body.nav-mode-top { padding-left: 0; }
   body.nav-mode-top .side-nav { display: none; }
   body.nav-mode-top .header-nav { display: flex; }
@@ -601,6 +658,17 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .auth-tab:hover { color: var(--color-text-primary); }
 .auth-tab.active { background: var(--color-primary); color: #fff; box-shadow: 0 1px 4px var(--color-shadow); }
 .auth-error { color: #e74c3c; font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+/* 认证页提示条（如找回密码第二步「验证码已发送至…」） */
+.auth-hint {
+  background: var(--color-bg-hover);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
 
 /* ── 世界频道面板 ── */
 .world-panel {
@@ -729,12 +797,12 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
   .nav-login { padding: 5px 10px; font-size: 12px; }
   /* 手机/窄屏：全局 Live2D 不显示（桌面/平板才常驻左下角） */
   #global-live2d.global-live2d { display: none !important; }
-  .world-panel { position: fixed; right: 0; top: 56px; height: calc(100vh - 56px); z-index: 95; transition: transform .25s ease; }
-  .world-panel.collapsed { width: var(--world-width) !important; transform: translateX(110%); display: flex !important; }
-  .world-panel.collapsed .world-collapse {
-    top: 64px;
-    right: 12px;
-  }
+  /* 手机端世界频道改用独立页 /World（底部标签栏入口），右侧浮层已完全隐藏 */
+  .world-panel { display: none !important; }
+  /* 头部只保留用户头像入口（其余导航入口都在底部标签栏） */
+  .header-nav { display: flex; margin-left: auto; }
+  .header-nav .nav-link { display: none; }
+  .header-nav .nav-user { margin-left: 0; }
 }
 
 /* ── Live2D 页 ── */
@@ -1071,7 +1139,8 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
     overflow-x: hidden;
     max-width: 100vw;
   }
-  body { padding-bottom: env(safe-area-inset-bottom); }
+  /* 正文底部预留：底部标签栏高度 + iPhone 安全区 */
+  body { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
 
   /* iOS 聚焦 input 时自动放大页面 → 把表单字号提升到 ≥16px */
   .form-group input, .form-group textarea, .form-group select,
@@ -1117,8 +1186,29 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
   .footer-inner { padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); }
   .footer-links { flex-wrap: wrap; gap: 10px; }
 
-  /* 世界频道：宽度改为屏幕减 16px，避免在 320px 机上正好卡死 */
-  .world-panel { --world-width: calc(100vw - 16px); }
+  /* 底部标签栏：常规手机再收紧一档，图标 + 文字更紧凑 */
+  .side-nav { height: calc(56px + env(safe-area-inset-bottom)); }
+  .side-nav .nav-tab { min-height: 46px; font-size: 10px; }
+  .side-nav .nav-tab i { font-size: 17px; }
+
+  /* 分区 tabs：手机上改为横向滚动一行，避免换行挤压正文 */
+  .category-tabs, .search-type-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .category-tabs .tab, .search-type-tabs .tab { flex: 0 0 auto; }
+
+  /* 弹窗：手机上从底部弹出、操作按钮吸底，长表单（如改密码）也能一键提交 */
+  .modal-mask { padding: 12px 10px calc(12px + env(safe-area-inset-bottom)); align-items: flex-end; }
+  .modal { max-height: 88vh; padding: 16px 14px; border-radius: 16px; }
+  .modal-actions {
+    position: sticky;
+    bottom: -2px;
+    padding: 8px 0 2px;
+    background: var(--color-bg-card);
+  }
 }
 
 /* ── 响应式：≤380px 超窄屏（iPhone SE 1/2/3 / 老安卓小屏）── */
@@ -1303,6 +1393,20 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .world-page-input-bar { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--color-border-divider); }
 .world-page-input-bar input { flex: 1; padding: 8px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg-secondary); color: var(--color-text-primary); }
 .world-page-input-bar button { padding: 8px 18px; border: none; border-radius: 8px; background: var(--color-primary); color: #fff; cursor: pointer; }
+.world-page-login-tip { padding: 0 16px 12px; }
+/* 手机端：世界频道独立页占满「头部栏 + 底部标签栏」之间的可视区 */
+@media (max-width: 900px) {
+  .world-page-container {
+    height: calc(100vh - 140px);
+    height: calc(100dvh - 140px);
+    min-height: 300px;
+    border-radius: 10px;
+  }
+  .world-page-header { padding: 10px 12px; }
+  .world-page-messages { padding: 10px 12px; gap: 10px; }
+  .world-page-msg-body { max-width: 78%; }
+  .world-page-input-bar { padding: 10px 12px; }
+}
 
 /* ── 第三方授权登录页（oauth.html → OAuthView.vue） ── */
 .oauth-container { display: flex; align-items: center; justify-content: center; min-height: 60vh; padding: 20px; }

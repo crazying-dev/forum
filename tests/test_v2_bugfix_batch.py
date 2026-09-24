@@ -493,11 +493,15 @@ def test_mobile_header_collapse_like_v1():
     assert "body.side-nav-expanded" in CSS, "缺少 side-nav-expanded 展开态样式"
     assert ".side-nav-item span { display: none; }" in CSS, "默认未隐藏文字只留图标"
     assert "body.side-nav-expanded .side-nav-item span" in CSS, "展开态未显示文字"
-    # 手机端：侧边栏为常驻图标栏（52px），展开为 220px 浮层显示文字
-    assert "body { padding-left: 52px; }" in CSS, "手机端缺少常驻图标栏占位"
-    assert ".side-nav { width: 52px;" in CSS, "手机端图标栏宽度不是 52px"
-    assert "body.side-nav-expanded .side-nav {" in CSS and "220px" in CSS, \
-        "手机端展开态未变为 220px 浮层"
+    # 手机端（≤900px）：左侧常驻图标栏（52px）会把正文压成很窄一条 → 改为底部标签栏，正文全宽
+    assert "padding-left: 52px" not in CSS, \
+        "手机端仍保留 52px 左侧图标栏占位（正文会被挤压）"
+    assert ".side-nav .nav-tab {" in CSS, "手机端未把侧边栏改造成底部标签栏"
+    assert ".nav-tab { display: none; }" in CSS, "桌面端未隐藏底部标签栏专属项"
+    assert "safe-area-inset-bottom" in CSS, "底部标签栏未适配 iPhone 安全区"
+    # 手机端世界频道改为独立页 /World，右侧浮层收起
+    assert ".world-panel { display: none !important; }" in CSS, \
+        "手机端未隐藏右侧世界频道浮层（应改用独立页 /World）"
     # 设置下拉提供 侧边/顶部 两种导航位置模式切换
     assert 'data-navmode="side"' in BASE_HTML and 'data-navmode="top"' in BASE_HTML, \
         "设置下拉缺少 侧边/顶部 导航位置模式切换项"

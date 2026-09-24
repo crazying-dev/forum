@@ -6,6 +6,14 @@
     POST /api/email/send-reset-password 发送重置密码邮件（body: email，防邮箱枚举）
     POST /api/email/reset-password      重置密码（body: token + password）
 
+6 位验证码（无需点邮件链接；登录页「找回密码」两步式 / 个人资料「修改密码」使用）：
+    POST /api/email/send-register-code          注册验证码
+    POST /api/email/send-verify-code            邮箱验证码（需登录）
+    POST /api/email/verify-code-email           校验邮箱验证码（需登录）
+    POST /api/email/send-code-reset-password    找回密码验证码
+    POST /api/email/reset-password-by-code      用验证码重置密码
+    POST /api/email/send-change-password-code   修改密码验证码（需登录）
+
 依赖 SMTP 配置（config.SMTP_*），邮件服务不可用时返回明确错误。
 """
 from __future__ import annotations
@@ -349,3 +357,74 @@ def api_reset_password_by_code():
     db.verify.mark_verify_code_used(email, code, "password_reset")
     _cleanup_codes(email, "password_reset")
     return jsonify({"success": True, "message": "密码重置成功"})
+
+
+@email_bp.route("/email/send-change-password-code", methods=["POST"])
+@login_required
+def api_send_change_password_code():
+    """发送6位验证码到当前登录用户的邮箱，用于「个人资料 → 修改密码」。
+
+    修改密码必须经过邮箱验证（用户选择：只需邮箱验证码，不要求旧密码）。
+    """
+    if rate_limit("change_pwd_code", 3, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+    user = db.user.get_user_by_id(g.user["id"])
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    email = (user.get("email") or "").strip().lower()
+    if not is_valid_email(email):
+        return jsonify(
+            {"success": False, "message": "当前账号未绑定有效邮箱，无法通过邮箱验证修改密码"}
+        ), 400
+
+    code = _random_code()
+    result = db.verify.create_verify_code(email, code, "change_password")
+    if not result.get("success"):
+        return jsonify({"success": False, "message": "生成验证码失败"}), 500
+
+    subject = "【妖精论坛】修改密码验证码"
+    plain = (
+        f"尊敬的 {user['name']}，您好！\n\n"
+        f"您正在修改账号密码，验证码为：{code}\n\n"
+        f"验证码有效期5分钟，请勿泄露给他人。\n"
+        f"如非本人操作，请立即修改密码并联系管理员。\n\n© 2026 妖精论坛 - 粉丝公益创作"
+    )
+    html = build_email_html(
+        label="修改密码验证码",
+        title="修改您的账号密码",
+        body_lines=[
+            f"尊敬的 <strong style=\"color:#6A8C89;\">{user['name']}</strong>，您好！",
+            "您正在修改账号密码，验证码为：",
+            f'<div style="font-size:32px;font-weight:700;color:#6A8C89;letter-spacing:6px;text-align:center;padding:12px 0;">{code}</div>',
+            "验证码有效期5分钟，请勿泄露给他人。",
+            "如非本人操作，请立即修改密码并联系管理员。",
+        ],
+    )
+    ok, err = send_email(subject, plain, receiver_list=[email], html_content=html)
+    if not ok:
+        return jsonify({"success": False, "message": f"邮件服务暂不可用: {err}"}), 503
+    return jsonify({"success": True, "message": "验证码已发送至邮箱"})
+
+
+def verify_change_password_code(email: str, code: str):
+    """校验「修改密码」验证码（供 api.user 的改密码接口复用）。
+
+    返回 (ok, message)：ok 为 True 时调用方应继续落库，并在成功后
+    调用 consume_change_password_code 标记已用。
+    """
+    if not _valid_code(code):
+        return False, "请输入6位数字验证码"
+    code_info = db.verify.get_verify_code(email, code, "change_password")
+    if not code_info:
+        db.verify.increment_verify_code_attempts(email, "change_password")
+        return False, "验证码无效或已过期"
+    return True, ""
+
+
+def consume_change_password_code(email: str, code: str):
+    """标记「修改密码」验证码已使用，并清理过期/已用记录。"""
+    try:
+        db.verify.mark_verify_code_used(email, code, "change_password")
+    except Exception:
+        pass
+    _cleanup_codes(email, "change_password")
