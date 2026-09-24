@@ -89,6 +89,24 @@ def get_user_by_login_identifier(identifier: str) -> Optional[dict]:
 # ──────────────────────────────────────────────
 # 注册
 # ──────────────────────────────────────────────
+def _auto_follow_default(user_id: str) -> None:
+    """新用户创建后自动关注官方账号 config.DEFAULT_FOLLOW_USER_ID。
+
+    尽力而为：目标账号不存在、已关注或插入冲突时静默跳过，绝不影响注册主流程。
+    """
+    target = (getattr(config, "DEFAULT_FOLLOW_USER_ID", "") or "").strip()
+    if not target or target == user_id:
+        return
+    try:
+        execute_insert(
+            "INSERT INTO user_follows (follower_id, following_id) VALUES (%s, %s)"
+            " ON CONFLICT (follower_id, following_id) DO NOTHING",
+            (user_id, target),
+        )
+    except Exception as e:
+        print(f"[warn] 新用户 {user_id} 自动关注 {target} 失败: {e}")
+
+
 def create_user(name: str, email: str, raw_password: str) -> dict:
     """创建新用户。
 
@@ -105,6 +123,8 @@ def create_user(name: str, email: str, raw_password: str) -> dict:
             " VALUES (%s, %s, %s, %s, %s, %s)",
             (user_id, name, avatar, email, hashed, config.vip),
         )
+        # 新用户默认关注官方账号（失败不影响注册）
+        _auto_follow_default(user_id)
         return {"success": True, "id": user_id, "avatar": avatar}
     except psycopg2.IntegrityError as e:
         msg = str(e).lower()

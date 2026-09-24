@@ -278,6 +278,8 @@ STATIC_VERSION = "17"
 # ──────────────────────────────────────────────────────────────
 USER_ID_PREFIX = "RL"  # 新注册用户 ID 前缀（与旧库一致）
 ALLOWED_USER_PREFIXES = ["HG", "YJ", "RL"]  # 仅允许这三种 ID 前缀
+# 新用户注册时自动关注的账号（官方账号）；留空则关闭自动关注
+DEFAULT_FOLLOW_USER_ID = "HG00000000000000000000"
 vip = "0"
 DEFAULT_AVATARS = [
     "/static/img/avatars/LaoJun.png",
