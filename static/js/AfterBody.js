@@ -633,16 +633,13 @@
 
   // ── 帖子分类汉化映射（口径对照 V1，与论坛分区 tab / 发帖选项一一对应）──
   // 分区 key：general/talk/question/share/creative → 综合/闲聊/求助/分享/创作
+  // 已清除旧版 V2 中文 key（叶羽/创意/求助）兼容映射，全站只认这 5 个分区 key
   var CATEGORY_MAP = {
     'general': '综合',
     'talk': '闲聊',
     'question': '求助',
     'share': '分享',
-    'creative': '创作',
-    // 历史遗留分类兼容（旧版 V2 中文 key），避免卡片显示原始 key
-    '叶羽': '叶羽',
-    '创意': '创作',
-    '求助': '求助'
+    'creative': '创作'
   };
   function categoryLabel(c) {
     var key = c || 'general';

@@ -53,6 +53,35 @@
   </div>
 </header>
 
+{% if announcement.enabled and announcement.text %}
+<!-- 公告组件②：全站公告横幅（config.SITE_ANNOUNCEMENT_* 配置，可关闭） -->
+<div class="site-announce" id="siteAnnounce" data-announce-key="{{ announcement.tag }}|{{ announcement.text }}">
+  <i class="fa fa-bullhorn site-announce-icon"></i>
+  {% if announcement.tag %}<span class="site-announce-tag">{{ announcement.tag }}</span>{% endif %}
+  <span class="site-announce-text">{{ announcement.text }}</span>
+  {% if announcement.link %}
+  <a class="site-announce-link" href="{{ announcement.link }}" target="_blank" rel="noopener">{{ announcement.link_text }}</a>
+  {% endif %}
+  <button class="site-announce-close" id="siteAnnounceClose" type="button" aria-label="关闭公告"><i class="fa fa-times"></i></button>
+</div>
+<script>
+// 公告关闭记忆：以「标签+文案」为 key 存 localStorage，文案一改即视为新公告重新展示
+(function () {
+  var el = document.getElementById('siteAnnounce');
+  if (!el) return;
+  var val = el.getAttribute('data-announce-key') || '';
+  var saved = null;
+  try { saved = localStorage.getItem('forum-announce-dismissed'); } catch (e) {}
+  if (saved && saved === val) { el.style.display = 'none'; return; }
+  var btn = document.getElementById('siteAnnounceClose');
+  if (btn) btn.addEventListener('click', function () {
+    try { localStorage.setItem('forum-announce-dismissed', val); } catch (e) {}
+    el.style.display = 'none';
+  });
+})();
+</script>
+{% endif %}
+
 <!-- 左侧边栏导航：除 logo/标题/搜索框外的入口都在这里，默认仅图标，可展开/收起 -->
 <nav class="side-nav" id="sideNav">
   <button class="side-nav-item" id="sideNavToggle" title="展开/收起侧边栏"><i class="fa fa-angle-right"></i><span>收起</span></button>

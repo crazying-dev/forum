@@ -77,9 +77,12 @@ def test_utils_category_map_align_v1():
     for key, label in V1_CATEGORIES:
         assert re.search(rf"\b{key}:\s*'{label}'", UTILS_JS), \
             f"utils.js CATEGORY_MAP 缺少 {key} → {label}"
-    # 历史遗留中文 key 兼容（旧版 V2 帖子仍能正确汉化，不会露出原始 key）
-    assert re.search(r"创意:\s*'创作'", UTILS_JS), "utils.js 兼容映射 创意 应显示为「创作」"
-    assert re.search(r"叶羽:\s*'叶羽'", UTILS_JS), "utils.js 兼容映射缺少 叶羽"
+    # 已清除旧版 V2 中文 key（叶羽/创意/求助）兼容映射，全站只认 5 个 V1 英文 key
+    assert "CATEGORY_LEGACY" not in UTILS_JS, \
+        "utils.js 仍存在 CATEGORY_LEGACY 旧中文 key 兼容映射"
+    for legacy in ("叶羽", "创意", "求助"):
+        assert not re.search(rf"\b{legacy}\s*:", UTILS_JS), \
+            f"utils.js 仍残留旧中文分类 key「{legacy}」兼容映射"
     assert "export const CATEGORY_MAP" in UTILS_JS, "utils.js 未导出 CATEGORY_MAP"
 
 
@@ -91,7 +94,10 @@ def test_afterbody_category_map_align_v1():
     for key, label in V1_CATEGORIES:
         assert f"'{key}': '{label}'" in body, \
             f"AfterBody.js CATEGORY_MAP 缺少 '{key}': '{label}'"
-    assert "'创意': '创作'" in body, "AfterBody.js 兼容映射 创意 应显示为「创作」"
+    # 已清除旧版 V2 中文 key 兼容映射（作为 map 的 key 不应再出现）
+    for legacy in ("叶羽", "创意", "求助"):
+        assert f"'{legacy}':" not in body, \
+            f"AfterBody.js CATEGORY_MAP 仍残留旧中文分类 key「{legacy}」"
 
 
 # ── P6 邮件分类名与页面标签统一（不再有旧叫法） ──

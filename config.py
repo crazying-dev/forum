@@ -271,7 +271,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "18"
+STATIC_VERSION = "19"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -320,6 +320,17 @@ AVATAR_UPLOAD_DIR = os.getenv("AVATAR_UPLOAD_DIR", "/root/db/avatar")
 # 分区口径对照 V1（论坛 tab / 发帖选项 / AfterBody CATEGORY_MAP 三处必须一致）
 # general=综合 talk=闲聊 question=求助 share=分享 creative=创作
 ALLOWED_CATEGORIES = ["general", "talk", "question", "share", "creative"]
+
+# ── 全站公告横幅（公告组件②）──
+# 文案留空或 SITE_ANNOUNCEMENT_ENABLED=0 时整个横幅不渲染；
+# 用户点关闭后按「标签+文案」记入 localStorage，改文案即视为新公告重新展示。
+SITE_ANNOUNCEMENT_ENABLED = os.getenv("SITE_ANNOUNCEMENT_ENABLED", "1") != "0"
+SITE_ANNOUNCEMENT_TAG = os.getenv("SITE_ANNOUNCEMENT_TAG", "公告")
+SITE_ANNOUNCEMENT_TEXT = os.getenv(
+    "SITE_ANNOUNCEMENT_TEXT", "妖精论坛 V2 已正式上架，欢迎体验并反馈 Bug！"
+)
+SITE_ANNOUNCEMENT_LINK = os.getenv("SITE_ANNOUNCEMENT_LINK", "")
+SITE_ANNOUNCEMENT_LINK_TEXT = os.getenv("SITE_ANNOUNCEMENT_LINK_TEXT", "查看详情")
 
 # ── 头像上传限制 ──
 AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5MB

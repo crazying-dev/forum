@@ -86,6 +86,21 @@ def create_app() -> Flask:
     def _inject_static_version():
         return {"static_version": getattr(config, "STATIC_VERSION", "1")}
 
+    # ── 模板全局变量：全站公告横幅（公告组件②）──
+    # 文案为空或 SITE_ANNOUNCEMENT_ENABLED=0 时模板不渲染，因此关公告只需改配置。
+    @app.context_processor
+    def _inject_announcement():
+        return {
+            "announcement": {
+                "enabled": bool(getattr(config, "SITE_ANNOUNCEMENT_ENABLED", False)),
+                "tag": getattr(config, "SITE_ANNOUNCEMENT_TAG", ""),
+                "text": (getattr(config, "SITE_ANNOUNCEMENT_TEXT", "") or "").strip(),
+                "link": (getattr(config, "SITE_ANNOUNCEMENT_LINK", "") or "").strip(),
+                "link_text": getattr(config, "SITE_ANNOUNCEMENT_LINK_TEXT", "查看详情"),
+            }
+        }
+
+
     # ── 数据库初始化（首次请求兜底执行一次，替代被废弃的 before_first_request） ──
     def _ensure_db_once():
         if _db_inited["done"]:

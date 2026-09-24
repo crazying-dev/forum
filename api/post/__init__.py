@@ -22,16 +22,13 @@ from api.user import login_required
 post_bp = Blueprint("post", __name__)
 
 # 邮件里的分类名与页面分区标签保持统一（对照 V1：综合/闲聊/求助/分享/创作）
+# 已清除旧版 V2 中文 key 兼容映射
 _CATEGORY_NAME_MAP = {
     "general": "综合",
     "talk": "闲聊",
     "question": "求助",
     "share": "分享",
     "creative": "创作",
-    # 历史遗留分类兼容（旧版 V2 中文 key）
-    "叶羽": "叶羽",
-    "创意": "创作",
-    "求助": "求助",
 }
 
 
