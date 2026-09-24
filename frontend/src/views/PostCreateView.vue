@@ -52,9 +52,10 @@ async function submit() {
           <label>分类</label>
           <select v-model="category">
             <option value="general">综合</option>
-            <option value="叶羽">叶羽</option>
-            <option value="创意">创意</option>
-            <option value="求助">求助</option>
+            <option value="talk">闲聊</option>
+            <option value="question">求助</option>
+            <option value="share">分享</option>
+            <option value="creative">创作</option>
           </select>
         </div>
         <div class="form-group">

@@ -271,7 +271,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "17"
+STATIC_VERSION = "18"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -317,7 +317,9 @@ CF_IMAGES_DELIVERY_HOST = os.getenv("avatar_DELIVERY_HOST", "https://imagedelive
 AVATAR_UPLOAD_DIR = os.getenv("AVATAR_UPLOAD_DIR", "/root/db/avatar")
 
 # ── 帖子分类白名单（非法分类回落 general）──
-ALLOWED_CATEGORIES = ["general", "叶羽", "创意", "求助"]
+# 分区口径对照 V1（论坛 tab / 发帖选项 / AfterBody CATEGORY_MAP 三处必须一致）
+# general=综合 talk=闲聊 question=求助 share=分享 creative=创作
+ALLOWED_CATEGORIES = ["general", "talk", "question", "share", "creative"]
 
 # ── 头像上传限制 ──
 AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5MB

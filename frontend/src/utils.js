@@ -39,18 +39,24 @@ export function openReportModal(type, id) {
   if (app.openReportModal) return app.openReportModal(type, id)
 }
 
-// ── 帖子分类汉化（与 AfterBody.js CATEGORY_MAP 保持一致） ──
-export const CATEGORY_MAP = {
+// ── 帖子分类汉化（口径对照 V1，与论坛分区 tab / 发帖选项一一对应） ──
+// 分区 key：general/talk/question/share/creative → 综合/闲聊/求助/分享/创作
+// 与 AfterBody.js CATEGORY_MAP 必须保持完全一致
+const CATEGORY_LABELS = {
   general: '综合',
-  叶羽: '叶羽',
-  创意: '创意',
-  求助: '求助',
-  // V1 存量分类兼容
   talk: '闲聊',
   question: '求助',
   share: '分享',
   creative: '创作',
 }
+// 历史遗留分类兼容（旧版 V2 中文 key），避免卡片/详情页显示原始 key
+const CATEGORY_LEGACY = {
+  叶羽: '叶羽',
+  创意: '创作',
+  求助: '求助',
+}
+export const CATEGORY_MAP = { ...CATEGORY_LABELS, ...CATEGORY_LEGACY }
+export const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS)
 export function categoryLabel(c) {
   const key = c || 'general'
   return CATEGORY_MAP[key] || key

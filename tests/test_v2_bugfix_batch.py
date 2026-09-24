@@ -458,14 +458,15 @@ def test_mobile_layout_full_width():
     assert ".layout-main { width: 100%; }" in CSS, "手机端 .layout-main 未占满宽度"
 
 
-# ── 回归 11：发帖页分类叫法与论坛 tab / 列表标签统一 ──
+# ── 回归 11：发帖页分类叫法与论坛 tab / 列表标签统一（分区口径对照 V1） ──
 def test_post_create_category_names_unified():
     # 发帖页已 Vue 化，分类选项在 PostCreateView.vue
     src = (PROJECT / "frontend" / "src" / "views" / "PostCreateView.vue").read_text(encoding="utf-8")
     assert "综合讨论" not in src, "发帖页仍使用旧叫法「综合讨论」，与论坛 tab「综合」不一致"
-    assert "创意工坊" not in src, "发帖页仍使用旧叫法「创意工坊」，与论坛 tab「创意」不一致"
+    assert "创意工坊" not in src, "发帖页仍使用旧叫法「创意工坊」，与论坛 tab「创作」不一致"
     assert "求助提问" not in src, "发帖页仍使用旧叫法「求助提问」，与论坛 tab「求助」不一致"
-    for label in ("综合", "叶羽", "创意", "求助"):
+    assert "叶羽" not in src, "发帖页仍提供「叶羽」分区（库里 0 篇，V1 无此分区）"
+    for label in ("综合", "闲聊", "求助", "分享", "创作"):
         assert label in src, f"发帖页分类缺少统一叫法 {label}"
 
 

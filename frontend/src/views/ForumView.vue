@@ -3,12 +3,14 @@ import { onMounted, ref } from 'vue'
 import PostList from '../components/PostList.vue'
 import { apiFetch } from '../utils.js'
 
+// 分区口径对照 V1：general/talk/question/share/creative → 综合/闲聊/求助/分享/创作
 const categories = [
   { key: '', label: '全部' },
   { key: 'general', label: '综合' },
-  { key: '叶羽', label: '叶羽' },
-  { key: '创意', label: '创意' },
-  { key: '求助', label: '求助' },
+  { key: 'talk', label: '闲聊' },
+  { key: 'question', label: '求助' },
+  { key: 'share', label: '分享' },
+  { key: 'creative', label: '创作' },
 ]
 const current = ref('')
 const posts = ref([])

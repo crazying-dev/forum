@@ -631,18 +631,18 @@
   // Part 1 定义、Part 2 需要使用（经 __yoyoApp 传递，否则未定义）
   var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, stripMarkdown = app.stripMarkdown;
 
-  // ── 帖子分类汉化映射 ──
-  // 除 V2 现有分类外，兼容 V1 存量帖子的英文分类（talk/share/creative 等），保证统一显示中文
+  // ── 帖子分类汉化映射（口径对照 V1，与论坛分区 tab / 发帖选项一一对应）──
+  // 分区 key：general/talk/question/share/creative → 综合/闲聊/求助/分享/创作
   var CATEGORY_MAP = {
     'general': '综合',
-    '叶羽': '叶羽',
-    '创意': '创意',
-    '求助': '求助',
-    // V1 存量分类兼容
     'talk': '闲聊',
     'question': '求助',
     'share': '分享',
-    'creative': '创作'
+    'creative': '创作',
+    // 历史遗留分类兼容（旧版 V2 中文 key），避免卡片显示原始 key
+    '叶羽': '叶羽',
+    '创意': '创作',
+    '求助': '求助'
   };
   function categoryLabel(c) {
     var key = c || 'general';

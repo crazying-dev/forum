@@ -296,7 +296,7 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 ### 9.4 发布帖子 —— POST /api/posts/create
 
 - **鉴权**：需要
-- Body：`title`（≤100 字，必填）、`content`（HTML，必填，入库前 XSS 净化）、`category`（默认 `general`，白名单：general / 叶羽 / 创意 / 求助）
+- Body：`title`（≤100 字，必填）、`content`（HTML，必填，入库前 XSS 净化）、`category`（默认 `general`，白名单：general / talk / question / share / creative，即 综合 / 闲聊 / 求助 / 分享 / 创作）
 - 成功 200：`{success, id}`
 - 发帖后异步邮件通知粉丝（失败静默，不影响发布）
 

@@ -1250,11 +1250,13 @@
                   "category": {
                     "type": "string",
                     "default": "general",
+                    "description": "分区（对照 V1）：general=综合 / talk=闲聊 / question=求助 / share=分享 / creative=创作",
                     "enum": [
                       "general",
-                      "叶羽",
-                      "创意",
-                      "求助"
+                      "talk",
+                      "question",
+                      "share",
+                      "creative"
                     ]
                   }
                 },

@@ -21,16 +21,17 @@ from api.user import login_required
 
 post_bp = Blueprint("post", __name__)
 
+# 邮件里的分类名与页面分区标签保持统一（对照 V1：综合/闲聊/求助/分享/创作）
 _CATEGORY_NAME_MAP = {
     "general": "综合",
-    "叶羽": "叶羽",
-    "创意": "创意",
-    "求助": "求助",
-    # V1 存量分类兼容
     "talk": "闲聊",
     "question": "求助",
     "share": "分享",
     "creative": "创作",
+    # 历史遗留分类兼容（旧版 V2 中文 key）
+    "叶羽": "叶羽",
+    "创意": "创作",
+    "求助": "求助",
 }
 
 
@@ -43,7 +44,7 @@ def _notify_fans_new_post_async(author_id, author_name, post_id, title, category
         emails = [f["email"] for f in fans if f.get("email") and f.get("id") != author_id]
         if not emails:
             return
-        category_name = _CATEGORY_NAME_MAP.get(category, category or "综合讨论")
+        category_name = _CATEGORY_NAME_MAP.get(category, category or "综合")
         base = config.SITE_BASE_URL.rstrip("/")
         post_url = f"{base}/post/{post_id}"
         plain_title = (title or "").strip()
