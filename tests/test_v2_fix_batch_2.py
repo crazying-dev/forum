@@ -13,6 +13,9 @@
   P5 资料页展示生日/年龄（照 V1：用户名下方，生日蛋糕图标 + 保密/xx 岁）
      —— UserView.vue 新增 ageDisplay（兼容 YYYYMMDD 算周岁 / 纯数字），
         main.css 新增 .user-profile-meta / .user-meta-item 样式。
+  P6 头衔（users.title）篇幅过小不显眼
+     —— .user-title 改为主题色实底徽章（白字 + 主题色渐变 + 加粗）；
+        折叠侧栏／窄屏头部空间不足时隐藏，避免被 overflow:hidden 裁切。
 """
 from __future__ import annotations
 
@@ -191,3 +194,42 @@ def test_p5_age_display_matches_v1_logic():
 def test_p5_age_meta_styles_present():
     assert ".user-profile-meta" in CSS, "main.css 缺少 .user-profile-meta 样式"
     assert ".user-meta-item" in CSS, "main.css 缺少 .user-meta-item 样式"
+
+
+# ── P 头衔徽章过小不显眼（改为主题色实底徽章） ──
+def _user_title_rule():
+    """取 .user-title 的基础样式块（排除 .side-nav-user .user-title 等派生规则）。"""
+    m = re.search(r"^\.user-title\s*\{([^}]*)\}", CSS, re.M)
+    assert m, "main.css 缺少 .user-title 基础样式"
+    return m.group(1)
+
+
+def test_p6_user_title_is_prominent_badge():
+    rule = _user_title_rule()
+    assert re.search(r"color:\s*#fff", rule), "头衔未使用白字（应为主题色实底徽章）"
+    assert "linear-gradient" in rule and "var(--color-primary)" in rule, \
+        "头衔背景未使用主题色渐变（依旧不显眼）"
+    assert re.search(r"font-weight:\s*[6-9]00", rule), "头衔字重未加重（依旧不显眼）"
+    size = re.search(r"font-size:\s*(\d+)px", rule)
+    assert size and int(size.group(1)) >= 13, "头衔字号未放大（原为 12px）"
+
+
+def test_p6_user_title_rendered_on_profile_and_chip():
+    assert re.search(r'v-if="user\.title"\s+class="user-title"', USER_VUE), \
+        "资料页用户名后未渲染头衔徽章"
+    assert '<span class="user-title">' in JS, "侧栏/顶部用户卡片未渲染头衔徽章"
+
+
+def test_p6_user_title_hidden_when_nav_too_narrow():
+    # 折叠侧栏放不下徽章，应隐藏并在展开时恢复，避免被 .side-nav 的 overflow:hidden 裁切
+    assert re.search(r"^\.side-nav-user \.user-title\s*\{\s*display:\s*none", CSS, re.M), \
+        "折叠侧栏未隐藏头衔徽章（会被裁切）"
+    assert re.search(
+        r"body\.side-nav-expanded \.side-nav-user \.user-title\s*\{\s*display:\s*inline-block", CSS
+    ), "侧栏展开后未恢复显示头衔徽章"
+    # 窄屏头部用户卡片同样隐藏（与 .user-chip-name 保持一致）
+    assert re.search(r"\.nav-user \.user-title\s*\{\s*display:\s*none", CSS), \
+        "窄屏头部用户卡片未隐藏头衔徽章"
+    # 侧栏展开后昵称较长时允许徽章换行，避免被裁切
+    assert re.search(r"body\.side-nav-expanded \.side-nav-user \.user-chip\s*\{\s*flex-wrap:\s*wrap", CSS), \
+        "侧栏展开时用户卡片未允许换行（长昵称会把徽章挤出可视区）"

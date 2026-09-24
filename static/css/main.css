@@ -189,6 +189,11 @@ body.side-nav-expanded .side-nav-item span { display: inline; }
 body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .side-nav-user .nav-login { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
 .side-nav-user .user-chip-name { display: none; }
+/* 侧栏折叠时宽度不足以完整容纳头衔徽章（.side-nav overflow:hidden 会裁切），仅在展开时显示 */
+.side-nav-user .user-title { display: none; }
+body.side-nav-expanded .side-nav-user .user-title { display: inline-block; }
+/* 侧栏展开后若昵称较长，允许头衔徽章换行显示，避免被 .side-nav 的 overflow:hidden 裁切 */
+body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px; }
 /* 侧边栏设置下拉：fixed 在侧边栏右侧弹出（独立于 .side-nav，避免被 overflow:hidden 裁剪） */
 .side-setting-dropdown {
   position: fixed; left: calc(var(--side-nav-w) + 8px); bottom: 12px;
@@ -512,19 +517,20 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
 .user-profile .avatar-lg img { width: 100%; height: 100%; object-fit: cover; }
 .user-profile-info-wrap { flex: 1; min-width: 0; }
 .user-profile-name { font-size: 20px; font-weight: 700; }
-/* 用户头衔：用较背景色深一点的颜色包裹显示在名称后 */
+/* 用户头衔：主题色实底徽章（白字 + 主题色渐变），醒目显示在名称后 */
 .user-title {
   display: inline-block;
   margin-left: 6px;
-  padding: 1px 8px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 400;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1.6;
   vertical-align: middle;
   white-space: nowrap;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-item-active);
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  box-shadow: 0 1px 3px var(--color-shadow);
 }
 /* 资料页元信息（生日/年龄，沿用 V1 布局） */
 .user-profile-meta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 6px; }
@@ -693,6 +699,8 @@ body.side-nav-expanded .side-nav-user { justify-content: flex-start; }
   .nav-link span { display: none; }
   /* 与 V1 一致：手机端隐藏用户名只留头像；收紧登录按钮，避免挤占搜索框 */
   .user-chip-name { display: none; }
+  /* 窄屏头部用户卡片同样隐藏头衔徽章，避免挤占/换行（展开的侧栏抽屉内仍显示） */
+  .nav-user .user-title { display: none; }
   .nav-login { padding: 5px 10px; font-size: 12px; }
   /* 手机/窄屏：全局 Live2D 不显示（桌面/平板才常驻左下角） */
   #global-live2d.global-live2d { display: none !important; }
