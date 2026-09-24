@@ -93,6 +93,31 @@ def build_email_html(label, title, body_lines, action_text=None, action_url=None
     )
 
 
+def _connect_smtp(context):
+    """按 config.SMTP_TLS 建立 SMTP 连接。
+
+    * "ssl"（默认，端口 465，兼容阿里云旧配置）：SMTP_SSL
+    * "starttls"（端口 587）：SMTP + STARTTLS
+    * "none"（纯明文，通常仅本地中继 / 特殊环境）
+
+    注：很多云厂商封锁出站 25 端口，自建 Postfix 无法直投外部 MX，
+    此时应改用 587/STARTTLS 中继或服务商解封。
+    """
+    mode = (getattr(config, "SMTP_TLS", "") or "").strip().lower()
+    host, port = config.SMTP_HOST, config.SMTP_PORT
+    timeout = int(getattr(config, "SMTP_TIMEOUT", 20) or 20)
+    if mode in ("starttls", "tls", "587"):
+        srv = smtplib.SMTP(host, port, timeout=timeout)
+        srv.ehlo()
+        srv.starttls(context=context)
+        srv.ehlo()
+        return srv
+    if mode in ("none", "plain", "cleartext", "off"):
+        return smtplib.SMTP(host, port, timeout=timeout)
+    # 默认 SSL（465）
+    return smtplib.SMTP_SSL(host, port, context=context, timeout=timeout)
+
+
 def send_email(subject: str, content: str, receiver_list: list | None = None, html_content: str | None = None):
     """发送邮件。
 
@@ -125,7 +150,7 @@ def send_email(subject: str, content: str, receiver_list: list | None = None, ht
         return True, None
     receiver_list = deduped
 
-    if not config.SMTP_PASSWORD:
+    if getattr(config, "SMTP_USE_AUTH", True) and not config.SMTP_PASSWORD:
         return False, "SMTP 密码未配置（SMTP_PASSWORD）"
 
     # 预构建正文部分（可在多封邮件之间复用，节省内存/时间）
@@ -138,8 +163,9 @@ def send_email(subject: str, content: str, receiver_list: list | None = None, ht
     context = ssl.create_default_context()
     server = None
     try:
-        server = smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, context=context)
-        server.login(SENDER, config.SMTP_PASSWORD)
+        server = _connect_smtp(context)
+        if getattr(config, "SMTP_USE_AUTH", True):
+            server.login(SENDER, config.SMTP_PASSWORD)
 
         from_header = Header(SENDER_NAME, "utf-8").encode() + f" <{SENDER}>"
         subject_header = Header(subject, "utf-8").encode()

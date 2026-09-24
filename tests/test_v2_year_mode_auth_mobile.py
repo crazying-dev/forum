@@ -1,4 +1,4 @@
-"""年制切换（无限年/公元年，cookie）/ 改密码邮箱验证 / 找回密码两步式 / 手机端底部标签栏 契约测试。
+"""年制切换（无限年/公元年，cookie）/ 改密码邮箱验证 / 找回密码单页表单 / 换绑邮箱两步验证 / 手机端底部标签栏 契约测试。
 
 均为静态源码断言（无需启动服务、无数据库依赖），与 tests/_run_tests.py 的运行器兼容。
 """
@@ -116,7 +116,7 @@ def test_profile_change_password_ui():
     vue = _read(USER_VIEW)
     assert "/api/user/password" in vue, "资料页未调用改密接口"
     assert "/api/email/send-change-password-code" in vue, "资料页缺少「获取验证码」调用"
-    assert "需邮箱验证" in vue, "改密码区未标注需邮箱验证"
+    assert "需邮箱验证码" in vue, "改密码区未标注需邮箱验证"
     for token in ["pwCode", "pwNew", "pwConfirm", "pwCooldown"]:
         assert token in vue, f"资料页改密 缺少 {token}"
     assert "new_password".replace("_", "_") in vue, "改密请求未提交 new_password"
@@ -124,19 +124,80 @@ def test_profile_change_password_ui():
 
 
 # ──────────────────────────────────────────────
-# 第 5 项：登录页找回密码两步式（邮箱 → 验证码 → 新密码）
+# 第 5 项：登录页找回密码「单页表单」（邮箱 + 验证码 + 新密码 + 确认）
 # ──────────────────────────────────────────────
-def test_forgot_password_two_step_code_flow():
+def test_forgot_password_single_page_code_flow():
     vue = _read(AUTH_VIEW)
-    assert "resetStep" in vue, "找回密码未实现分步（resetStep）"
-    assert "/api/email/send-code-reset-password" in vue, "第一步未调用发送验证码接口"
-    assert "/api/email/reset-password-by-code" in vue, "第二步未调用验证码重置接口"
+    # 已从两步式改为单页表单：不应再有分步状态
+    assert "resetStep" not in vue, "找回密码已改为单页表单，不应再有分步状态 resetStep"
+    assert "isCodeResetStep2" not in vue, "不应再有两步式第二步状态 isCodeResetStep2"
+    # 找回密码时始终显示邮箱 + 验证码输入框（一次性全部显示）
+    assert re.search(r"showCode\s*=[^\n]*isCodeReset", vue), \
+        "找回密码未始终显示验证码输入框（showCode 应包含 isCodeReset）"
+    assert re.search(r"showEmail\s*=[^\n]*isResetWithToken", vue), \
+        "找回密码应始终显示邮箱输入框（仅在 ?token= 时隐藏）"
+    assert "/api/email/send-code-reset-password" in vue, "缺少「获取验证码」发送接口"
+    assert "/api/email/reset-password-by-code" in vue, "缺少验证码重置接口"
+    assert "email: email.value, code: code.value.trim(), password: password.value" in vue, \
+        "单页表单未一次性提交 邮箱 + 验证码 + 新密码"
     assert "/api/email/send-reset-password" not in vue, \
-        "登录页不应再走邮件链接方式（改为两步式验证码）"
-    assert "验证码已发送至" in vue, "第二步缺少「验证码已发送至」提示"
-    assert "isCodeResetStep2" in vue
+        "登录页不应再走「先发链接」方式"
     # 邮件链接方式（?token=）仍保留兼容
-    assert "/api/email/reset-password" in vue, "邮件链接重置（?token=）分支被误删"
+    assert "body: { token, password: password.value }" in vue, "邮件链接重置（?token=）分支被误删"
+
+
+# ──────────────────────────────────────────────
+# 第 3 项：编辑资料不显示邮箱 + 换绑邮箱两步验证（旧邮箱身份 → 新邮箱）
+# ──────────────────────────────────────────────
+def test_change_email_two_step_backend():
+    email_api = _read(EMAIL_API)
+    user_api = _read(USER_API)
+    # 发往旧邮箱的验证码接口（第1步：验证当前邮箱身份）
+    assert "/email/send-change-email-old-code" in email_api, \
+        "缺少发往旧邮箱的身份验证码接口"
+    assert "change_email_old" in email_api, "旧邮箱验证码 purpose 应为 change_email_old"
+    assert "def verify_change_email_old_code" in email_api, "缺少旧邮箱验证码校验函数"
+    assert "def consume_change_email_old_code" in email_api, "缺少旧邮箱验证码消费函数"
+    # 发往新邮箱的验证码接口（第2步）
+    assert "/email/send-change-email-code" in email_api, "缺少发往新邮箱的验证码接口"
+    assert "change_email" in email_api
+    # 换绑接口同时校验旧/新两枚验证码
+    assert "old_code" in user_api, "换绑接口未接收旧邮箱验证码 old_code"
+    assert "verify_change_email_old_code" in user_api, "换绑接口未校验旧邮箱身份"
+    assert "verify_change_email_code" in user_api, "换绑接口未校验新邮箱验证码"
+
+
+def test_edit_profile_no_email_two_entries():
+    vue = _read(USER_VIEW)
+    # 编辑资料中不显示当前邮箱（不得有 editForm.email 或直接渲染 user.email）
+    assert "editForm.email" not in vue, "编辑资料弹窗不应包含邮箱字段"
+    assert "{{ user.email" not in vue and "{{user.email" not in vue, \
+        "编辑资料弹窗不应直接显示当前邮箱"
+    # 双入口：修改密码 / 修改邮箱
+    assert "editPanel" in vue, "缺少编辑弹窗面板切换 editPanel"
+    assert "openEmailPanel" in vue, "缺少「修改邮箱」入口"
+    assert "/api/email/send-change-email-old-code" in vue, "修邮箱第1步未调用旧邮箱发码接口"
+    assert "/api/email/send-change-email-code" in vue, "修邮箱第2步未调用新邮箱发码接口"
+    assert "/api/user/email" in vue, "缺少换绑邮箱接口调用"
+    assert "old_code: emOldCode.value.trim()" in vue, "换绑请求未提交旧邮箱验证码"
+    # 两步向导：emStep 1→2
+    assert "emStep" in vue and "goEmailStep2" in vue, "换邮箱未实现两步向导"
+    # 两个安全入口按钮
+    assert "修改邮箱" in vue and "修改密码" in vue, "缺少两个安全入口按钮"
+
+
+# ──────────────────────────────────────────────
+# 第 2 项：SMTP 传输可配置（465/SSL 与 587/STARTTLS），便于更换服务商
+# ──────────────────────────────────────────────
+def test_smtp_transport_is_configurable():
+    email_py = _read(ROOT / "Email.py")
+    cfg = _read(ROOT / "config.py")
+    assert "SMTP_TLS" in cfg, "config 缺少 SMTP_TLS 传输模式配置"
+    assert "SMTP_USE_AUTH" in cfg, "config 缺少 SMTP_USE_AUTH（中继/无认证）开关"
+    assert "SMTP_TIMEOUT" in cfg, "config 缺少 SMTP_TIMEOUT"
+    assert "_connect_smtp" in email_py, "Email.py 缺少按 SMTP_TLS 建连的 _connect_smtp"
+    assert "starttls" in email_py, "Email.py 未支持 STARTTLS（587 端口）"
+    assert "SMTP_SSL" in email_py, "Email.py 未保留 465/SSL 分支"
 
 
 # ──────────────────────────────────────────────

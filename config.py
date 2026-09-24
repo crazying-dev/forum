@@ -271,7 +271,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "24"
+STATIC_VERSION = "25"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -300,6 +300,11 @@ COMMENT_ID_PREFIX = "CM"
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://yjlt.top")
 SMTP_HOST = os.getenv("SMTP_HOST", "smtpdm.aliyun.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
+# 传输加密方式：ssl（端口 465，默认）/ starttls（端口 587）/ none（明文，仅内网中继）
+SMTP_TLS = os.getenv("SMTP_TLS", "ssl")
+# 是否使用 SMTP 认证（本地/开放中继可设为 0）
+SMTP_USE_AUTH = os.getenv("SMTP_USE_AUTH", "1") != "0"
+SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "20"))
 SMTP_USER = os.getenv("SMTP_USER", "maomi@email.yjlt.top")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "妖精论坛(二创)")

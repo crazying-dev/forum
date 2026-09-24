@@ -7,7 +7,7 @@
     GET  /api/user/info       获取当前登录用户信息
     PUT  /api/user/info       更新当前用户基础资料
     POST /api/user/password   修改密码（邮箱验证码 code + new_password；也兼容旧密码校验）
-    POST /api/user/email      更换绑定邮箱（新邮箱验证码 code + email）
+    POST /api/user/email      更换绑定邮箱（需旧邮箱验证码 old_code + 新邮箱验证码 code）
     GET  /api/user/<id>       公开查询某个用户资料
 """
 from __future__ import annotations
@@ -424,25 +424,28 @@ def api_user_change_password():
 
 
 # ──────────────────────────────────────────────
-# 7. 更换绑定邮箱（需登录，需新邮箱验证码）
-#    验证码由 /api/email/send-change-email-code 发往「新邮箱」，
-#    校验通过后调用 db.user.change_email 完成换绑。
+# 7. 更换绑定邮箱（需登录，两步验证）
+#    第1步：/api/email/send-change-email-old-code 发码到「当前邮箱」，验证身份；
+#    第2步：/api/email/send-change-email-code     发码到「新邮箱」，验证可达；
+#    本接口同时校验两枚验证码，通过后调用 db.user.change_email 完成换绑。
 # ──────────────────────────────────────────────
 @user_bp.route("/email", methods=["POST"])
 @login_required
 def api_user_change_email():
-    """更换绑定邮箱。
+    """更换绑定邮箱（两步验证）。
 
     Body(JSON):
-        email: str 新邮箱（验证码已发往该邮箱）
-        code:  str 6 位数字验证码
+        old_code: str 旧邮箱验证码（已发往当前绑定邮箱）
+        email:    str 新邮箱
+        code:     str 新邮箱验证码（已发往新邮箱）
     """
     if rate_limit("change_email", 5, 300):
         return jsonify({"success": False, "message": "请求过于频繁，请稍后再试"}), 429
 
     data = request.get_json(silent=True) or {}
     new_email = (data.get("email") or "").strip().lower()
-    code = (data.get("code") or "").strip()
+    new_code = (data.get("code") or "").strip()
+    old_code = (data.get("old_code") or "").strip()
 
     if not is_valid_email(new_email):
         return jsonify({"success": False, "message": "请输入有效的邮箱"}), 400
@@ -450,22 +453,38 @@ def api_user_change_email():
     user = db.user.get_user_by_id(g.user["id"])
     if not user:
         return jsonify({"success": False, "message": "用户不存在"}), 404
-    if new_email == (user.get("email") or "").strip().lower():
+    cur_email = (user.get("email") or "").strip().lower()
+    if not is_valid_email(cur_email):
+        return jsonify(
+            {"success": False, "message": "当前账号未绑定有效邮箱，无法通过邮箱验证更换邮箱"}
+        ), 400
+    if new_email == cur_email:
         return jsonify({"success": False, "message": "新邮箱与当前邮箱相同"}), 400
     if db.user.get_user_by_email(new_email):
         return jsonify({"success": False, "message": "该邮箱已被其他账号绑定"}), 400
 
     # 局部导入：api.email 又依赖本模块的 login_required，顶层互导会形成循环
-    from api.email import verify_change_email_code, consume_change_email_code
+    from api.email import (
+        verify_change_email_old_code,
+        consume_change_email_old_code,
+        verify_change_email_code,
+        consume_change_email_code,
+    )
 
-    ok, msg = verify_change_email_code(new_email, code)
+    # 第1步：验证旧邮箱身份
+    ok, msg = verify_change_email_old_code(cur_email, old_code)
     if not ok:
-        return jsonify({"success": False, "message": msg}), 400
+        return jsonify({"success": False, "message": "当前邮箱验证码错误：" + msg}), 400
+    # 第2步：验证新邮箱可达
+    ok, msg = verify_change_email_code(new_email, new_code)
+    if not ok:
+        return jsonify({"success": False, "message": "新邮箱验证码错误：" + msg}), 400
 
     ok, msg = db.user.change_email(g.user["id"], new_email)
     if not ok:
         return jsonify({"success": False, "message": msg}), 400
-    consume_change_email_code(new_email, code)
+    consume_change_email_old_code(cur_email, old_code)
+    consume_change_email_code(new_email, new_code)
 
     refreshed = db.user.get_user_by_id(g.user["id"])
     return jsonify({

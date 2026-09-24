@@ -34,6 +34,8 @@ const editError = ref('')
 const editErrorColor = ref('')
 const editAvatarFile = ref(null)
 const pendingAvatar = ref('')
+// 编辑弹窗面板：'' = 资料；'password' = 修改密码；'email' = 更换邮箱
+const editPanel = ref('')
 // 粉丝/关注弹窗
 const listModalOpen = ref(false)
 const listTitle = ref('')
@@ -186,13 +188,18 @@ function openEdit() {
   bpDay.value = ymd ? ymd.d : 1
   bpDirty.value = false
   pendingAvatar.value = ''
+  editPanel.value = ''
   // 改密码区默认清空（验证码一次性，不保留上次输入）
   pwCode.value = ''
   pwNew.value = ''
   pwConfirm.value = ''
   pwMsg.value = ''
   pwMsgColor.value = ''
-  // 更换邮箱区同样清空
+  // 更换邮箱区同样清空（两步验证）
+  emStep.value = 1
+  emOldCode.value = ''
+  emOldMsg.value = ''
+  emOldMsgColor.value = ''
   emNew.value = ''
   emCode.value = ''
   emMsg.value = ''
@@ -312,13 +319,27 @@ function changePassword() {
   }).catch(() => { pwMsg.value = '网络错误' })
 }
 
-// ── 更换绑定邮箱（验证码发往新邮箱；编辑资料中不显示当前邮箱）──
+// ── 更换绑定邮箱（两步验证：先验旧邮箱身份，再验新邮箱；编辑资料中不显示当前邮箱）──
+const emStep = ref(1)          // 1 = 验证当前邮箱身份；2 = 填写并验证新邮箱
+const emOldCode = ref('')
+const emOldCooldown = ref(0)
+const emOldMsg = ref('')
+const emOldMsgColor = ref('')
+let emOldTimer = null
 const emNew = ref('')
 const emCode = ref('')
 const emCooldown = ref(0)
 const emMsg = ref('')
 const emMsgColor = ref('')
 let emTimer = null
+function startEmOldCooldown() {
+  emOldCooldown.value = 60
+  clearInterval(emOldTimer)
+  emOldTimer = setInterval(() => {
+    emOldCooldown.value -= 1
+    if (emOldCooldown.value <= 0) { clearInterval(emOldTimer); emOldTimer = null }
+  }, 1000)
+}
 function startEmCooldown() {
   emCooldown.value = 60
   clearInterval(emTimer)
@@ -327,6 +348,42 @@ function startEmCooldown() {
     if (emCooldown.value <= 0) { clearInterval(emTimer); emTimer = null }
   }, 1000)
 }
+function openEmailPanel() {
+  editPanel.value = 'email'
+  emStep.value = 1
+  emOldCode.value = ''
+  emOldMsg.value = ''
+  emOldMsgColor.value = ''
+  emNew.value = ''
+  emCode.value = ''
+  emMsg.value = ''
+  emMsgColor.value = ''
+}
+// 第1步：向「当前绑定邮箱」发送验证码，验证身份
+function sendOldEmailCode() {
+  if (emOldCooldown.value > 0) return
+  emOldMsg.value = ''
+  emOldMsgColor.value = ''
+  apiFetch('/api/email/send-change-email-old-code', { method: 'POST', body: {} })
+    .then((d) => {
+      if (!d) return
+      if (d.success) {
+        emOldMsgColor.value = '#2ecc71'
+        emOldMsg.value = d.message || '验证码已发送至当前绑定邮箱'
+        startEmOldCooldown()
+      } else {
+        emOldMsgColor.value = ''
+        emOldMsg.value = d.message || '发送失败'
+      }
+    })
+    .catch(() => { emOldMsg.value = '网络错误' })
+}
+function goEmailStep2() {
+  if (!emOldCode.value.trim()) { emOldMsg.value = '请填写当前邮箱验证码'; return }
+  emOldMsg.value = ''
+  emStep.value = 2
+}
+// 第2步：向「新邮箱」发送验证码
 function sendEmailCode() {
   if (emCooldown.value > 0) return
   emMsg.value = ''
@@ -351,20 +408,23 @@ function changeEmail() {
   emMsg.value = ''
   emMsgColor.value = ''
   const addr = emNew.value.trim()
+  if (!emOldCode.value.trim()) { emStep.value = 1; emOldMsg.value = '请填写当前邮箱验证码'; return }
   if (!addr) { emMsg.value = '请先填写新邮箱'; return }
-  if (!emCode.value.trim()) { emMsg.value = '请填写邮箱验证码'; return }
+  if (!emCode.value.trim()) { emMsg.value = '请填写新邮箱验证码'; return }
   apiFetch('/api/user/email', {
     method: 'POST',
-    body: { email: addr, code: emCode.value.trim() },
+    body: { old_code: emOldCode.value.trim(), email: addr, code: emCode.value.trim() },
   }).then((d) => {
     if (!d) return
     if (d.success) {
       emMsgColor.value = '#2ecc71'
       emMsg.value = d.message || '邮箱已更换'
       toast('邮箱已更换')
+      emOldCode.value = ''
       emNew.value = ''
       emCode.value = ''
       if (d.user && user.value) user.value.email = d.user.email
+      setTimeout(() => { editPanel.value = ''; emStep.value = 1 }, 1200)
     } else {
       emMsgColor.value = ''
       emMsg.value = d.message || '更换失败'
@@ -466,9 +526,79 @@ onMounted(load)
     <div v-if="editOpen" class="modal-mask" @click.self="closeEdit">
       <div class="modal">
         <div class="modal-header">
-          <h3><i class="fa fa-user"></i> 编辑资料</h3>
+          <h3><i class="fa fa-user"></i> {{ editPanel === 'password' ? '修改密码' : editPanel === 'email' ? '更换绑定邮箱' : '编辑资料' }}</h3>
           <button class="modal-close" @click="closeEdit">&times;</button>
         </div>
+        <!-- 面板：修改密码（不显示邮箱） -->
+        <template v-if="editPanel === 'password'">
+          <div class="form-hint">系统会向你的绑定邮箱发送 6 位验证码，验证后即可设置新密码（无需旧密码）。</div>
+          <div class="form-group">
+            <label>邮箱验证码</label>
+            <div class="code-row">
+              <input v-model="pwCode" type="text" maxlength="6" placeholder="6 位数字验证码">
+              <button type="button" class="btn btn-outline btn-sm" :disabled="pwCooldown > 0" @click="sendPwCode">
+                {{ pwCooldown > 0 ? pwCooldown + 's' : '获取验证码' }}
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>新密码</label>
+            <input v-model="pwNew" type="password" maxlength="64" placeholder="至少 8 位，含字母和数字">
+          </div>
+          <div class="form-group">
+            <label>确认新密码</label>
+            <input v-model="pwConfirm" type="password" maxlength="64">
+          </div>
+          <p class="auth-error" :style="pwMsgColor ? { color: pwMsgColor } : {}">{{ pwMsg }}</p>
+          <div class="modal-actions">
+            <button class="btn btn-outline" @click="editPanel = ''">返回</button>
+            <button class="btn btn-primary" @click="changePassword"><i class="fa fa-key"></i> 修改密码</button>
+          </div>
+        </template>
+
+        <!-- 面板：更换邮箱（两步：旧邮箱身份 → 新邮箱） -->
+        <template v-else-if="editPanel === 'email'">
+          <p class="form-hint">{{ emStep === 1 ? '第 1 步 / 共 2 步：验证当前绑定邮箱身份' : '第 2 步 / 共 2 步：填写并验证新邮箱' }}</p>
+          <template v-if="emStep === 1">
+            <div class="form-group">
+              <label>当前邮箱验证码</label>
+              <div class="code-row">
+                <input v-model="emOldCode" type="text" maxlength="6" placeholder="6 位数字验证码">
+                <button type="button" class="btn btn-outline btn-sm" :disabled="emOldCooldown > 0" @click="sendOldEmailCode">
+                  {{ emOldCooldown > 0 ? emOldCooldown + 's' : '获取验证码' }}
+                </button>
+              </div>
+            </div>
+            <p class="auth-error" :style="emOldMsgColor ? { color: emOldMsgColor } : {}">{{ emOldMsg }}</p>
+            <div class="modal-actions">
+              <button class="btn btn-outline" @click="editPanel = ''">返回</button>
+              <button class="btn btn-primary" @click="goEmailStep2">下一步</button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="form-group">
+              <label>新邮箱</label>
+              <input v-model="emNew" type="email" maxlength="120" placeholder="新邮箱地址">
+            </div>
+            <div class="form-group">
+              <label>新邮箱验证码</label>
+              <div class="code-row">
+                <input v-model="emCode" type="text" maxlength="6" placeholder="6 位数字验证码">
+                <button type="button" class="btn btn-outline btn-sm" :disabled="emCooldown > 0" @click="sendEmailCode">
+                  {{ emCooldown > 0 ? emCooldown + 's' : '获取验证码' }}
+                </button>
+              </div>
+            </div>
+            <p class="auth-error" :style="emMsgColor ? { color: emMsgColor } : {}">{{ emMsg }}</p>
+            <div class="modal-actions">
+              <button class="btn btn-outline" @click="emStep = 1">上一步</button>
+              <button class="btn btn-primary" @click="changeEmail"><i class="fa fa-envelope-o"></i> 确认更换</button>
+            </div>
+          </template>
+        </template>
+
+        <!-- 面板：编辑资料 -->
+        <template v-else>
         <div class="form-group">
           <label>昵称</label>
           <input v-model="editForm.name" type="text" maxlength="20">
@@ -514,48 +644,16 @@ onMounted(load)
           <p class="auth-error" :style="editErrorColor ? { color: editErrorColor } : {}">{{ editError }}</p>
         </div>
         <div class="setting-divider"></div>
-        <div class="form-group">
-          <label>修改密码（需邮箱验证）</label>
-          <div class="form-hint">系统会向你的绑定邮箱发送 6 位验证码，验证后即可设置新密码（无需旧密码）。</div>
-          <div class="code-row" style="margin-top:8px;">
-            <input v-model="pwCode" type="text" maxlength="6" placeholder="6 位数字验证码">
-            <button type="button" class="btn btn-outline btn-sm" :disabled="pwCooldown > 0" @click="sendPwCode">
-              {{ pwCooldown > 0 ? pwCooldown + 's' : '获取验证码' }}
-            </button>
-          </div>
+        <div class="form-hint">账号安全：修改密码 / 更换绑定邮箱均需邮箱验证码。</div>
+        <div class="modal-actions" style="justify-content:flex-start; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+          <button type="button" class="btn btn-outline" @click="editPanel = 'password'"><i class="fa fa-key"></i> 修改密码</button>
+          <button type="button" class="btn btn-outline" @click="openEmailPanel"><i class="fa fa-envelope-o"></i> 修改邮箱</button>
         </div>
-        <div class="form-group">
-          <label>新密码</label>
-          <input v-model="pwNew" type="password" maxlength="64" placeholder="至少 8 位，含字母和数字">
-        </div>
-        <div class="form-group">
-          <label>确认新密码</label>
-          <input v-model="pwConfirm" type="password" maxlength="64">
-        </div>
-        <div class="modal-actions" style="justify-content:flex-start; margin-bottom:4px;">
-          <button type="button" class="btn btn-outline" @click="changePassword"><i class="fa fa-key"></i> 修改密码</button>
-        </div>
-        <p class="auth-error" :style="pwMsgColor ? { color: pwMsgColor } : {}">{{ pwMsg }}</p>
-        <div class="setting-divider"></div>
-        <div class="form-group">
-          <label>更换绑定邮箱（需新邮箱验证）</label>
-          <div class="form-hint">系统会向新邮箱发送 6 位验证码，验证通过后完成换绑。</div>
-          <input v-model="emNew" type="email" maxlength="120" placeholder="新邮箱地址" style="margin-top:8px;">
-          <div class="code-row" style="margin-top:8px;">
-            <input v-model="emCode" type="text" maxlength="6" placeholder="6 位数字验证码">
-            <button type="button" class="btn btn-outline btn-sm" :disabled="emCooldown > 0" @click="sendEmailCode">
-              {{ emCooldown > 0 ? emCooldown + 's' : '获取验证码' }}
-            </button>
-          </div>
-        </div>
-        <div class="modal-actions" style="justify-content:flex-start; margin-bottom:4px;">
-          <button type="button" class="btn btn-outline" @click="changeEmail"><i class="fa fa-envelope-o"></i> 更换邮箱</button>
-        </div>
-        <p class="auth-error" :style="emMsgColor ? { color: emMsgColor } : {}">{{ emMsg }}</p>
         <div class="modal-actions">
           <button class="btn btn-outline" @click="closeEdit">取消</button>
           <button class="btn btn-primary" @click="saveEdit">保存</button>
         </div>
+        </template>
       </div>
     </div>
   </div>

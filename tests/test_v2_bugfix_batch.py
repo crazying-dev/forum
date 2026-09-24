@@ -615,3 +615,35 @@ def test_post_item_whole_card_clickable():
         ".post-item 缺少 cursor: pointer，无点击提示"
 
 
+# ── 回归 18：登录页找回密码改为单页表单 + 换绑邮箱两步验证（旧邮箱身份 → 新邮箱）──
+def test_reset_single_page_and_change_email_two_step():
+    auth = AUTH_VUE
+    user_vue = USER_VUE
+    email_api = (PROJECT / "api" / "email" / "__init__.py").read_text(encoding="utf-8")
+    user_api = (PROJECT / "api" / "user" / "__init__.py").read_text(encoding="utf-8")
+    # 单页表单：不再分步，验证码始终可见
+    assert "resetStep" not in auth and "isCodeResetStep2" not in auth, \
+        "登录页找回密码应改为单页表单（去掉分步状态）"
+    assert re.search(r"showCode\s*=[^\n]*isCodeReset", auth), "找回密码未始终显示验证码输入"
+    assert "email: email.value, code: code.value.trim(), password: password.value" in auth, \
+        "单页表单未一次性提交 邮箱 + 验证码 + 新密码"
+    # 换绑邮箱：两步（旧邮箱身份 → 新邮箱）
+    assert "/email/send-change-email-old-code" in email_api, "缺少旧邮箱身份验证码接口"
+    assert "change_email_old" in email_api, "旧邮箱验证码 purpose 缺失"
+    assert "old_code" in user_api, "换绑接口未接收旧邮箱验证码"
+    assert "verify_change_email_old_code" in user_api, "换绑接口未校验旧邮箱身份"
+    # 编辑资料：双入口 + 不显示邮箱
+    assert "editPanel" in user_vue and "openEmailPanel" in user_vue, "编辑资料缺少双入口"
+    assert "editForm.email" not in user_vue, "编辑资料不应显示邮箱字段"
+
+
+# ── 回归 19：静态版本号已针对本次 JS/CSS/Vue 变更提升 ──
+def test_static_version_bumped_for_email_flows():
+    import config
+    m = re.search(r'STATIC_VERSION = "(\d+)"', (PROJECT / "config.py").read_text(encoding="utf-8"))
+    assert m, "config 缺少 STATIC_VERSION 数字版本号"
+    assert int(m.group(1)) >= 25, \
+        "本次改动改变了前端资源，STATIC_VERSION 应提升到 >= 25"
+
+
+
