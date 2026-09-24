@@ -417,6 +417,7 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
   padding: 10px 4px;
   border-bottom: 1px dashed var(--color-border);
   transition: background .15s;
+  cursor: pointer;
 }
 .post-item:last-child { border-bottom: none; }
 .post-item:hover { background: var(--color-bg-hover); border-radius: 6px; }

@@ -1763,6 +1763,25 @@
       });
     });
   }
+  // ── 帖子卡片整块点击进入详情：点击卡片任意处均可跳转；
+  // 卡片内的链接（标题 / 作者用户名等 <a>）保持其自身目标，不跳详情。──
+  function initPostItemNav() {
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented) return;
+      if (typeof e.button === 'number' && e.button !== 0) return; // 仅左键
+      var t = e.target;
+      if (!t || !t.closest) return;
+      // 标题、作者用户名等 <a> 链接交由其自身处理
+      if (t.closest('a')) return;
+      var item = t.closest('.post-item');
+      if (!item) return;
+      // 正在框选文本时不跳转
+      var sel = window.getSelection ? window.getSelection() : null;
+      if (sel && String(sel).length > 0) return;
+      var link = item.getAttribute('data-post-link') || ('/post/' + item.getAttribute('data-pid'));
+      if (link) location.href = link;
+    });
+  }
   function initContextMenu() {
     var menu = el('ctxMenu');
     if (!menu) return;
@@ -1873,6 +1892,7 @@
     initWuxianConverter();
     initPWA();
     initContextMenu();
+    initPostItemNav();
     // 解析页面已有（SSR/模板直接生成）的头像 img[data-src]，不等接口回来，立即异步触发加载。
     resolveAvatarDeferred(document);
     var path = location.pathname;

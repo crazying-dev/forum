@@ -13,6 +13,7 @@
     POST /api/email/send-code-reset-password    找回密码验证码
     POST /api/email/reset-password-by-code      用验证码重置密码
     POST /api/email/send-change-password-code   修改密码验证码（需登录）
+    POST /api/email/send-change-email-code      更换邮箱验证码（需登录，发到新邮箱）
 
 依赖 SMTP 配置（config.SMTP_*），邮件服务不可用时返回明确错误。
 """
@@ -428,3 +429,78 @@ def consume_change_password_code(email: str, code: str):
     except Exception:
         pass
     _cleanup_codes(email, "change_password")
+
+
+@email_bp.route("/email/send-change-email-code", methods=["POST"])
+@login_required
+def api_send_change_email_code():
+    """发送6位验证码到「新邮箱」，用于「个人资料 → 更换邮箱」。
+
+    验证码发往新邮箱：只有能收信新邮箱的人才可完成换绑。
+    """
+    if rate_limit("change_email_code", 3, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+    user = db.user.get_user_by_id(g.user["id"])
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+
+    data = request.get_json(silent=True) or {}
+    new_email = (data.get("email") or "").strip().lower()
+    if not is_valid_email(new_email):
+        return jsonify({"success": False, "message": "请输入有效的邮箱"}), 400
+    if new_email == (user.get("email") or "").strip().lower():
+        return jsonify({"success": False, "message": "新邮箱与当前邮箱相同"}), 400
+    if db.user.get_user_by_email(new_email):
+        return jsonify({"success": False, "message": "该邮箱已被其他账号绑定"}), 400
+
+    code = _random_code()
+    result = db.verify.create_verify_code(new_email, code, "change_email")
+    if not result.get("success"):
+        return jsonify({"success": False, "message": "生成验证码失败"}), 500
+
+    subject = "【妖精论坛】更换绑定邮箱验证码"
+    plain = (
+        f"尊敬的 {user['name']}，您好！\n\n"
+        f"您正在为账号更换绑定邮箱，验证码为：{code}\n\n"
+        f"验证码有效期5分钟，请勿泄露给他人。\n"
+        f"如非本人操作，请忽略此邮件。\n\n© 2026 妖精论坛 - 粉丝公益创作"
+    )
+    html = build_email_html(
+        label="更换邮箱验证码",
+        title="更换您的绑定邮箱",
+        body_lines=[
+            f"尊敬的 <strong style=\"color:#6A8C89;\">{user['name']}</strong>，您好！",
+            "您正在为账号更换绑定邮箱，验证码为：",
+            f'<div style="font-size:32px;font-weight:700;color:#6A8C89;letter-spacing:6px;text-align:center;padding:12px 0;">{code}</div>',
+            "验证码有效期5分钟，请勿泄露给他人。",
+            "如非本人操作，请忽略此邮件。",
+        ],
+    )
+    ok, err = send_email(subject, plain, receiver_list=[new_email], html_content=html)
+    if not ok:
+        return jsonify({"success": False, "message": f"邮件服务暂不可用: {err}"}), 503
+    return jsonify({"success": True, "message": "验证码已发送至新邮箱"})
+
+
+def verify_change_email_code(email: str, code: str):
+    """校验「更换邮箱」验证码（供 api.user 的换邮箱接口复用）。
+
+    返回 (ok, message)：ok 为 True 时调用方应继续落库，并在成功后
+    调用 consume_change_email_code 标记已用。
+    """
+    if not _valid_code(code):
+        return False, "请输入6位数字验证码"
+    code_info = db.verify.get_verify_code(email, code, "change_email")
+    if not code_info:
+        db.verify.increment_verify_code_attempts(email, "change_email")
+        return False, "验证码无效或已过期"
+    return True, ""
+
+
+def consume_change_email_code(email: str, code: str):
+    """标记「更换邮箱」验证码已使用，并清理过期/已用记录。"""
+    try:
+        db.verify.mark_verify_code_used(email, code, "change_email")
+    except Exception:
+        pass
+    _cleanup_codes(email, "change_email")

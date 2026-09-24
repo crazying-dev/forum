@@ -15,6 +15,14 @@ import config
 SENDER = config.SMTP_USER
 SENDER_NAME = config.SMTP_FROM_NAME or "妖精论坛"
 
+# SMTP 认证阶段错误码 → 中文提示（阿里云邮件推送常见码）
+_AUTH_ERROR_HINTS = {
+    535: "账号或独立SMTP密码错误",
+    551: "发信账户状态异常，请到邮件推送控制台查看账户状态",
+    436: "MAIL FROM 与实际发信地址不一致",
+    552: "发信额度已用尽",
+}
+
 # 同一邮箱 1 秒内最多发一封邮件，避免短时间重复推送
 _EMAIL_MIN_INTERVAL = 1.0
 _email_send_lock = threading.Lock()
@@ -149,8 +157,19 @@ def send_email(subject: str, content: str, receiver_list: list | None = None, ht
                 last_err = f"部分发送失败({rcpt}): {e}"
 
         return (True, None) if last_err is None else (False, last_err)
-    except smtplib.SMTPAuthenticationError:
-        return False, "SMTP认证失败：账号或独立SMTP密码错误"
+    except smtplib.SMTPAuthenticationError as e:
+        # 细化错误：把 SMTP 服务器返回的真实错误码/原因透出，避免误判为密码问题。
+        # 例如阿里云邮件推送 551 表示「发信账户状态异常」，并非密码错误（535 才是）。
+        code = getattr(e, "smtp_code", None)
+        raw = getattr(e, "smtp_error", b"")
+        if isinstance(raw, (bytes, bytearray)):
+            raw = raw.decode("utf-8", "ignore")
+        raw = str(raw or "").strip()
+        hint = _AUTH_ERROR_HINTS.get(code, "账号或独立SMTP密码错误")
+        msg = f"SMTP认证失败({code})：{hint}" if code else f"SMTP认证失败：{hint}"
+        if raw:
+            msg += f" - {raw}"
+        return False, msg
     except smtplib.SMTPException as e:
         return False, f"SMTP发送异常: {e}"
     except Exception as e:

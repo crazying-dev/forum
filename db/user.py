@@ -229,6 +229,27 @@ def change_password(user_id: str, old_raw: str, new_raw: str) -> tuple[bool, str
         return False, f"数据库错误: {e}"
 
 
+def change_email(user_id: str, new_email: str) -> tuple[bool, str]:
+    """更换绑定邮箱（仅供「新邮箱验证码」校验通过后调用）。
+
+    换绑成功后新邮箱天然已验证，故同时置 email_verified = 1。
+    """
+    if not user_id or not new_email:
+        return False, "缺少参数"
+    try:
+        rowcount = execute_query(
+            "UPDATE users SET email = %s, email_verified = 1 WHERE id = %s",
+            (new_email.strip(), user_id),
+        )
+        if rowcount and rowcount > 0:
+            return True, "邮箱已更换"
+        return False, "未找到对应用户"
+    except psycopg2.IntegrityError:
+        return False, "该邮箱已被其他账号绑定"
+    except Exception as e:
+        return False, f"数据库错误: {e}"
+
+
 def reset_password(user_id: str, new_raw: str) -> tuple[bool, str]:
     """重置密码（无需旧密码，供找回密码功能使用）。"""
     user = get_user_by_id(user_id)

@@ -596,3 +596,22 @@ def test_live2d_focus_uses_canvas_center():
     assert re.search(r"rect\.width\s*/\s*2", JS), "缺少映射回画布宽/2 的换算"
 
 
+# ── 回归 17：帖子列表整卡可点击跳转（作者用户名等链接除外） ──
+def test_post_item_whole_card_clickable():
+    # JS：存在全局委托点击处理，点击 .post-item 任意处跳转 data-post-link
+    assert "function initPostItemNav" in JS, "缺少帖子卡片整块点击跳转的 initPostItemNav"
+    assert "initPostItemNav();" in JS, "init() 未注册 initPostItemNav"
+    assert re.search(r"closest\('\.post-item'\)", JS), "未通过 closest('.post-item') 定位卡片"
+    # 卡片内的 <a>（标题 / 作者用户名）跳过，交由其自身处理
+    assert re.search(r"if \(t\.closest\('a'\)\) return", JS), \
+        "点击卡片内的链接（标题/作者用户名）未被排除"
+    assert "getAttribute('data-post-link')" in JS, "未读取卡片 data-post-link 作为跳转目标"
+    # 两种渲染器都带 data-post-link
+    assert 'data-post-link="/post/' in JS, "postItemHtml 未生成 data-post-link"
+    postcard = (VUE_SRC / "components" / "PostCard.vue").read_text(encoding="utf-8")
+    assert "data-post-link" in postcard, "Vue PostCard 未生成 data-post-link"
+    # CSS：卡片显示可点击手型
+    assert re.search(r"\.post-item\s*\{[^}]*cursor:\s*pointer", CSS), \
+        ".post-item 缺少 cursor: pointer，无点击提示"
+
+

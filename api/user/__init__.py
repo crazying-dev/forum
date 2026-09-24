@@ -7,6 +7,7 @@
     GET  /api/user/info       获取当前登录用户信息
     PUT  /api/user/info       更新当前用户基础资料
     POST /api/user/password   修改密码（邮箱验证码 code + new_password；也兼容旧密码校验）
+    POST /api/user/email      更换绑定邮箱（新邮箱验证码 code + email）
     GET  /api/user/<id>       公开查询某个用户资料
 """
 from __future__ import annotations
@@ -423,7 +424,59 @@ def api_user_change_password():
 
 
 # ──────────────────────────────────────────────
-# 7. 按 ID 查询任意用户公开资料（无需登录）
+# 7. 更换绑定邮箱（需登录，需新邮箱验证码）
+#    验证码由 /api/email/send-change-email-code 发往「新邮箱」，
+#    校验通过后调用 db.user.change_email 完成换绑。
+# ──────────────────────────────────────────────
+@user_bp.route("/email", methods=["POST"])
+@login_required
+def api_user_change_email():
+    """更换绑定邮箱。
+
+    Body(JSON):
+        email: str 新邮箱（验证码已发往该邮箱）
+        code:  str 6 位数字验证码
+    """
+    if rate_limit("change_email", 5, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请稍后再试"}), 429
+
+    data = request.get_json(silent=True) or {}
+    new_email = (data.get("email") or "").strip().lower()
+    code = (data.get("code") or "").strip()
+
+    if not is_valid_email(new_email):
+        return jsonify({"success": False, "message": "请输入有效的邮箱"}), 400
+
+    user = db.user.get_user_by_id(g.user["id"])
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    if new_email == (user.get("email") or "").strip().lower():
+        return jsonify({"success": False, "message": "新邮箱与当前邮箱相同"}), 400
+    if db.user.get_user_by_email(new_email):
+        return jsonify({"success": False, "message": "该邮箱已被其他账号绑定"}), 400
+
+    # 局部导入：api.email 又依赖本模块的 login_required，顶层互导会形成循环
+    from api.email import verify_change_email_code, consume_change_email_code
+
+    ok, msg = verify_change_email_code(new_email, code)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+
+    ok, msg = db.user.change_email(g.user["id"], new_email)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    consume_change_email_code(new_email, code)
+
+    refreshed = db.user.get_user_by_id(g.user["id"])
+    return jsonify({
+        "success": True,
+        "message": "邮箱已更换",
+        "user": _strip_user_public(refreshed),
+    }), 200
+
+
+# ──────────────────────────────────────────────
+# 8. 按 ID 查询任意用户公开资料（无需登录）
 # ──────────────────────────────────────────────
 @user_bp.route("/<user_id>", methods=["GET"])
 def api_user_public(user_id: str):

@@ -192,6 +192,11 @@ function openEdit() {
   pwConfirm.value = ''
   pwMsg.value = ''
   pwMsgColor.value = ''
+  // 更换邮箱区同样清空
+  emNew.value = ''
+  emCode.value = ''
+  emMsg.value = ''
+  emMsgColor.value = ''
   editError.value = ''
   editErrorColor.value = ''
   editOpen.value = true
@@ -305,6 +310,66 @@ function changePassword() {
       pwMsg.value = d.message || '修改失败'
     }
   }).catch(() => { pwMsg.value = '网络错误' })
+}
+
+// ── 更换绑定邮箱（验证码发往新邮箱；编辑资料中不显示当前邮箱）──
+const emNew = ref('')
+const emCode = ref('')
+const emCooldown = ref(0)
+const emMsg = ref('')
+const emMsgColor = ref('')
+let emTimer = null
+function startEmCooldown() {
+  emCooldown.value = 60
+  clearInterval(emTimer)
+  emTimer = setInterval(() => {
+    emCooldown.value -= 1
+    if (emCooldown.value <= 0) { clearInterval(emTimer); emTimer = null }
+  }, 1000)
+}
+function sendEmailCode() {
+  if (emCooldown.value > 0) return
+  emMsg.value = ''
+  emMsgColor.value = ''
+  const addr = emNew.value.trim()
+  if (!addr) { emMsg.value = '请先填写新邮箱'; return }
+  apiFetch('/api/email/send-change-email-code', { method: 'POST', body: { email: addr } })
+    .then((d) => {
+      if (!d) return
+      if (d.success) {
+        emMsgColor.value = '#2ecc71'
+        emMsg.value = d.message || '验证码已发送至新邮箱'
+        startEmCooldown()
+      } else {
+        emMsgColor.value = ''
+        emMsg.value = d.message || '发送失败'
+      }
+    })
+    .catch(() => { emMsg.value = '网络错误' })
+}
+function changeEmail() {
+  emMsg.value = ''
+  emMsgColor.value = ''
+  const addr = emNew.value.trim()
+  if (!addr) { emMsg.value = '请先填写新邮箱'; return }
+  if (!emCode.value.trim()) { emMsg.value = '请填写邮箱验证码'; return }
+  apiFetch('/api/user/email', {
+    method: 'POST',
+    body: { email: addr, code: emCode.value.trim() },
+  }).then((d) => {
+    if (!d) return
+    if (d.success) {
+      emMsgColor.value = '#2ecc71'
+      emMsg.value = d.message || '邮箱已更换'
+      toast('邮箱已更换')
+      emNew.value = ''
+      emCode.value = ''
+      if (d.user && user.value) user.value.email = d.user.email
+    } else {
+      emMsgColor.value = ''
+      emMsg.value = d.message || '更换失败'
+    }
+  }).catch(() => { emMsg.value = '网络错误' })
 }
 
 onMounted(load)
@@ -471,6 +536,22 @@ onMounted(load)
           <button type="button" class="btn btn-outline" @click="changePassword"><i class="fa fa-key"></i> 修改密码</button>
         </div>
         <p class="auth-error" :style="pwMsgColor ? { color: pwMsgColor } : {}">{{ pwMsg }}</p>
+        <div class="setting-divider"></div>
+        <div class="form-group">
+          <label>更换绑定邮箱（需新邮箱验证）</label>
+          <div class="form-hint">系统会向新邮箱发送 6 位验证码，验证通过后完成换绑。</div>
+          <input v-model="emNew" type="email" maxlength="120" placeholder="新邮箱地址" style="margin-top:8px;">
+          <div class="code-row" style="margin-top:8px;">
+            <input v-model="emCode" type="text" maxlength="6" placeholder="6 位数字验证码">
+            <button type="button" class="btn btn-outline btn-sm" :disabled="emCooldown > 0" @click="sendEmailCode">
+              {{ emCooldown > 0 ? emCooldown + 's' : '获取验证码' }}
+            </button>
+          </div>
+        </div>
+        <div class="modal-actions" style="justify-content:flex-start; margin-bottom:4px;">
+          <button type="button" class="btn btn-outline" @click="changeEmail"><i class="fa fa-envelope-o"></i> 更换邮箱</button>
+        </div>
+        <p class="auth-error" :style="emMsgColor ? { color: emMsgColor } : {}">{{ emMsg }}</p>
         <div class="modal-actions">
           <button class="btn btn-outline" @click="closeEdit">取消</button>
           <button class="btn btn-primary" @click="saveEdit">保存</button>
