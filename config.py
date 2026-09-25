@@ -298,14 +298,14 @@ COMMENT_ID_PREFIX = "CM"
 # ── SMTP 邮件（邮箱验证 / 找回密码）──
 # 邮件里所有按钮 / 链接都使用固定域名，避免用 request.host_url 动态解析当前网址
 SITE_BASE_URL = os.getenv("SITE_BASE_URL", "https://yjlt.top")
-SMTP_HOST = os.getenv("SMTP_HOST", "smtpdm.aliyun.com")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.163.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "465"))
 # 传输加密方式：ssl（端口 465，默认）/ starttls（端口 587）/ none（明文，仅内网中继）
 SMTP_TLS = os.getenv("SMTP_TLS", "ssl")
 # 是否使用 SMTP 认证（本地/开放中继可设为 0）
 SMTP_USE_AUTH = os.getenv("SMTP_USE_AUTH", "1") != "0"
 SMTP_TIMEOUT = int(os.getenv("SMTP_TIMEOUT", "20"))
-SMTP_USER = os.getenv("SMTP_USER", "maomi@email.yjlt.top")
+SMTP_USER = os.getenv("SMTP_USER", "ourpet001@163.com")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "妖精论坛(二创)")
 RECEIVERALL = os.getenv("RECEIVERALL", SMTP_USER)
