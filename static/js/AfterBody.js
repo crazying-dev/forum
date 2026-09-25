@@ -232,6 +232,7 @@
       var data = await apiFetch('/api/user/info', { noAuthRedirect: true });
       if (data && data.success) {
         currentUser = data.user;
+        document.body.classList.add('is-authed'); // 手机端顶部「发帖」入口据此显示
         var u = data.user;
         var html =
           '<a href="/users/' + esc(u.id) + '" class="user-chip">' +
@@ -246,6 +247,7 @@
         if (li) li.style.display = '';
       }
     } catch (e) {
+      document.body.classList.remove('is-authed');
       chips.forEach(function (c) { c.innerHTML = '<a href="/auth" class="nav-login">登录</a>'; });
     }
   }

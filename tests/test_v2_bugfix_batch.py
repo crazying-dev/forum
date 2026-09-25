@@ -671,3 +671,58 @@ def test_mobile_egg_tab():
 def test_static_version_at_least_26():
     m = re.search(r'STATIC_VERSION = "(\d+)"', (PROJECT / "config.py").read_text(encoding="utf-8"))
     assert m and int(m.group(1)) >= 26, "STATIC_VERSION 应提升到 >= 26"
+
+
+# ── 回归 23：手机版「发帖」入口由底部标签栏移入顶部头部栏（仅登录后显示）──
+def test_mobile_create_entry_in_header():
+    # 发帖入口位于 .header-nav 内，带 headerCreate / .header-create 标记
+    assert 'id="headerCreate"' in BASE_HTML, "顶部头部栏缺少手机端发帖入口 headerCreate"
+    assert re.search(r'class="nav-link header-create"', BASE_HTML), "发帖入口缺少 .header-create 类"
+    assert 'href="/post/create"' in BASE_HTML, "发帖入口未指向 /post/create"
+    # 桌面端不显示（基础规则 display:none），仅 ≤900px 且已登录时显示
+    assert ".header-create { display: none; }" in CSS, "发帖入口未在桌面端隐藏"
+    assert re.search(r"body\.is-authed \.header-nav \.nav-link\.header-create\s*\{", CSS), \
+        "发帖入口缺少 body.is-authed 手机端显示规则"
+    # JS 登录态切换 body.is-authed
+    assert "classList.add('is-authed')" in JS, "登录后未标记 body.is-authed"
+    assert "classList.remove('is-authed')" in JS, "未登录/失败时未清除 body.is-authed"
+
+
+# ── 回归 24：手机版底部标签栏最终集合（首页/世界/WIKI/彩蛋/设置）──
+def test_mobile_bottom_tabs_final_set():
+    # 去掉「论坛」「发帖」标签
+    assert 'data-navtab="/forum"' not in BASE_HTML, "底部标签栏仍保留「论坛」标签"
+    assert 'data-navtab="/post/create"' not in BASE_HTML, "底部标签栏仍保留「发帖」标签（应移到顶部）"
+    # 恢复 V1 的 WIKI 入口
+    assert 'data-navtab="/WIKI"' in BASE_HTML, "底部标签栏缺少 WIKI 入口"
+    assert re.search(r'<a[^>]*class="side-nav-item nav-tab"[^>]*href="/WIKI"', BASE_HTML), \
+        "WIKI 入口不是底部标签栏项"
+    # 恰好 5 个底部标签
+    assert BASE_HTML.count('class="side-nav-item nav-tab"') == 5, \
+        "底部标签栏应恰为 5 项（首页/世界/WIKI/彩蛋/设置）"
+    # 高亮逻辑仍覆盖底部标签
+    assert "markActiveTab" in JS and ".nav-tab[data-navtab]" in JS
+
+
+# ── 回归 25：手机版设置面板隐藏「导航位置」分组 ──
+def test_mobile_settings_hides_navmode_group():
+    assert 'class="setting-navmode-group"' in BASE_HTML, "导航位置分组缺少容器 setting-navmode-group"
+    assert re.search(r"\.setting-navmode-group\s*\{\s*display:\s*none", CSS), \
+        "手机端未隐藏「导航位置」分组（手机端恒为底部标签栏）"
+    # 桌面端仍保留 侧边/顶部 切换项（供 JS 绑定）
+    assert 'data-navmode="side"' in BASE_HTML and 'data-navmode="top"' in BASE_HTML
+    assert "setNavMode" in JS
+
+
+# ── 回归 26：手机版底部标签栏不再显示登录/用户（用户只在顶部头部栏）──
+def test_mobile_bottom_bar_hides_user():
+    assert re.search(r"\.side-nav \.side-nav-user\s*\{\s*display:\s*none", CSS), \
+        "手机端底部标签栏未隐藏登录/用户区（.side-nav-user）"
+    # 顶部头部栏保留用户 chip（headerNavUser）
+    assert 'id="headerNavUser"' in BASE_HTML, "顶部头部栏缺少用户 chip（headerNavUser）"
+
+
+# ── 回归 27：静态版本号 ≥ 27（本次前端资源变更）──
+def test_static_version_at_least_27():
+    m = re.search(r'STATIC_VERSION = "(\d+)"', (PROJECT / "config.py").read_text(encoding="utf-8"))
+    assert m and int(m.group(1)) >= 27, "STATIC_VERSION 应提升到 >= 27"

@@ -154,6 +154,8 @@ textarea { resize: vertical; }
   font-size: 13px;
 }
 .nav-login:hover { background: var(--color-primary-hover); color: #fff; }
+/* 手机端「发帖」入口（.header-nav 内）：桌面端不显示，仅 ≤900px 且已登录（body.is-authed）时显示 */
+.header-create { display: none; }
 .user-chip { display: flex; align-items: center; gap: 8px; }
 .user-chip .avatar {
   width: 32px; height: 32px; border-radius: 50%;
@@ -282,6 +284,10 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
   }
   /* 手机端世界频道走独立页 /World，收起原右侧浮层（避免遮挡正文） */
   .world-panel { display: none !important; }
+  /* 底部标签栏不再承载登录/用户（用户信息只保留在顶部头部栏） */
+  .side-nav .side-nav-user { display: none; }
+  /* 设置面板：移动端隐藏「导航位置」分组（手机端恒为底部标签栏，无侧边/顶部之分） */
+  .setting-navmode-group { display: none; }
 }
 
 /* 顶部模式（桌面）：导航与头部栏合并（隐藏左侧边栏），显示 header-nav */
@@ -804,6 +810,20 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
   .header-nav { display: flex; margin-left: auto; }
   .header-nav .nav-link { display: none; }
   .header-nav .nav-user { margin-left: 0; }
+  /* 手机端「发帖」入口：仅登录后显示，并以主题色胶囊凸显（放在顶部头部栏） */
+  body.is-authed .header-nav .nav-link.header-create {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    margin-right: 4px;
+    border-radius: 16px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  body.is-authed .header-nav .nav-link.header-create span { display: inline; }
 }
 
 /* ── Live2D 页 ── */
@@ -1234,6 +1254,10 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 
   .category-tabs, .search-type-tabs { gap: 6px; }
   .tab { padding: 5px 12px; font-size: 12px; }
+
+  /* 超窄屏：发帖入口只留图标，避免挤占搜索框 */
+  body.is-authed .header-nav .nav-link.header-create { padding: 6px 10px; }
+  body.is-authed .header-nav .nav-link.header-create span { display: none; }
 }
 
 /* ── 自定义右键菜单（N2） ── */
