@@ -21,6 +21,7 @@ const favCollapsed = ref(false)
 const favVisible = ref(false)
 const myComments = ref([])
 const commentsVisible = ref(false)
+const cmtCollapsed = ref(false)   // 我的评论折叠（与「我的收藏」一致）
 // 资料编辑弹窗
 const editOpen = ref(false)
 const editForm = ref({ name: '', gender: '0', prefix: '', intro: '' })
@@ -260,6 +261,7 @@ function saveEdit() {
   })
 }
 function toggleFav() { favCollapsed.value = !favCollapsed.value }
+function toggleCmt() { cmtCollapsed.value = !cmtCollapsed.value }
 
 // ── 修改密码（需邮箱验证码；用户确认口径：不要求旧密码）──
 const pwCode = ref('')
@@ -475,8 +477,11 @@ onMounted(load)
       <div v-if="commentsVisible" class="card">
         <div class="card-header">
           <h2 class="card-title"><i class="fa fa-comments-o"></i> 我的评论</h2>
+          <button class="btn btn-sm" @click="toggleCmt">
+            <i :class="cmtCollapsed ? 'fa fa-angle-down' : 'fa fa-angle-up'"></i> {{ cmtCollapsed ? '展开' : '收起' }}
+          </button>
         </div>
-        <div class="user-comment-list">
+        <div v-show="!cmtCollapsed" class="user-comment-list">
           <div v-for="c in myComments" :key="c.id" class="user-comment-item">
             <div class="user-comment-text">{{ c.content }}</div>
             <div class="user-comment-meta">

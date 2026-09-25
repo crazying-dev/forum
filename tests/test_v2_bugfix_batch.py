@@ -646,4 +646,28 @@ def test_static_version_bumped_for_email_flows():
         "本次改动改变了前端资源，STATIC_VERSION 应提升到 >= 25"
 
 
+# ── 回归 20：个人主页「我的评论」支持折叠（对齐「我的收藏」）──
+def test_profile_comments_collapsible():
+    assert "cmtCollapsed" in USER_VUE, "个人主页评论缺少折叠状态"
+    assert "toggleCmt" in USER_VUE, "个人主页评论缺少折叠切换函数"
+    assert 'v-show="!cmtCollapsed"' in USER_VUE, "评论列表未按折叠状态显隐"
+    # 折叠按钮位于「我的评论」卡片头部（与「我的收藏」同款）
+    assert re.search(r'我的评论[\s\S]{0,400}?@click="toggleCmt"', USER_VUE), \
+        "「我的评论」卡片头缺少折叠按钮"
 
+
+# ── 回归 21：手机版底部标签栏新增「彩蛋」入口 ──
+def test_mobile_egg_tab():
+    assert re.search(r'<button[^>]*class="[^"]*nav-tab[^"]*"[^>]*data-egg', BASE_HTML), \
+        "手机版底部标签栏缺少彩蛋按钮（应带 .nav-tab + data-egg）"
+    # 桌面端隐藏底部标签栏项（彩蛋按钮随之仅在手机端出现）
+    assert ".nav-tab { display: none; }" in CSS, "桌面端未隐藏底部标签栏项"
+    assert ".side-nav .nav-tab {" in CSS, "手机端缺少底部标签栏样式"
+    # JS 以 [data-egg] 统一绑定（底部彩蛋按钮复用同一逻辑）
+    assert "[data-egg]" in JS, "JS 未以 [data-egg] 绑定彩蛋入口"
+
+
+# ── 回归 22：静态版本号 ≥ 26（本次前端资源变更）──
+def test_static_version_at_least_26():
+    m = re.search(r'STATIC_VERSION = "(\d+)"', (PROJECT / "config.py").read_text(encoding="utf-8"))
+    assert m and int(m.group(1)) >= 26, "STATIC_VERSION 应提升到 >= 26"
