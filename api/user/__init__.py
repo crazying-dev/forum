@@ -1,0 +1,676 @@
+"""用户相关 API 路由（Blueprint）。
+
+接口列表：
+    POST /api/user/login      登录（写 cookie: token + ID）
+    POST /api/user/logout     登出（清 cookie）
+    POST /api/user/register   注册
+    GET  /api/user/info       获取当前登录用户信息
+    PUT  /api/user/info       更新当前用户基础资料
+    POST /api/user/password   修改密码（邮箱验证码 code + new_password；也兼容旧密码校验）
+    POST /api/user/email      更换绑定邮箱（需旧邮箱验证码 old_code + 新邮箱验证码 code）
+    GET  /api/user/<id>       公开查询某个用户资料
+"""
+from __future__ import annotations
+
+import os
+import threading
+import time
+from functools import wraps
+from typing import Callable
+
+import re  # noqa: F401 — 用于 age 格式校验与本文件其他正则
+
+from flask import Blueprint, request, jsonify, g, make_response
+
+import config
+import db
+import tool
+from api.ratelimit import rate_limit
+from api.encrypt import (
+    generate_login_token,
+    verify_login_token,
+    validate_password,
+    validate_username,
+    is_valid_email,
+)
+from Email import send_email, build_email_html
+
+user_bp = Blueprint("user", __name__)
+
+
+# ──────────────────────────────────────────────
+# 工具：获取真实客户端 IP
+# ──────────────────────────────────────────────
+def _client_ip() -> str:
+    """优先取 X-Forwarded-For，兜底 remote_addr。"""
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "0.0.0.0"
+
+
+# ──────────────────────────────────────────────
+# 工具：cookie 写入（仅 token + ID 两个）
+# ──────────────────────────────────────────────
+def _set_auth_cookies(resp, token_full: str, user_id: str):
+    """按约束写入两个 cookie：token、ID。"""
+    common = {
+        "path": config.COOKIE_PATH,
+        "httponly": config.COOKIE_HTTPONLY,
+        "secure": config.COOKIE_SECURE,
+        "samesite": config.COOKIE_SAMESITE,
+        "max_age": config.TOKEN_TTL_SECONDS,
+    }
+    if config.COOKIE_DOMAIN:
+        common["domain"] = config.COOKIE_DOMAIN
+    resp.set_cookie(config.TOKEN_COOKIE_NAME, token_full, **common)
+    resp.set_cookie(config.ID_COOKIE_NAME, user_id, **common)
+
+
+def _clear_auth_cookies(resp):
+    common = {
+        "path": config.COOKIE_PATH,
+        "httponly": config.COOKIE_HTTPONLY,
+        "secure": config.COOKIE_SECURE,
+        "samesite": config.COOKIE_SAMESITE,
+        "expires": 0,
+    }
+    if config.COOKIE_DOMAIN:
+        common["domain"] = config.COOKIE_DOMAIN
+    resp.delete_cookie(config.TOKEN_COOKIE_NAME, path=config.COOKIE_PATH, domain=config.COOKIE_DOMAIN)
+    resp.delete_cookie(config.ID_COOKIE_NAME, path=config.COOKIE_PATH, domain=config.COOKIE_DOMAIN)
+
+
+# ──────────────────────────────────────────────
+# 工具：鉴权中间件 —— 从 cookie 取 token/ID，验证挂到 g.user
+# ──────────────────────────────────────────────
+def _authenticate_from_cookies():
+    """把当前请求的用户挂到 g.user（成功）或 g.user=None（失败）。"""
+    token = request.cookies.get(config.TOKEN_COOKIE_NAME)
+    uid = request.cookies.get(config.ID_COOKIE_NAME)
+    if not token or not uid:
+        g.user = None
+        return
+    user = db.user.get_user_by_id(uid)
+    if not user or user.get("is_banned"):
+        g.user = None
+        return
+    ok = verify_login_token(
+        user_id=uid,
+        cookie_token=token,
+        password_hash=user.get("password") or "",
+        client_ip=_client_ip(),
+        ttl_seconds=config.TOKEN_TTL_SECONDS,
+    )
+    g.user = user if ok else None
+
+
+def _strip_user_public(user: dict | None) -> dict | None:
+    """去掉密码哈希，返回前端安全可见的公开字段。"""
+    if not user:
+        return None
+    return {
+        "id": user.get("id"),
+        "name": user.get("name"),
+        "avatar": user.get("avatar"),
+        "email": user.get("email"),
+        "gender": user.get("gender", 0),
+        "age": user.get("age") or "",
+        "intro": user.get("intro") or "",
+        "vip": user.get("vip") or "0",
+        "prefix": user.get("prefix") or "",
+        "title": user.get("title") or "",
+        "email_verified": user.get("email_verified", 0),
+        "created_at": user.get("created_at"),
+        "last_login": user.get("last_login"),
+    }
+
+
+def login_required(fn: Callable) -> Callable:
+    """装饰器：要求用户已登录，否则返回 401。"""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not getattr(g, "user", None):
+            return jsonify({"success": False, "message": "请先登录"}), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+# ──────────────────────────────────────────────
+# 1. 登录
+# ──────────────────────────────────────────────
+@user_bp.route("/login", methods=["POST"])
+def api_user_login():
+    """
+    Body(JSON):
+        password:  str (必填)
+        name:      str (可选，用户名或邮箱二选一)
+        email:     str (可选，用户名或邮箱二选一)
+    """
+    data = request.get_json(silent=True) or {}
+    tool.GETIP(_client_ip())
+
+    if rate_limit("login", 10, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+
+    password = data.get("password")
+    name = (data.get("name") or "").strip() or None
+    email = (data.get("email") or "").strip() or None
+
+    if not password:
+        return jsonify({"success": False, "message": "用户名或密码错误"}), 401
+    identifier = name or email
+    if not identifier:
+        return jsonify({"success": False, "message": "用户名或密码错误"}), 401
+
+    userinfo = db.user.LoginINFOTrueorFlase(identifier, password, _client_ip())
+    if not userinfo:
+        return jsonify({"success": False, "message": "用户名或密码错误"}), 401
+
+    # 生成 token（按已有算法），写 cookie：仅 token + ID
+    token_full, core, st = generate_login_token(
+        user_id=userinfo["id"],
+        password_hash=userinfo["password"],
+        client_ip=_client_ip(),
+    )
+    public_user = _strip_user_public(userinfo)
+    resp = make_response(jsonify({
+        "success": True,
+        "message": "登录成功",
+        "Token": f"token---{core}---{st}",   # 与接口原有命名/格式兼容
+        "user": public_user,
+    }))
+    _set_auth_cookies(resp, token_full, userinfo["id"])
+
+    # 登录提醒邮件（异步发送，不阻塞登录）
+    user_email = userinfo.get("email")
+    if user_email:
+        def _send_login_notice():
+            try:
+                now_str = time.strftime("%Y-%m-%d %H:%M:%S")
+                plain = (
+                    f"尊敬的 {userinfo['name']}，您好！\n\n"
+                    f"您的账号已于 {now_str} 登录妖精论坛。\n"
+                    f"如非本人操作，请立即修改密码。\n\n"
+                    f"© 2026 妖精论坛 - 粉丝公益创作"
+                )
+                html = build_email_html(
+                    label="登录提醒",
+                    title="您的账号已登录",
+                    body_lines=[
+                        f"尊敬的 <strong style=\"color:#6A8C89;\">{userinfo['name']}</strong>，您好！",
+                        f"您的账号已于 <strong>{now_str}</strong> 登录妖精论坛。",
+                        "如非本人操作，请立即修改密码。",
+                    ],
+                )
+                send_email("【妖精论坛】登录提醒", plain, receiver_list=[user_email], html_content=html)
+            except Exception:
+                pass  # 邮件发送失败不影响登录流程
+        threading.Thread(target=_send_login_notice, daemon=True).start()
+
+    return resp
+
+
+# ──────────────────────────────────────────────
+# 2. 登出
+# ──────────────────────────────────────────────
+@user_bp.route("/logout", methods=["POST"])
+def api_user_logout():
+    resp = make_response(jsonify({"success": True, "message": "已退出登录"}))
+    _clear_auth_cookies(resp)
+    return resp
+
+
+# ──────────────────────────────────────────────
+# 3. 注册
+# ──────────────────────────────────────────────
+@user_bp.route("/register", methods=["POST"])
+def api_user_register():
+    """
+    Body(JSON):
+        name:     str  2-20 字符
+        email:    str  合法邮箱
+        password: str  ≥8 位，含字母+数字
+    """
+    data = request.get_json(silent=True) or {}
+    tool.GETIP(_client_ip())
+
+    if rate_limit("register", 5, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
+
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    code = (data.get("code") or "").strip()
+
+    ok, msg = validate_username(name)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    if not is_valid_email(email):
+        return jsonify({"success": False, "message": "请输入有效的邮箱"}), 400
+    ok, msg = validate_password(password)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+
+    # 注册验证码校验（V1 迁移：注册必须凭邮箱验证码）
+    if not code or not code.isdigit() or len(code) != 6:
+        return jsonify({"success": False, "message": "请输入6位数字验证码"}), 400
+    code_info = db.verify.get_verify_code(email, code, "register")
+    if not code_info:
+        db.verify.increment_verify_code_attempts(email, "register")
+        return jsonify({"success": False, "message": "验证码无效或已过期"}), 400
+
+    result = db.user.create_user(name=name, email=email, raw_password=password)
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    # 验证码校验通过，标记已使用并清理过期记录
+    db.verify.mark_verify_code_used(email, code, "register")
+    try:
+        db.execute_query(
+            "DELETE FROM verify_codes WHERE email = %s AND purpose = %s "
+            "AND (expires_at < CURRENT_TIMESTAMP OR used = 1)",
+            (email, "register"),
+        )
+    except Exception:
+        pass
+
+    # 注册即登录：查回用户记录，生成 token 写 cookie
+    user = db.user.get_user_by_id(result["id"])
+    if user:
+        token_full, core, st = generate_login_token(
+            user_id=user["id"],
+            password_hash=user["password"],
+            client_ip=_client_ip(),
+        )
+        resp = make_response(jsonify({
+            "success": True,
+            "message": "注册成功",
+            "id": result["id"],
+            "avatar": result["avatar"],
+            "Token": f"token---{core}---{st}",
+            "user": _strip_user_public(user),
+        }), 200)
+        _set_auth_cookies(resp, token_full, user["id"])
+        return resp
+
+    return jsonify({
+        "success": True,
+        "message": "注册成功",
+        "id": result["id"],
+        "avatar": result["avatar"],
+    }), 200
+
+
+# ──────────────────────────────────────────────
+# 4. 当前用户信息（需登录）
+# ──────────────────────────────────────────────
+@user_bp.route("/info", methods=["GET"])
+@login_required
+def api_user_info():
+    user = _strip_user_public(g.user)
+    user["stats"] = _build_user_stats(g.user["id"])
+    return jsonify({"success": True, "user": user}), 200
+
+
+# ──────────────────────────────────────────────
+# 5. 更新当前用户信息（需登录）
+# ──────────────────────────────────────────────
+@user_bp.route("/info", methods=["PUT", "POST"])
+@login_required
+def api_user_update():
+    data = request.get_json(silent=True) or {}
+    # 允许更新的字段白名单
+    payload = {}
+    if "avatar" in data and isinstance(data["avatar"], str):
+        payload["avatar"] = data["avatar"].strip()
+    if "gender" in data:
+        try:
+            payload["gender"] = int(data["gender"])
+        except (ValueError, TypeError):
+            pass
+    if "age" in data and isinstance(data["age"], str):
+        age_raw = data["age"].strip()
+        if age_raw:
+            # 允许：纯数字年龄、YYYY-MM-DD / YYYY/MM/DD 日期、
+            # YYYYMMDD（V1 存量格式，也是 V1 生日选择器（年-月-日）的存库格式）
+            if not re.fullmatch(r"\d{1,3}", age_raw) and \
+               not re.fullmatch(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", age_raw) and \
+               not re.fullmatch(r"\d{8}", age_raw):
+                return jsonify({"success": False, "message": "年龄格式不正确（数字、YYYY-MM-DD 或 YYYYMMDD）"}), 400
+            payload["age"] = age_raw[:32]
+        else:
+            payload["age"] = None  # 清空年龄（兼容线上 INTEGER 列）
+    if "intro" in data and isinstance(data["intro"], str):
+        # 净化简介，防 XSS（移除危险标签/事件属性/javascript: 伪协议）
+        payload["intro"] = db.safe_html(data["intro"].strip())[:500]
+    if "name" in data and isinstance(data["name"], str):
+        name = data["name"].strip()
+        ok, msg = validate_username(name)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        payload["name"] = name
+    if "prefix" in data and isinstance(data["prefix"], str):
+        payload["prefix"] = data["prefix"].strip()[:32]
+
+    if not payload:
+        return jsonify({"success": False, "message": "没有可更新的字段"}), 400
+
+    ok, msg = db.user.update_user(g.user["id"], **payload)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    # 刷新信息返回
+    refreshed = db.user.get_user_by_id(g.user["id"])
+    return jsonify({"success": True, "message": msg, "user": _strip_user_public(refreshed)}), 200
+
+
+# ──────────────────────────────────────────────
+# 6. 修改密码（需登录，需邮箱验证码）
+#    用户确认的口径：先向绑定邮箱发送 6 位验证码，凭验证码改密（不需旧密码）。
+#    同时保留「旧密码」校验分支，便于其他调用方兼容。
+# ──────────────────────────────────────────────
+@user_bp.route("/password", methods=["POST"])
+@login_required
+def api_user_change_password():
+    """修改密码。
+
+    body 两种形式：
+      * {code, new_password}         —— 邮箱验证码校验（个人资料页默认走此路）
+      * {old_password, new_password} —— 旧密码校验（兼容保留）
+    """
+    data = request.get_json(silent=True) or {}
+    code = (data.get("code") or "").strip()
+    old_raw = data.get("old_password") or ""
+    new_raw = data.get("new_password") or ""
+
+    ok, msg = validate_password(new_raw)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+
+    if code:
+        # —— 邮箱验证码分支 ——
+        # 局部导入：api.email 又依赖本模块的 login_required，顶层互导会形成循环
+        from api.email import verify_change_password_code, consume_change_password_code
+
+        user = db.user.get_user_by_id(g.user["id"])
+        email = ((user or {}).get("email") or "").strip().lower()
+        if not email:
+            return jsonify(
+                {"success": False, "message": "当前账号未绑定邮箱，无法通过邮箱验证修改密码"}
+            ), 400
+        ok, msg = verify_change_password_code(email, code)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        ok, msg = db.user.reset_password(g.user["id"], new_raw)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+        consume_change_password_code(email, code)
+        resp = make_response(
+            jsonify({"success": True, "message": "密码修改成功，请用新密码重新登录"})
+        )
+        _clear_auth_cookies(resp)  # 改密后重登更安全
+        return resp
+
+    # —— 旧密码分支（兼容）——
+    if old_raw == new_raw:
+        return jsonify({"success": False, "message": "新密码不能与旧密码相同"}), 400
+    ok, msg = db.user.change_password(g.user["id"], old_raw, new_raw)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    # 改密后重新登录更安全：清理 cookie，要求重新登录
+    resp = make_response(jsonify({"success": True, "message": msg}))
+    _clear_auth_cookies(resp)
+    return resp
+
+
+# ──────────────────────────────────────────────
+# 7. 更换绑定邮箱（需登录，两步验证）
+#    第1步：/api/email/send-change-email-old-code 发码到「当前邮箱」，验证身份；
+#    第2步：/api/email/send-change-email-code     发码到「新邮箱」，验证可达；
+#    本接口同时校验两枚验证码，通过后调用 db.user.change_email 完成换绑。
+# ──────────────────────────────────────────────
+@user_bp.route("/email", methods=["POST"])
+@login_required
+def api_user_change_email():
+    """更换绑定邮箱（两步验证）。
+
+    Body(JSON):
+        old_code: str 旧邮箱验证码（已发往当前绑定邮箱）
+        email:    str 新邮箱
+        code:     str 新邮箱验证码（已发往新邮箱）
+    """
+    if rate_limit("change_email", 5, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请稍后再试"}), 429
+
+    data = request.get_json(silent=True) or {}
+    new_email = (data.get("email") or "").strip().lower()
+    new_code = (data.get("code") or "").strip()
+    old_code = (data.get("old_code") or "").strip()
+
+    if not is_valid_email(new_email):
+        return jsonify({"success": False, "message": "请输入有效的邮箱"}), 400
+
+    user = db.user.get_user_by_id(g.user["id"])
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    cur_email = (user.get("email") or "").strip().lower()
+    if not is_valid_email(cur_email):
+        return jsonify(
+            {"success": False, "message": "当前账号未绑定有效邮箱，无法通过邮箱验证更换邮箱"}
+        ), 400
+    if new_email == cur_email:
+        return jsonify({"success": False, "message": "新邮箱与当前邮箱相同"}), 400
+    if db.user.get_user_by_email(new_email):
+        return jsonify({"success": False, "message": "该邮箱已被其他账号绑定"}), 400
+
+    # 局部导入：api.email 又依赖本模块的 login_required，顶层互导会形成循环
+    from api.email import (
+        verify_change_email_old_code,
+        consume_change_email_old_code,
+        verify_change_email_code,
+        consume_change_email_code,
+    )
+
+    # 第1步：验证旧邮箱身份
+    ok, msg = verify_change_email_old_code(cur_email, old_code)
+    if not ok:
+        return jsonify({"success": False, "message": "当前邮箱验证码错误：" + msg}), 400
+    # 第2步：验证新邮箱可达
+    ok, msg = verify_change_email_code(new_email, new_code)
+    if not ok:
+        return jsonify({"success": False, "message": "新邮箱验证码错误：" + msg}), 400
+
+    ok, msg = db.user.change_email(g.user["id"], new_email)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    consume_change_email_old_code(cur_email, old_code)
+    consume_change_email_code(new_email, new_code)
+
+    refreshed = db.user.get_user_by_id(g.user["id"])
+    return jsonify({
+        "success": True,
+        "message": "邮箱已更换",
+        "user": _strip_user_public(refreshed),
+    }), 200
+
+
+# ──────────────────────────────────────────────
+# 8. 按 ID 查询任意用户公开资料（无需登录）
+# ──────────────────────────────────────────────
+@user_bp.route("/<user_id>", methods=["GET"])
+def api_user_public(user_id: str):
+    user = db.user.get_user_by_id(user_id.strip())
+    if not user or user.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    public = _strip_user_public(user)
+    public.pop("email", None)  # 公开资料隐藏 email
+    public["stats"] = _build_user_stats(user["id"])
+    viewer = getattr(g, "user", None)
+    viewer_id = viewer.get("id") if viewer else None
+    public["is_following"] = bool(viewer_id) and db.follow.is_following(viewer_id, user["id"])
+    public["is_self"] = viewer_id == user["id"]
+    return jsonify({"success": True, "user": public}), 200
+
+
+# ══════════════════════════════════════════════════════════════
+# 以下为 forum-new 全量 API 追加：头像上传 / 用户社交 / 统计
+# ══════════════════════════════════════════════════════════════
+
+import io as _io
+
+
+def _build_user_stats(user_id):
+    """合并帖子统计 + 关注统计。"""
+    stats = db.post.get_user_stats(user_id)
+    follow_stats = db.follow.get_follow_stats(user_id)
+    return {**stats, **follow_stats}
+
+
+# ── 8. 上传头像（保存本地 /root/db/avatar，经 /avatar/<file> 访问；与 v1 一致）──
+@user_bp.route("/avatar/upload", methods=["POST"])
+@login_required
+def api_user_avatar_upload():
+    file = request.files.get("avatar")
+    if not file or not file.filename:
+        return jsonify({"success": False, "message": "请选择图片"}), 400
+    raw = file.read()
+    if len(raw) > config.AVATAR_MAX_BYTES:
+        return jsonify({"success": False, "message": "图片过大（最大5MB）"}), 400
+
+    # 裁剪压缩为 400×400 WebP（质量85）
+    try:
+        from PIL import Image
+        img = Image.open(_io.BytesIO(raw))
+        img = img.convert("RGBA")
+        bg = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        bg.paste(img, mask=img.split()[3] if img.mode == "RGBA" else None)
+        img.close()
+        img = bg.convert("RGB")
+        bg.close()
+        img = img.resize((400, 400), Image.LANCZOS)
+        buf = _io.BytesIO()
+        img.save(buf, format="WEBP", quality=85)
+        webp_data = buf.getvalue()
+        img.close()
+        buf.close()
+    except Exception:
+        return jsonify({"success": False, "message": "图片处理失败，请上传有效图片"}), 400
+
+    # 保存到本地头像目录（/avatar/<file> 静态路由指向此处）
+    import uuid as _uuid
+    avatar_dir = config.AVATAR_UPLOAD_DIR
+    try:
+        os.makedirs(avatar_dir, exist_ok=True)
+        avatar_id = str(_uuid.uuid4())
+        avatar_path = os.path.join(avatar_dir, f"{avatar_id}.webp")
+        with open(avatar_path, "wb") as f:
+            f.write(webp_data)
+    except Exception as e:
+        return jsonify({"success": False, "message": f"头像保存失败: {e}"}), 500
+
+    avatar_url = f"/avatar/{avatar_id}.webp"
+    ok, msg = db.user.update_user(g.user["id"], avatar=avatar_url)
+    if not ok:
+        return jsonify({"success": False, "message": msg}), 400
+    return jsonify({"success": True, "avatar": avatar_url})
+
+
+# ── 9. 关注 / 取消关注（需登录）──
+@user_bp.route("/<user_id>/follow", methods=["POST"])
+@login_required
+def api_user_follow(user_id):
+    target = db.user.get_user_by_id(user_id.strip())
+    if not target or target.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    result = db.follow.toggle_follow(g.user["id"], target["id"])
+    if not result.get("success"):
+        return jsonify(result), 400
+    return jsonify(result)
+
+
+# ── 10. 关注列表 / 粉丝列表（公开，登录者视角标注 is_following/is_self）──
+def _annotate_user_list(users):
+    viewer = getattr(g, "user", None)
+    viewer_id = viewer.get("id") if viewer else None
+    for u in users:
+        u["is_following"] = bool(viewer_id) and db.follow.is_following(viewer_id, u["id"])
+        u["is_self"] = viewer_id == u["id"]
+    return users
+
+
+@user_bp.route("/<user_id>/posts", methods=["GET"])
+def api_user_posts(user_id):
+    """获取指定用户的帖子列表（公开）。"""
+    user = db.user.get_user_by_id(user_id.strip())
+    if not user or user.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 20, type=int), 1), 100)
+    posts = db.post.get_user_posts(user["id"], page, page_size)
+    return jsonify({"success": True, "posts": posts, "page": page, "page_size": page_size})
+
+
+@user_bp.route("/<user_id>/favorites", methods=["GET"])
+def api_user_favorites(user_id):
+    """获取指定用户收藏的帖子列表（仅本人可查）。"""
+    user = db.user.get_user_by_id(user_id.strip())
+    if not user or user.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    viewer = getattr(g, "user", None)
+    if not viewer or viewer.get("id") != user["id"]:
+        return jsonify({"success": False, "message": "无权查看他人收藏"}), 403
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 20, type=int), 1), 100)
+    posts = db.post.get_user_favorites(user["id"], page, page_size)
+    return jsonify({"success": True, "posts": posts, "page": page, "page_size": page_size})
+
+
+@user_bp.route("/<user_id>/following", methods=["GET"])
+def api_user_following(user_id):
+    user = db.user.get_user_by_id(user_id.strip())
+    if not user or user.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 20, type=int), 1), 100)
+    users = db.follow.get_following_list(user["id"], page, page_size)
+    return jsonify({
+        "success": True,
+        "users": _annotate_user_list(users),
+        "page": page,
+        "page_size": page_size,
+    })
+
+
+@user_bp.route("/<user_id>/followers", methods=["GET"])
+def api_user_followers(user_id):
+    user = db.user.get_user_by_id(user_id.strip())
+    if not user or user.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 20, type=int), 1), 100)
+    users = db.follow.get_follower_list(user["id"], page, page_size)
+    return jsonify({
+        "success": True,
+        "users": _annotate_user_list(users),
+        "page": page,
+        "page_size": page_size,
+    })
+
+
+# ── 11. 指定用户的评论列表（公开）──
+@user_bp.route("/<user_id>/comments", methods=["GET"])
+def api_user_comments(user_id):
+    """获取指定用户的所有评论（附带 post_id/post_title 用于跳转锚点）。"""
+    user = db.user.get_user_by_id(user_id.strip())
+    if not user or user.get("is_banned"):
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 20, type=int), 1), 100)
+    comments, total = db.comment.get_user_comments(user["id"], page, page_size)
+    return jsonify({
+        "success": True,
+        "comments": comments,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })

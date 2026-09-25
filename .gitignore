@@ -185,6 +185,10 @@ cython_debug/
 
 .test/
 
+# 前端 Vite/Vue3
+frontend/node_modules/
+frontend/dist/
+
 \...*
 data/
 *测试*.*

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}第三方授权登录 - 妖精论坛{% endblock %}
+{% block body_attrs %} data-vue-page="oauth"{% endblock %}
+{% block content %}
+<div id="app" data-port="{{ port | tojson }}"></div>
+<script type="module" src="/static/vue/oauth.js?v={{ static_version }}"></script>
+{% endblock %}

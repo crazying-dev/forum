@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}发布帖子 - 妖精论坛{% endblock %}
+{% block body_attrs %} data-vue-page="post_create"{% endblock %}
+{% block content %}
+<div id="app"></div>
+<script type="module" src="/static/vue/post_create.js?v={{ static_version }}"></script>
+{% endblock %}
