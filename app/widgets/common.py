@@ -172,22 +172,37 @@ class LoadingHint(QLabel):
 
 
 def button(text: str, variant: str | None = None, on_click=None,
-           parent: QWidget | None = None, *, tooltip: str = "") -> QPushButton:
-    """主题化按钮；variant ∈ {None, 'primary', 'ghost', 'danger', 'chip'}。"""
+           parent: QWidget | None = None, *, tooltip: str = "",
+           icon: str = "", icon_size: int = 16, icon_color: str = "") -> QPushButton:
+    """主题化按钮；variant ∈ {None, 'primary', 'ghost', 'danger', 'chip'}。
+
+    ``icon`` 为内置 SVG 图标名（见 :mod:`app.icons`，与网页端同形）；
+    ``icon_color`` 缺省时按 variant 取主题色（primary 用 primary_text，
+    其余用 text_secondary），保证与按钮前景色一致。
+    """
     btn = QPushButton(text, parent)
     if variant:
         btn.setProperty("variant", variant)
     btn.setCursor(Qt.CursorShape.PointingHandCursor)
     if tooltip:
         btn.setToolTip(tooltip)
+    if icon:
+        from .. import icons
+        color = str(icon_color or "")
+        if not color:
+            palette = theme.palette()
+            color = palette["primary_text" if variant == "primary" else "text_secondary"]
+        btn.setIcon(icons.icon(icon, icon_size, color))
+        btn.setIconSize(QSize(icon_size, icon_size))
     if on_click is not None:
         btn.clicked.connect(on_click)
     return btn
 
 
 def ghost_button(text: str, on_click=None, parent: QWidget | None = None,
-                 *, tooltip: str = "") -> QPushButton:
-    return button(text, "ghost", on_click, parent, tooltip=tooltip)
+                 *, tooltip: str = "", icon: str = "", icon_size: int = 16) -> QPushButton:
+    return button(text, "ghost", on_click, parent, tooltip=tooltip,
+                  icon=icon, icon_size=icon_size)
 
 
 def set_variant(widget: QWidget, variant: str | None) -> None:

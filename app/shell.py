@@ -14,13 +14,14 @@ from __future__ import annotations
 import importlib
 from urllib.parse import parse_qs, unquote, urlparse
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import (QFrame, QLabel, QLineEdit, QMainWindow, QSizePolicy,
                              QSplitter, QStackedWidget, QStatusBar, QVBoxLayout,
                              QWidget)
 
 from . import api as api_mod
-from . import config, constants, logger, theme, util
+from . import config, constants, icons, logger, theme, util
 from .widgets import Chip, UserLink, button, hbox, vbox
 from .widgets.images import Avatar
 from .widgets.toast import ToastManager, toast
@@ -28,16 +29,20 @@ from .widgets.world_panel import WorldPanel
 
 _log = logger.get_logger("shell")
 
+# 导航项：(路由, 图标名, 文字)。图标名对应 resources/icons/<name>.svg，
+# 由网页端同款 font-awesome@4.7.0 字形轮廓导出，两侧图形完全一致。
+# 「下载」入口已从 APP 端移除（客户端本身就是下载产物，官网 /Download 已覆盖）。
 NAV_ITEMS = (
-    ("home", "🏠", "首页"),
-    ("forum", "💬", "论坛"),
-    ("me", "👤", "我的"),
-    ("world", "🌍", "世界"),
-    ("wiki", "📖", "WIKI"),
-    ("download", "⬇️", "下载"),
-    ("easter_egg", "🎁", "彩蛋"),
-    ("settings", "⚙️", "设置"),
+    ("home", "home", "首页"),
+    ("forum", "list", "论坛"),
+    ("me", "user", "我的"),
+    ("world", "globe", "世界"),
+    ("wiki", "book", "WIKI"),
+    ("easter_egg", "gift", "彩蛋"),
+    ("settings", "cog", "设置"),
 )
+
+NAV_ICON_NAMES = {route: icon for route, icon, _label in NAV_ITEMS}
 
 PAGE_MODULES = {
     "home": ("app.pages.home", "HomePage"),
@@ -59,13 +64,77 @@ PAGE_MODULES = {
 
 NAV_WIDTH_COLLAPSED = 54
 NAV_WIDTH_EXPANDED = 168
+NAV_ICON_SIZE = 18    # 导航图标像素尺寸
+NAV_ICON_BOX = 22     # 图标占位方框（保证折叠/展开时图标对齐）
+NAV_ROW_HEIGHT = 38
+
+
+class _NavRow(QWidget):
+    """左侧导航的一行：**整行**都可点击（不再只有图标可点）。
+
+    自带悬停 / 选中态，并向外广播 ``state_changed`` 供图标重新着色。
+    """
+
+    clicked = pyqtSignal()
+    state_changed = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("NavRow")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(NAV_ROW_HEIGHT)
+        self._active = False
+        self._hover = False
+
+    def is_active(self) -> bool:
+        return self._active
+
+    def is_hovered(self) -> bool:
+        return self._hover
+
+    def set_active(self, active: bool) -> None:
+        active = bool(active)
+        if active == self._active:
+            return
+        self._active = active
+        self._sync()
+
+    def _sync(self) -> None:
+        self.setProperty("hover", "true" if self._hover else "false")
+        self.setProperty("active", "true" if self._active else "false")
+        theme.restyle(self)
+        self.state_changed.emit()
+
+    # ── 交互：整行响应鼠标 ──
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton and \
+                self.rect().contains(event.position().toPoint()):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        self._hover = True
+        self._sync()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hover = False
+        self._sync()
+        super().leaveEvent(event)
 
 
 class SideNav(QFrame):
-    """左侧导航（默认仅图标，鼠标悬浮展开）。"""
+    """左侧导航。
+
+    * 折叠态仅图标、展开态图标 + 文字；**整行**都可点击
+    * 不再「悬停立即展开」：悬停 ``HOVER_EXPAND_MS`` 毫秒才展开，
+      或直接点击展开按钮（点击后固定展开，鼠标离开不再自动收起）
+    """
 
     navigate = pyqtSignal(str)
     expand_changed = pyqtSignal(bool)
+    HOVER_EXPAND_MS = 2000
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -73,20 +142,33 @@ class SideNav(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setFixedWidth(NAV_WIDTH_COLLAPSED)
         self._expanded = False
-        self._buttons: dict[str, QWidget] = {}
-        self._labels: list[QLabel] = []
+        self._pinned = False          # 点击展开按钮后固定展开，鼠标离开不自动收起
+        self._rows: dict[str, _NavRow] = {}
+        self._texts: list[QLabel] = []
+        self._icon_rows: list[tuple[QLabel, _NavRow]] = []
+
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setSingleShot(True)
+        self._hover_timer.setInterval(self.HOVER_EXPAND_MS)
+        self._hover_timer.timeout.connect(self._on_hover_timeout)
 
         root = vbox(self, margins=(6, 8, 6, 8), spacing=4)
-        self._toggle = button("»", "ghost", self.toggle, tooltip="展开 / 收起导航")
-        root.addWidget(self._toggle)
+        self._toggle_row, self._toggle_icon = self._make_row(
+            "angle-right", "收起", self.toggle)
+        self._toggle_row.setToolTip("展开 / 收起导航")
+        root.addWidget(self._toggle_row)
         root.addSpacing(4)
 
-        for route, icon, label in NAV_ITEMS:
-            root.addWidget(self._make_item(route, icon, label))
+        for route, icon_name, label in NAV_ITEMS:
+            row, _icon = self._make_row(
+                icon_name, label, lambda r=route: self.navigate.emit(r))
+            self._rows[route] = row
+            root.addWidget(row)
         root.addStretch(1)
+
         self._extra_row = hbox(spacing=4)
-        self._bug_btn = button("🐞", "ghost", lambda: self.navigate.emit("__bug__"),
-                               tooltip="反馈 Bug")
+        self._bug_btn = button("", "ghost", lambda: self.navigate.emit("__bug__"),
+                               tooltip="反馈 Bug", icon="bug", icon_size=NAV_ICON_SIZE)
         self._extra_row.addWidget(self._bug_btn)
         self._about_label = QLabel("v%s" % constants.APP_VERSION)
         self._about_label.setProperty("muted", "true")
@@ -94,29 +176,73 @@ class SideNav(QFrame):
         self._extra_row.addWidget(self._about_label)
         self._extra_row.addStretch(1)
         root.addLayout(self._extra_row)
+        self.reload_theme()
 
-    def _make_item(self, route: str, icon: str, label: str) -> QWidget:
-        holder = QWidget(self)
-        layout = hbox(holder, margins=(0, 0, 0, 0), spacing=8)
-        # 注意：``QPushButton.clicked(bool)`` 会把 checked 当作第一个参数传进来，
-        # 所以槽函数必须留一个占位形参，否则 route 会被替换成 bool 而崩溃。
-        btn = button("%s" % icon, None,
-                     lambda _checked=False, r=route: self.navigate.emit(r))
-        btn.setObjectName("NavButton")
-        btn.setProperty("route", route)
-        btn.setFixedWidth(NAV_WIDTH_COLLAPSED - 12)
-        layout.addWidget(btn)
-        text = QLabel(label)
+    # ── 构建 ──
+    def _make_row(self, icon_name: str, label: str, on_click) -> tuple[_NavRow, QLabel]:
+        row = _NavRow(self)
+        row.clicked.connect(on_click)
+        layout = hbox(row, margins=(12, 0, 10, 0), spacing=10)
+        icon = QLabel(row)
+        icon.setObjectName("NavIcon")
+        icon.setFixedSize(NAV_ICON_BOX, NAV_ICON_BOX)
+        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon.setProperty("icon", icon_name)
+        layout.addWidget(icon)
+        text = QLabel(label, row)
+        text.setObjectName("NavText")
         text.hide()
         layout.addWidget(text)
         layout.addStretch(1)
-        self._labels.append(text)
-        self._buttons[route] = btn
-        return holder
+        self._texts.append(text)
+        self._icon_rows.append((icon, row))
+        row.state_changed.connect(lambda ic=icon, r=row: self._paint_icon(ic, r))
+        return row, icon
+
+    # ── 图标着色 ──
+    def _paint_icon(self, label: QLabel, row: _NavRow) -> None:
+        name = str(label.property("icon") or "")
+        if not name:
+            return
+        palette = theme.palette()
+        if row.is_active():
+            color = palette["primary"]
+        elif row.is_hovered():
+            color = palette["text_primary"]
+        else:
+            color = palette["text_secondary"]
+        label.setPixmap(icons.pixmap(name, NAV_ICON_SIZE, color))
+
+    def reload_theme(self) -> None:
+        """主题切换后按状态重绘所有图标。"""
+        for icon, row in self._icon_rows:
+            self._paint_icon(icon, row)
+        palette = theme.palette()
+        self._bug_btn.setIcon(icons.icon("bug", NAV_ICON_SIZE, palette["text_secondary"]))
+        self._bug_btn.setIconSize(QSize(NAV_ICON_SIZE, NAV_ICON_SIZE))
 
     # ── 展开 / 收起 ──
     def is_expanded(self) -> bool:
         return self._expanded
+
+    def _on_hover_timeout(self) -> None:
+        if not self._pinned:
+            self.set_expanded(True)
+
+    def enterEvent(self, event) -> None:  # noqa: N802
+        if not self._expanded:
+            self._hover_timer.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        self._hover_timer.stop()
+        # 光标移到子控件上时 Qt 也会给父控件发 LeaveEvent：仍在栏内就别收起
+        if self.rect().contains(self.mapFromGlobal(QCursor.pos())):
+            super().leaveEvent(event)
+            return
+        if not self._pinned and self._expanded:
+            self.set_expanded(False)
+        super().leaveEvent(event)
 
     def set_expanded(self, expanded: bool) -> None:
         expanded = bool(expanded)
@@ -124,30 +250,27 @@ class SideNav(QFrame):
             return
         self._expanded = expanded
         self.setFixedWidth(NAV_WIDTH_EXPANDED if expanded else NAV_WIDTH_COLLAPSED)
-        for text in self._labels:
+        for text in self._texts:
             text.setVisible(expanded)
-        self._toggle.setText("«" if expanded else "»")
+        self._toggle_icon.setProperty("icon", "angle-left" if expanded else "angle-right")
+        self._paint_icon(self._toggle_icon, self._toggle_row)
         self._about_label.setVisible(expanded)
         self.expand_changed.emit(expanded)
 
     def toggle(self) -> None:
-        self.set_expanded(not self._expanded)
-
-    def enterEvent(self, event) -> None:  # noqa: N802
-        self.set_expanded(True)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event) -> None:  # noqa: N802
-        self.set_expanded(False)
-        super().leaveEvent(event)
+        """展开按钮：点击后固定展开，再点收起。"""
+        self._hover_timer.stop()
+        if self._pinned:
+            self._pinned = False
+            self.set_expanded(False)
+        else:
+            self._pinned = True
+            self.set_expanded(True)
 
     # ── 高亮 ──
     def set_active(self, route: str) -> None:
-        for key, btn in self._buttons.items():
-            active = "true" if key == route else "false"
-            if btn.property("active") != active:
-                btn.setProperty("active", active)
-                theme.restyle(btn)
+        for key, row in self._rows.items():
+            row.set_active(key == route)
 
 
 class Shell(QMainWindow):
@@ -222,7 +345,8 @@ class Shell(QMainWindow):
         bar.setFixedHeight(58)
         layout = hbox(bar, margins=(12, 8, 12, 8), spacing=10)
 
-        self.back_btn = button("‹", "ghost", self.go_back, tooltip="后退")
+        self.back_btn = button("", "ghost", self.go_back, tooltip="后退",
+                               icon="angle-left", icon_size=16)
         self.back_btn.hide()
         layout.addWidget(self.back_btn)
 
@@ -250,10 +374,13 @@ class Shell(QMainWindow):
         self.search_input.setFixedWidth(260)
         self.search_input.returnPressed.connect(self._do_search)
         layout.addWidget(self.search_input)
-        self.search_btn = button("🔍", "ghost", self._do_search, tooltip="搜索")
+        self.search_btn = button("", "ghost", self._do_search, tooltip="搜索",
+                                 icon="search", icon_size=16)
         layout.addWidget(self.search_btn)
 
-        self.create_btn = button("✏ 发帖", "primary", lambda: self.navigate("post_create"))
+        self.create_btn = button("发帖", "primary",
+                                 lambda: self.navigate("post_create"),
+                                 icon="pencil", icon_size=15)
         layout.addWidget(self.create_btn)
 
         self.user_area = QWidget(bar)
@@ -269,9 +396,10 @@ class Shell(QMainWindow):
                 widget.setParent(None)
                 widget.deleteLater()
         self._top_nav_buttons: dict[str, QWidget] = {}
-        for route, icon, label in NAV_ITEMS:
-            btn = button("%s %s" % (icon, label), "ghost",
-                         lambda _checked=False, r=route: self._on_nav(r))
+        for route, icon_name, label in NAV_ITEMS:
+            btn = button(label, "ghost",
+                         lambda _checked=False, r=route: self._on_nav(r),
+                         icon=icon_name, icon_size=15)
             self._top_nav_buttons[route] = btn
             self.top_nav.addWidget(btn)
 
@@ -327,9 +455,11 @@ class Shell(QMainWindow):
         self._update_top_routes()
 
     def _update_top_routes(self) -> None:
+        # 顶部导航按钮只在「顶部模式」下显示，否则会与左侧栏同时出现（默认 BUG）。
+        top = self._nav_mode() == "top"
         for route, btn in getattr(self, "_top_nav_buttons", {}).items():
             need_login = route == "me"
-            btn.setVisible(not need_login or bool(api_mod.api().user))
+            btn.setVisible(top and (not need_login or bool(api_mod.api().user)))
 
     # ────────────────────── 导航 ──────────────────────
     def _on_nav(self, route: str) -> None:
@@ -554,14 +684,15 @@ class Shell(QMainWindow):
         self.status_label.setText(str(text or ""))
 
     # ────────────────────── 导航模式 ──────────────────────
+    def _nav_mode(self) -> str:
+        return str(self.config.get("nav_mode", "side") or "side")
+
     def _apply_nav_mode(self) -> None:
-        mode = str(self.config.get("nav_mode", "side") or "side")
-        top = mode == "top"
+        top = self._nav_mode() == "top"
         if not getattr(self, "_top_nav_buttons", None):
             self._build_top_nav()
         self.side_nav.setVisible(not top)
-        for btn in self._top_nav_buttons.values():
-            btn.setVisible(top)
+        self._update_top_routes()
 
     # ────────────────────── 配置变化 ──────────────────────
     def on_config_changed(self, key: str) -> None:
@@ -576,6 +707,7 @@ class Shell(QMainWindow):
         from PyQt6.QtWidgets import QApplication
         effective = theme.apply(QApplication.instance(), self.config.theme)
         self.theme_changed.emit(effective)
+        self._reload_icons()
         for page in self._pages.values():
             reloader = getattr(page, "reload_theme", None)
             if callable(reloader):
@@ -583,6 +715,31 @@ class Shell(QMainWindow):
                     reloader()
                 except Exception:
                     pass
+
+    def _reload_icons(self) -> None:
+        """按新主题重绘外壳自带的 SVG 图标（侧栏导航 / 顶栏按钮）。"""
+        nav = getattr(self, "side_nav", None)
+        reloader = getattr(nav, "reload_theme", None)
+        if callable(reloader):
+            try:
+                reloader()
+            except Exception:
+                pass
+        palette = theme.palette()
+        specs = (
+            ("back_btn", "angle-left", 16, "text_secondary"),
+            ("search_btn", "search", 16, "text_secondary"),
+            ("create_btn", "pencil", 15, "primary_text"),
+        )
+        for attr, name, size, color_key in specs:
+            btn = getattr(self, attr, None)
+            if btn is None:
+                continue
+            try:
+                btn.setIcon(icons.icon(name, size, palette[color_key]))
+                btn.setIconSize(QSize(size, size))
+            except Exception:
+                pass
 
     # ────────────────────── 登录失效 ──────────────────────
     def _on_unauthorized(self) -> None:

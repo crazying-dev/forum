@@ -346,8 +346,10 @@ def test_download_page_contract():
 
 def test_shell_registers_download_route():
     from app import pages, shell
-    routes = [item[0] for item in shell.NAV_ITEMS]
-    assert "download" in routes
+    # 「下载」已从 APP 导航栏移除（客户端本身就是下载产物），
+    # 但路由/页面必须保留：/Download 深链与托盘「打开下载页」仍然依赖它。
+    nav_routes = [item[0] for item in shell.NAV_ITEMS]
+    assert "download" not in nav_routes
     assert shell.PAGE_MODULES["download"] == ("app.pages.download", "DownloadPage")
     assert "download" in pages.__all__
 

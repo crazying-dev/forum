@@ -2,8 +2,8 @@
 # PyInstaller 版本资源（仅备用后端使用；Nuitka 通过命令行参数写入）
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 2, 4, 0),
+    prodvers=(1, 2, 4, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -16,12 +16,12 @@ VSVersionInfo(
       StringTable('080404b0', [
         StringStruct('CompanyName', 'CrForum'),
         StringStruct('FileDescription', '妖精论坛 Windows 客户端'),
-        StringStruct('FileVersion', '1.0.0.0'),
+        StringStruct('FileVersion', '1.2.4.0'),
         StringStruct('InternalName', 'forum'),
         StringStruct('LegalCopyright', '© 2026 妖精论坛 - 粉丝公益创作'),
         StringStruct('OriginalFilename', 'forum.exe'),
         StringStruct('ProductName', '妖精论坛客户端'),
-        StringStruct('ProductVersion', '1.0.0.0'),
+        StringStruct('ProductVersion', '1.2.4.0'),
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [2052, 1200])])

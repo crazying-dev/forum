@@ -168,21 +168,25 @@ QToolTip {{
     background: {bg_header};
     border-right: 1px solid {border};
 }}
-#NavButton {{
+#NavRow {{
     background: transparent;
-    border: none;
     border-radius: {radius}px;
+}}
+/* 整行可点：悬停 / 选中整行高亮（不再只有图标可点） */
+#NavRow[hover="true"] {{
+    background: {bg_item_hover};
+}}
+#NavRow[active="true"] {{
+    background: {bg_item_active};
+}}
+#NavRow QLabel#NavText {{
     color: {text_secondary};
-    text-align: left;
-    padding: 9px 10px;
     font-size: 13px;
 }}
-#NavButton:hover {{
-    background: {bg_item_hover};
+#NavRow[hover="true"] QLabel#NavText {{
     color: {text_primary};
 }}
-#NavButton[active="true"] {{
-    background: {bg_item_active};
+#NavRow[active="true"] QLabel#NavText {{
     color: {primary};
     font-weight: 700;
 }}
