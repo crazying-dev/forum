@@ -32,7 +32,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-26T21:45:00+08:00",
+    "updated_at": "2026-09-26T23:30:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -42,17 +42,18 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.3.1",
+                    "version": "1.3.2",
                     "channel": "stable",
                     "date": "2026-09-26",
-                    "size": 48521375,
-                    "url": "https://www.yjlt.top/api/app/windows/forum.exe",
-                    "sha256": "d16ca3eb346e0283b3acfe647238b8568660bbd75d79bc3fb768b41df006b2eb",
+                    "size": 48587343,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.2/forum_setup.exe",
+                    "filename": "forum_setup.exe",
+                    "sha256": "d9e21f20a21d1bdd2e59c5b47496a3e751922ddfdafd70c910e26111fc9067f",
                     "notes": [
-                        "移除「称号前缀」功能（V1.3.1）",
-                        "个人资料不再展示 / 编辑称号前缀，相关标签全部下线",
-                        "用户搜索改为仅按昵称匹配",
-                        "接口与网页端同步调整，网页端静态资源已重建",
+                        "世界频道的头像与昵称现在可以点击，直达该用户主页",
+                        "修复查看他人主页时顶部资料卡显示「匿名用户」的问题",
+                        "更新包按版本号分目录存放（~/.Cr/forum/update/<版本>/），不再相互覆盖",
+                        "更新改为静默安装（显示进度条、不走向导），装完自动重启；可选「退出时自动安装」",
                     ],
                     "mandatory": False,
                 }
