@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-09-26T20:40:00+08:00",
+  "updated_at": "2026-09-26T21:45:00+08:00",
   "platforms": [
     {
       "key": "windows",
@@ -10,17 +10,17 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.0",
+          "version": "1.3.1",
           "channel": "stable",
           "date": "2026-09-26",
-          "size": 48521108,
+          "size": 48521375,
           "url": "https://www.yjlt.top/api/app/windows/forum.exe",
-          "sha256": "7ff129096a344950154f798a5676dc3a5767e619b460cf4054535f78a71acb19",
+          "sha256": "d16ca3eb346e0283b3acfe647238b8568660bbd75d79bc3fb768b41df006b2eb",
           "notes": [
-            "修复个人主页帖子显示「匿名用户」+ 默认头像的问题（V1.3.0）",
-            "服务端 /api/user/<id>/posts 补全作者字段（user_id / user_name / user_avatar）",
-            "客户端个人主页帖子卡片对历史接口做作者信息兜底",
-            "主程序与安装包均写入 1.3.0 版本信息，文件属性可直接查看"
+            "移除「称号前缀」功能（V1.3.1）",
+            "个人资料不再展示 / 编辑称号前缀，相关标签全部下线",
+            "用户搜索改为仅按昵称匹配",
+            "接口与网页端同步调整，网页端静态资源已重建"
           ],
           "mandatory": false
         }
