@@ -222,6 +222,18 @@ header{
     transition: color 0.5s ease;
 }
 
+/* 品牌角标：ov2 上标小字（弱化色、随各断点字号等比缩放） */
+#header h1 .header-brand-badge {
+    font-size: 0.45em;
+    font-weight: 400;
+    letter-spacing: 0;
+    vertical-align: super;
+    margin-left: 2px;
+    color: inherit;
+    opacity: 0.55;
+    white-space: nowrap;
+}
+
 #header .header-center {
     flex: 1;
     display: flex;

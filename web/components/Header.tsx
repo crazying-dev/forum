@@ -140,7 +140,10 @@ export default function Header() {
           </button>
           <Link className="header-left-link" href="/">
             <img src="/assets/img/favicon.png" alt="logo" id="logo" style={{ borderRadius: "50%" }} />
-            <h1>妖精论坛重构预览版ov2</h1>
+            <h1>
+              妖精论坛
+              <span className="header-brand-badge" aria-hidden="true" title="重构预览版 ov2">ov2</span>
+            </h1>
           </Link>
         </div>
         <div className="header-center">
