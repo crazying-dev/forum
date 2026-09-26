@@ -7865,15 +7865,16 @@ input {
     overflow: visible !important;
 }
 
-/* 用户身份 chip：会馆名（主题色实底 + 对比字）/ 馆长（低饱和墨绿实底 + 白字） */
+/* 用户身份 chip：会馆名（主题色实底 + 对比字）/ 馆长（低饱和墨绿实底 + 白字）
+   规格与通用标签（.space-badge / 分类徽章）对齐：18px 高全圆胶囊（12px 字 + 3px 上下内距） */
 .user-guild-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 9px;
+    padding: 3px 10px;
     border-radius: 10px;
     font-size: 12px;
-    line-height: 1.7;
+    line-height: 12px;
     white-space: nowrap;
     vertical-align: middle;
 }
