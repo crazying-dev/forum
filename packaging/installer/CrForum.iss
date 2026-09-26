@@ -2,15 +2,17 @@
 ; Inno Setup script for the Forum Windows client (optional path).
 ; build.ps1 uses this automatically when ISCC.exe is installed.
 ; Compile manually:
-;   ISCC.exe /DMyAppVersion=1.2.5 /DStageDir=..\output\installer_stage CrForum.iss
+;   ISCC.exe /DMyAppVersion=1.3.0 /DStageDir=..\output\installer_stage CrForum.iss
 ; ============================================================
 
 #define MyAppName "Forum Client"
 #define MyAppExeName "forum.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.5"
+  #define MyAppVersion "1.3.0"
 #endif
+; 安装包自身的文件信息（四段式版本号，便于在文件属性里看到版本）
+#define MyAppVersion4 MyAppVersion + ".0"
 #ifndef StageDir
   #define StageDir "..\output\installer_stage"
 #endif
@@ -32,6 +34,12 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 AllowNoIcons=yes
+VersionInfoVersion={#MyAppVersion4}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoProductName={#MyAppName}
+VersionInfoCompany=CrForum
+VersionInfoDescription=Forum Client Setup
+VersionInfoTextVersion={#MyAppVersion4}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
