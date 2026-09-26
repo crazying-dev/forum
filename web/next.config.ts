@@ -4,7 +4,16 @@ const API_TARGET = process.env.API_TARGET || "http://127.0.0.1:8090";
 // 会馆 logo 等图片资源由管理端提供（/guild-img/* → {ADMIN_TARGET}/api/*）
 const ADMIN_TARGET = process.env.ADMIN_TARGET || "http://127.0.0.1:8080";
 
+// HTML-limited bots：命中名单的 UA 会等待元数据解析完成后再发包（阻塞式渲染），
+// 确保 title/og:* 标签稳定出现在 <head>。默认的流式元数据在冷缓存场景可能把标签
+// 追加到 <body>（实测：微信爬虫冷请求命中过该竞态），会导致微信/QQ 分享卡片解析失败。
+// 名单 = Next.js 运行时默认值（next/dist/shared/lib/router/utils/html-bots.js）
+// + 中文社交爬虫 / 微信内置浏览器（MicroMessenger / WeChat / QQ / Weibo / Bytespider）。
+const htmlLimitedBots =
+  /[\w-]+-Google|Google-[\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight|MicroMessenger|WeChat|QQ\/|Weibo|Bytespider|BytedanceBot/i;
+
 const nextConfig: NextConfig = {
+  htmlLimitedBots,
   allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.19"],
   reactStrictMode: true,
   images: {
