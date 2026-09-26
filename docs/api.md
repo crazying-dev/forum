@@ -35,7 +35,7 @@
 | GET | `/users/:id/following` | 关注列表 | 否 |
 | GET | `/users/:id/followers` | 粉丝列表 | 否 |
 
-> 会馆字段：`guild` 为 `{id, slug, name, theme_color, is_leader}`，未入馆时为 `null`；顶层同名布尔字段 `is_leader` 便于前端直接判断（两者取值一致）。
+> 会馆字段：`guild` 为 `{id, uuid, slug, name, theme_color, is_leader}`，未入馆时为 `null`；顶层同名布尔字段 `is_leader` 便于前端直接判断（两者取值一致）。`uuid` 为会馆稳定标识，`id` 仅供展示/排序，前端路由与接口调用一律使用 `uuid`（`/users/me` 与 `/users/:id` 的 `guild` 对象同构）。
 
 ## 帖子 Posts
 
@@ -44,14 +44,15 @@
 | GET | `/posts?page=&page_size=&category=` | 帖子列表（缓存 30s，page_size 上限 50） | 否 |
 | GET | `/posts/random` | 随机 200 条 | 否 |
 | GET | `/posts/:id` | 详情 + 评论 + liked/favorited（缓存 60s） | 否 |
-| POST | `/posts` | 发帖（title/content/category，可选 `guild_id`） | 是 |
+| POST | `/posts` | 发帖（title/content/category，可选 `guild_uuid` / `guild_id`） | 是 |
 | POST | `/posts/:id/like` | 点赞/取消 | 是 |
 | POST | `/posts/:id/favorite` | 收藏/取消 | 是 |
 | POST | `/posts/:id/delete` | 删除（仅作者，软删） | 是 |
 | POST | `/posts/:id/report` | 举报（reason/detail） | 是 |
 
 > - 会馆归属字段：列表项（`posts[]`）与详情（`post`）均新增 `guild_id`（number 或 `null`，`null` = 公共广场）、`guild_name`、`guild_theme_color`（公共帖为空/省略）。
-> - 发帖请求体：`{title, content, category, guild_id?}`；传 `guild_id` 时必须是该会馆成员（否则 403），`category` 由该馆自定义分类归一（缺省/非法值回退「综合」或第一项）；不传 `guild_id` 时 `category` 走公共白名单。
+> - 作者会馆字段：上述列表项与详情还含作者所属会馆的 `user_guild_name` / `user_guild_theme_color` / `user_is_leader`（无会馆时为 `""` / `""` / `false`）；评论、信息流（`items[]`）与搜索结果（`posts`）中的帖子同构。
+> - 发帖请求体：`{title, content, category, guild_uuid?, guild_id?}`；`guild_uuid`（string）为会馆稳定标识且优先，`guild_id`（number）为旧字段兼容——**仅在未传 `guild_uuid` 时生效**；`guild_uuid` 对应的会馆不存在（含非法 UUID 文本）返回 404「会馆不存在」。归属会馆时必须是该会馆成员（否则 403），`category` 由该馆自定义分类归一（缺省/非法值回退「综合」或第一项）；不传会馆标识时 `category` 走公共白名单。
 > - 公共分类白名单：`general` / `talk` / `question` / `share` / `creative`，并兼容旧中文 `求助` / `创意`；缺省或非法值统一归一为 `general`。
 
 ## 评论 Comments
@@ -61,6 +62,8 @@
 | GET | `/posts/:id/comments` | 评论列表（缓存 60s） | 否 |
 | POST | `/posts/:id/comments` | 评论/回复（content/parent_id） | 是 |
 | DELETE | `/comments/:id` | 删除评论（仅作者） | 是 |
+
+> 评论列表与「我收到的回复」均含评论作者的会馆字段 `user_guild_name` / `user_guild_theme_color` / `user_is_leader`（无会馆时为空串 / 空串 / `false`）。
 
 ## 会馆 / 信息流 Guilds & Feed
 
@@ -77,10 +80,10 @@
 
 **响应字段**
 
-- `guilds[]` 列表项：`id`(int) / `slug` / `name` / `intro` / `theme_color` / `member_count` / `has_logo` / `logo_version` / `leader`（`{id, name, avatar, intro}`，无馆长为 `null`）。
-- `guild` 详情：列表项字段 + `leader_user_id`(string\|null) / `leader_bio` / `created_at` / `updated_at` / `categories[]`（`{id, guild_id, name, sort}`）/ `announcements[]`（`{id, guild_id, content, created_at, updated_at}`，新→旧）。会馆 logo 使用 `has_logo` + `logo_version` 经 `/guild-img` 代理展示；`logo_file_id` 为管理端内部文件 ID，**不随详情下发**。
+- `guilds[]` 列表项：`id`(int，仅供展示/排序) / `uuid`(string，稳定标识) / `slug` / `name` / `intro` / `theme_color` / `member_count` / `has_logo` / `logo_version` / `leader`（`{id, name, avatar, intro}`，无馆长为 `null`）。
+- `guild` 详情：列表项字段（含 `uuid`）+ `leader_user_id`(string\|null) / `leader_bio` / `created_at` / `updated_at` / `categories[]`（`{id, guild_id, name, sort}`）/ `announcements[]`（`{id, guild_id, content, created_at, updated_at}`，新→旧）。会馆 logo 使用 `has_logo` + `logo_version` 经 `/guild-img/guilds/{uuid}/logo?v={logo_version}` 代理展示（管理端兼容旧数字 id）；`logo_file_id` 为管理端内部文件 ID，**不随详情下发**。
 - `my_state`：登录时 `{is_member, is_leader, has_pending_request, request_id?}`，未登录为 `null`。
-- 信息流 `items[]`（帖子与文章同构）：`type`（`post` / `article`）/ `id`(string) / `title` / `summary` / `category`（文章为空串）/ `likes` / `views` / `comment_count` / `created_at` / `updated_at` / `user_id` / `user_name` / `user_avatar` / `guild_id`(number\|null) / `guild_name` / `guild_theme_color` / `author`（文章作者 `{id, name, avatar}`，帖子为 `null`）/ `participants_count`。
+- 信息流 `items[]`（帖子与文章同构）：`type`（`post` / `article`）/ `id`(string) / `title` / `summary` / `category`（文章为空串）/ `likes` / `views` / `comment_count` / `created_at` / `updated_at` / `user_id` / `user_name` / `user_avatar` / `user_guild_name` / `user_guild_theme_color` / `user_is_leader` / `guild_id`(number\|null) / `guild_name` / `guild_theme_color` / `author`（文章作者 `{id, name, avatar}`，帖子为 `null`）/ `participants_count`。
 - 分页：`page` / `page_size`（默认 20，上限 50）+ `has_more`（布尔，是否为多取一条探测所得）。
 
 **行为说明**
@@ -103,7 +106,9 @@
 | GET | `/easter-egg` | 随机彩蛋 |
 | GET | `/avatar/:filename` | 头像文件（本地磁盘） |
 
-> 兼容说明：旧 `GET /api/v1/hui-guan`（会馆 JSON 列表）**已删除**，由 `GET /api/v1/guilds` 替代；旧实时消息接口 `/api/v1/world/messages`（`/World` 页面）与 `world` 数据表一并移除，由公共广场（`/feed?space=public`）与会馆信息流取代。会馆 logo 图片由管理端存储，前端经 `/guild-img/guilds/{id}/logo?v={logo_version}` 代理访问。
+> 搜索结果：`posts[]` 与帖子列表字段同构（含会馆归属与作者会馆字段）；`users[]` 为用户摘要。响应另含 `keyword` / `page` / `page_size` 与 `posts_total` / `posts_has_more` / `users_total` / `users_has_more`（按 `type` 选择性返回）。
+
+> 兼容说明：旧 `GET /api/v1/hui-guan`（会馆 JSON 列表）**已删除**，由 `GET /api/v1/guilds` 替代；旧实时消息接口 `/api/v1/world/messages`（`/World` 页面）与 `world` 数据表一并移除，由公共广场（`/feed?space=public`）与会馆信息流取代。会馆 logo 图片由管理端存储，前端经 `/guild-img/guilds/{uuid}/logo?v={logo_version}` 代理访问（管理端兼容旧数字 id）。
 
 ## 限流规则（key: IP）
 
@@ -120,7 +125,7 @@
 - `users`：id(RL+时间戳)/name/avatar/email/password/gender/age/intro/vip/prefix/is_banned/email_verified
 - `posts`：id(PS+时间戳)/user_id/title/content/category/likes/views/status/**guild_id（NULL = 公共广场）**
 - `comments`：id(CM+时间戳)/post_id/user_id/content/parent_id/likes/status
-- `guilds`：id(INTEGER 主键，人工排序)/slug/name/intro/logo_file_id/logo_version/theme_color/leader_user_id/leader_bio
+- `guilds`：id(INTEGER 主键，人工排序)/**uuid(UUID，唯一，对外稳定标识；0005 迁移新增)**/slug/name/intro/logo_file_id/logo_version/theme_color/leader_user_id/leader_bio
 - `guild_members`：user_id(主键)/guild_id/joined_at（一个用户同时至多属于一个会馆）
 - `guild_join_requests`：id/guild_id/user_id/status（0 待审 / 1 通过 / 2 拒绝 / 3 撤回）/reason/handled_by/handled_at/handled_note/created_at（0004 迁移新增 `handled_note`，并对 `(guild_id, user_id) WHERE status = 0` 建部分唯一索引）
 - `guild_categories`：id/guild_id/name/sort；`guild_announcements`：id/guild_id/content/created_at/updated_at
