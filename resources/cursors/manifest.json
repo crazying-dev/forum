@@ -1,0 +1,1330 @@
+{
+ "version": 1,
+ "roles": {
+  "arrow": {
+   "windows": "Arrow",
+   "qt": "ArrowCursor",
+   "label": "正常选择"
+  },
+  "help": {
+   "windows": "Help",
+   "qt": "WhatsThisCursor",
+   "label": "帮助选择"
+  },
+  "work": {
+   "windows": "AppStarting",
+   "qt": "BusyCursor",
+   "label": "后台运行"
+  },
+  "wait": {
+   "windows": "Wait",
+   "qt": "WaitCursor",
+   "label": "忙"
+  },
+  "crosshair": {
+   "windows": "Crosshair",
+   "qt": "CrossCursor",
+   "label": "精确选择"
+  },
+  "text": {
+   "windows": "IBeam",
+   "qt": "IBeamCursor",
+   "label": "文本选择"
+  },
+  "hand": {
+   "windows": "NWPen",
+   "qt": null,
+   "label": "手写"
+  },
+  "unavailable": {
+   "windows": "No",
+   "qt": "ForbiddenCursor",
+   "label": "不可用"
+  },
+  "sizens": {
+   "windows": "SizeNS",
+   "qt": "SizeVerCursor",
+   "label": "垂直调整大小"
+  },
+  "sizewe": {
+   "windows": "SizeWE",
+   "qt": "SizeHorCursor",
+   "label": "水平调整大小"
+  },
+  "sizenwse": {
+   "windows": "SizeNWSE",
+   "qt": "SizeFDiagCursor",
+   "label": "沿对角线调整大小1"
+  },
+  "sizenesw": {
+   "windows": "SizeNESW",
+   "qt": "SizeBDiagCursor",
+   "label": "沿对角线调整大小2"
+  },
+  "sizeall": {
+   "windows": "SizeAll",
+   "qt": "SizeAllCursor",
+   "label": "移动"
+  },
+  "uparrow": {
+   "windows": "UpArrow",
+   "qt": "UpArrowCursor",
+   "label": "候选"
+  },
+  "link": {
+   "windows": "Hand",
+   "qt": "PointingHandCursor",
+   "label": "链接选择"
+  }
+ },
+ "variants": {
+  "normal": {
+   "label": "普通",
+   "roles": {
+    "arrow": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      33,
+      61
+     ],
+     "dir": "normal/arrow",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png",
+      "f011.png",
+      "f012.png",
+      "f013.png",
+      "f014.png",
+      "f015.png",
+      "f016.png",
+      "f017.png"
+     ],
+     "delays": [
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117
+     ]
+    },
+    "help": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      33,
+      61
+     ],
+     "dir": "normal/help",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "work": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      32,
+      64
+     ],
+     "dir": "normal/work",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "wait": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      106,
+      136
+     ],
+     "dir": "normal/wait",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png",
+      "f011.png",
+      "f012.png",
+      "f013.png",
+      "f014.png",
+      "f015.png",
+      "f016.png",
+      "f017.png",
+      "f018.png",
+      "f019.png",
+      "f020.png",
+      "f021.png",
+      "f022.png",
+      "f023.png",
+      "f024.png",
+      "f025.png",
+      "f026.png",
+      "f027.png"
+     ],
+     "delays": [
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67
+     ]
+    },
+    "crosshair": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      90,
+      101
+     ],
+     "dir": "normal/crosshair",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "text": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      28,
+      60
+     ],
+     "dir": "normal/text",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "hand": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      206,
+      73
+     ],
+     "dir": "normal/hand",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png",
+      "f011.png",
+      "f012.png",
+      "f013.png",
+      "f014.png",
+      "f015.png",
+      "f016.png",
+      "f017.png",
+      "f018.png",
+      "f019.png",
+      "f020.png",
+      "f021.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "unavailable": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      78,
+      100
+     ],
+     "dir": "normal/unavailable",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizens": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      96,
+      113
+     ],
+     "dir": "normal/sizens",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizewe": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      97,
+      111
+     ],
+     "dir": "normal/sizewe",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizenwse": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      94,
+      110
+     ],
+     "dir": "normal/sizenwse",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizenesw": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      96,
+      111
+     ],
+     "dir": "normal/sizenesw",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizeall": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      94,
+      113
+     ],
+     "dir": "normal/sizeall",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "uparrow": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      202,
+      67
+     ],
+     "dir": "normal/uparrow",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "link": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      33,
+      61
+     ],
+     "dir": "normal/link",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    }
+   }
+  },
+  "large_dynamic": {
+   "label": "放大·动态",
+   "roles": {
+    "arrow": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      2,
+      28
+     ],
+     "dir": "large_dynamic/arrow",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png",
+      "f011.png",
+      "f012.png",
+      "f013.png",
+      "f014.png",
+      "f015.png",
+      "f016.png"
+     ],
+     "delays": [
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117,
+      117
+     ]
+    },
+    "help": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      22,
+      54
+     ],
+     "dir": "large_dynamic/help",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "work": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      20,
+      38
+     ],
+     "dir": "large_dynamic/work",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "wait": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      66,
+      89
+     ],
+     "dir": "large_dynamic/wait",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png",
+      "f011.png",
+      "f012.png",
+      "f013.png",
+      "f014.png",
+      "f015.png",
+      "f016.png",
+      "f017.png",
+      "f018.png",
+      "f019.png",
+      "f020.png",
+      "f021.png",
+      "f022.png",
+      "f023.png",
+      "f024.png",
+      "f025.png",
+      "f026.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "crosshair": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      123,
+      144
+     ],
+     "dir": "large_dynamic/crosshair",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "text": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      132,
+      152
+     ],
+     "dir": "large_dynamic/text",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "hand": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      121,
+      42
+     ],
+     "dir": "large_dynamic/hand",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png",
+      "f010.png",
+      "f011.png",
+      "f012.png",
+      "f013.png",
+      "f014.png",
+      "f015.png",
+      "f016.png",
+      "f017.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      800
+     ]
+    },
+    "unavailable": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      71,
+      80
+     ],
+     "dir": "large_dynamic/unavailable",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizens": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      58,
+      64
+     ],
+     "dir": "large_dynamic/sizens",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizewe": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      65,
+      63
+     ],
+     "dir": "large_dynamic/sizewe",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizenwse": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      59,
+      70
+     ],
+     "dir": "large_dynamic/sizenwse",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizenesw": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      61,
+      67
+     ],
+     "dir": "large_dynamic/sizenesw",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "sizeall": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      62,
+      60
+     ],
+     "dir": "large_dynamic/sizeall",
+     "seq": [
+      "f000.png",
+      "f001.png",
+      "f002.png",
+      "f003.png",
+      "f004.png",
+      "f005.png",
+      "f006.png",
+      "f007.png",
+      "f008.png",
+      "f009.png"
+     ],
+     "delays": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100
+     ]
+    },
+    "uparrow": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      120,
+      43
+     ],
+     "dir": "large_dynamic/uparrow",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "link": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      12,
+      36
+     ],
+     "dir": "large_dynamic/link",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    }
+   }
+  },
+  "large_static": {
+   "label": "放大·静态",
+   "roles": {
+    "arrow": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      1,
+      28
+     ],
+     "dir": "large_static/arrow",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "help": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      22,
+      54
+     ],
+     "dir": "large_static/help",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "work": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      24,
+      38
+     ],
+     "dir": "large_static/work",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "wait": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      126,
+      177
+     ],
+     "dir": "large_static/wait",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "crosshair": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      123,
+      144
+     ],
+     "dir": "large_static/crosshair",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "text": {
+     "size": [
+      256,
+      256
+     ],
+     "hotspot": [
+      132,
+      152
+     ],
+     "dir": "large_static/text",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "hand": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      120,
+      43
+     ],
+     "dir": "large_static/hand",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "unavailable": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      71,
+      80
+     ],
+     "dir": "large_static/unavailable",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizens": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      60,
+      67
+     ],
+     "dir": "large_static/sizens",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizewe": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      61,
+      76
+     ],
+     "dir": "large_static/sizewe",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizenwse": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      55,
+      56
+     ],
+     "dir": "large_static/sizenwse",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizenesw": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      61,
+      58
+     ],
+     "dir": "large_static/sizenesw",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "sizeall": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      62,
+      61
+     ],
+     "dir": "large_static/sizeall",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "uparrow": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      120,
+      43
+     ],
+     "dir": "large_static/uparrow",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    },
+    "link": {
+     "size": [
+      128,
+      128
+     ],
+     "hotspot": [
+      11,
+      35
+     ],
+     "dir": "large_static/link",
+     "seq": [
+      "f000.png"
+     ],
+     "delays": [
+      100
+     ]
+    }
+   }
+  }
+ }
+}
