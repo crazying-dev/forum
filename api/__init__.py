@@ -15,6 +15,7 @@ from .search import search_bp
 from .bug import bug_bp
 from .email import email_bp
 from .misc import misc_bp
+from .release import release_bp
 
 
 def register_blueprints(app: Flask) -> None:
@@ -27,6 +28,9 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(bug_bp, url_prefix="/api")
     app.register_blueprint(email_bp, url_prefix="/api")
     app.register_blueprint(misc_bp)
+    # 客户端发布 / 更新接口：/api/app/releases、/api/app/check、/api/app/windows/forum.exe
+    app.register_blueprint(release_bp, url_prefix="/api/app")
+
     app.register_blueprint(pages_bp)
 
 
@@ -40,4 +44,5 @@ __all__ = [
     "bug_bp",
     "email_bp",
     "misc_bp",
+    "release_bp",
 ]

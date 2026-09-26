@@ -4,6 +4,7 @@ import uuid
 from flask import Blueprint, render_template, redirect, request, url_for, Response, jsonify
 
 import db
+from api.release import human_size, load_manifest
 
 pages_bp = Blueprint("pages", __name__)
 
@@ -190,3 +191,30 @@ def goto_page():
 @pages_bp.route("/favicon.ico")
 def favicon():
     return redirect(url_for("static", filename="img/favicon.png"))
+
+
+@pages_bp.route("/Download")
+def download_page():
+    """客户端下载页（纯 Jinja 渲染，不依赖 Vue / npm 构建）。"""
+    manifest = load_manifest()
+    # 复制平台 / release 字典，预先把人类可读大小写进副本，模板无需再算
+    platform_list = []
+    for platform in (manifest.get("platforms") or []):
+        if not isinstance(platform, dict):
+            continue
+        item = dict(platform)
+        releases = []
+        for release in (platform.get("releases") or []):
+            if not isinstance(release, dict):
+                continue
+            entry = dict(release)
+            entry["size_text"] = human_size(release.get("size"))
+            releases.append(entry)
+        item["releases"] = releases
+        platform_list.append(item)
+    return render_template(
+        "download.html",
+        show_world=False,
+        platforms=platform_list,
+        updated_at=manifest.get("updated_at", ""),
+    )

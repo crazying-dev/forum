@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "updated_at": "2026-09-26T12:00:00+08:00",
+  "platforms": [
+    {
+      "key": "windows",
+      "name": "Windows",
+      "icon": "fa-windows",
+      "status": "available",
+      "requirement": "Windows 10 / 11（64 位）",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "date": "2026-09-26",
+          "size": 48468327,
+          "url": "https://www.yjlt.top/api/app/windows/forum.exe",
+          "sha256": "",
+          "notes": ["首个正式版：论坛/世界频道/WIKI/彩蛋全功能", "内置 Live2D 桌宠，支持多版本模型切换"],
+          "mandatory": false
+        }
+      ]
+    },
+    { "key": "android", "name": "Android", "icon": "fa-android", "status": "coming_soon", "requirement": "Android 8.0 及以上", "releases": [] },
+    { "key": "linux",   "name": "Linux",   "icon": "fa-linux",   "status": "coming_soon", "requirement": "x86_64 桌面发行版", "releases": [] },
+    { "key": "macos",   "name": "macOS",   "icon": "fa-apple", "status": "coming_soon", "requirement": "macOS 11 及以上（Intel / Apple Silicon）", "releases": [] }
+  ]
+}

@@ -195,3 +195,8 @@ data/
 *.local
 admin/
 clear_db.py
+
+# 客户端安装包（不入库，仅保留占位文件与说明）
+releases/*
+!releases/.gitkeep
+!releases/README.md

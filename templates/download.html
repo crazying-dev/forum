@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}下载客户端 - 妖精论坛{% endblock %}
+
+{% block content %}
+<div class="dl-page" data-page="/Download">
+  <div class="card dl-hero">
+    <h1 class="dl-title"><i class="fa fa-download"></i> 下载客户端</h1>
+    <p class="dl-sub">妖精论坛 Windows 客户端 —— 论坛 / 世界频道 / WIKI / 彩蛋一站式入口，内置 Live2D 桌宠。</p>
+  </div>
+
+  <!-- 平台切换：按钮仅作 JS 增强；脚本不执行时所有平台区块照样显示（见下方 noscript） -->
+  <div class="dl-tabs" id="dlTabs" role="tablist">
+    {% for p in platforms %}
+    <button class="dl-tab{% if p.key == 'windows' %} active{% endif %}" type="button"
+            role="tab" data-platform-tab="{{ p.key }}"><i class="fa {{ p.icon }}"></i><span>{{ p.name }}</span></button>
+    {% endfor %}
+  </div>
+  <noscript>
+    <!-- 无 JS 环境：直接展开全部平台区块，下载按钮依然可用 -->
+    <style>[data-platform].dl-hidden { display: block !important; }</style>
+  </noscript>
+
+  {% for p in platforms %}
+  <section class="dl-platform{% if p.key != 'windows' %} dl-hidden{% endif %}" data-platform="{{ p.key }}">
+    <div class="card dl-platform-card{% if p.status != 'available' %} is-disabled{% endif %}">
+      <div class="card-header">
+        <h2 class="card-title dl-platform-name"><i class="fa {{ p.icon }}"></i> {{ p.name }}</h2>
+        {% if p.status == 'available' %}
+        <span class="dl-badge dl-badge-ok">已发布</span>
+        {% else %}
+        <span class="dl-badge dl-badge-soon">即将推出</span>
+        {% endif %}
+      </div>
+      <p class="dl-requirement">运行环境：{{ p.requirement }}</p>
+
+      {% if p.status == 'available' and p.releases %}
+      {% for r in p.releases %}
+      <div class="dl-release">
+        <div class="dl-release-head">
+          <span class="dl-version">v{{ r.version }}</span>
+          <span class="dl-channel">{{ r.channel }}</span>
+          <span class="dl-date">{{ r.date }}</span>
+          {% if r.size_text %}<span class="dl-size">{{ r.size_text }}</span>{% endif %}
+          {% if r.mandatory %}<span class="dl-badge dl-badge-warn">强制更新</span>{% endif %}
+        </div>
+        {% if r.notes %}
+        <ul class="dl-notes">
+          {% for note in r.notes %}<li>{{ note }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        <div class="dl-actions">
+          <a class="btn btn-primary" href="{{ r.url }}"><i class="fa fa-download"></i> 下载</a>
+          <button class="btn btn-outline dl-copy" type="button" data-copy-url="{{ r.url }}"><i class="fa fa-link"></i> 复制直链</button>
+        </div>
+      </div>
+      {% endfor %}
+      {% elif p.status == 'coming_soon' %}
+      <p class="form-hint">客户端正在开发中，敬请期待。</p>
+      <div class="dl-actions">
+        <button class="btn" type="button" disabled>即将推出</button>
+      </div>
+      {% else %}
+      <p class="form-hint">该平台暂无可用安装包，请稍后再来看看。</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <p class="dl-foot">
+    清单更新时间：{{ updated_at or '未知' }} · 本页由服务端 <code>app_releases.json</code> 驱动 ·
+    <a href="/Download">固定链接</a>
+  </p>
+</div>
+
+<script>
+// 渐进增强：平台标签切换 + 复制直链（脚本不执行时所有区块照样可见可下载）
+(function () {
+  var tabs = document.querySelectorAll('[data-platform-tab]');
+  var panels = document.querySelectorAll('[data-platform]');
+  var DEFAULT_PLATFORM = 'windows';
+
+  function selectPlatform(key) {
+    var matched = false;
+    for (var i = 0; i < panels.length; i++) {
+      var show = panels[i].getAttribute('data-platform') === key;
+      panels[i].classList.toggle('dl-hidden', !show);
+      if (show) { matched = true; }
+    }
+    if (!matched) { return; }
+    for (var j = 0; j < tabs.length; j++) {
+      tabs[j].classList.toggle('active', tabs[j].getAttribute('data-platform-tab') === key);
+    }
+    if (location.hash !== '#' + key) {
+      try { history.replaceState(null, '', '#' + key); } catch (e) {}
+    }
+  }
+
+  function currentKey() {
+    return (location.hash || '').replace('#', '') || DEFAULT_PLATFORM;
+  }
+
+  for (var k = 0; k < tabs.length; k++) {
+    tabs[k].addEventListener('click', function () {
+      selectPlatform(this.getAttribute('data-platform-tab'));
+    });
+  }
+  window.addEventListener('hashchange', function () { selectPlatform(currentKey()); });
+  // 首次渲染：按 URL hash 选中平台，无 hash 默认 Windows
+  selectPlatform(currentKey());
+
+  // 复制直链：clipboard API 不可用时降级到临时 textarea
+  var copyBtns = document.querySelectorAll('.dl-copy');
+  for (var c = 0; c < copyBtns.length; c++) {
+    copyBtns[c].addEventListener('click', function () {
+      var btn = this;
+      var text = btn.getAttribute('data-copy-url') || '';
+      var original = btn.innerHTML;
+      function done(ok) {
+        btn.innerHTML = ok ? '<i class="fa fa-check"></i> 已复制' : '<i class="fa fa-times"></i> 复制失败';
+        setTimeout(function () { btn.innerHTML = original; }, 1500);
+      }
+      function fallback() {
+        try {
+          var ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', 'readonly');
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          var ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          done(ok);
+        } catch (e) { done(false); }
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, fallback);
+      } else {
+        fallback();
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

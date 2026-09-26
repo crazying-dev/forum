@@ -1552,3 +1552,54 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 @media (max-width: 900px) {
   .site-announce { width: calc(100% - 20px); margin: 8px 10px 0; }
 }
+
+/* ── 客户端下载页 /Download（纯 Jinja 渲染，无 Vue 依赖）── */
+.dl-page { max-width: 900px; }
+.dl-hero { padding: 20px; }
+.dl-title { font-size: 22px; display: flex; align-items: center; gap: 10px; color: var(--color-text-primary); }
+.dl-title .fa { color: var(--color-primary); }
+.dl-sub { margin-top: 8px; font-size: 14px; line-height: 1.7; color: var(--color-text-secondary); }
+/* 平台切换标签（纯 CSS，交互由页面内联脚本渐进增强） */
+.dl-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.dl-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  font-size: 14px; font-family: inherit;
+  cursor: pointer;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.dl-tab:hover { background: var(--color-bg-hover); color: var(--color-primary); }
+.dl-tab.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.dl-hidden { display: none; }
+.dl-platform { margin-bottom: 16px; }
+/* 未发布的平台：置灰卡片 + 禁用按钮，作为后续扩展位 */
+.dl-platform-card.is-disabled { opacity: .6; filter: grayscale(1); }
+.dl-platform-name { font-size: 16px; }
+.dl-requirement { margin: 0 0 12px; font-size: 13px; color: var(--color-text-secondary); }
+.dl-badge { padding: 1px 10px; border-radius: 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.dl-badge-ok { background: var(--color-primary); color: #fff; }
+.dl-badge-soon { background: var(--color-bg-icon); color: var(--color-text-secondary); }
+.dl-badge-warn { background: #ef4444; color: #fff; }
+.dl-release { border-top: 1px solid var(--color-border-divider); margin-top: 12px; padding-top: 12px; }
+.dl-release:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.dl-release-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dl-version { font-size: 18px; font-weight: 700; color: var(--color-text-primary); }
+.dl-channel { padding: 1px 8px; border-radius: 8px; background: var(--color-bg-icon); color: var(--color-text-secondary); font-size: 12px; }
+.dl-date, .dl-size { font-size: 13px; color: var(--color-text-tertiary); }
+.dl-notes { margin: 10px 0 0 18px; font-size: 13px; line-height: 1.8; color: var(--color-text-secondary); }
+.dl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.dl-foot { margin: 20px 0 8px; font-size: 12px; text-align: center; color: var(--color-text-tertiary); }
+.dl-foot a { color: var(--color-primary); }
+.dl-foot code { font-size: 12px; }
+
+@media (max-width: 900px) {
+  .dl-hero { padding: 16px; }
+  .dl-title { font-size: 19px; }
+  .dl-tabs { gap: 6px; }
+  .dl-tab { padding: 8px 12px; font-size: 13px; }
+  .dl-actions .btn { flex: 1 1 auto; min-height: 44px; justify-content: center; }
+}

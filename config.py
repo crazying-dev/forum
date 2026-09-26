@@ -271,7 +271,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "27"
+STATIC_VERSION = "28"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -320,6 +320,19 @@ CF_IMAGES_DELIVERY_HOST = os.getenv("avatar_DELIVERY_HOST", "https://imagedelive
 # 头像上传：保存到本地目录，通过 /avatar/<file> 静态路由访问（与 v1 一致）
 # 不用 Cloudflare Images API（store_xxx 是交付 hash，不是 Account ID，无法路由到 /images/v1）
 AVATAR_UPLOAD_DIR = os.getenv("AVATAR_UPLOAD_DIR", "/root/db/avatar")
+
+# 客户端安装包分发目录：把 forum.exe / forum_setup.exe 放进来即可被
+# /api/app/windows/forum.exe 与 /api/app/download/<platform>/<filename> 对外分发。
+# 二进制不入库（见 .gitignore 中的 releases/*）。
+APP_RELEASE_DIR = os.getenv(
+    "APP_RELEASE_DIR",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "releases"),
+)
+try:
+    # 目录不存在时自动创建；权限不足等异常不阻塞启动（下载接口会返回 503）
+    os.makedirs(APP_RELEASE_DIR, exist_ok=True)
+except OSError:
+    pass
 
 # ── 帖子分类白名单（非法分类回落 general）──
 # 分区口径对照 V1（论坛 tab / 发帖选项 / AfterBody CATEGORY_MAP 三处必须一致）
