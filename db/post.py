@@ -132,31 +132,28 @@ def get_random_posts(user_id=None, limit=200):
 
 
 def get_user_posts(user_id, page=1, page_size=20):
-    """分页获取指定用户的帖子列表。"""
+    """分页获取指定用户的帖子列表（含作者信息）。
+
+    必须 JOIN users 取回 ``user_id`` / ``user_name`` / ``user_avatar``：
+    旧实现只返回 id/title/summary/...，客户端拿不到作者就会回退成
+    「匿名用户」+ 默认头像（个人主页帖子全部变匿名，历史 Bug）。
+    字段结构与 :func:`_to_list_item` 保持一致。
+    """
     offset = (page - 1) * page_size
     rows = execute_query(
         """
-        SELECT id, title, LEFT(content, 200) AS summary, category, likes, views, created_at
-        FROM posts
-        WHERE user_id = %s AND status = 1
-        ORDER BY created_at DESC
+        SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
+               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar
+        FROM posts p
+        JOIN users u ON p.user_id = u.id
+        WHERE p.user_id = %s AND p.status = 1
+        ORDER BY p.created_at DESC
         LIMIT %s OFFSET %s
         """,
         (user_id, page_size, offset),
         fetch_all=True,
     )
-    posts = []
-    for r in rows:
-        posts.append({
-            "id": r.get("id"),
-            "title": r.get("title"),
-            "summary": (r.get("summary") or "")[:200],
-            "category": r.get("category"),
-            "likes": r.get("likes") or 0,
-            "views": r.get("views") or 0,
-            "created_at": str(r.get("created_at")) if r.get("created_at") else None,
-        })
-    return posts
+    return [_to_list_item(r) for r in rows]
 
 
 def get_user_stats(user_id):
