@@ -217,9 +217,9 @@ export default function GuildDetailPage() {
           </div>
           <p className="guild-hero-intro">{guild.intro || "这个会馆还没有简介～"}</p>
           <div className="guild-hero-meta">
-            <span>
+            <Link className="guild-hero-meta-link" href={`/huiguan/${guild.slug}/members`}>
               <i className="fa fa-users"></i> {guild.member_count} 人
-            </span>
+            </Link>
             <span>
               <i className="fa fa-clock-o"></i> 创建于 {guild.created_at ? formatUserTime(guild.created_at) : "—"}
             </span>
@@ -268,6 +268,7 @@ export default function GuildDetailPage() {
             <div className="guild-leader-text">
               <div className="guild-leader-name">
                 {guild.leader.name}
+                {guild.leader.title ? <span className="guild-leader-title theme-ink" style={inkStyle}>{guild.leader.title}</span> : null}
                 <span className="guild-leader-tag" style={{ background: theme, color: contrastText(theme) }}>
                   <i className="fa fa-crown"></i> 馆长
                 </span>
@@ -282,8 +283,8 @@ export default function GuildDetailPage() {
                 <i className="fa fa-star"></i> 馆长专区
               </div>
               <p className="guild-leader-bio">{guild.leader_bio || "馆长还没有留下寄语～"}</p>
-              <Link className="guild-leader-link theme-ink" href={`/users/${guild.leader.id}`} style={inkStyle}>
-                查看馆长主页 <i className="fa fa-arrow-right"></i>
+              <Link className="guild-leader-link theme-ink" href={`/huiguan/${guild.slug}/leader`} style={inkStyle}>
+                查看馆长介绍页 <i className="fa fa-arrow-right"></i>
               </Link>
             </div>
           )}

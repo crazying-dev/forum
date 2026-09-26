@@ -137,9 +137,13 @@ export default function HuiGuanPage() {
           <span className="guild-card-meta-item">
             <i className="fa fa-user-o"></i> 馆长：{current.leader?.name || "虚位以待"}
           </span>
-          <span className="guild-card-meta-item">
+          <Link
+            className="guild-card-meta-item guild-card-meta-link"
+            href={`/huiguan/${current.slug}/members`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <i className="fa fa-users"></i> {current.member_count} 人
-          </span>
+          </Link>
           <span className="guild-card-meta-item">
             <i className="fa fa-clock-o"></i> 创建于 {current.created_at ? formatUserTime(current.created_at) : "—"}
           </span>
@@ -331,7 +335,15 @@ export default function HuiGuanPage() {
                         <span>
                           <i className="fa fa-user-o"></i> {g.leader?.name || "虚位以待"}
                         </span>
-                        <span>
+                        <span
+                          className="guild-list-meta-link"
+                          title="查看成员名单"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            router.push(`/huiguan/${g.slug}/members`);
+                          }}
+                        >
                           <i className="fa fa-users"></i> {g.member_count}
                         </span>
                       </div>

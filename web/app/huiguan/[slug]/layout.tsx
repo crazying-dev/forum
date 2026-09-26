@@ -30,19 +30,28 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { ok, status, guild } = await getGuild(slug);
   if (!ok || !guild) {
     const missing = status === 404;
-    return pageMetadata({
-      title: missing ? "会馆不存在" : "会馆",
-      description: missing ? "该会馆不存在或已被解散。" : "妖精论坛会馆详情。",
-      path: `/huiguan/${encodeURIComponent(slug)}`,
-      index: !missing,
-    });
+    const title = missing ? "会馆不存在" : "会馆";
+    return {
+      ...pageMetadata({
+        title,
+        description: missing ? "该会馆不存在或已被解散。" : "妖精论坛会馆详情。",
+        path: `/huiguan/${encodeURIComponent(slug)}`,
+        index: !missing,
+      }),
+      // 显式携带模板：子段（成员名单/馆长介绍）为字符串标题时仍保留「妖精论坛 - 」前缀
+      title: { default: title, template: "妖精论坛 - %s" },
+    };
   }
   const description = truncate(guild.intro || "", 140) || `${guild.name} 是妖精论坛的一个会馆，欢迎加入交流。`;
-  return pageMetadata({
-    title: guild.name,
-    description,
-    path: `/huiguan/${encodeURIComponent(slug)}`,
-  });
+  return {
+    ...pageMetadata({
+      title: guild.name,
+      description,
+      path: `/huiguan/${encodeURIComponent(slug)}`,
+    }),
+    // 同上：保留前缀模板给更深层的动态页
+    title: { default: guild.name, template: "妖精论坛 - %s" },
+  };
 }
 
 export default async function GuildDetailLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {

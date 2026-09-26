@@ -86,6 +86,28 @@ export interface GuildLeader {
   avatar: string;
   intro: string;
   bio?: string;
+  // 馆长称号（管理端填写，可能为空）
+  title?: string;
+}
+
+// 会馆成员（成员名单页）
+export interface GuildMember {
+  id: string;
+  name: string;
+  avatar: string;
+  vip?: string;
+  prefix?: string;
+  intro?: string;
+  is_leader?: boolean;
+  joined_at?: string;
+}
+
+// 馆长介绍页数据（GET /guilds/:slug/leader）
+export interface GuildLeaderPageData {
+  guild: { uuid: string; slug: string; name: string; theme_color: string };
+  leader: GuildLeader | null;
+  leader_bio?: string;
+  content?: string;
 }
 
 // 会馆列表项
@@ -207,6 +229,8 @@ export interface UserBrief {
   intro?: string;
   is_self?: boolean;
   is_following?: boolean;
+  // 共同关注：viewer 是否也关注了该用户（仅 following 列表下发；粉丝列表/匿名/本人恒 false）
+  is_mutual?: boolean;
 }
 
 // 用户所在会馆概要（个人中心标签）
@@ -285,9 +309,12 @@ export const userApi = {
     request<{ posts: Post[] }>(`/users/${id}/favorites?page=${page}&page_size=${pageSize}`),
   follow: (id: string) => request<{ following: boolean }>(`/users/${id}/follow`, { method: "POST" }),
   following: (id: string, page = 1, pageSize = 20) =>
-    request<{ users: UserBrief[] }>(`/users/${id}/following?page=${page}&page_size=${pageSize}`),
+    request<{ users: UserBrief[]; page?: number; page_size?: number; has_more?: boolean }>(`/users/${id}/following?page=${page}&page_size=${pageSize}`),
   followers: (id: string, page = 1, pageSize = 20) =>
-    request<{ users: UserBrief[] }>(`/users/${id}/followers?page=${page}&page_size=${pageSize}`),
+    request<{ users: UserBrief[]; page?: number; page_size?: number; has_more?: boolean }>(`/users/${id}/followers?page=${page}&page_size=${pageSize}`),
+  // 共同关注（匿名 / 看自己时后端返回空数组）
+  mutual: (id: string, page = 1, pageSize = 20) =>
+    request<{ users: UserBrief[]; page: number; page_size: number; has_more?: boolean }>(`/users/${id}/mutual?page=${page}&page_size=${pageSize}`),
   comments: (id: string, page = 1, pageSize = 20) =>
     request<{ comments: ReplyItem[]; total: number }>(`/users/${id}/comments?page=${page}&page_size=${pageSize}`),
   updateMe: (data: Record<string, unknown>) =>
@@ -335,6 +362,14 @@ export const guildApi = {
   list: () => request<{ guilds: GuildListItem[] }>("/guilds"),
   detail: (slug: string) =>
     request<{ guild: GuildDetail; my_state: GuildMyState | null }>(`/guilds/${encodeURIComponent(slug)}`),
+  // 成员名单（分页，默认每页 24；is_leader 项为馆长）
+  members: (slug: string, page = 1, pageSize = 24) =>
+    request<{ members: GuildMember[]; page: number; page_size: number; has_more: boolean }>(
+      `/guilds/${encodeURIComponent(slug)}/members?page=${page}&page_size=${pageSize}`
+    ),
+  // 馆长介绍页（含寄语 leader_bio 与正文 content）
+  leaderPage: (slug: string) =>
+    request<GuildLeaderPageData>(`/guilds/${encodeURIComponent(slug)}/leader`),
   feed: (slug: string, page = 1, pageSize = 20, category = "") =>
     request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; guild: { id: number; uuid?: string; slug: string; name: string; theme_color: string } }>(
       `/guilds/${encodeURIComponent(slug)}/feed?page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`

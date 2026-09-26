@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import PostCard from "@/components/PostCard";
-import FollowListModal from "@/components/FollowListModal";
+import FollowListModal, { FollowTab } from "@/components/FollowListModal";
 import UserProfileModal from "@/components/UserProfileModal";
 import CategoryBadge from "@/components/ui/CategoryBadge";
 import SpaceBadge from "@/components/ui/SpaceBadge";
@@ -35,8 +35,11 @@ export default function UserPage() {
   const [guild, setGuild] = useState<GuildMembership | null>(null);
   const [isLeader, setIsLeader] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showFollowList, setShowFollowList] = useState<null | "following" | "followers">(null);
+  const [showFollowList, setShowFollowList] = useState<FollowTab | null>(null);
   const [followUsers, setFollowUsers] = useState<UserBrief[]>([]);
+  const [followHasMore, setFollowHasMore] = useState(false);
+  const [followLoadingMore, setFollowLoadingMore] = useState(false);
+  const followPageRef = useRef(1);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"posts" | "comments">("posts");
   const [postView, setPostView] = useState<"posts" | "favorites">("posts");
@@ -100,12 +103,45 @@ export default function UserPage() {
     }
   };
 
-  const openFollowList = async (kind: "following" | "followers") => {
+  // 关注列表：打开/切 Tab 拉第 1 页；加载更多 page+1 追加（seq 校验：慢响应不得写入已切走的 Tab）
+  const followSeqRef = useRef(0);
+  const loadFollow = useCallback(
+    async (tab: FollowTab, pageNo: number, append: boolean) => {
+      const seq = ++followSeqRef.current;
+      try {
+        const r =
+          tab === "following"
+            ? await userApi.following(id, pageNo)
+            : tab === "followers"
+              ? await userApi.followers(id, pageNo)
+              : await userApi.mutual(id, pageNo);
+        if (seq !== followSeqRef.current) return; // 已切换 Tab/关闭，丢弃过期响应
+        setFollowUsers((prev) => (append ? [...prev, ...(r.users || [])] : r.users || []));
+        setFollowHasMore(!!r.has_more);
+      } catch {
+        if (seq !== followSeqRef.current) return;
+        if (!append) setFollowUsers([]);
+        setFollowHasMore(false);
+      } finally {
+        if (seq === followSeqRef.current) setFollowLoadingMore(false);
+      }
+    },
+    [id]
+  );
+
+  const openFollowList = (kind: FollowTab) => {
     setShowFollowList(kind);
-    try {
-      const r = kind === "following" ? await userApi.following(id) : await userApi.followers(id);
-      setFollowUsers(r.users || []);
-    } catch { setFollowUsers([]); }
+    setFollowUsers([]);
+    setFollowHasMore(false);
+    followPageRef.current = 1;
+    loadFollow(kind, 1, false);
+  };
+
+  const loadMoreFollow = () => {
+    if (!showFollowList) return;
+    followPageRef.current += 1;
+    setFollowLoadingMore(true);
+    loadFollow(showFollowList, followPageRef.current, true);
   };
 
   const sendVerifyEmail = async () => {
@@ -130,9 +166,21 @@ export default function UserPage() {
   const onToggleFollowInList = async (u: UserBrief) => {
     try {
       await userApi.follow(u.id);
-      setFollowUsers((list) => list.map((x) => (x.id === u.id ? { ...x, is_following: !x.is_following } : x)));
+      if (showFollowList === "mutual") {
+        // 共同关注中取消关注 → 该行不再属于共同关注
+        setFollowUsers((list) => list.filter((x) => x.id !== u.id));
+      } else {
+        setFollowUsers((list) =>
+          list.map((x) =>
+            x.id === u.id ? { ...x, is_following: !x.is_following, is_mutual: x.is_following ? false : x.is_mutual } : x
+          )
+        );
+      }
     } catch { /* 忽略 */ }
   };
+
+  // 共同关注 Tab：仅登录且非本人主页时展示
+  const showMutualTab = !isSelf && !!me;
 
   if (loading) return <div className="loading-text" style={{ padding: 40 }}>加载中...</div>;
   if (!profile) return <div className="loading-text" style={{ padding: 40 }}>用户不存在</div>;
@@ -373,11 +421,16 @@ export default function UserPage() {
 
       {showFollowList && (
         <FollowListModal
-          title={showFollowList === "following" ? "关注列表" : "粉丝列表"}
+          activeTab={showFollowList}
           users={followUsers}
           currentUserId={userId}
+          isSelf={isSelf}
+          showMutualTab={showMutualTab}
+          hasMore={followHasMore}
+          loadingMore={followLoadingMore}
           onClose={() => setShowFollowList(null)}
           onTabChange={(tab) => openFollowList(tab)}
+          onLoadMore={loadMoreFollow}
           onToggleFollow={onToggleFollowInList}
         />
       )}
