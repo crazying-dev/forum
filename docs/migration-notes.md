@@ -31,13 +31,13 @@
 | `GET /api/posts/<id>/comments` | `GET /api/v1/posts/:id/comments` | 评论列表 |
 | `POST /api/posts/<id>/comments/create` | `POST /api/v1/posts/:id/comments` | 发评论 |
 | `POST /api/comments/<id>/delete` | `DELETE /api/v1/comments/:id` | 删评论 |
-| `POST /api/World/Send` | `POST /api/v1/world/messages` | 世界发送 |
-| `GET /api/World/ALL` | `GET /api/v1/world/messages` | 世界列表 |
+| `POST /api/World/Send` | _已移除_ | 旧实时消息接口下线（0003 迁移 DROP `world`） |
+| `GET /api/World/ALL` | `GET /api/v1/feed?space=public` | 公共广场信息流（会馆信息流另见 `/guilds/:slug/feed`） |
 | `GET /api/search` | `GET /api/v1/search` | 搜索 |
 | `POST /api/vote/version` | `POST /api/v1/votes/version` | 投票 |
 | `GET /api/vote/version/stats` | `GET /api/v1/votes/version/stats` | 投票统计 |
 | `POST /api/report-bug` | `POST /api/v1/reports/bug` | Bug 举报 |
-| `GET /api/huiguan` | `GET /api/v1/hui-guan` | 会馆 |
+| `GET /api/huiguan` | `GET /api/v1/guilds` | 动态会馆列表（旧 `hui-guan.json` 与 `GET /api/v1/hui-guan` 均已删除） |
 | `GET /Easter-Egg` | `GET /api/v1/easter-egg` | 彩蛋 |
 | `GET /avatar/<filename>` | `GET /avatar/:filename` | 头像（Go 提供） |
 | `GET /api/login/otherAPP` | `GET /api/v1/auth/oauth/callback` | 第三方登录（兼容） |
@@ -53,7 +53,7 @@
 | `/search` | `app/search/page.tsx` |
 | `/login` | `app/login/page.tsx` |
 | `/users/<id>` | `app/users/[id]/page.tsx` |
-| `/World` | `app/World/page.tsx` |
+| `/World` | _已移除_（由主页公共广场信息流与 `/huiguan` 会馆入口取代） |
 | `/WIKI` 全套 | `app/WIKI/**` |
 | `/privacy` | `app/privacy/page.tsx` |
 | `/GoTo` | `app/GoTo/page.tsx` |
@@ -81,9 +81,10 @@
 2. **修复**：legacy 缓存失效 key 硬编码与运行时不一致 → ov2 统一按实际参数前缀失效。
 3. **修复**：legacy `SECRET_KEY` 读取 chr 混淆 bug（永远取不到环境变量）→ ov2 直接读取。
 4. **修复**：legacy `main.css` 多余花括号导致 CSS 解析问题 → ov2 已修正。
-5. **World 表名**：legacy PG 中未加引号实际小写 `world` → ov2 迁移文件统一小写 `world`。
-6. **分类**：legacy seed 用中文分类（求助/创意）与前端 tab（question/creative）不一致 → ov2 前端显示映射表兜底，新增发帖统一英文 key。
+5. **World 表**：legacy 的 `world` 表已在 0003 迁移中 `DROP`，实时消息功能由公共广场（`/feed?space=public`）与会馆信息流取代。
+6. **分类**：公共广场白名单为 `general` / `talk` / `question` / `share` / `creative`，并兼容旧中文 `求助` / `创意`（缺省归一 `general`）；会馆帖子使用各馆自定义分类（`guild_categories`，缺省/非法值回退「综合」或第一项）。
 7. 头像存储：legacy `/root/db/avatar/`（Vercel 上不可持久）→ ov2 `AVATAR_DIR` 本地磁盘。
+8. **会馆**：legacy 静态 `hui-guan.json` 列表 + `hei.navifox.net` 外链 → ov2 动态会馆（PostgreSQL `guilds` 系列表）、入馆申请由管理端审批；会馆 logo 由管理端存储，经 `/guild-img` 代理展示。
 
 ## 部署要点
 

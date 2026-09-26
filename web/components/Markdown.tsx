@@ -15,6 +15,16 @@ function isExternalLink(href: string): boolean {
   return true;
 }
 
+/** 转义 HTML 实体：净化不可用时以纯文本渲染，避免原样输出未净化 HTML */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 let hookAdded = false;
 /** 在浏览器中注册一次链接改写 hook（幂等） */
 function ensureHook() {
@@ -44,23 +54,26 @@ function ensureHook() {
 export default function Markdown({ content, className = "" }: { content?: string; className?: string }) {
   const html = useMemo(() => {
     if (!content) return "";
-    let raw = "";
+    let raw: string | null = null;
     try {
       raw = marked.parse(content, { breaks: true, gfm: true }) as string;
     } catch {
-      return content;
+      // 解析异常：降级为转义文本（不输出未净化 HTML）
     }
-    // 浏览器环境净化；SSR/未初始化时原样返回（客户端渲染时再净化）
-    if (typeof DOMPurify.sanitize !== "function") return raw;
+    if (raw === null) return escapeHtml(content);
+    // 浏览器环境净化；SSR/未初始化等净化不可用时转义为纯文本，不输出未净化 HTML
+    if (typeof DOMPurify.sanitize !== "function") return escapeHtml(raw);
+    let sanitized: string | null = null;
     try {
       ensureHook();
-      return DOMPurify.sanitize(raw, {
+      sanitized = DOMPurify.sanitize(raw, {
         USE_PROFILES: { html: true },
         FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "style", "link", "meta"],
       });
     } catch {
-      return raw;
+      // 净化异常：降级为转义文本（不输出未净化 HTML）
     }
+    return sanitized === null ? escapeHtml(raw) : sanitized;
   }, [content]);
 
   return <div className={className || undefined} dangerouslySetInnerHTML={{ __html: html }} />;

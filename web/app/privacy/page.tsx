@@ -16,7 +16,7 @@ export default function PrivacyPage() {
           <p>为了向您提供服务，我们会收集以下信息：</p>
           <ul className="privacy-list">
             <li><b>账号资料</b>：注册时填写的用户名、邮箱，以及您主动完善的头像、性别、生日、个性签名等；</li>
-            <li><b>内容数据</b>：您发布的帖子、评论、收藏、关注关系、世界频道消息等公开互动数据；</li>
+            <li><b>内容数据</b>：您发布的帖子、评论、收藏、关注关系、入馆申请与会馆互动等公开互动数据；</li>
             <li><b>技术信息</b>：访问日志中的 IP 地址、浏览器类型（User-Agent）、访问时间等，用于安全防护与体验优化；</li>
             <li><b>本地存储</b>：登录会话 Cookie 与浏览器本地存储中的主题偏好等。</li>
           </ul>
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
           <h3><span className="section-icon"><i className="fa fa-cogs"></i></span>信息的使用</h3>
           <p>我们收集的信息仅用于：</p>
           <ul className="privacy-list">
-            <li>向您提供核心功能（登录、发帖、评论、私信、收藏、世界频道等）；</li>
+            <li>向您提供核心功能（登录、发帖、评论、收藏、会馆等）；</li>
             <li>保障账号与社区安全（登录校验、风控限流、反滥用检测）；</li>
             <li>记住您的偏好（如明/暗主题），改善使用体验；</li>
             <li>以汇总、匿名形式进行统计分析，帮助我们改进服务。</li>
@@ -58,7 +58,8 @@ export default function PrivacyPage() {
           <h3><span className="section-icon"><i className="fa fa-exchange"></i></span>第三方服务</h3>
           <ul className="privacy-list">
             <li><b>邮件服务</b>：注册验证码、密码重置等邮件通过邮件服务商发送，仅传递必要的账号信息；</li>
-            <li><b>外部链接</b>：站点内的「会馆」「WIKI」等为第三方站点，离开本站后适用对方隐私政策；</li>
+            <li><b>会馆数据</b>：本站会馆为站内功能，会馆内容与服务均适用本隐私政策；</li>
+            <li><b>外部链接</b>：站点内的「WIKI」及站外跳转链接为第三方站点，离开本站后适用对方隐私政策；</li>
             <li><b>CDN 资源</b>：部分字体、头像等静态资源可能由内容分发网络提供。</li>
           </ul>
         </div>

@@ -22,20 +22,22 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    loadRandom();
+    // 延后一个 tick 发起请求，避免在 effect 内同步触发加载态更新
+    const t = window.setTimeout(loadRandom, 0);
+    return () => window.clearTimeout(t);
   }, [loadRandom]);
 
   return (
     <>
       <div className="home-container">
         <section className="home-quick-top">
-          <Link className="quick-top-entry" href="/World">
-            <div className="quick-top-icon">
-              <i className="fa fa-globe"></i>
+          <Link className="quick-top-entry" href="/huiguan">
+            <div className="quick-top-icon quick-top-icon-guild">
+              <i className="fa fa-home"></i>
             </div>
             <div className="quick-top-body">
-              <div className="quick-top-name">世界频道</div>
-              <div className="quick-top-desc">和小伙伴们一起聊天</div>
+              <div className="quick-top-name">会馆广场</div>
+              <div className="quick-top-desc">走进会馆，遇见同好</div>
             </div>
             <i className="fa fa-chevron-right quick-top-arrow"></i>
           </Link>

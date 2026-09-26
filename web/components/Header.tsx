@@ -171,10 +171,10 @@ export default function Header() {
           </button>
           <ul ref={menuRef}>
             <li className="header-collapsible">
-              <a className="header-btn" href="//hei.navifox.net">
+              <Link className="header-btn" href="/huiguan">
                 <i className="fa fa-home"></i>
                 <span>会馆</span>
-              </a>
+              </Link>
             </li>
             <li className="header-collapsible">
               <button className="header-btn" id="Easter-Egg" onClick={showEasterEgg}>
@@ -307,7 +307,7 @@ export default function Header() {
               )}
             </div>
             <Link className="mobile-menu-item" href="/WIKI" onClick={() => setShowMobileMenu(false)}><i className="fa fa-book"></i> WIKI</Link>
-            <a className="mobile-menu-item" href="//hei.navifox.net" onClick={() => setShowMobileMenu(false)}><i className="fa fa-home"></i> 会馆</a>
+            <Link className="mobile-menu-item" href="/huiguan" onClick={() => setShowMobileMenu(false)}><i className="fa fa-home"></i> 会馆</Link>
             <button className="mobile-menu-item" onClick={() => { setShowDonate(true); setShowMobileMenu(false); }}><i className="fa fa-heart"></i> 赞赏</button>
             <button className="mobile-menu-item" onClick={() => { setShowBug(true); setShowMobileMenu(false); }}><i className="fa fa-bug"></i> Bug举报</button>
             <button className="mobile-menu-item" id="pwa-install-mobile" onClick={installPWA}><i className="fa fa-download"></i> 安装论坛客户端</button>

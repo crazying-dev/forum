@@ -45,6 +45,10 @@ export interface Post {
   created_at?: string;
   user_name: string;
   user_avatar: string;
+  // 会馆归属（null/undefined 表示公共空间）
+  guild_id?: number | null;
+  guild_name?: string;
+  guild_theme_color?: string;
 }
 
 export interface Comment {
@@ -65,14 +69,120 @@ export interface ReplyItem extends Comment {
   post_title?: string;
 }
 
-export interface WorldMessage {
+// ---- 会馆 ----
+
+// 馆长摘要（列表/详情共用）
+export interface GuildLeader {
+  id: string;
+  name: string;
+  avatar: string;
+  intro: string;
+  bio?: string;
+}
+
+// 会馆列表项
+export interface GuildListItem {
   id: number;
-  sender_id: string;
-  sender_name: string;
-  sender_avatar?: string;
-  content: string;
-  parent_id?: number | null;
+  slug: string;
+  name: string;
+  intro: string;
+  theme_color: string;
+  member_count: number;
+  has_logo: boolean;
+  logo_version: number;
   created_at?: string;
+  leader?: GuildLeader | null;
+}
+
+// 会馆自定义分类
+export interface GuildCategory {
+  id: number;
+  guild_id: number;
+  name: string;
+  sort: number;
+}
+
+// 会馆公告
+export interface GuildAnnouncement {
+  id: number;
+  guild_id: number;
+  content: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// 会馆详情（logo_file_id 为管理端内部字段，接口不下发）
+export interface GuildDetail {
+  id: number;
+  slug: string;
+  name: string;
+  intro: string;
+  logo_version: number;
+  theme_color: string;
+  leader_user_id?: string | null;
+  leader_bio?: string;
+  created_at?: string;
+  updated_at?: string;
+  leader?: GuildLeader | null;
+  member_count: number;
+  has_logo: boolean;
+  categories: GuildCategory[];
+  announcements: GuildAnnouncement[];
+}
+
+// 当前用户与会馆的关系（详情页；未登录为 null）
+export interface GuildMyState {
+  is_member: boolean;
+  is_leader: boolean;
+  has_pending_request: boolean;
+  request_id?: number;
+}
+
+// 动态流条目（帖子或文章）
+export interface FeedItem {
+  type: "post" | "article";
+  id: string;
+  title: string;
+  summary: string;
+  category: string;
+  likes: number;
+  views: number;
+  comment_count: number;
+  created_at?: string;
+  updated_at?: string;
+  user_id: string;
+  user_name: string;
+  user_avatar: string;
+  guild_id?: number | null;
+  guild_name?: string | null;
+  guild_theme_color?: string | null;
+  author?: GuildLeader | null;
+  participants_count: number;
+}
+
+// 文章参与人
+export interface GuildArticleParticipant {
+  user_id: string;
+  user_name: string;
+  avatar: string;
+}
+
+// 会馆文章
+export interface GuildArticle {
+  id: string;
+  guild_id: number;
+  title: string;
+  summary: string;
+  content?: string;
+  author_user_id?: string;
+  views: number;
+  created_at?: string;
+  updated_at?: string;
+  author?: GuildLeader | null;
+  participants: GuildArticleParticipant[];
+  guild_slug?: string;
+  guild_name?: string;
+  guild_theme_color?: string;
 }
 
 export interface UserBrief {
@@ -84,6 +194,15 @@ export interface UserBrief {
   intro?: string;
   is_self?: boolean;
   is_following?: boolean;
+}
+
+// 用户所在会馆概要（个人中心标签）
+export interface GuildMembership {
+  id: number;
+  slug: string;
+  name: string;
+  theme_color: string;
+  is_leader: boolean;
 }
 
 export interface SearchResult {
@@ -135,9 +254,17 @@ export const authApi = {
 
 // ---- 用户 ----
 export const userApi = {
-  me: () => request<{ user?: User }>("/users/me"),
+  me: () => request<{ user?: User; guild?: GuildMembership | null; is_leader?: boolean }>("/users/me"),
   profile: (id: string) =>
-    request<{ user: User; stats?: any; follow_stats?: any; is_following?: boolean; is_self?: boolean }>(`/users/${id}`),
+    request<{
+      user: User;
+      stats?: { post_count: number; total_likes: number; total_views: number };
+      follow_stats?: { following_count: number; follower_count: number };
+      is_following?: boolean;
+      is_self?: boolean;
+      guild?: GuildMembership | null;
+      is_leader?: boolean;
+    }>(`/users/${id}`),
   posts: (id: string, page = 1, pageSize = 20) =>
     request<{ posts: Post[]; page: number; page_size: number }>(`/users/${id}/posts?page=${page}&page_size=${pageSize}`),
   favorites: (id: string, page = 1, pageSize = 20) =>
@@ -170,8 +297,12 @@ export const postApi = {
   random: () => request<{ posts: Post[] }>("/posts/random"),
   detail: (id: string) =>
     request<{ post: Post; comments: Comment[]; liked: boolean; favorited: boolean }>(`/posts/${id}`),
-  create: (title: string, content: string, category: string) =>
-    request<{ id: string }>("/posts", { method: "POST", body: JSON.stringify({ title, content, category }) }),
+  // guildId 传入时帖子归属该会馆（需为该馆成员），否则发到公共空间
+  create: (title: string, content: string, category: string, guildId?: number) =>
+    request<{ id: string }>("/posts", {
+      method: "POST",
+      body: JSON.stringify(guildId ? { title, content, category, guild_id: guildId } : { title, content, category }),
+    }),
   like: (id: string) => request<{ liked: boolean; likes: number }>(`/posts/${id}/like`, { method: "POST" }),
   favorite: (id: string) => request<{ favorited: boolean }>(`/posts/${id}/favorite`, { method: "POST" }),
   remove: (id: string) => request<{ success: boolean }>(`/posts/${id}/delete`, { method: "POST" }),
@@ -185,11 +316,35 @@ export const postApi = {
   likeComment: (id: string) => request<{ liked: boolean; likes: number }>(`/comments/${id}/like`, { method: "POST" }),
 };
 
-// ---- 世界频道 ----
-export const worldApi = {
-  messages: () => request<WorldMessage[]>("/world/messages"),
-  send: (content: string, parentId?: number) =>
-    request<{ success: boolean }>("/world/messages", { method: "POST", body: JSON.stringify({ content, parent_id: parentId ?? null }) }),
+// ---- 会馆 ----
+export const guildApi = {
+  list: () => request<{ guilds: GuildListItem[] }>("/guilds"),
+  detail: (slug: string) =>
+    request<{ guild: GuildDetail; my_state: GuildMyState | null }>(`/guilds/${encodeURIComponent(slug)}`),
+  feed: (slug: string, page = 1, pageSize = 20, category = "") =>
+    request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; guild: { id: number; slug: string; name: string; theme_color: string } }>(
+      `/guilds/${encodeURIComponent(slug)}/feed?page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`
+    ),
+  article: (id: string) =>
+    request<{ article: GuildArticle }>(`/articles/${encodeURIComponent(id)}`),
+  join: (slug: string, reason = "") =>
+    request<{ request_id: number; message: string }>(`/guilds/${encodeURIComponent(slug)}/join`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  cancelJoin: (slug: string) =>
+    request<{ message: string }>(`/guilds/${encodeURIComponent(slug)}/join/cancel`, { method: "POST" }),
+  leave: (slug: string) =>
+    request<{ message: string }>(`/guilds/${encodeURIComponent(slug)}/leave`, { method: "POST" }),
+};
+
+// ---- 全站信息流 ----
+export const feedApi = {
+  // space: all | public | guild（guild 时可用 guildId 指定具体会馆；不带则全部会馆帖子）
+  list: (space: "all" | "public" | "guild" = "all", guildId = 0, category = "", page = 1, pageSize = 20) =>
+    request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; space: string }>(
+      `/feed?space=${space}&guild_id=${guildId}&page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`
+    ),
 };
 
 // ---- 搜索/杂项 ----
@@ -199,7 +354,6 @@ export const miscApi = {
   reportBug: (data: { title: string; detail: string; steps?: string; contact?: string; page_url?: string }) =>
     request<{ id: number }>("/reports/bug", { method: "POST", body: JSON.stringify(data) }),
   easterEgg: () => request<{ ID: string; Name: string; Text: string }>("/easter-egg"),
-  huiGuan: () => request<{ list: unknown }>("/hui-guan"),
 };
 
 export { request };

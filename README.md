@@ -35,8 +35,8 @@
 | 帖子 | 分类浏览、分页、随机推荐、Markdown 编辑预览、点赞、收藏、举报、软删除（仅作者）、SafeHTML 内容净化 |
 | 评论 | 发表/回复（parent_id 嵌套）、点赞、删除（仅作者）、时间展示 |
 | 搜索 | 帖子 + 用户双通道、加载更多 |
-| 世界频道 | 实时消息（3s 轮询）、发送限速（2s/条） |
-| 其他 | 版本投票、Bug 举报、彩蛋、会馆、WIKI 全套（官方/个人/鼠标/Live2D）、隐私政策、PWA、主题切换（亮/暗 + 时段自动）、RSS/robots |
+| 会馆 | 会馆广场列表与详情（馆长/成员数/分类/公告）、会馆信息流（帖子 + 文章混排与分页）、文章阅读、入馆申请与退馆（申请由管理端审批）、全站信息流三档筛选（全部/公共广场/会馆） |
+| 其他 | 版本投票、Bug 举报、彩蛋、WIKI 全套（官方/个人/鼠标/Live2D）、隐私政策、PWA、主题切换（亮/暗 + 时段自动）、RSS/robots |
 | 通知 | SMTP 邮件：注册验证码、密码重置、登录提醒、粉丝/评论通知、Bug 通知（异步 goroutine） |
 
 ## 技术栈（ov2）
@@ -57,7 +57,7 @@
 │   ├── cmd/yj-forum/    # 入口（迁移 SQL 已嵌入二进制）
 │   └── internal/        # auth / cache / config / database / email / handler / middleware / models
 ├── web/             # Next.js 前端（App Router，standalone 输出）
-│   ├── app/             # 页面（首页/论坛/帖子/用户/世界/WIKI/搜索等）
+│   ├── app/             # 页面（首页/论坛/帖子/文章/会馆/用户/WIKI/搜索等）
 │   ├── components/      # 共享组件（Header/Card/Modal/Toast 等）
 │   ├── lib/             # api.ts / store.tsx（站点状态、主题）
 │   └── public/assets/   # 本地化静态资源（图片/字体/CSS/JS/Live2D）
@@ -109,7 +109,7 @@ make dev          # 一键启动：Docker PGSQL + Go 后端(:8090) + Next.js(:32
 1. **数据库**：外部 PGSQL，连接串写入 `server/.env` 的 `DATABASE_URL`；
 2. **后端**：`make server-build` 编译二进制 → `deploy/yj-forum.service` 交给 systemd；
 3. **前端**：`pnpm build` 产出 `.next/standalone`，`node server.js` 运行（`yj-web.service`）；
-4. **Nginx**：`/api/*`、`/avatar/*` 反代 Go(:8090)，其余反代 Next.js(:3000)；
+4. **Nginx**：`/api/*`、`/avatar/*` 反代 Go(:8090)，`/guild-img/*` 反代会馆 logo 的管理端(:8080)，其余反代 Next.js(:3000)；
 5. **HTTPS**：`deploy/nginx/yj-forum.conf` 内含 443 配置模板。
 
 ## 文档

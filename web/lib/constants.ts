@@ -28,6 +28,18 @@ export function categoryColor(category?: string): string {
   return CATEGORY_COLORS[category || ""] || "#6A8C89";
 }
 
+// 会馆主题色：校验 hex（#RGB/#RRGGBB），非法时回退默认主色
+const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+export function themeColor(color?: string, fallback = "#6A8C89"): string {
+  const c = (color || "").trim();
+  return HEX_COLOR_RE.test(c) ? c : fallback;
+}
+
+// 主题色浅底（拼接透明度后缀，如 #6A8C89 + 22 ≈ 13%）；用于标签/卡片浅色背景
+export function themeTint(color?: string, alpha = "22"): string {
+  return themeColor(color) + alpha;
+}
+
 // 相对时间（刚刚 / N分钟前 / N小时前 / N天前 / 日期）
 export function timeAgo(ts?: string): string {
   if (!ts) return "";

@@ -10,8 +10,8 @@ import { ProfilePrefixBadge } from "@/components/PrefixBadge";
 import CategoryBadge from "@/components/ui/CategoryBadge";
 import { useToast } from "@/components/Toast";
 import { UserAvatar } from "@/components/ui/UserAvatar";
-import { userApi, postApi, User, Post, UserBrief, ReplyItem, ApiException } from "@/lib/api";
-import { ageDisplay } from "@/lib/constants";
+import { userApi, postApi, User, Post, UserBrief, ReplyItem, ApiException, GuildMembership } from "@/lib/api";
+import { ageDisplay, themeColor, themeTint } from "@/lib/constants";
 import { useStore } from "@/lib/store";
 
 function fmtDate(v?: string) {
@@ -32,6 +32,8 @@ export default function UserPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
+  const [guild, setGuild] = useState<GuildMembership | null>(null);
+  const [isLeader, setIsLeader] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showFollowList, setShowFollowList] = useState<null | "following" | "followers">(null);
   const [followUsers, setFollowUsers] = useState<UserBrief[]>([]);
@@ -49,6 +51,8 @@ export default function UserPage() {
       setFollowStats(r.follow_stats);
       setIsFollowing(!!r.is_following);
       setIsSelf(!!r.is_self || userId === id);
+      setGuild(r.guild || null);
+      setIsLeader(!!r.is_leader);
       const p = await userApi.posts(id, 1, 20);
       setPosts(p.posts || []);
     } catch (e) {
@@ -174,6 +178,29 @@ export default function UserPage() {
                     <i className="fa fa-envelope"></i> 验证邮箱
                   </button>
                 )
+              )}
+            </div>
+            <div className="user-guild-row" id="user-profile-guild">
+              {guild ? (
+                <>
+                  <Link
+                    className="user-guild-tag"
+                    href={`/huiguan/${guild.slug}`}
+                    title={`进入会馆「${guild.name}」`}
+                    style={{ background: themeTint(guild.theme_color), color: themeColor(guild.theme_color) }}
+                  >
+                    <i className="fa fa-home"></i> {guild.name}
+                  </Link>
+                  {isLeader && (
+                    <span className="user-guild-leader-tag" style={{ background: themeTint(guild.theme_color), color: themeColor(guild.theme_color) }}>
+                      <i className="fa fa-crown"></i> 馆长
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="user-guild-tag user-guild-none" id="user-profile-no-guild">
+                  <i className="fa fa-home"></i> 未加入会馆
+                </span>
               )}
             </div>
           </div>

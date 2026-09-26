@@ -2,10 +2,19 @@ import Link from "next/link";
 import type { Post } from "@/lib/api";
 import { timeAgo } from "@/lib/constants";
 import CategoryBadge from "./ui/CategoryBadge";
+import SpaceBadge from "./ui/SpaceBadge";
 import { UserAvatar, UserName } from "./ui/UserAvatar";
 
-/** 帖子卡片（与 legacy renderPostCard 结构 1:1） */
-export default function PostCard({ post, showTime = true }: { post: Post; showTime?: boolean }) {
+/** 帖子卡片（与 legacy renderPostCard 结构 1:1）；showSpace 开启后显示会馆/公共空间标签 */
+export default function PostCard({
+  post,
+  showTime = true,
+  showSpace = false,
+}: {
+  post: Post;
+  showTime?: boolean;
+  showSpace?: boolean;
+}) {
   const summary = (post.summary || "").replace(/<[^>]+>/g, "").substring(0, 100);
 
   return (
@@ -18,6 +27,7 @@ export default function PostCard({ post, showTime = true }: { post: Post; showTi
       <div className="post-card-body">
         <div className="post-card-header">
           <CategoryBadge category={post.category} />
+          {showSpace && <SpaceBadge name={post.guild_name} color={post.guild_theme_color} />}
           <span className="post-card-author Username">
             <UserName name={post.user_name} userId={post.user_id} />
           </span>
