@@ -32,7 +32,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-26T15:10:00+08:00",
+    "updated_at": "2026-09-26T20:40:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -42,17 +42,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.2.5",
+                    "version": "1.3.0",
                     "channel": "stable",
                     "date": "2026-09-26",
-                    "size": 48516817,
+                    "size": 48521108,
                     "url": "https://www.yjlt.top/api/app/windows/forum.exe",
-                    "sha256": "22b97d03d55f414b51e988c1c9b22d47a791c88b1e9f6bb475ad974ec4e73184",
+                    "sha256": "7ff129096a344950154f798a5676dc3a5767e619b460cf4054535f78a71acb19",
                     "notes": [
-                        "检查更新发现新版本时弹窗询问是否下载（V1.2.5）",
-                        "应用内下载安装包，带进度条 / 速度 / 预计剩余时间",
-                        "下载完成后询问「立即安装」，安装即重启客户端",
-                        "托盘 / 下载页 / 设置 三处更新入口统一为同一套弹窗",
+                        "修复个人主页帖子显示「匿名用户」+ 默认头像的问题（V1.3.0）",
+                        "服务端 /api/user/<id>/posts 补全作者字段（user_id / user_name / user_avatar）",
+                        "客户端个人主页帖子卡片对历史接口做作者信息兜底",
+                        "主程序与安装包均写入 1.3.0 版本信息，文件属性可直接查看",
                     ],
                     "mandatory": False,
                 }
