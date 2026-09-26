@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 例外：环境变量模板需入库（与已跟踪的 server/.env.example 对齐）
+!.env.example
 
 # vercel
 .vercel
