@@ -78,8 +78,8 @@ def search_users(keyword, page=1, page_size=20):
 
     token_clauses, where_params = [], []
     for like in likes:
-        token_clauses.append("(name ILIKE %s OR prefix ILIKE %s)")
-        where_params.extend([like, like])
+        token_clauses.append("(name ILIKE %s)")
+        where_params.extend([like])
     where_clause = " AND ".join(token_clauses)
 
     count_row = execute_query(
@@ -92,13 +92,12 @@ def search_users(keyword, page=1, page_size=20):
     score_parts, score_params = [], []
     for like in likes:
         score_parts.append("(CASE WHEN name ILIKE %s THEN 100 ELSE 0 END)")
-        score_parts.append("(CASE WHEN prefix ILIKE %s THEN 30 ELSE 0 END)")
-        score_params.extend([like, like])
+        score_params.extend([like])
     score_expr = " + ".join(score_parts)
 
     rows = execute_query(
         f"""
-        SELECT id, name, avatar, vip, prefix, created_at, ({score_expr}) AS relevance
+        SELECT id, name, avatar, vip, created_at, ({score_expr}) AS relevance
         FROM users
         WHERE is_banned = 0 AND ({where_clause})
         ORDER BY relevance DESC, created_at DESC
@@ -114,7 +113,6 @@ def search_users(keyword, page=1, page_size=20):
             "name": r.get("name"),
             "avatar": r.get("avatar"),
             "vip": r.get("vip") or "0",
-            "prefix": r.get("prefix") or "",
             "created_at": str(r.get("created_at")) if r.get("created_at") else None,
         })
     return users, total

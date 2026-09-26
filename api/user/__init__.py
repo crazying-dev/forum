@@ -118,7 +118,6 @@ def _strip_user_public(user: dict | None) -> dict | None:
         "age": user.get("age") or "",
         "intro": user.get("intro") or "",
         "vip": user.get("vip") or "0",
-        "prefix": user.get("prefix") or "",
         "title": user.get("title") or "",
         "email_verified": user.get("email_verified", 0),
         "created_at": user.get("created_at"),
@@ -350,8 +349,6 @@ def api_user_update():
         if not ok:
             return jsonify({"success": False, "message": msg}), 400
         payload["name"] = name
-    if "prefix" in data and isinstance(data["prefix"], str):
-        payload["prefix"] = data["prefix"].strip()[:32]
 
     if not payload:
         return jsonify({"success": False, "message": "没有可更新的字段"}), 400

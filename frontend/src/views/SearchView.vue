@@ -88,7 +88,6 @@ onMounted(() => { if (keyword.value) load(true); else loading.value = false })
               <div v-for="u in users" :key="u.id" class="post-item">
                 <span v-html="avatarHtml(u.avatar)"></span>
                 <a class="link-user" :href="'/users/' + esc(u.id)">{{ u.name }}</a>
-                <span v-if="u.prefix" class="tag" style="margin-left:6px;">{{ u.prefix }}</span>
               </div>
             </div>
             <div v-else class="empty">无相关用户</div>

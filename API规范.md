@@ -158,7 +158,6 @@ OpenAPI 机器可读文档见同目录 [API.json](./API.json)，版本号同步�
       "age": "20",
       "intro": "...",
       "vip": "0",
-      "prefix": "",
       "email_verified": 0,
       "created_at": "2026-08-24T12:00:00+08:00",
       "last_login": "2026-08-24T19:30:00+08:00"
@@ -177,7 +176,6 @@ OpenAPI 机器可读文档见同目录 [API.json](./API.json)，版本号同步�
   | age    | str  | ≤32 字符 |
   | intro  | str  | 个人简介 |
   | name   | str  | 新昵称（2-20 字符，做唯一性校验） |
-  | prefix | str  | 称号前缀（≤32 字符） |
 - **成功 200**：返回更新后的最新资料。
 - **失败 400**：字段非法 / 昵称冲突。
 
@@ -366,7 +364,7 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 - `GET /api/search?k=<关键词>&page=1&page_size=20&type=both`
 - `type`：`posts` / `users` / `both`（默认 both）
 - 关键词 ≥2 字符（否则 400）；支持空格分隔多关键词（AND 关系）
-- 相关性排序：标题/名称命中 > 内容/称号 > 分类/简介
+- 相关性排序：标题/名称命中 > 内容 > 分类
 - 成功 200：`{success, keyword, posts, posts_total, posts_has_more, users, users_total, users_has_more, page, page_size}`
 
 ---

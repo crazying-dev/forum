@@ -4,7 +4,7 @@
  后端契约（python 可直接断言）
   B1  帖子类型完全汉化（config ALLOWED_CATEGORIES × CATEGORY_MAP 1:1 覆盖）
   B2  年龄改为日期选择（API 接受 YYYY-MM-DD 字符串保存）
-  B4  搜索用户不再匹配简介（search_users 仅 name/prefix）
+  B4  搜索用户不再匹配简介（search_users 仅 name）
   B6  /auth 路径存在并承载三模式；/login /register /reset-password 跳 /auth
   B13 /WIKI 页面无错别字/棍母、无 Barkground 等错误类名
   B15 邮件多收件人逐个 To（已存在老测试，这里仅确认仍生效）

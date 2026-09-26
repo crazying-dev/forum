@@ -110,11 +110,6 @@
             "description": "VIP 等级，默认 0",
             "example": "0"
           },
-          "prefix": {
-            "type": "string",
-            "description": "称号前缀，可为空",
-            "example": "妖精"
-          },
           "email_verified": {
             "type": "integer",
             "enum": [
@@ -798,7 +793,7 @@
           "User"
         ],
         "summary": "更新当前登录用户资料",
-        "description": "支持部分字段更新：avatar、gender、age、intro、name、prefix。其中 name 会做唯一性校验，冲突返回 400。POST 方法同样可用。",
+        "description": "支持部分字段更新：avatar、gender、age、intro、name。其中 name 会做唯一性校验，冲突返回 400。POST 方法同样可用。",
         "security": [
           {
             "cookieAuth": []
@@ -839,11 +834,6 @@
                     "minLength": 2,
                     "maxLength": 20,
                     "description": "新昵称"
-                  },
-                  "prefix": {
-                    "type": "string",
-                    "maxLength": 32,
-                    "description": "称号前缀"
                   }
                 },
                 "minProperties": 1

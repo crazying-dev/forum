@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS users (
     age VARCHAR(32) DEFAULT '',
     intro TEXT DEFAULT '',
     vip VARCHAR(32) NOT NULL DEFAULT '0',
-    prefix VARCHAR(32) DEFAULT '',
     title VARCHAR(64) DEFAULT '',
     is_banned INTEGER NOT NULL DEFAULT 0,
     email_verified INTEGER NOT NULL DEFAULT 0,
@@ -212,7 +211,6 @@ CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_posts_content_trgm ON posts USING gin (content gin_trgm_ops);",
     "CREATE INDEX IF NOT EXISTS idx_posts_category_trgm ON posts USING gin (category gin_trgm_ops);",
     "CREATE INDEX IF NOT EXISTS idx_users_name_trgm ON users USING gin (name gin_trgm_ops);",
-    "CREATE INDEX IF NOT EXISTS idx_users_prefix_trgm ON users USING gin (prefix gin_trgm_ops);",
     "CREATE INDEX IF NOT EXISTS idx_users_intro_trgm ON users USING gin (intro gin_trgm_ops);",
 ]
 
@@ -271,7 +269,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "29"
+STATIC_VERSION = "30"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值

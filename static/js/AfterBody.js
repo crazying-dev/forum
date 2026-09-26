@@ -1264,7 +1264,6 @@
             html += d.users.length ? d.users.map(function (u) {
               return '<div class="post-item">' + avatarHtml(u.avatar) +
                 ' <a class="link-user" href="/users/' + esc(u.id) + '">' + esc(u.name) + '</a>' +
-                (u.prefix ? '<span class="tag" style="margin-left:6px;">' + esc(u.prefix) + '</span>' : '') +
                 '</div>';
             }).join('') : '<div class="empty">无相关用户</div>';
           }
@@ -1301,7 +1300,7 @@
       profile.innerHTML =
         avatarHtml(u.avatar, 'avatar-lg') +
         '<div class="user-profile-info-wrap">' +
-        '<div class="user-profile-name">' + esc(u.name) + (u.prefix ? ' <span class="tag">' + esc(u.prefix) + '</span>' : '') + '</div>' +
+        '<div class="user-profile-name">' + esc(u.name) + '</div>' +
         '<div class="user-profile-stats">' +
         '<span>帖子 ' + (s.post_count || 0) + '</span>' +
         '<button class="stat-btn" data-list="followers">粉丝 ' + (s.follower_count || 0) + '</button>' +
@@ -1396,7 +1395,6 @@
           return '<div class="user-list-item">' +
             avatarHtml(u.avatar) +
             '<a class="link-user" href="/users/' + esc(u.id) + '">' + esc(u.name) + '</a>' +
-            (u.prefix ? '<span class="tag" style="margin-left:6px;">' + esc(u.prefix) + '</span>' : '') +
             '</div>';
         }).join('');
         resolveAvatarDeferred(body);
@@ -1429,7 +1427,6 @@
     el('editName').value = u.name || '';
     el('editGender').value = String(u.gender == null ? 0 : u.gender);
     el('editAge').value = toDateValue(u.age);
-    el('editPrefix').value = u.prefix || '';
     el('editIntro').value = u.intro || '';
     el('editError').textContent = '';
     modal.style.display = 'flex';
@@ -1472,7 +1469,6 @@
         name: el('editName').value.trim(),
         gender: parseInt(el('editGender').value, 10) || 0,
         age: el('editAge').value.trim(),
-        prefix: el('editPrefix').value.trim(),
         intro: el('editIntro').value.trim()
       };
       if (pendingAvatar) body.avatar = pendingAvatar;

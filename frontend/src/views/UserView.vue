@@ -24,7 +24,7 @@ const commentsVisible = ref(false)
 const cmtCollapsed = ref(false)   // 我的评论折叠（与「我的收藏」一致）
 // 资料编辑弹窗
 const editOpen = ref(false)
-const editForm = ref({ name: '', gender: '0', prefix: '', intro: '' })
+const editForm = ref({ name: '', gender: '0', intro: '' })
 // 出生日期选择器（沿用 V1 组件：年 ± 步进 / 月 / 日，存库格式 YYYYMMDD）
 const bpYear = ref(new Date().getFullYear())
 const bpMonth = ref(1)
@@ -182,7 +182,7 @@ function closeList() { listModalOpen.value = false }
 // ── 编辑资料弹窗 ──
 function openEdit() {
   const u = user.value
-  editForm.value = { name: u.name || '', gender: String(u.gender == null ? 0 : u.gender), prefix: u.prefix || '', intro: u.intro || '' }
+  editForm.value = { name: u.name || '', gender: String(u.gender == null ? 0 : u.gender), intro: u.intro || '' }
   const ymd = parseAgeToYmd(u.age)
   bpYear.value = ymd ? String(ymd.y) : String(new Date().getFullYear())
   bpMonth.value = ymd ? ymd.m : 1
@@ -240,7 +240,6 @@ function saveEdit() {
   const body = {
     name: editForm.value.name.trim(),
     gender: parseInt(editForm.value.gender, 10) || 0,
-    prefix: editForm.value.prefix.trim(),
     intro: editForm.value.intro.trim(),
   }
   // 生日只在用户实际改动选择器时提交，格式 YYYYMMDD（与 V1 一致）
@@ -445,7 +444,7 @@ onMounted(load)
       <div class="card user-profile">
         <span v-html="avatarHtml(user.avatar, 'avatar-lg')"></span>
         <div class="user-profile-info-wrap">
-          <div class="user-profile-name">{{ user.name }} <span v-if="user.prefix" class="tag">{{ user.prefix }}</span><span v-if="user.title" class="user-title">{{ user.title }}</span></div>
+          <div class="user-profile-name">{{ user.name }}<span v-if="user.title" class="user-title">{{ user.title }}</span></div>
           <div class="user-profile-meta">
             <span class="user-meta-item"><i class="fa fa-birthday-cake"></i> {{ ageDisplay }}</span>
           </div>
@@ -520,7 +519,6 @@ onMounted(load)
             <div v-for="u in listUsers" :key="u.id" class="user-list-item">
               <span v-html="avatarHtml(u.avatar)"></span>
               <a class="link-user" :href="'/users/' + esc(u.id)">{{ u.name }}</a>
-              <span v-if="u.prefix" class="tag" style="margin-left:6px;">{{ u.prefix }}</span>
             </div>
           </div>
         </div>
@@ -629,10 +627,6 @@ onMounted(load)
             <span class="bp-sep">-</span>
             <input v-model="bpDay" class="bp-day" type="number" min="1" max="31" @input="bpDirty = true">
           </div>
-        </div>
-        <div class="form-group">
-          <label>称号前缀</label>
-          <input v-model="editForm.prefix" type="text" maxlength="32" placeholder="如：妖精">
         </div>
         <div class="form-group">
           <label>简介</label>

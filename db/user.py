@@ -34,7 +34,6 @@ def _row_to_user(row: Optional[dict]) -> Optional[dict]:
         "age": row.get("age") or "",
         "intro": row.get("intro") or "",
         "vip": row.get("vip") or "0",
-        "prefix": row.get("prefix") or "",
         "title": row.get("title") or "",
         "is_banned": row.get("is_banned", 0),
         "email_verified": row.get("email_verified", 0),
@@ -169,7 +168,7 @@ def LoginINFOTrueorFlase(username_or_email: str, raw_password: str, client_ip: O
 # ──────────────────────────────────────────────
 # 更新用户信息
 # ──────────────────────────────────────────────
-_ALLOWED_UPDATE_FIELDS = {"avatar", "gender", "age", "intro", "name", "prefix"}
+_ALLOWED_UPDATE_FIELDS = {"avatar", "gender", "age", "intro", "name"}
 
 
 def update_user(user_id: str, **fields) -> tuple[bool, str]:
@@ -177,7 +176,7 @@ def update_user(user_id: str, **fields) -> tuple[bool, str]:
 
     Args:
         user_id: 目标用户 ID
-        **fields: avatar/gender/age/intro/name/prefix
+        **fields: avatar/gender/age/intro/name
 
     Returns:
         (ok, message)
