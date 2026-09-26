@@ -16,7 +16,9 @@ import sys
 
 from PyInstaller.utils.hooks import collect_all
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(SPECPATH), ".."))
+# PyInstaller 把 SPECPATH 设为 **本 spec 文件所在的目录**（即 packaging/），
+# 因此仓库根目录是它的上一级；不要再套一层 dirname（否则会跑到仓库外面去）。
+ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
 
 binaries = []
 datas = [(os.path.join(ROOT, "resources"), "resources")]
