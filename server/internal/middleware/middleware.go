@@ -26,7 +26,11 @@ var (
 
 // RateLimit 简易速率限制（key 维度 + 客户端 IP）。
 // 返回 true 表示超限（应返回 429）。
+// window 必须传 time.Duration（如 300*time.Second）；小于 1 秒的窗口一律视为误传裸整数，回退为 1 分钟防御。
 func RateLimit(key string, maxCount int, window time.Duration) gin.HandlerFunc {
+	if window < time.Second {
+		window = time.Minute
+	}
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 		rk := key + ":" + ip

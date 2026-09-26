@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -43,7 +44,7 @@ func (h *MiscHandler) userFromCookie(c *gin.Context) string {
 
 // SendRegisterCode 注册验证码。
 func (h *MiscHandler) SendRegisterCode(c *gin.Context) {
-	mw := middleware.RateLimit("register_code", 3, 300)
+	mw := middleware.RateLimit("register_code", 3, 300*time.Second)
 	mw(c)
 	if c.IsAborted() {
 		return

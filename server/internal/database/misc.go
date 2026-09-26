@@ -142,7 +142,7 @@ func (d *DB) SearchPosts(ctx context.Context, keyword string, page, pageSize int
 	}
 	_ = d.QueryRow(ctx, "SELECT COUNT(*) FROM posts p "+where, args...).Scan(&total)
 	// 相关性: title 100, content 50, 简化: 标题命中优先
-	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
+	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, `+postSummaryExpr+`, p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
 		p.guild_id, g.name, g.theme_color,

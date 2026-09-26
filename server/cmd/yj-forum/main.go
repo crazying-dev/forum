@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -36,12 +38,12 @@ func main() {
 	}
 	defer db.Close()
 
-	// 2. 迁移（golang-migrate，嵌入二进制，无工作目录依赖）
+	// 2. 迁移（golang-migrate，嵌入二进制，无工作目录依赖）；失败即退出（fail-fast），
+	// 避免缺失新列/新表时无守卫引用打挂核心读路径
 	if err := database.Migrate(cfg.DatabaseURL); err != nil {
-		log.Printf("[WARN] 迁移执行失败（表可能已存在）: %v", err)
-	} else {
-		log.Println("[DB] 迁移完成")
+		log.Fatalf("[FATAL] 数据库迁移失败，服务退出: %v", err)
 	}
+	log.Println("[DB] 迁移完成")
 
 	// 3. 会话/邮件
 	sessions := &auth.SessionManager{DB: db}
@@ -52,13 +54,20 @@ func main() {
 	r := gin.New()
 	handler.Register(r, cfg, db, sessions, mailer)
 
-	// 5. 后台清理任务
+	// 5. 后台清理任务（10 分钟：会话/验证码；1 小时：过期媒体文件）
 	go func() {
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			sessions.Cleanup(ctx)
-			_ = db.CleanExpiredVerifyCodes(ctx)
+		cleanTicker := time.NewTicker(10 * time.Minute)
+		defer cleanTicker.Stop()
+		mediaTicker := time.NewTicker(1 * time.Hour)
+		defer mediaTicker.Stop()
+		for {
+			select {
+			case <-cleanTicker.C:
+				sessions.Cleanup(ctx)
+				_ = db.CleanExpiredVerifyCodes(ctx)
+			case <-mediaTicker.C:
+				cleanDeletedMediaFiles(ctx, db, cfg.MediaDir)
+			}
 		}
 	}()
 
@@ -83,4 +92,27 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// cleanDeletedMediaFiles 清理已删除（status=0）且超过 7 天的媒体物理文件；行记录保留，文件已不存在则忽略。
+func cleanDeletedMediaFiles(ctx context.Context, db *database.DB, mediaDir string) {
+	assets, err := db.ListExpiredMediaAssets(ctx, 7)
+	if err != nil {
+		log.Printf("[MEDIA] 过期媒体查询失败: %v", err)
+		return
+	}
+	removed := 0
+	for _, a := range assets {
+		// 路径穿越防护（防御性，文件名本由服务端生成）
+		if a.FileName == "" || strings.Contains(a.FileName, "..") ||
+			strings.Contains(a.FileName, "/") || strings.Contains(a.FileName, "\\") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(mediaDir, a.FileName)); err == nil {
+			removed++
+		}
+	}
+	if removed > 0 {
+		log.Printf("[MEDIA] 已清理 %d 个过期媒体文件", removed)
+	}
 }

@@ -34,6 +34,7 @@ type Config struct {
 	// 存储
 	AvatarDir string // 头像本地目录
 	DataDir   string // 黑名单等数据目录
+	MediaDir  string // 用户媒体（发帖图片）本地目录
 
 	// 业务
 	ImageFatherURL string
@@ -63,6 +64,7 @@ func Load() *Config {
 		ReceiverAll:    getEnv("RECEIVERALL", ""),
 		AvatarDir:      getEnv("AVATAR_DIR", "/var/yj-forum/avatar"),
 		DataDir:        getEnv("DATA_DIR", "/var/yj-forum/data"),
+		MediaDir:       getEnv("MEDIA_DIR", "/var/yj-forum/media"),
 		ImageFatherURL: getEnv("IMAGE_FATHER_URL", "https://img.crazying-dev.top/text/one"),
 		PublicBaseURL:  getEnv("PUBLIC_BASE_URL", "localhost:3000"),
 		EasterEggPath:  getEnv("EASTER_EGG_PATH", "main/EasterEgg/1.json"),

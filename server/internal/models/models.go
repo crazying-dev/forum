@@ -35,19 +35,20 @@ type UserBrief struct {
 
 // Post 帖子。
 type Post struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	Title      string     `json:"title"`
-	Content    string     `json:"content"`
-	Summary    string     `json:"summary,omitempty"`
-	Category   string     `json:"category"`
-	Likes      int        `json:"likes"`
-	Views      int        `json:"views"`
-	Status     int        `json:"status"`
-	CreatedAt  *time.Time `json:"created_at"`
-	UpdatedAt  *time.Time `json:"updated_at"`
-	UserName   string     `json:"user_name"`
-	UserAvatar string     `json:"user_avatar"`
+	ID            string     `json:"id"`
+	UserID        string     `json:"user_id"`
+	Title         string     `json:"title"`
+	Content       string     `json:"content"`
+	ContentFormat string     `json:"content_format"` // 正文存储形态：markdown（历史数据）/ html（新富文本）
+	Summary       string     `json:"summary,omitempty"`
+	Category      string     `json:"category"`
+	Likes         int        `json:"likes"`
+	Views         int        `json:"views"`
+	Status        int        `json:"status"`
+	CreatedAt     *time.Time `json:"created_at"`
+	UpdatedAt     *time.Time `json:"updated_at"`
+	UserName      string     `json:"user_name"`
+	UserAvatar    string     `json:"user_avatar"`
 	// 作者所属会馆（无会馆时为 "" / "" / false）
 	UserGuildName       string `json:"user_guild_name"`
 	UserGuildThemeColor string `json:"user_guild_theme_color"`
@@ -146,6 +147,25 @@ type GuildLeaderPage struct {
 	Leader    *GuildLeaderInfo `json:"leader"`
 	LeaderBio string           `json:"leader_bio"`
 	Content   string           `json:"content"`
+}
+
+// GuildIntroSummary 会馆介绍页头（会馆概要 + 统计 + 封面）。
+type GuildIntroSummary struct {
+	UUID          string     `json:"uuid"`
+	Slug          string     `json:"slug"`
+	Name          string     `json:"name"`
+	Intro         string     `json:"intro"`
+	ThemeColor    string     `json:"theme_color"`
+	CreatedAt     *time.Time `json:"created_at"`
+	MemberCount   int        `json:"member_count"`
+	CategoryCount int        `json:"category_count"`
+	CoverFileID   string     `json:"cover_file_id"`
+}
+
+// GuildIntroPage 会馆介绍页（富文本正文）。
+type GuildIntroPage struct {
+	Guild   GuildIntroSummary `json:"guild"`
+	Content string            `json:"content"`
 }
 
 // GuildListItem 会馆列表项。
@@ -249,6 +269,7 @@ type GuildArticle struct {
 	Title           string                    `json:"title"`
 	Summary         string                    `json:"summary"`
 	Content         string                    `json:"content,omitempty"`
+	ContentFormat   string                    `json:"content_format"` // 正文存储形态：markdown（历史数据）/ html（富文本）
 	AuthorUserID    *string                   `json:"author_user_id,omitempty"`
 	Views           int                       `json:"views"`
 	CreatedAt       *time.Time                `json:"created_at"`
@@ -258,6 +279,57 @@ type GuildArticle struct {
 	GuildSlug       string                    `json:"guild_slug,omitempty"`
 	GuildName       string                    `json:"guild_name,omitempty"`
 	GuildThemeColor string                    `json:"guild_theme_color,omitempty"`
+}
+
+// ArticleSearchItem 文章搜索结果项。
+type ArticleSearchItem struct {
+	ID        string     `json:"id"`
+	Title     string     `json:"title"`
+	GuildName string     `json:"guild_name"`
+	CreatedAt *time.Time `json:"created_at"`
+}
+
+// ---- 引用卡片（embeds）----
+
+// EmbedGuild 引用卡片中用户所属会馆的摘要。
+type EmbedGuild struct {
+	Name       string `json:"name"`
+	Slug       string `json:"slug"`
+	ThemeColor string `json:"theme_color"`
+}
+
+// EmbedUser 引用卡片用户（无会馆时 guild 为 null）。
+type EmbedUser struct {
+	ID     string      `json:"id"`
+	Name   string      `json:"name"`
+	Avatar string      `json:"avatar"`
+	VIP    string      `json:"vip"`
+	Prefix string      `json:"prefix"`
+	Intro  string      `json:"intro"`
+	Guild  *EmbedGuild `json:"guild"`
+}
+
+// EmbedPost 引用卡片帖子。
+type EmbedPost struct {
+	ID         string     `json:"id"`
+	Title      string     `json:"title"`
+	UserID     string     `json:"user_id"`
+	UserName   string     `json:"user_name"`
+	UserAvatar string     `json:"user_avatar"`
+	Category   string     `json:"category"`
+	CreatedAt  *time.Time `json:"created_at"`
+	GuildName  string     `json:"guild_name"`
+}
+
+// EmbedArticle 引用卡片文章。
+type EmbedArticle struct {
+	ID           string     `json:"id"`
+	Title        string     `json:"title"`
+	AuthorID     string     `json:"author_id"`
+	AuthorName   string     `json:"author_name"`
+	AuthorAvatar string     `json:"author_avatar"`
+	CreatedAt    *time.Time `json:"created_at"`
+	GuildName    string     `json:"guild_name"`
 }
 
 // FeedItem 动态流条目（帖子或文章）：公共广场与会馆信息流统一结构。

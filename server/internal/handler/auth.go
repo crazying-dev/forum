@@ -37,7 +37,7 @@ type registerReq struct {
 
 // Register 注册 + 自动登录。
 func (h *AuthHandler) Register(c *gin.Context) {
-	middleware.RateLimit("register", 5, 300)(c)
+	middleware.RateLimit("register", 5, 300*time.Second)(c)
 	if c.IsAborted() {
 		return
 	}
@@ -108,7 +108,7 @@ type loginReq struct {
 
 // Login 登录。
 func (h *AuthHandler) Login(c *gin.Context) {
-	middleware.RateLimit("login", 10, 300)(c)
+	middleware.RateLimit("login", 10, 300*time.Second)(c)
 	if c.IsAborted() {
 		return
 	}

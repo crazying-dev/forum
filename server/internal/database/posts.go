@@ -5,12 +5,16 @@ import (
 	"time"
 
 	"yj-forum/server/internal/models"
+	"yj-forum/server/internal/sanitize"
 )
 
 // guildCols 归一化 LEFT JOIN guilds 得到的可空列。
 func guildCols(id *int64, name, theme *string) (*int64, string, string) {
 	return id, strVal(name), strVal(theme)
 }
+
+// postSummaryExpr 帖子摘要投影：html 正文先剥离标签再截断，历史 markdown 保持原样。
+const postSummaryExpr = `CASE WHEN p.content_format = 'html' THEN LEFT(regexp_replace(p.content, '<[^>]+>', '', 'g'), 200) ELSE LEFT(p.content, 200) END`
 
 // GetPostList 分页帖子列表（对齐 legacy get_post_list）。
 func (d *DB) GetPostList(ctx context.Context, page, pageSize int, category string) ([]models.PostListItem, error) {
@@ -21,7 +25,7 @@ func (d *DB) GetPostList(ctx context.Context, page, pageSize int, category strin
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
-	base := `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
+	base := `SELECT p.id, p.user_id, p.title, ` + postSummaryExpr + `, p.category, p.likes, p.views,
 	       p.created_at, u.name, u.avatar,
 	       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
 	       p.guild_id, g.name, g.theme_color,
@@ -66,7 +70,7 @@ func (d *DB) GetRandomPosts(ctx context.Context, limit int) ([]models.PostListIt
 	if limit < 1 || limit > 200 {
 		limit = 200
 	}
-	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
+	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, `+postSummaryExpr+`, p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
 		p.guild_id, g.name, g.theme_color,
@@ -99,7 +103,7 @@ func (d *DB) GetRandomPosts(ctx context.Context, limit int) ([]models.PostListIt
 
 // GetPost 帖子详情（JOIN 用户与所属会馆）。
 func (d *DB) GetPost(ctx context.Context, postID string) (*models.Post, error) {
-	row := d.QueryRow(ctx, `SELECT p.id, p.user_id, p.title, p.content, p.category, p.likes, p.views, p.status,
+	row := d.QueryRow(ctx, `SELECT p.id, p.user_id, p.title, p.content, p.content_format, p.category, p.likes, p.views, p.status,
 		p.created_at, p.updated_at, u.name, u.avatar, p.guild_id, g.name, g.theme_color,
 		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
 		FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN guilds g ON g.id = p.guild_id
@@ -110,7 +114,7 @@ func (d *DB) GetPost(ctx context.Context, postID string) (*models.Post, error) {
 	var createdAt, updatedAt *time.Time
 	var guildID *int64
 	var guildName, guildTheme *string
-	err := row.Scan(&p.ID, &p.UserID, &p.Title, &p.Content, &p.Category, &p.Likes, &p.Views, &p.Status,
+	err := row.Scan(&p.ID, &p.UserID, &p.Title, &p.Content, &p.ContentFormat, &p.Category, &p.Likes, &p.Views, &p.Status,
 		&createdAt, &updatedAt, &p.UserName, &p.UserAvatar, &guildID, &guildName, &guildTheme,
 		&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader)
 	if err != nil {
@@ -122,14 +126,15 @@ func (d *DB) GetPost(ctx context.Context, postID string) (*models.Post, error) {
 	return &p, nil
 }
 
-// SendPost 发帖（guildID 非空时归属该会馆）。
+// SendPost 发帖（guildID 非空时归属该会馆）；新帖正文一律按富文本（html）存储。
 func (d *DB) SendPost(ctx context.Context, userID, title, content, category string, guildID *int64) (string, error) {
 	if category == "" {
 		category = "general"
 	}
 	postID := GenID("PS")
-	_, err := d.Exec(ctx, `INSERT INTO posts (id, user_id, title, content, category, guild_id) VALUES ($1,$2,$3,$4,$5,$6)`,
-		postID, userID, title, SafeHTML(content), category, guildID)
+	_, err := d.Exec(ctx, `INSERT INTO posts (id, user_id, title, content, content_format, category, guild_id)
+		VALUES ($1,$2,$3,$4,'html',$5,$6)`,
+		postID, userID, title, sanitize.SanitizeRichContent(content), category, guildID)
 	if err != nil {
 		return "", err
 	}
@@ -145,7 +150,7 @@ func (d *DB) GetUserPosts(ctx context.Context, userID string, page, pageSize int
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
-	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
+	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, `+postSummaryExpr+`, p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
 		p.guild_id, g.name, g.theme_color,

@@ -109,6 +109,29 @@ func (d *DB) GetGuildLeaderPage(ctx context.Context, slug string) (*models.Guild
 	return &pg, nil
 }
 
+// GetGuildIntroPage 会馆介绍页（概要 + 统计 + 封面 + 富文本正文）；不存在返回 (nil, nil)。
+func (d *DB) GetGuildIntroPage(ctx context.Context, slug string) (*models.GuildIntroPage, error) {
+	var pg models.GuildIntroPage
+	var themeColor *string
+	var createdAt *time.Time
+	err := d.QueryRow(ctx, `SELECT g.uuid::text, g.slug, g.name, COALESCE(g.intro, ''), COALESCE(g.theme_color, ''), g.created_at,
+		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
+		(SELECT COUNT(*) FROM guild_categories c WHERE c.guild_id = g.id) AS category_count,
+		COALESCE(g.intro_cover_file_id, ''), g.intro_page_content
+		FROM guilds g WHERE g.slug = $1`, slug).
+		Scan(&pg.Guild.UUID, &pg.Guild.Slug, &pg.Guild.Name, &pg.Guild.Intro, &themeColor, &createdAt,
+			&pg.Guild.MemberCount, &pg.Guild.CategoryCount, &pg.Guild.CoverFileID, &pg.Content)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	pg.Guild.ThemeColor = strVal(themeColor)
+	pg.Guild.CreatedAt = createdAt
+	return &pg, nil
+}
+
 // GetGuildIDByUUID 按会馆 UUID 查数字 id（发帖 guild_uuid 契约用）；不存在返回 (nil, nil)。
 func (d *DB) GetGuildIDByUUID(ctx context.Context, uuid string) (*int64, error) {
 	var id int64
@@ -327,7 +350,7 @@ func (d *DB) GetArticle(ctx context.Context, articleID string) (*models.GuildArt
 	var authorID, authorName, authorAvatar *string
 	var guildSlug, guildName, guildTheme *string
 	var createdAt, updatedAt *time.Time
-	err := d.QueryRow(ctx, `SELECT a.id, a.guild_id, a.title, a.summary, a.content, a.author_user_id, a.views,
+	err := d.QueryRow(ctx, `SELECT a.id, a.guild_id, a.title, a.summary, a.content, a.content_format, a.author_user_id, a.views,
 		a.created_at, a.updated_at,
 		author.id, author.name, author.avatar,
 		g.slug, g.name, g.theme_color
@@ -335,7 +358,7 @@ func (d *DB) GetArticle(ctx context.Context, articleID string) (*models.GuildArt
 		LEFT JOIN users author ON author.id = a.author_user_id
 		LEFT JOIN guilds g ON g.id = a.guild_id
 		WHERE a.id = $1`, articleID).
-		Scan(&a.ID, &a.GuildID, &a.Title, &a.Summary, &a.Content, &a.AuthorUserID, &a.Views,
+		Scan(&a.ID, &a.GuildID, &a.Title, &a.Summary, &a.Content, &a.ContentFormat, &a.AuthorUserID, &a.Views,
 			&createdAt, &updatedAt, &authorID, &authorName, &authorAvatar, &guildSlug, &guildName, &guildTheme)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -371,10 +394,54 @@ func (d *DB) GetArticle(ctx context.Context, articleID string) (*models.GuildArt
 	return &a, rows.Err()
 }
 
+// SearchArticles 文章搜索（title/summary ILIKE；has_more 用 pageSize+1 探测）。
+func (d *DB) SearchArticles(ctx context.Context, keyword string, page, pageSize int) ([]models.ArticleSearchItem, int, bool, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 50 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+	like := "%" + keyword + "%"
+	var total int
+	if err := d.QueryRow(ctx, `SELECT COUNT(*) FROM guild_articles
+		WHERE title ILIKE $1 OR summary ILIKE $1`, like).Scan(&total); err != nil {
+		return nil, 0, false, err
+	}
+	rows, err := d.Query(ctx, `SELECT a.id, a.title, COALESCE(g.name, ''), a.created_at
+		FROM guild_articles a LEFT JOIN guilds g ON g.id = a.guild_id
+		WHERE a.title ILIKE $1 OR a.summary ILIKE $1
+		ORDER BY a.created_at DESC, a.id DESC LIMIT $2 OFFSET $3`,
+		like, pageSize+1, offset)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer rows.Close()
+	items := []models.ArticleSearchItem{}
+	for rows.Next() {
+		var it models.ArticleSearchItem
+		var createdAt *time.Time
+		if err := rows.Scan(&it.ID, &it.Title, &it.GuildName, &createdAt); err != nil {
+			return nil, 0, false, err
+		}
+		it.CreatedAt = createdAt
+		items = append(items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, false, err
+	}
+	hasMore := len(items) > pageSize
+	if hasMore {
+		items = items[:pageSize]
+	}
+	return items, total, hasMore, nil
+}
+
 // ---- 信息流 ----
 
 // feedPostSelect 帖子信息流投影（与 feedArticleSelect 列一一对应）。
-const feedPostSelect = `SELECT 'post' AS type, p.id, p.title, LEFT(p.content, 200) AS summary, p.category,
+const feedPostSelect = `SELECT 'post' AS type, p.id, p.title, ` + postSummaryExpr + ` AS summary, p.category,
 	p.likes, p.views, p.created_at, p.updated_at,
 	p.user_id, u.name, u.avatar,
 	p.guild_id, g.name, g.theme_color,

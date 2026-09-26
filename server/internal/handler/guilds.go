@@ -158,6 +158,22 @@ func (h *GuildsHandler) LeaderPage(c *gin.Context) {
 		"leader_bio": pg.LeaderBio, "content": pg.Content})
 }
 
+// ---- GET /api/v1/guilds/:slug/intro ----
+
+// IntroPage 会馆介绍页（公开，无缓存；slug 不存在返回 404）。
+func (h *GuildsHandler) IntroPage(c *gin.Context) {
+	pg, err := h.DB.GetGuildIntroPage(c.Request.Context(), c.Param("slug"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	if pg == nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "会馆不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "guild": pg.Guild, "content": pg.Content})
+}
+
 // ---- GET /api/v1/feed ----
 
 // GlobalFeed 全站信息流：space=all/public/guild。
@@ -195,6 +211,28 @@ func (h *GuildsHandler) Article(c *gin.Context) {
 	_ = h.DB.IncrementArticleViews(c.Request.Context(), id)
 	a.Views++
 	c.JSON(http.StatusOK, gin.H{"success": true, "article": a})
+}
+
+// ---- GET /api/v1/articles/search ----
+
+// SearchArticles 文章搜索（公开；k≥2 字符，page_size 默认 10 上限 50）。
+func (h *GuildsHandler) SearchArticles(c *gin.Context) {
+	k := strings.TrimSpace(c.Query("k"))
+	if len([]rune(k)) < 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "关键词至少2个字符"})
+		return
+	}
+	page, pageSize := parsePageWithDefault(c, 10)
+	if pageSize > 50 {
+		pageSize = 10
+	}
+	articles, total, hasMore, err := h.DB.SearchArticles(c.Request.Context(), k, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "articles": articles, "total": total, "has_more": hasMore,
+		"page": page, "page_size": pageSize})
 }
 
 // ---- POST /api/v1/guilds/:slug/join ----

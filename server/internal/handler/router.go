@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 
 	"yj-forum/server/internal/auth"
@@ -23,6 +25,8 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions}
 	miscH := &MiscHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions}
 	guildsH := &GuildsHandler{DB: db, Cache: cacheSet, Sessions: sessions}
+	mediaH := &MediaHandler{DB: db, Cfg: cfg}
+	embedsH := &EmbedsHandler{DB: db}
 
 	api := r.Group("/api/v1")
 
@@ -75,14 +79,21 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.GET("/guilds/:slug/feed", guildsH.Feed)
 	api.GET("/guilds/:slug/members", guildsH.Members)
 	api.GET("/guilds/:slug/leader", guildsH.LeaderPage)
+	api.GET("/guilds/:slug/intro", guildsH.IntroPage)
 	api.POST("/guilds/:slug/join", authH.AuthRequired(), guildsH.Join)
 	api.POST("/guilds/:slug/join/cancel", authH.AuthRequired(), guildsH.CancelJoin)
 	api.POST("/guilds/:slug/leave", authH.AuthRequired(), guildsH.Leave)
 	api.GET("/feed", guildsH.GlobalFeed)
+	api.GET("/articles/search", guildsH.SearchArticles)
 	api.GET("/articles/:id", guildsH.Article)
 
 	// ---- 搜索 ----
 	api.GET("/search", postsH.Search)
+
+	// ---- 引用卡片 / 媒体 ----
+	api.GET("/embeds", embedsH.List)
+	api.POST("/media/images", middleware.RateLimit("media_image", 30, 600*time.Second), authH.AuthRequired(), mediaH.UploadImage)
+	api.GET("/media/:id", mediaH.ServeImage)
 
 	// ---- 投票 / 举报 / 杂项 ----
 	api.POST("/votes/version", miscH.VoteVersion)

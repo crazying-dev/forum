@@ -13,7 +13,11 @@ import (
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/email"
+	"yj-forum/server/internal/sanitize"
 )
+
+// maxPostContentBytes 发帖原始正文长度上限（256KB，与管理端发帖限制保持一致）。
+const maxPostContentBytes = 256 * 1024
 
 // PostsHandler 帖子/评论/收藏相关（含缓存）。
 type PostsHandler struct {
@@ -88,6 +92,17 @@ func (h *PostsHandler) Create(c *gin.Context) {
 	title := strings.TrimSpace(req.Title)
 	if title == "" || len([]rune(title)) > 100 {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "标题需1-100字符"})
+		return
+	}
+	// 正文服务端校验：原始长度上限 + 净化后非空（纯图片/纯引用帖视为有效内容），避免纯空白内容入库
+	if len(req.Content) > maxPostContentBytes {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "正文过长"})
+		return
+	}
+	sanitizedContent := sanitize.SanitizeRichContent(req.Content)
+	hasRichMedia := strings.Contains(sanitizedContent, "<img") || strings.Contains(sanitizedContent, "data-embed")
+	if sanitize.StripTagsAndTrim(sanitizedContent) == "" && !hasRichMedia {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "正文不能为空"})
 		return
 	}
 	var (

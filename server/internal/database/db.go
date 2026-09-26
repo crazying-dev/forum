@@ -19,7 +19,7 @@ type DB struct {
 	Pool *pgxpool.Pool
 }
 
-// New 创建连接池；若 schema 未初始化则运行迁移。
+// New 创建连接池（数据库迁移由启动流程在连接建立后单独执行，失败即退出）。
 func New(ctx context.Context, dsn string) (*DB, error) {
 	poolCfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
