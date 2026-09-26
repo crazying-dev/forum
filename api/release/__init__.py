@@ -32,7 +32,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-26T12:00:00+08:00",
+    "updated_at": "2026-09-26T14:00:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -42,14 +42,16 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.0.0",
+                    "version": "1.2.4",
                     "channel": "stable",
                     "date": "2026-09-26",
-                    "size": 48468327,
+                    "size": 48520153,
                     "url": "https://www.yjlt.top/api/app/windows/forum.exe",
-                    "sha256": "",
+                    "sha256": "9894de8ece1a6d4e91893bf02e0b055fc8302ee49e999c83b6b22133b3f4d7fa",
                     "notes": [
-                        "首个正式版：论坛/世界频道/WIKI/彩蛋全功能",
+                        "图标与网页端统一（SVG），移除 APP 端「下载」入口",
+                        "左侧导航整行可点击；悬停 2 秒或点展开按钮才展开",
+                        "修复默认状态下顶部与左侧菜单同时出现的 BUG",
                         "内置 Live2D 桌宠，支持多版本模型切换",
                     ],
                     "mandatory": False,

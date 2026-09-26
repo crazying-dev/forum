@@ -91,18 +91,21 @@ def test_release_api_endpoints():
     assert rv.status_code == 404
     assert rv.get_json()["success"] is False
 
-    rv = client.get("/api/app/check?platform=windows&version=1.0.0")
+    windows = next(p for p in _load_manifest()["platforms"] if p.get("key") == "windows")
+    latest = (windows.get("releases") or [{}])[0].get("version")
+
+    rv = client.get("/api/app/check?platform=windows&version=%s" % latest)
     body = rv.get_json()
     assert rv.status_code == 200
     assert body["available"] is False, "已是最新版时不应提示更新"
-    assert body["latest"] == "1.0.0"
+    assert body["latest"] == latest
 
     rv = client.get("/api/app/check?platform=windows&version=0.0.1")
     body = rv.get_json()
     assert body["available"] is True
-    assert body["latest"] == "1.0.0"
+    assert body["latest"] == latest
     assert isinstance(body.get("release"), dict)
-    assert body["release"]["version"] == "1.0.0"
+    assert body["release"]["version"] == latest
     assert body["message"], "发现新版本时 message 不能为空"
 
     rv = client.get("/api/app/check?platform=android&version=0.0.1")
