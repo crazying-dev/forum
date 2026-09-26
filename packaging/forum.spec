@@ -14,7 +14,7 @@
 import os
 import sys
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 # PyInstaller 把 SPECPATH 设为 **本 spec 文件所在的目录**（即 packaging/），
 # 因此仓库根目录是它的上一级；不要再套一层 dirname（否则会跑到仓库外面去）。
@@ -32,6 +32,14 @@ for package in ("live2d",):
         hiddenimports += pkg_hidden
     except Exception as exc:  # noqa: BLE001
         print("[forum.spec] 收集 %s 失败：%s" % (package, exc))
+
+# ``app.shell`` / ``app.pages`` 等是通过 importlib 按字符串动态导入的
+# （见 app/shell.py 的 PAGE_MODULES），静态分析看不到它们，必须显式收集，
+# 否则打包后会报 “No module named 'app.pages'”。
+try:
+    hiddenimports += collect_submodules("app")
+except Exception as exc:  # noqa: BLE001
+    print("[forum.spec] 收集 app 子模块失败：%s" % exc)
 
 hiddenimports += [
     "PyQt6.QtNetwork",

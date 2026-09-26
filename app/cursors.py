@@ -75,11 +75,25 @@ __all__ = [
 
 # ────────────────────────── 缩放基准 ──────────────────────────
 
-BASE_TARGET_PX = 32
+BASE_TARGET_PX = 48
 SCALE_ENV = "CRFORUM_CURSOR_SCALE"
 MIN_TICK_MS = 20
 MAX_TICK_MS = 50
 DEFAULT_DELAY_MS = 100
+
+
+def _clamp_scale(value, default: float = None) -> float:
+    """把尺寸系数夹到合法区间（非法值回退默认）。"""
+    if default is None:
+        default = constants.CURSOR_SCALE_DEFAULT
+    try:
+        scale = float(value)
+    except (TypeError, ValueError):
+        return default
+    if scale <= 0:
+        return default
+    return max(constants.CURSOR_SCALE_MIN,
+               min(constants.CURSOR_SCALE_MAX, scale))
 
 
 def _dpi_ratio() -> float:
@@ -163,7 +177,7 @@ _MISSING = object()
 
 
 def _target_px() -> int:
-    """当前目标边长（设备无关像素）：32 * DPI 比例 * 缩放系数。"""
+    """当前目标边长（设备无关像素）：BASE_TARGET_PX * DPI 比例 * 缩放系数。"""
     override = getattr(RoleCursor, "scale_override", None)
     scale = 1.0
     if override:
@@ -185,7 +199,7 @@ class RoleCursor:
     才会真正读盘并解码 PNG。
     """
 
-    #: 允许用类属性覆盖缩放系数（倍数，用于预览/调试）；None 表示用环境变量。
+    #: 当前缩放系数（倍数），由 :class:`CursorManager` 设置；None 表示用环境变量。
     scale_override = None
 
     def __init__(self, role, *, windows_name="", qt_shape=None, label="",
@@ -273,6 +287,14 @@ class RoleCursor:
         if self._scaled_hotspot is None:
             self.pixmaps()
         return self._scaled_hotspot or self.hotspot
+
+    def invalidate_scale(self) -> None:
+        """丢弃按旧尺寸缓存的帧与热点（缩放系数变化后必须调用）。
+
+        ``_raw_frames`` / ``_cumulative`` 与尺寸无关，不清理。
+        """
+        self._frames = None
+        self._scaled_hotspot = None
 
     def frame_at(self, elapsed_ms: int) -> int:
         """按累计 delay（毫秒）算出 elapsed_ms 时刻应显示的帧号。"""
@@ -381,6 +403,12 @@ class CursorPack:
             base_dir=base,
         )
 
+    def all_cursors(self):
+        """所有已构建的 :class:`RoleCursor`（已缓存的部分）。"""
+        for cache in self._cache.values():
+            for cursor in cache.values():
+                yield cursor
+
 
 class CursorManager(QObject):
     """把罗小黑光标套到 Qt 控件上（挂在 QApplication 的事件过滤器上）。"""
@@ -396,6 +424,8 @@ class CursorManager(QObject):
         self._clock_ms = 0
         self._enabled = self._read_enabled()
         self._variant = self._read_variant()
+        self._scale = self._read_scale()
+        RoleCursor.scale_override = self._scale
         self._timer = QTimer(self)
         try:
             self._timer.setTimerType(Qt.TimerType.PreciseTimer)
@@ -428,6 +458,22 @@ class CursorManager(QObject):
                 pass
         return self._normalize_variant(key)
 
+    def _read_scale(self) -> float:
+        # 环境变量优先级最高（调试 / 便携覆盖），其次读配置，再退回默认值。
+        env = os.environ.get(SCALE_ENV)
+        if env:
+            try:
+                return _clamp_scale(float(env))
+            except (TypeError, ValueError):
+                pass
+        if self._conf is None:
+            return constants.CURSOR_SCALE_DEFAULT
+        try:
+            return _clamp_scale(self._conf.get(
+                "cursor_scale", constants.CURSOR_SCALE_DEFAULT))
+        except Exception:
+            return constants.CURSOR_SCALE_DEFAULT
+
     def _write_config(self, key, value) -> None:
         if self._conf is None:
             return
@@ -454,6 +500,10 @@ class CursorManager(QObject):
     @property
     def variant(self) -> str:
         return self._variant
+
+    @property
+    def scale(self) -> float:
+        return self._scale
 
     def _roles(self):
         if not self._pack.available:
@@ -529,6 +579,22 @@ class CursorManager(QObject):
         self._write_config("cursor_variant", self._variant)
         self._timer.setInterval(self._interval())
         self.refresh()
+
+    def set_scale(self, scale) -> None:
+        """热切换尺寸系数（倍数）：丢弃旧尺寸缓存并立即刷新。"""
+        self._scale = _clamp_scale(scale)
+        self._write_config("cursor_scale", self._scale)
+        RoleCursor.scale_override = self._scale
+        self._invalidate_scales()
+        self.refresh()
+
+    def _invalidate_scales(self) -> None:
+        """让所有已缓存的帧按新尺寸重新生成。"""
+        try:
+            for cursor in self._pack.all_cursors():
+                cursor.invalidate_scale()
+        except Exception:  # noqa: BLE001
+            pass
 
     def refresh(self) -> None:
         """重扫已纳管控件并重设光标（变体切换 / 启停后调用）。"""

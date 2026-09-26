@@ -182,6 +182,10 @@ class WorldPanel(QFrame):
 
     def _poll(self) -> None:
         if not self._can_poll():
+            # 面板未显示 / 窗口最小化等原因先跳过；但必须把定时器挂回来，
+            # 否则窗口恢复后就再也不会轮询了（世界频道“卡在未连接”的成因）。
+            if self._started and not self._collapsed:
+                self._schedule(constants.WORLD_IDLE_POLL_MS)
             return
         if self._busy:
             return
@@ -211,7 +215,7 @@ class WorldPanel(QFrame):
             self._retry += 1
             self._schedule(min(constants.WORLD_RETRY_MAX_MS,
                                constants.WORLD_POLL_MS * (2 ** min(self._retry, 4))))
-            _log.debug("世界频道轮询失败：%s", message)
+            _log.info("世界频道轮询失败：%s", message)
 
         if not self._messages:
             self._set_status("连接中…", "")

@@ -25,6 +25,7 @@ DEFAULTS: dict[str, Any] = {
     "nav_expanded": False,
     "cursor_enabled": True,
     "cursor_variant": constants.CURSOR_VARIANT_DEFAULT,
+    "cursor_scale": constants.CURSOR_SCALE_DEFAULT,
     "check_update": True,
     "last_update_check": 0.0,
     "last_user": "",
@@ -37,6 +38,7 @@ DEFAULTS: dict[str, Any] = {
         "scale": 1.0,
         "opacity": 1.0,
         "passthrough": False,
+        "track": True,                     # 视线跟随鼠标（窗口外也生效）
         "fps": 60,
         "model": "HEI4.0",
     },

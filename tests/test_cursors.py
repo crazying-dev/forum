@@ -180,6 +180,62 @@ def manager_pack_variants():
     return cursors_mod.CursorPack().variants()
 
 
+# ────────────────────── 指针尺寸系数 ──────────────────────
+
+
+def test_clamp_scale_bounds():
+    assert cursors_mod._clamp_scale(0.01) == constants.CURSOR_SCALE_MIN
+    assert cursors_mod._clamp_scale(99.0) == constants.CURSOR_SCALE_MAX
+    assert cursors_mod._clamp_scale("bad") == constants.CURSOR_SCALE_DEFAULT
+    assert cursors_mod._clamp_scale(None) == constants.CURSOR_SCALE_DEFAULT
+    assert cursors_mod._clamp_scale(1.5) == 1.5
+
+
+def test_target_px_scales_with_override():
+    from app.cursors import RoleCursor
+    previous = RoleCursor.scale_override
+    try:
+        RoleCursor.scale_override = 1.0
+        base = cursors_mod._target_px()
+        RoleCursor.scale_override = 2.0
+        assert cursors_mod._target_px() == base * 2
+    finally:
+        RoleCursor.scale_override = previous
+
+
+def test_base_target_px_is_large_enough():
+    """回归：基准边长曾为 32px，用户反馈“鼠标过小”。"""
+    assert cursors_mod.BASE_TARGET_PX >= 48
+
+
+def test_manager_set_scale_refreshes_frame_cache():
+    _qapp()
+    from app import config as config_mod
+    from app.cursors import RoleCursor
+    previous = RoleCursor.scale_override
+    try:
+        manager = cursors_mod.CursorManager()
+        role = manager._pack.roles("normal")["arrow"]
+        RoleCursor.scale_override = 1.0
+        role.invalidate_scale()
+        small = role.pixmaps()[0].width()
+        assert small > 0
+        manager.set_scale(2.0)
+        assert manager.scale == 2.0
+        big = role.pixmaps()[0].width()
+        assert big > small, (small, big)
+        # 越界值会被夹回合法区间
+        manager.set_scale(100)
+        assert manager.scale == constants.CURSOR_SCALE_MAX
+    finally:
+        RoleCursor.scale_override = previous
+        try:
+            config_mod.current().set("cursor_scale",
+                                     constants.CURSOR_SCALE_DEFAULT)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 _ROLE_KEYS = (
     ("arrow", "正常选择"), ("help", "帮助选择"), ("work", "后台运行"),
     ("wait", "忙"), ("crosshair", "精确选择"), ("text", "文本选择"),

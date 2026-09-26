@@ -19,7 +19,7 @@ from urllib.parse import urlparse
 import requests
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal
 
-from . import constants, logger, session_store
+from . import constants, logger, session_store, tls
 
 _log = logger.get_logger("api")
 
@@ -179,6 +179,9 @@ class ForumApi:
         self.store = store if store is not None else session_store.SessionStore()
         self._timeout = timeout
         self.session = requests.Session()
+        # 显式指定可信根证书，避开打包环境里 certifi 证书包陈旧导致的
+        # CERTIFICATE_VERIFY_FAILED（详见 app/tls.py）。
+        self.session.verify = tls.verify_target()
         self.session.headers.update({
             "User-Agent": constants.CLIENT_UA,
             "Accept": "application/json, text/plain, */*",

@@ -35,6 +35,7 @@ from PyQt6.QtWidgets import QApplication  # noqa: E402
 from app import config as config_mod  # noqa: E402
 from app import api as api_mod  # noqa: E402
 from app import constants, deeplink, logger, paths, theme  # noqa: E402
+from app import tls as tls_mod  # noqa: E402
 from app.shell import Shell  # noqa: E402
 
 _log = logger.get_logger("main")
@@ -64,6 +65,8 @@ def _setup_app(argv: list[str], debug: bool) -> QApplication:
     paths.ensure_dirs()
     logger.setup(level=10 if debug else 20)
     logger.hook_excepthook()
+    # 尽早钦定可信根证书（写入 REQUESTS_CA_BUNDLE 等环境变量）
+    tls_mod.install()
     _set_surface_format()
 
     app = QApplication(argv)

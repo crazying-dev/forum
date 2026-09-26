@@ -168,6 +168,8 @@ RES_CURSORS_DIR = resource("cursors")
 RES_CURSOR_MANIFEST = resource("cursors", "manifest.json")
 RES_MOUSE_CREDITS = resource("docs", "mouse_credits.md")
 RES_QSS_DIR = resource("qss")
+# 随包发布的可信根证书（打包环境里 certifi 自带的可能是旧版，见 app/tls.py）
+RES_CA_BUNDLE = resource("ca", "cacert.pem")
 
 DEFAULT_AVATAR_POOL = (
     RES_AVATARS_DIR / "LuoXiaoHei1.png",
@@ -189,6 +191,12 @@ CURSOR_VARIANTS = (
     ("large_static", "放大·静态"),
 )
 CURSOR_VARIANT_DEFAULT = "normal"
+
+# 应用内指针尺寸系数（倍数）。基准边长见 app/cursors.BASE_TARGET_PX。
+CURSOR_SCALE_MIN = 0.5
+CURSOR_SCALE_MAX = 2.0
+CURSOR_SCALE_DEFAULT = 1.0
+
 SYSTEM_CURSOR_DIR_NAME = "Cursors\\罗小黑鼠标指针"
 SYSTEM_CURSOR_SCHEME = "罗小黑鼠标指针"
 

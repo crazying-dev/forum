@@ -239,6 +239,16 @@ class SettingsPage(Page):
                     self._on_cursor_variant)
 
         card.body.addWidget(Divider())
+        self._cursor_scale = QSlider(Qt.Orientation.Horizontal)
+        self._cursor_scale.setRange(int(constants.CURSOR_SCALE_MIN * 100),
+                                    int(constants.CURSOR_SCALE_MAX * 100))
+        self._cursor_scale.valueChanged.connect(self._on_cursor_scale)
+        self._cursor_scale_label = self._value_label("")
+        card.body.addLayout(self._slider_row("指针大小", self._cursor_scale,
+                                             self._cursor_scale_label))
+        card.body.addWidget(self._muted("觉得指针过大或过小都可以在这里调整。"))
+
+        card.body.addWidget(Divider())
         self._cursor_state_label = self._muted("")
         card.body.addWidget(self._cursor_state_label)
         row = hbox(spacing=8)
@@ -284,6 +294,28 @@ class SettingsPage(Page):
             except Exception as exc:  # noqa: BLE001
                 _log.warning("切换指针样式失败：%s", exc)
         self._mark("cursor_variant", key)
+
+    def _on_cursor_scale(self, value: int) -> None:
+        scale = round(int(value) / 100.0, 2)
+        config_mod.current().set("cursor_scale", scale)
+        manager = self._cursor_manager()
+        setter = getattr(manager, "set_scale", None)
+        if callable(setter):
+            try:
+                setter(scale)
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("调整指针大小失败：%s", exc)
+        self._update_cursor_scale_label()
+
+    def _update_cursor_scale_label(self) -> None:
+        slider = getattr(self, "_cursor_scale", None)
+        label = getattr(self, "_cursor_scale_label", None)
+        if slider is None or label is None:
+            return
+        try:
+            label.setText("%d%%" % slider.value())
+        except RuntimeError:
+            return
 
     def _current_variant(self) -> str:
         try:
@@ -365,6 +397,10 @@ class SettingsPage(Page):
         self._pet_passthrough.toggled.connect(self._on_pet_passthrough)
         card.body.addWidget(self._pet_passthrough)
 
+        self._pet_track = QCheckBox("视线跟随鼠标（窗口外也生效）")
+        self._pet_track.toggled.connect(self._on_pet_track)
+        card.body.addWidget(self._pet_track)
+
         card.body.addWidget(Divider())
         self._pet_opacity = QSlider(Qt.Orientation.Horizontal)
         self._pet_opacity.setRange(20, 100)
@@ -374,7 +410,7 @@ class SettingsPage(Page):
                                              self._pet_opacity_label))
 
         self._pet_scale = QSlider(Qt.Orientation.Horizontal)
-        self._pet_scale.setRange(50, 200)
+        self._pet_scale.setRange(30, 200)
         self._pet_scale.valueChanged.connect(self._on_pet_scale)
         self._pet_scale_label = self._value_label("")
         card.body.addLayout(self._slider_row("缩放", self._pet_scale,
@@ -418,6 +454,9 @@ class SettingsPage(Page):
 
     def _on_pet_passthrough(self, checked: bool) -> None:
         self._pet_apply(passthrough=bool(checked))
+
+    def _on_pet_track(self, checked: bool) -> None:
+        self._pet_apply(track=bool(checked))
 
     def _on_pet_opacity(self, value: int) -> None:
         self._pet_apply(opacity=round(int(value) / 100.0, 2))
@@ -792,13 +831,20 @@ class SettingsPage(Page):
         self._set_quietly(getattr(self, "_pet_opacity", None),
                           self._percent(cfg.get("pet.opacity", 1.0), 100, 20, 100))
         self._set_quietly(getattr(self, "_pet_scale", None),
-                          self._percent(cfg.get("pet.scale", 1.0), 100, 50, 200))
+                          self._percent(cfg.get("pet.scale", 1.0), 100, 30, 200))
+        self._set_quietly(getattr(self, "_pet_track", None),
+                          cfg.get("pet.track", True))
+        self._set_quietly(getattr(self, "_cursor_scale", None),
+                          self._percent(cfg.get("cursor_scale", 1.0), 100,
+                                        int(constants.CURSOR_SCALE_MIN * 100),
+                                        int(constants.CURSOR_SCALE_MAX * 100)))
 
         self._refresh_cursor_state()
         self._sync_autostart()
         self._sync_scheme()
         self._update_pet_note()
         self._update_pet_labels()
+        self._update_cursor_scale_label()
 
     @staticmethod
     def _percent(value, factor: int, low: int, high: int) -> int:

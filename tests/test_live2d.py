@@ -167,6 +167,76 @@ def test_widget_module_importable():
     assert isinstance(widget.live2d_error(), str)
 
 
+# ────────────────────── 桌宠窗口尺寸 / 视线跟随 ──────────────────────
+
+
+def test_pet_default_size_is_compact():
+    """回归：默认尺寸曾为 (380, 560)，用户反馈“桌宠过大”。"""
+    from app.live2d import pet as pet_mod
+    assert pet_mod.DEFAULT_SIZE == (272, 400)
+    assert pet_mod.MIN_SCALE <= 0.3
+
+
+def test_scale_floor_clamps():
+    from app.live2d import pet as pet_mod
+    assert pet_mod._scale_floor(1.0) == 1.0
+    assert pet_mod._scale_floor(0.01) == pet_mod.MIN_SCALE
+    assert pet_mod._scale_floor("bad") == 1.0
+    assert pet_mod._scale_floor(None) == 1.0
+
+
+def test_pet_window_size_follows_scale():
+    from PyQt6.QtWidgets import QApplication, QWidget
+    QApplication.instance() or QApplication([])
+    from app.config import Config
+    from app.live2d import pet as pet_mod
+    cfg = Config(path=os.path.join(tempfile.mkdtemp(), "config.json"))
+    window = pet_mod.PetWindow()
+    try:
+        cfg.set("pet.scale", 1.0)
+        window.restore_position(cfg)
+        assert (window.width(), window.height()) == pet_mod.DEFAULT_SIZE
+        cfg.set("pet.scale", 2.0)
+        window.restore_position(cfg)
+        assert (window.width(), window.height()) == (
+            pet_mod.DEFAULT_SIZE[0] * 2, pet_mod.DEFAULT_SIZE[1] * 2)
+    finally:
+        window.deleteLater()
+        assert isinstance(window, QWidget)
+
+
+def test_pet_window_track_flag_and_timer():
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from app.config import Config
+    from app.live2d import pet as pet_mod
+    cfg = Config(path=os.path.join(tempfile.mkdtemp(), "config.json"))
+    window = pet_mod.PetWindow()
+    try:
+        cfg.set("pet.track", False)
+        window.apply_config(cfg)
+        assert window._track is False
+        assert window._track_timer.isActive() is False
+        cfg.set("pet.track", True)
+        window.apply_config(cfg)
+        assert window._track is True
+    finally:
+        window.deleteLater()
+
+
+def test_widget_track_screen_pos_is_safe_without_model():
+    """没有模型时 track_screen_pos() 不得抛异常。"""
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from app.live2d.widget import Live2DWidget
+    view = Live2DWidget(transparent=True)
+    try:
+        assert view.is_loaded() is False
+        view.track_screen_pos()
+    finally:
+        view.deleteLater()
+
+
 def test_online_ensure_downloads_and_caches():
     if not ONLINE:
         return

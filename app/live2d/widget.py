@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import QTimer, Qt, pyqtSignal
+from PyQt6.QtGui import QCursor
 from PyQt6.QtOpenGLWidgets import QOpenGLWidget
 from PyQt6.QtWidgets import QWidget
 
@@ -123,6 +124,26 @@ class Live2DWidget(QOpenGLWidget):
 
     def set_focus_centre(self) -> None:
         self.set_focus(self.width() * 0.5, self.height() * 0.5)
+
+    def track_screen_pos(self) -> None:
+        """按当前全局鼠标位置更新视线（鼠标在窗口外也生效）。
+
+        ``QWidget`` 只能收到落在自己范围内的鼠标移动事件，所以鼠标离开
+        桌宠窗口后视线就停住了。这里改用轮询全局光标位置，再映射成控件
+        局部坐标；坐标会被夹到控件范围内，这样鼠标在窗口外时模型至少会
+        朝那个方向看。
+        """
+        if self._model is None:
+            return
+        try:
+            local = self.mapFromGlobal(QCursor.pos())
+            width = float(max(self.width(), 1))
+            height = float(max(self.height(), 1))
+            x = min(max(float(local.x()), 0.0), width)
+            y = min(max(float(local.y()), 0.0), height)
+            self.set_focus(x, y)
+        except Exception:
+            pass
 
     def random_motion(self, group: str | None = None) -> None:
         if self._model is None:

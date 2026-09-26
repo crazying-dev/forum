@@ -55,6 +55,10 @@ packaging/
    - 全程只用 HKCU，**不需要管理员权限**
 5. **自动更新**：客户端内置更新器按 `app/constants.py` 里混淆过的地址下载新版 exe，由 `~/.Cr/forum/update/apply_update.cmd` 在主程序退出后替换并重启。
 6. **编码**：PowerShell 5.1 会把无 BOM 的 `.ps1` 当 ANSI 读，因此 `build.ps1` / `postinstall.ps1` 一律只用 ASCII；需要中文（如快捷方式名）时用 `[char]0x....` 拼出来；`version.json` 显式按 UTF-8 读取。
+7. **内置根证书**：`resources/ca/cacert.pem` 随包发布，启动时由 `app/tls.py` 选优并写入 `REQUESTS_CA_BUNDLE` / `SSL_CERT_FILE`，再赋值 `ForumApi.session.verify`。
+   这样即使打包环境里 `certifi` 附带的证书包陈旧（PyInstaller 的 `hook-certifi` 收集的就是它），HTTPS 也不会再报 `CERTIFICATE_VERIFY_FAILED`。
+   证书会随 CA 轮换而变旧，需要时重刷：`python -c "import certifi,shutil;shutil.copy(certifi.where(),r'resources\ca\cacert.pem')"`。
+8. **动态导入**：`app/shell.py` 用 `importlib` 按字符串加载页面（`app.pages.*`），静态分析看不到，因此 `forum.spec` 里有 `collect_submodules("app")`，不能删。
 
 ## 清理
 

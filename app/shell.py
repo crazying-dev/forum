@@ -96,7 +96,10 @@ class SideNav(QFrame):
     def _make_item(self, route: str, icon: str, label: str) -> QWidget:
         holder = QWidget(self)
         layout = hbox(holder, margins=(0, 0, 0, 0), spacing=8)
-        btn = button("%s" % icon, None, lambda r=route: self.navigate.emit(r))
+        # 注意：``QPushButton.clicked(bool)`` 会把 checked 当作第一个参数传进来，
+        # 所以槽函数必须留一个占位形参，否则 route 会被替换成 bool 而崩溃。
+        btn = button("%s" % icon, None,
+                     lambda _checked=False, r=route: self.navigate.emit(r))
         btn.setObjectName("NavButton")
         btn.setProperty("route", route)
         btn.setFixedWidth(NAV_WIDTH_COLLAPSED - 12)
@@ -266,7 +269,7 @@ class Shell(QMainWindow):
         self._top_nav_buttons: dict[str, QWidget] = {}
         for route, icon, label in NAV_ITEMS:
             btn = button("%s %s" % (icon, label), "ghost",
-                         lambda r=route: self._on_nav(r))
+                         lambda _checked=False, r=route: self._on_nav(r))
             self._top_nav_buttons[route] = btn
             self.top_nav.addWidget(btn)
 

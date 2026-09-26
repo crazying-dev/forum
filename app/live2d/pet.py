@@ -27,8 +27,23 @@ from .widget import Live2DWidget
 
 _log = logger.get_logger("live2d.pet")
 
-DEFAULT_SIZE = (380, 560)
+DEFAULT_SIZE = (272, 400)
 SCREEN_MARGIN = 24
+#: 视线跟随鼠标的轮询间隔（毫秒）
+TRACK_INTERVAL_MS = 40
+
+
+#: 桌宠窗口尺寸下限（与设置里的缩放滑块下限保持一致）
+MIN_SCALE = 0.3
+
+
+def _scale_floor(value: float) -> float:
+    """把缩放系数夹到合法区间。"""
+    try:
+        scale = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    return max(MIN_SCALE, scale)
 
 
 class PetWindow(QWidget):
@@ -55,6 +70,7 @@ class PetWindow(QWidget):
         self._drag_origin: QPoint | None = None
         self._window_origin = QPoint(0, 0)
         self._passthrough = False
+        self._track = True
 
         layout = vbox(self, margins=(0, 0, 0, 0), spacing=0)
         self.view = Live2DWidget(self, fps=60, transparent=True)
@@ -78,6 +94,12 @@ class PetWindow(QWidget):
         self.view.loaded.connect(self._on_loaded)
         self.view.ready.connect(self._on_first_frame)
 
+        # 视线跟随：QWidget 只在鼠标落在自己范围内时才收到 move 事件，
+        # 鼠标移到桌宠窗口外就丢跟随了。用定时器轮询全局光标位置补上。
+        self._track_timer = QTimer(self)
+        self._track_timer.setInterval(TRACK_INTERVAL_MS)
+        self._track_timer.timeout.connect(self._track_cursor)
+
     # ────────────────────── 配置 ──────────────────────
     def apply_config(self, cfg=None) -> None:
         cfg = cfg or config.current()
@@ -87,12 +109,14 @@ class PetWindow(QWidget):
         self.view.set_scale(scale)
         self.view.set_fps(int(cfg.get("pet.fps", 60) or 60))
         self.set_passthrough(bool(cfg.get("pet.passthrough", False)))
+        self._track = bool(cfg.get("pet.track", True))
+        self._sync_track_timer()
 
     def restore_position(self, cfg=None) -> None:
         cfg = cfg or config.current()
         width, height = DEFAULT_SIZE
-        scale = float(cfg.get("pet.scale", 1.0) or 1.0)
-        self.resize(int(width * max(scale, 0.4)), int(height * max(scale, 0.4)))
+        scale = _scale_floor(cfg.get("pet.scale", 1.0) or 1.0)
+        self.resize(int(width * scale), int(height * scale))
         screens = QGuiApplication.screens()
         index = cfg.get("pet.screen")
         screen = None
@@ -190,6 +214,20 @@ class PetWindow(QWidget):
         self.status.hide()
         self.progress.hide()
 
+    # ────────────────────── 视线跟随 ──────────────────────
+    def _sync_track_timer(self) -> None:
+        """按配置与可见性启停轮询表。"""
+        should_run = bool(self._track) and self.isVisible()
+        if should_run and not self._track_timer.isActive():
+            self._track_timer.start()
+        elif not should_run and self._track_timer.isActive():
+            self._track_timer.stop()
+
+    def _track_cursor(self) -> None:
+        if not self._track or not self.isVisible():
+            return
+        self.view.track_screen_pos()
+
     # ────────────────────── 鼠标 ──────────────────────
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton and not self._passthrough:
@@ -245,9 +283,11 @@ class PetWindow(QWidget):
     def showEvent(self, event) -> None:  # noqa: N802
         super().showEvent(event)
         self.view.start()
+        self._sync_track_timer()
 
     def hideEvent(self, event) -> None:  # noqa: N802
         self.view.stop()
+        self._sync_track_timer()
         super().hideEvent(event)
 
     def closeEvent(self, event) -> None:  # noqa: N802
