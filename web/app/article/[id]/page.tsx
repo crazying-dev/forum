@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import GlobalLoading from "@/components/GlobalLoading";
 import Markdown from "@/components/Markdown";
+import RichContent from "@/components/ui/RichContent";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { guildApi, GuildArticle } from "@/lib/api";
 import { contrastText, formatTime, themeColor, themeInk } from "@/lib/constants";
@@ -154,7 +155,11 @@ export default function ArticlePage() {
           </div>
 
           <div className="article-content" ref={bodyRef}>
-            <Markdown content={article.content} className="post-body-html" />
+            {article.content_format === "html" ? (
+              <RichContent content={article.content} className="post-body-html" />
+            ) : (
+              <Markdown content={article.content} className="post-body-html" />
+            )}
           </div>
         </div>
 

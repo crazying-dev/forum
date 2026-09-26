@@ -8518,3 +8518,838 @@ input {
 .guild-leader-profile-btn:hover {
     transform: translateY(-1px);
 }
+
+/* ======================== 富文本编辑器（发帖正文） ======================== */
+
+.rich-editor {
+    display: flex;
+    flex-direction: column;
+}
+
+/* 带文字的按钮（H2/H3/引用）自动放宽：图标 + 文字并排 */
+.rich-editor-toolbar {
+    align-items: center;
+    border-radius: 10px 10px 0 0;
+}
+
+.rich-editor-toolbar .editor-tool {
+    width: auto;
+    min-width: 32px;
+    padding: 0 8px;
+    gap: 4px;
+}
+
+.editor-tool-text {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.editor-tool:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* 图片宽度条 / 引用样式条 */
+.rich-editor-option-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-card);
+    border-top: none;
+    border-bottom: none;
+    background: var(--color-bg-item);
+}
+
+.rich-editor-option-label {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.rich-editor-option-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 8px;
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.rich-editor-option-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.rich-editor-option-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff !important;
+}
+
+.rich-editor-number {
+    width: 86px;
+    padding: 4px 8px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 8px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+}
+
+.rich-editor-number:focus {
+    border-color: var(--color-border-focus);
+}
+
+/* 编辑区（TipTap 挂载点） */
+.rich-editor-content {
+    border: 1px solid var(--color-border-card);
+    border-radius: 0 0 10px 10px;
+    background: var(--color-bg-search);
+}
+
+.rich-editor-body {
+    min-height: 300px;
+    padding: 14px 16px;
+    outline: none;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.rich-editor-body p {
+    margin: 0 0 8px;
+}
+
+.rich-editor-body h2 {
+    margin: 14px 0 8px;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.rich-editor-body h3 {
+    margin: 12px 0 6px;
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.rich-editor-body ul,
+.rich-editor-body ol {
+    margin: 6px 0 10px;
+    padding-left: 22px;
+}
+
+.rich-editor-body li {
+    margin: 2px 0;
+}
+
+.rich-editor-body blockquote {
+    margin: 8px 0;
+    padding-left: 12px;
+    border-left: 3px solid var(--color-primary);
+    color: var(--color-text-secondary);
+}
+
+.rich-editor-body a {
+    color: var(--color-primary);
+    word-break: break-all;
+}
+
+.rich-editor-body img {
+    max-width: 100%;
+    border-radius: 8px;
+    margin: 8px 0;
+}
+
+.rich-editor-body img.ProseMirror-selectednode {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* 占位符（Placeholder 扩展：is-empty / is-editor-empty + data-placeholder） */
+.rich-editor-body p.is-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--color-text-tertiary);
+    pointer-events: none;
+    float: left;
+    height: 0;
+}
+
+/* 引用节点（编辑器内预览） */
+.embed-node {
+    position: relative;
+    display: block;
+    margin: 10px 0;
+    padding: 4px;
+    border: 1px dashed transparent;
+    border-radius: 12px;
+}
+
+.embed-node:hover {
+    border-color: var(--color-border-card);
+}
+
+.embed-node-selected {
+    border-color: var(--color-primary);
+    border-style: solid;
+}
+
+.embed-node-remove {
+    position: absolute;
+    top: -10px;
+    right: -6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: #ef4444;
+    color: #fff !important;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.embed-node-remove i {
+    color: inherit !important;
+}
+
+/* ======================== 引用卡片（正文渲染端） ======================== */
+
+.quote-embed-host {
+    display: block;
+}
+
+.quote-card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border-card);
+    border-left: 3px solid var(--color-primary);
+    border-radius: 10px;
+    background: var(--color-bg-item);
+    font-size: 14px;
+    text-decoration: none;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.quote-card:hover {
+    border-color: var(--color-border-focus);
+}
+
+/* 用户卡片：头像 + 信息横向；用户卡片居中时改为纵向 */
+.quote-card-user {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.quote-card-user.quote-card-center {
+    flex-direction: column;
+    text-align: center;
+}
+
+.quote-card-center .quote-card-name-row {
+    justify-content: center;
+}
+
+/* 尺寸 */
+.quote-card-sm {
+    padding: 8px 12px;
+    font-size: 13px;
+}
+
+.quote-card-md {
+    padding: 10px 14px;
+    font-size: 14px;
+}
+
+.quote-card-lg {
+    padding: 14px 18px;
+    font-size: 15px;
+}
+
+/* 紧凑版式：单行、省略类型标签与时间以外的信息 */
+.quote-card-compact {
+    gap: 2px;
+    padding: 6px 12px;
+}
+
+.quote-card-compact .quote-card-head {
+    display: none;
+}
+
+.quote-card-compact.quote-card-user {
+    gap: 8px;
+}
+
+/* 头像 */
+.quote-card-avatar {
+    position: relative;
+    display: block;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: visible;
+    background: var(--color-bg-avatar);
+}
+
+.quote-card-sm .quote-card-avatar {
+    width: 32px;
+    height: 32px;
+}
+
+.quote-card-md .quote-card-avatar {
+    width: 40px;
+    height: 40px;
+}
+
+.quote-card-lg .quote-card-avatar {
+    width: 52px;
+    height: 52px;
+}
+
+.quote-card-avatar img,
+.quote-card-avatar .avatar-fallback {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.quote-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.quote-card-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.quote-card-name {
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.quote-card-vip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: #f59e0b;
+    color: #fff !important;
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.quote-card-vip i {
+    color: inherit !important;
+}
+
+.quote-card-intro {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 0.88em;
+    line-height: 1.7;
+    color: var(--color-text-tertiary);
+    word-break: break-word;
+}
+
+/* 帖子/文章卡片 */
+.quote-card-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78em;
+    letter-spacing: 1px;
+    color: var(--color-text-tertiary);
+}
+
+.quote-card-head i {
+    color: inherit !important;
+}
+
+.quote-card-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 1.07em;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.quote-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    font-size: 0.82em;
+    color: var(--color-text-tertiary);
+}
+
+.quote-card-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+}
+
+.quote-card-meta-item i {
+    color: inherit !important;
+}
+
+/* 加载骨架 */
+.quote-card-skeleton {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    border-left-color: var(--color-border-card);
+}
+
+.quote-skeleton-block {
+    background: linear-gradient(90deg, var(--color-bg-item-hover) 25%, var(--color-bg-icon) 37%, var(--color-bg-item-hover) 63%);
+    background-size: 400% 100%;
+    border-radius: 6px;
+    animation: quoteSkeleton 1.4s ease infinite;
+}
+
+@keyframes quoteSkeleton {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+
+.quote-card-skeleton-line {
+    display: block;
+    width: 100%;
+    height: 12px;
+}
+
+.quote-card-skeleton-line-short {
+    width: 45%;
+}
+
+/* 内容已删除 / 不可用 */
+.quote-card-missing {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    border-left-color: var(--color-text-tertiary);
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.quote-card-missing i {
+    color: inherit !important;
+}
+
+/* ======================== 引用选择弹窗 ======================== */
+
+.quote-picker-container {
+    max-width: 520px;
+}
+
+.quote-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--color-border-divider);
+    background: var(--color-bg-item);
+}
+
+.quote-picker-search i {
+    color: var(--color-text-tertiary);
+}
+
+.quote-picker-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-search);
+    border-radius: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+}
+
+.quote-picker-input:focus {
+    border-color: var(--color-border-focus);
+}
+
+.quote-picker-insert {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 16px;
+    background: var(--color-primary);
+    color: #fff !important;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.quote-picker-insert:hover {
+    opacity: 0.88;
+}
+
+.quote-picker-id {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    word-break: break-all;
+}
+
+.quote-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    transition: background-color 0.2s ease;
+}
+
+.quote-picker-item:hover {
+    background: var(--color-bg-item-hover);
+}
+
+.quote-picker-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.quote-picker-item-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--color-text-primary);
+}
+
+.quote-picker-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.quote-picker-item-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+}
+
+.quote-picker-item-meta i {
+    color: inherit !important;
+}
+
+.quote-picker-more {
+    display: block;
+    width: calc(100% - 40px);
+    margin: 8px 20px 12px;
+    padding: 8px 0;
+    border: 1px dashed var(--color-border-card);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.quote-picker-more:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ======================== 夜间模式适配（编辑器 / 引用卡片） ======================== */
+
+.night-mode .quote-card {
+    background: rgba(26, 36, 35, 0.55);
+}
+
+.night-mode .quote-skeleton-block {
+    background: linear-gradient(90deg, rgba(132, 168, 185, 0.12) 25%, rgba(132, 168, 185, 0.28) 37%, rgba(132, 168, 185, 0.12) 63%);
+    background-size: 400% 100%;
+}
+
+.night-mode .rich-editor-option-btn,
+.night-mode .rich-editor-number {
+    background: var(--color-bg-input);
+}
+
+.night-mode .embed-node-selected {
+    border-color: var(--color-border-focus);
+}
+
+/* ======================== 会馆介绍页 ======================== */
+.guild-intro-page {
+    max-width: 900px;
+}
+
+.guild-intro-hero {
+    position: relative;
+    padding: 30px 24px 28px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px var(--color-shadow-search);
+}
+
+.guild-intro-hero-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.guild-intro-hero-guild {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.9;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-intro-hero-guild i {
+    color: inherit !important;
+}
+
+/* 徽标（无 logo 字段，用主题色块 + 图标占位） */
+.guild-intro-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    margin-top: 4px;
+    border-radius: 24px;
+    box-shadow: 0 0 0 3px var(--guild-fg-soft, rgba(255, 255, 255, 0.18));
+}
+
+.guild-intro-badge i {
+    font-size: 34px;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-intro-hero-name {
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-intro-hero-intro {
+    max-width: 560px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.92;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+    word-break: break-word;
+}
+
+/* 信息卡：成立时间 / 成员数 / 分类数 */
+.guild-intro-meta-card {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.guild-intro-meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 12px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+    text-align: center;
+    text-decoration: none;
+}
+
+.guild-intro-meta-item > i {
+    color: var(--color-primary);
+    font-size: 16px;
+}
+
+.guild-intro-meta-label {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-intro-meta-value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.guild-intro-meta-value i {
+    font-size: 11px;
+    color: inherit !important;
+}
+
+.guild-intro-meta-link {
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guild-intro-meta-link:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-border-focus);
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+}
+
+/* 正文面板 */
+.guild-intro-panel {
+    margin-top: 16px;
+    padding: 18px 20px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+}
+
+.guild-intro-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.guild-intro-panel-title i {
+    color: inherit !important;
+}
+
+.guild-intro-content {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.guild-intro-content p {
+    margin: 0 0 10px;
+}
+
+.guild-intro-content h1,
+.guild-intro-content h2,
+.guild-intro-content h3,
+.guild-intro-content h4,
+.guild-intro-content h5,
+.guild-intro-content h6 {
+    margin: 14px 0 8px;
+    color: var(--color-text-primary);
+}
+
+.guild-intro-content ul,
+.guild-intro-content ol {
+    margin: 6px 0 10px;
+    padding-left: 22px;
+}
+
+.guild-intro-content li {
+    margin: 3px 0;
+}
+
+.guild-intro-content img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+.guild-intro-content a {
+    color: var(--color-primary);
+    word-break: break-all;
+}
+
+.guild-intro-content blockquote {
+    margin: 8px 0;
+    padding: 8px 14px;
+    border-left: 3px solid var(--color-primary);
+    border-radius: 0 10px 10px 0;
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+}
+
+.guild-intro-content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.guild-intro-content th,
+.guild-intro-content td {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-card);
+}
+
+.guild-intro-placeholder {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-intro-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+}
+
+.guild-intro-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 26px;
+    border-radius: 22px;
+    font-size: 14px;
+    text-decoration: none;
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+    transition: transform 0.2s ease;
+}
+
+.guild-intro-back-btn i {
+    color: inherit !important;
+}
+
+.guild-intro-back-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* 会馆介绍页：窄屏信息卡改两列（第三项换行居中） */
+@media (max-width: 640px) {
+    .guild-intro-meta-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+

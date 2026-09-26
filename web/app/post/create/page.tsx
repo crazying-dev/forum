@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GlobalLoading from "@/components/GlobalLoading";
-import Markdown from "@/components/Markdown";
+import RichTextEditor from "@/components/editor/RichTextEditor";
 import { useToast } from "@/components/Toast";
 import BackButton from "@/components/ui/BackButton";
 import { postApi, userApi, guildApi, ApiException, GuildMembership } from "@/lib/api";
@@ -20,9 +20,15 @@ const COMPLIANCE = [
   "违反以上规定的帖子将被删除，情节严重者将封禁账号",
 ];
 
+/** 富文本是否为空（无文本且无图片/引用节点）：编辑器空文档序列化为 <p></p> */
+function hasRichContent(html: string): boolean {
+  const text = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  return !!text || /<img\b/i.test(html) || /data-embed=/i.test(html);
+}
+
 /**
  * 发帖页（useSearchParams 需在 Suspense 内，遵循 Next.js App Router 规范）：
- * 发布到（公共空间 / 我的会馆）+ 分类联动 + 桌面左右排版；支持 ?guild=slug 预选会馆。
+ * 发布到（公共空间 / 我的会馆）+ 分类联动 + 富文本编辑器（TipTap，提交 HTML）；支持 ?guild=slug 预选会馆。
  */
 export default function PostCreatePage() {
   return (
@@ -51,7 +57,6 @@ function PostCreateForm() {
   const [guildCats, setGuildCats] = useState<string[]>([]);
   const [target, setTarget] = useState<"public" | "guild">("public");
   const [guild, setGuild] = useState<GuildMembership | null>(null);
-  const [tab, setTab] = useState<"edit" | "preview">("edit");
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -84,7 +89,8 @@ function PostCreateForm() {
 
   const submit = async () => {
     if (!title.trim()) return setErr("请输入标题");
-    if (!content.trim()) return setErr("请输入内容");
+    // 编辑器空文档序列化为 <p></p>，故按「无文本且无图片/引用节点」判空
+    if (!hasRichContent(content)) return setErr("请输入内容");
     // 目标为会馆时必须携带会馆 uuid：缺失说明会馆数据异常，明确报错阻断，
     // 避免静默降级成发布到公共空间
     if (target === "guild" && !guild?.uuid) {
@@ -184,29 +190,7 @@ function PostCreateForm() {
 
           <div className="form-group">
             <label className="form-label">帖子内容</label>
-            <div className="form-html-warning">
-              <i className="fa fa-markdown"></i> 支持 Markdown 语法，HTML 标签会被自动转义
-            </div>
-            <div className="form-editor-tabs">
-              <button className={`editor-tab ${tab === "edit" ? "active" : ""}`} id="tab-edit" onClick={() => setTab("edit")}>
-                编辑
-              </button>
-              <button className={`editor-tab ${tab === "preview" ? "active" : ""}`} id="tab-preview" onClick={() => setTab("preview")}>
-                预览
-              </button>
-            </div>
-            <div className={`post-editor-split ${tab === "edit" ? "show-edit" : "show-preview"}`}>
-              <textarea
-                className="form-editor"
-                id="post-content-editor"
-                placeholder="在此输入 Markdown 内容..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
-              <div className="form-preview post-editor-preview" id="post-content-preview">
-                <Markdown content={content} className="markdown-body" />
-              </div>
-            </div>
+            <RichTextEditor value={content} onChange={setContent} placeholder="在此输入正文…" />
           </div>
 
           {err && <p style={{ color: "#ef4444", margin: "12px 0 0" }}>{err}</p>}

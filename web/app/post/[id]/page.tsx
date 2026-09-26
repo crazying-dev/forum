@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/ui/Modal";
 import Markdown from "@/components/Markdown";
+import RichContent from "@/components/ui/RichContent";
 import CommentSection from "@/components/CommentSection";
 import { UserAvatar, UserName } from "@/components/ui/UserAvatar";
 import { UserGuildChip } from "@/components/ui/UserGuildChip";
@@ -187,9 +188,13 @@ export default function PostDetailPage() {
             </div>
           </div>
 
-          <div className="post-body-html">
-            <Markdown content={post.content} />
-          </div>
+          {post.content_format === "html" ? (
+            <RichContent content={post.content} className="post-body-html" />
+          ) : (
+            <div className="post-body-html">
+              <Markdown content={post.content} />
+            </div>
+          )}
 
           <div className="post-actions">
             <button className={`post-action-btn ${liked ? "liked" : ""}`} id="post-like-btn" onClick={doLike}>

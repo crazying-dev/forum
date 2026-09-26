@@ -220,6 +220,9 @@ export default function GuildDetailPage() {
             <Link className="guild-hero-meta-link" href={`/huiguan/${guild.slug}/members`}>
               <i className="fa fa-users"></i> {guild.member_count} 人
             </Link>
+            <Link className="guild-hero-meta-link" href={`/huiguan/${guild.slug}/intro`}>
+              <i className="fa fa-book"></i> 会馆介绍
+            </Link>
             <span>
               <i className="fa fa-clock-o"></i> 创建于 {guild.created_at ? formatUserTime(guild.created_at) : "—"}
             </span>

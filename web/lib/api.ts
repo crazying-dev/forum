@@ -45,6 +45,8 @@ export interface Post {
   created_at?: string;
   user_name: string;
   user_avatar: string;
+  // 正文格式：'markdown'（旧帖）| 'html'（富文本编辑器产出）
+  content_format?: string;
   // 会馆（null/undefined 表示公共空间）
   guild_id?: number | null;
   guild_name?: string;
@@ -195,6 +197,79 @@ export interface FeedItem {
   participants_count: number;
 }
 
+// 会馆介绍页数据（GET /guilds/:slug/intro）
+export interface GuildIntroPageData {
+  guild: {
+    uuid: string;
+    slug: string;
+    name: string;
+    intro: string;
+    theme_color: string;
+    created_at?: string;
+    member_count: number;
+    category_count: number;
+    cover_file_id: string;
+  };
+  content?: string;
+}
+
+// 文章搜索项/结果（GET /articles/search，k≥2）
+export interface ArticleSearchItem {
+  id: string;
+  title: string;
+  guild_name: string;
+  created_at?: string;
+}
+
+export interface ArticleSearchResult {
+  articles: ArticleSearchItem[];
+  total: number;
+  has_more: boolean;
+  page: number;
+  page_size: number;
+}
+
+// 引用卡片（GET /embeds）：三类数据，查不到的 id 不出现在数组里
+export type EmbedKind = "user" | "post" | "article";
+
+export interface EmbedUserItem {
+  id: string;
+  name: string;
+  avatar: string;
+  vip: string;
+  prefix: string;
+  intro: string;
+  guild: { name: string; slug: string; theme_color: string } | null;
+}
+
+export interface EmbedPostItem {
+  id: string;
+  title: string;
+  user_id: string;
+  user_name: string;
+  user_avatar: string;
+  category: string;
+  created_at?: string;
+  guild_name: string;
+}
+
+export interface EmbedArticleItem {
+  id: string;
+  title: string;
+  author_id: string;
+  author_name: string;
+  author_avatar: string;
+  created_at?: string;
+  guild_name: string;
+}
+
+// 批量解析结果（每类 ≤30）
+export interface EmbedResolved {
+  users: EmbedUserItem[];
+  posts: EmbedPostItem[];
+  articles: EmbedArticleItem[];
+}
+
 // 文章参与人
 export interface GuildArticleParticipant {
   user_id: string;
@@ -209,6 +284,8 @@ export interface GuildArticle {
   title: string;
   summary: string;
   content?: string;
+  // 正文格式：'markdown'（旧文）| 'html'（富文本编辑器产出）
+  content_format?: string;
   author_user_id?: string;
   views: number;
   created_at?: string;
@@ -370,6 +447,11 @@ export const guildApi = {
   // 馆长介绍页（含寄语 leader_bio 与正文 content）
   leaderPage: (slug: string) =>
     request<GuildLeaderPageData>(`/guilds/${encodeURIComponent(slug)}/leader`),
+  // 会馆介绍页（概要/统计/封面 + 富文本正文 content）
+  intro: (slug: string) => request<GuildIntroPageData>(`/guilds/${encodeURIComponent(slug)}/intro`),
+  // 文章搜索（k≥2 字符；引用卡片选文用）
+  searchArticles: (k: string, page = 1, pageSize = 10) =>
+    request<ArticleSearchResult>(`/articles/search?k=${encodeURIComponent(k)}&page=${page}&page_size=${pageSize}`),
   feed: (slug: string, page = 1, pageSize = 20, category = "") =>
     request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; guild: { id: number; uuid?: string; slug: string; name: string; theme_color: string } }>(
       `/guilds/${encodeURIComponent(slug)}/feed?page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`
@@ -394,6 +476,28 @@ export const feedApi = {
     request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; space: string }>(
       `/feed?space=${space}&guild_id=${guildId}&page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`
     ),
+};
+
+// ---- 引用卡片 ----
+export const embedApi = {
+  // 批量解析引用 id（URLSearchParams 逗号拼接；查不到的 id 省略；每类最多 30 个）
+  resolve: (ids: { users?: string[]; posts?: string[]; articles?: string[] }) => {
+    const qs = new URLSearchParams();
+    if (ids.users?.length) qs.set("users", ids.users.join(","));
+    if (ids.posts?.length) qs.set("posts", ids.posts.join(","));
+    if (ids.articles?.length) qs.set("articles", ids.articles.join(","));
+    return request<EmbedResolved>(`/embeds?${qs.toString()}`);
+  },
+};
+
+// ---- 媒体（发帖配图） ----
+export const mediaApi = {
+  // 上传图片（需登录；multipart file，≤5MB，png/jpeg/webp/gif）→ { id, url }
+  upload: (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<{ id: string; url: string }>("/media/images", { method: "POST", body: fd });
+  },
 };
 
 // ---- 搜索/杂项 ----

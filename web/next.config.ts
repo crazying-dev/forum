@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const API_TARGET = process.env.API_TARGET || "http://127.0.0.1:8090";
-// 会馆图片资源（logo、馆长介绍页图片）由管理端提供（/guild-img/* → {ADMIN_TARGET}/api/*）
+// 会馆图片资源（logo、馆长介绍页图片、会馆介绍页封面与正文图片）由管理端提供（/guild-img/* → {ADMIN_TARGET}/api/*）
 const ADMIN_TARGET = process.env.ADMIN_TARGET || "http://127.0.0.1:8080";
 
 // HTML-limited bots：命中名单的 UA 会等待元数据解析完成后再发包（阻塞式渲染），
@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
         destination: `${API_TARGET}/api/:path*`,
       },
       {
-        // 会馆图片代理：/guild-img/guilds/{uuid}/logo（logo）、/guild-img/guilds/{uuid}/leader-images/{fileId}（馆长页图片）→ 管理端 /api/*
+        // 会馆图片代理：/guild-img/guilds/{uuid}/logo（logo）、/guild-img/guilds/{uuid}/leader-images/{fileId}（馆长介绍页图片）、/guild-img/guilds/{uuid}/intro-images/{fileId}（会馆介绍页封面/正文图片）→ 管理端 /api/*
         source: "/guild-img/:path*",
         destination: `${ADMIN_TARGET}/api/:path*`,
       },
