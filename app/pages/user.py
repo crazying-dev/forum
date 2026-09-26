@@ -17,7 +17,8 @@ from PyQt6.QtWidgets import QLabel, QTabWidget, QWidget
 
 from .. import constants, yearmode
 from ..widgets import (Card, Chip, EmptyHint, Muted, PostCard, ScrollPage,
-                       UserLink, UserListDialog, button, hbox, set_variant, vbox)
+                       UserLink, UserListDialog, button, hbox, set_variant, vbox,
+                       with_author)
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -222,7 +223,7 @@ class UserPage(Page):
     def _build_tabs(self) -> QTabWidget:
         tabs = QTabWidget()
         self.posts_pane = _ListPane(self, self._fetch_posts, rows_key="posts",
-                                    build_item=self._build_post_widget,
+                                    build_item=self._build_own_post_widget,
                                     empty_text="暂无帖子")
         tabs.addTab(self.posts_pane, "发布的帖子")
         self.favorites_pane = _ListPane(self, self._fetch_favorites,
@@ -237,6 +238,19 @@ class UserPage(Page):
         tabs.addTab(self.comments_pane, "评论")
         tabs.currentChanged.connect(self._on_tab_changed)
         return tabs
+
+    def _author_defaults(self) -> dict:
+        """主页主人资料：接口未返回作者字段时用来补齐帖子卡片。"""
+        user = self._user or {}
+        return {
+            "user_id": str(user.get("id") or self._user_id),
+            "name": str(user.get("name") or ""),
+            "avatar": str(user.get("avatar") or ""),
+        }
+
+    def _build_own_post_widget(self, post: dict) -> QWidget:
+        """「发布的帖子」：作者字段缺失时用主页主人资料补齐（历史接口兼容）。"""
+        return self._build_post_widget(with_author(post, **self._author_defaults()))
 
     def _build_post_widget(self, post: dict) -> QWidget:
         card = PostCard(post)

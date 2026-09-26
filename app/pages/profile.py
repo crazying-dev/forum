@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDateEdit, QFileDialog,
 from .. import constants, yearmode
 from ..widgets import (BaseDialog, Card, Chip, EmptyHint, Muted, PostCard,
                        ScrollPage, UserLink, UserListDialog, button, hbox,
-                       toast, vbox)
+                       toast, vbox, with_author)
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -270,7 +270,7 @@ class ProfilePage(Page):
     def _build_tabs(self) -> QTabWidget:
         tabs = QTabWidget()
         self.posts_pane = _ListPane(self, self._fetch_posts, rows_key="posts",
-                                    build_item=self._build_post_widget,
+                                    build_item=self._build_own_post_widget,
                                     empty_text="暂无帖子")
         tabs.addTab(self.posts_pane, "我的帖子")
         self.favorites_pane = _ListPane(self, self._fetch_favorites,
@@ -290,6 +290,19 @@ class ProfilePage(Page):
         tabs.addTab(self.replies_pane, "我的回复")
         tabs.currentChanged.connect(self._on_tab_changed)
         return tabs
+
+    def _author_defaults(self) -> dict:
+        """主页主人资料：接口未返回作者字段时用来补齐帖子卡片。"""
+        user = self._user or self.me or {}
+        return {
+            "user_id": str(user.get("id") or self._me_id()),
+            "name": str(user.get("name") or ""),
+            "avatar": str(user.get("avatar") or ""),
+        }
+
+    def _build_own_post_widget(self, post: dict) -> QWidget:
+        """「我的帖子」：作者字段缺失时用本人资料补齐（历史接口兼容）。"""
+        return self._build_post_widget(with_author(post, **self._author_defaults()))
 
     def _build_post_widget(self, post: dict) -> QWidget:
         card = PostCard(post)

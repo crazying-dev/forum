@@ -11,6 +11,25 @@ from .common import Chip, Muted, UserLink, hbox, vbox
 from .images import Avatar
 
 
+def with_author(post: dict, *, user_id: str = "", name: str = "",
+                avatar: str = "") -> dict:
+    """补齐帖子作者信息（返回副本，不修改入参）。
+
+    历史接口 ``/api/user/<id>/posts`` 不返回 ``user_id`` / ``user_name`` /
+    ``user_avatar``，个人主页的帖子卡片因此回退成「匿名用户」+ 默认头像。
+    而在「某个用户的主页」里，列表中的帖子必然属于该主页的主人，
+    所以缺作者信息时可以用主页主人补齐（防御性兼容；服务端修好后不会触发）。
+    """
+    data = dict(post or {})
+    if user_id and not str(data.get("user_id") or "").strip():
+        data["user_id"] = user_id
+    if name and not str(data.get("user_name") or "").strip():
+        data["user_name"] = name
+    if avatar and not str(data.get("user_avatar") or "").strip():
+        data["user_avatar"] = avatar
+    return data
+
+
 class PostCard(QFrame):
     """列表中的一条帖子（布局对照 Web 端 PostCard.vue）。"""
 
