@@ -7,7 +7,7 @@ import GlobalLoading from "@/components/GlobalLoading";
 import Markdown from "@/components/Markdown";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { guildApi, GuildArticle } from "@/lib/api";
-import { formatTime, themeColor, themeTint } from "@/lib/constants";
+import { contrastText, formatTime, themeColor, themeInk } from "@/lib/constants";
 
 type TocItem = { id: string; text: string; level: number };
 
@@ -106,6 +106,9 @@ export default function ArticlePage() {
   }
 
   const theme = themeColor(article.guild_theme_color);
+  // 主题色文字（章节导航选中项）：日间用可读 ink，夜间由 .theme-ink 规则提亮
+  const ink = themeInk(theme);
+  const inkStyle = { "--guild-ink": ink } as React.CSSProperties;
 
   return (
     <div className="article-page">
@@ -118,7 +121,7 @@ export default function ArticlePage() {
               <Link
                 className="article-guild-tag"
                 href={`/huiguan/${article.guild_slug}`}
-                style={{ background: themeTint(theme), color: theme }}
+                style={{ background: theme, color: contrastText(theme) }}
               >
                 <i className="fa fa-home"></i> {article.guild_name}
               </Link>
@@ -165,8 +168,8 @@ export default function ArticlePage() {
               {toc.map((t) => (
                 <li key={t.id} className={t.level === 3 ? "toc-level-3" : undefined}>
                   <button
-                    className={`article-toc-item ${activeId === t.id ? "active" : ""}`}
-                    style={activeId === t.id ? { color: theme, borderColor: theme } : undefined}
+                    className={`article-toc-item ${activeId === t.id ? "active theme-ink" : ""}`}
+                    style={activeId === t.id ? { ...inkStyle, borderColor: ink } : undefined}
                     onClick={() => jumpTo(t.id)}
                   >
                     {t.text}

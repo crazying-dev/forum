@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Comment } from "@/lib/api";
 import { timeAgo } from "@/lib/constants";
 import { UserAvatar, UserName } from "./ui/UserAvatar";
+import { UserGuildChip } from "./ui/UserGuildChip";
 import Markdown from "./Markdown";
 
 // 表情包面板（当前仅 emoji 字符，按分类切换）
@@ -64,21 +65,23 @@ function CommentItem({
   return (
     <div className={`comment-item ${isReply ? "comment-item-reply" : ""}`} data-comment-id={c.id}>
       <Link href={`/users/${c.user_id}`} className="comment-avatar">
-        <UserAvatar src={c.user_avatar} />
+        <UserAvatar src={c.user_avatar} userId={c.user_id} />
       </Link>
       <div className="comment-body">
         <div className="comment-header">
           <Link href={`/users/${c.user_id}`} className="comment-author Username">
-            <UserName name={c.user_name} userId={c.user_id} />
+            <UserName name={c.user_name} />
           </Link>
+          <UserGuildChip name={c.user_guild_name} color={c.user_guild_theme_color} isLeader={c.user_is_leader} />
           <span className="comment-time">{timeAgo(c.created_at)}</span>
         </div>
         {parent && (
           <div className="comment-reply-to">
             回复{" "}
             <Link href={`/users/${parent.user_id}`} className="Username">
-              <UserName name={parent.user_name} userId={parent.user_id} />
+              <UserName name={parent.user_name} />
             </Link>
+            <UserGuildChip name={parent.user_guild_name} color={parent.user_guild_theme_color} isLeader={parent.user_is_leader} />
           </div>
         )}
         <div className="comment-text">

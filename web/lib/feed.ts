@@ -17,5 +17,8 @@ export function feedItemToPost(item: FeedItem): Post {
     guild_id: item.guild_id ?? null,
     guild_name: item.guild_name ?? undefined,
     guild_theme_color: item.guild_theme_color ?? undefined,
+    user_guild_name: item.user_guild_name ?? undefined,
+    user_guild_theme_color: item.user_guild_theme_color ?? undefined,
+    user_is_leader: item.user_is_leader,
   };
 }

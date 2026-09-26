@@ -30,14 +30,82 @@ export function categoryColor(category?: string): string {
 
 // 会馆主题色：校验 hex（#RGB/#RRGGBB），非法时回退默认主色
 const HEX_COLOR_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
-export function themeColor(color?: string, fallback = "#6A8C89"): string {
+export function themeColor(color?: string | null, fallback = "#6A8C89"): string {
   const c = (color || "").trim();
   return HEX_COLOR_RE.test(c) ? c : fallback;
 }
 
 // 主题色浅底（拼接透明度后缀，如 #6A8C89 + 22 ≈ 13%）；用于标签/卡片浅色背景
-export function themeTint(color?: string, alpha = "22"): string {
+export function themeTint(color?: string | null, alpha = "22"): string {
   return themeColor(color) + alpha;
+}
+
+// ---- 颜色可读性（WCAG 对比度）----
+
+// 解析 #RGB / #RRGGBB 为 [r,g,b]（0-255）；非法返回 null
+function parseHex(hex?: string): [number, number, number] | null {
+  const c = (hex || "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(c)) {
+    return [parseInt(c[0] + c[0], 16), parseInt(c[1] + c[1], 16), parseInt(c[2] + c[2], 16)];
+  }
+  if (/^[0-9a-f]{6}$/i.test(c)) {
+    return [parseInt(c.slice(0, 2), 16), parseInt(c.slice(2, 4), 16), parseInt(c.slice(4, 6), 16)];
+  }
+  return null;
+}
+
+// sRGB 通道线性化（WCAG 2.x 公式）
+function channelLum(v: number): number {
+  const s = v / 255;
+  return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+}
+
+// WCAG 相对亮度（0=纯黑，1=纯白）；非法色值按 0 处理
+function luminanceOf(hex?: string): number {
+  const rgb = parseHex(hex);
+  if (!rgb) return 0;
+  return 0.2126 * channelLum(rgb[0]) + 0.7152 * channelLum(rgb[1]) + 0.0722 * channelLum(rgb[2]);
+}
+
+// WCAG 对比度（1 ~ 21）
+export function contrastRatio(a?: string, b?: string): number {
+  const la = luminanceOf(a);
+  const lb = luminanceOf(b);
+  const hi = Math.max(la, lb);
+  const lo = Math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// 相对亮度阈值判断是否亮色（阈值 0.35：中间调偏亮即视为亮色，需配深色前景）
+export function isLightHex(hex?: string, threshold = 0.35): boolean {
+  return luminanceOf(hex) > threshold;
+}
+
+// 按 WCAG 对比度取更清晰的前景色：白 / 深灰
+export function contrastText(hex?: string): "#fff" | "#1f2937" {
+  if (!parseHex(hex)) return "#fff";
+  return contrastRatio(hex, "#ffffff") >= contrastRatio(hex, "#1f2937") ? "#fff" : "#1f2937";
+}
+
+// 会馆 hero 前景色：亮色会馆用深字（#17323a），暗色会馆用白字
+export const GUILD_FG_DARK = "#17323a";
+export function guildForeground(hex?: string): string {
+  return isLightHex(hex) ? GUILD_FG_DARK : "#ffffff";
+}
+
+// 主题色作为「卡片底上的文字/图标色」时的日间可读版本：亮色主题色压暗，
+// 暗色主题色保持原色（夜间由 .theme-ink 规则向白色混合提亮）
+export function themeInk(color?: string | null): string {
+  const c = themeColor(color);
+  const rgb = parseHex(c);
+  if (!rgb || !isLightHex(c)) return c;
+  const mix = (v: number) => Math.round(v * 0.45);
+  return `rgb(${mix(rgb[0])}, ${mix(rgb[1])}, ${mix(rgb[2])})`;
+}
+
+// VIP 字段（"0" 表示非会员；空值不渲染）
+export function isVip(vip?: string | null): boolean {
+  return !!vip && vip !== "0";
 }
 
 // 相对时间（刚刚 / N分钟前 / N小时前 / N天前 / 日期）
@@ -111,15 +179,4 @@ export function prefixBadgeColor(userId?: string | null): string | null {
   if (prefix === "HG") return "#3b82f6";
   if (prefix === "YJ") return "#f59e0b";
   return null;
-}
-
-// 按 profile.prefix 字段生成徽章（搜索/资料卡）
-export function prefixBadgeFor(prefix?: string): { color: string; text: string } | null {
-  if (!prefix) return null;
-  let color = "";
-  if (prefix.startsWith("HG") && prefix !== "HG00000000000000000000") color = "#3b82f6";
-  else if (prefix === "HG00000000000000000000") color = "#6366f1";
-  else if (prefix === "YJ") color = "#f59e0b";
-  if (!color) return null;
-  return { color, text: prefix };
 }

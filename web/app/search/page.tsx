@@ -5,10 +5,10 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { useEffect, useState } from "react";
 import PostCard from "@/components/PostCard";
-import { ProfilePrefixBadge } from "@/components/PrefixBadge";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ListLoading, ListEmpty, LoadMoreButton } from "@/components/ui/ListState";
 import { miscApi, Post, UserBrief } from "@/lib/api";
+import { isVip } from "@/lib/constants";
 
 function SearchInner() {
   const params = useSearchParams();
@@ -115,14 +115,8 @@ function SearchInner() {
             ) : (
               <div style={{ display: tab === "users" ? "block" : "none" }}>
                 {users.map((u) => {
-                  const vipIcon = u.vip !== "0" ? (
-                    <img
-                      src="https://op-kdocs.wpscdn.cn/odimg/web/2024-03-26-12-26/vipnew_hover.svg"
-                      className="prefix-badge-svg"
-                      style={{ width: 22, height: 22 }}
-                      alt="VIP"
-                    />
-                  ) : null;
+                  // VIP 图标（内置 vip.svg）与前缀徽标统一在头像右下角：VIP 优先靠角，徽标向左并排
+                  const vip = isVip(u.vip);
                   return (
                     <Link className="search-user-item" href={`/users/${u.id}`} key={u.id} style={{ display: "flex" }}>
                       <div className="search-user-avatar-wrapper">
@@ -131,9 +125,9 @@ function SearchInner() {
                           alt={u.name}
                           imgClassName="search-user-avatar"
                           fallbackClassName="avatar-fallback search-user-avatar-fallback"
+                          userId={u.id}
+                          vip={vip}
                         />
-                        {vipIcon}
-                        <ProfilePrefixBadge prefix={u.prefix} />
                       </div>
                       <div className="search-user-info">
                         <div className="search-user-name" style={{ whiteSpace: "nowrap" }}>{u.name}</div>

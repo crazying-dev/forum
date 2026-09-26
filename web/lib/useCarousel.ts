@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * 轮播状态（会馆广场 / 会馆公告共用）：
@@ -49,11 +49,14 @@ export function useCarousel(length: number, interval = 5000, cooldownMs = 8000) 
     [cool]
   );
 
-  // 悬停事件：挂到轮播容器实现「悬停暂停 / 移出恢复」
-  const hoverProps = {
-    onMouseEnter: () => setHovered(true),
-    onMouseLeave: () => setHovered(false),
-  };
+  // 悬停事件：挂到轮播容器实现「悬停暂停 / 移出恢复」；useMemo 保证引用稳定，避免每次渲染生成新对象
+  const hoverProps = useMemo(
+    () => ({
+      onMouseEnter: () => setHovered(true),
+      onMouseLeave: () => setHovered(false),
+    }),
+    []
+  );
 
   // 返回：当前下标（数量变化时自动回到合法范围）、按步切换、跳转指定下标、悬停事件（挂到轮播容器）
   const safeIndex = length > 0 ? index % length : 0;

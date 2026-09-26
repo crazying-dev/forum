@@ -1,6 +1,6 @@
-import { categoryColor, categoryLabel } from "@/lib/constants";
+import { categoryColor, categoryLabel, contrastText } from "@/lib/constants";
 
-/** 分类徽章(彩色胶囊,颜色取自 CATEGORY_COLORS) */
+/** 分类徽章(彩色实底胶囊 + WCAG 对比字,避免浅底透背景) */
 export default function CategoryBadge({
   category,
   className = "post-card-category",
@@ -10,7 +10,7 @@ export default function CategoryBadge({
 }) {
   const catColor = categoryColor(category);
   return (
-    <span className={className} style={{ background: `${catColor}22`, color: catColor }}>
+    <span className={className} style={{ background: catColor, color: contrastText(catColor) }}>
       {categoryLabel(category)}
     </span>
   );

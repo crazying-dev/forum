@@ -8,7 +8,9 @@ import Modal from "@/components/ui/Modal";
 import Markdown from "@/components/Markdown";
 import CommentSection from "@/components/CommentSection";
 import { UserAvatar, UserName } from "@/components/ui/UserAvatar";
+import { UserGuildChip } from "@/components/ui/UserGuildChip";
 import CategoryBadge from "@/components/ui/CategoryBadge";
+import SpaceBadge from "@/components/ui/SpaceBadge";
 import BackButton from "@/components/ui/BackButton";
 import { postApi, Comment, ApiException } from "@/lib/api";
 import { useStore } from "@/lib/store";
@@ -162,17 +164,21 @@ export default function PostDetailPage() {
         <article className="post-content">
           <div className="post-meta-top">
             <CategoryBadge category={post.category} className="post-category-badge" />
+            <SpaceBadge name={post.guild_name} color={post.guild_theme_color} />
           </div>
           <h1 className="post-title">{post.title}</h1>
 
           <div className="post-author-row">
             <Link href={`/users/${post.user_id}`} className="post-author-avatar">
-              <UserAvatar src={post.user_avatar} />
+              <UserAvatar src={post.user_avatar} userId={post.user_id} />
             </Link>
             <div className="post-author-info">
-              <Link href={`/users/${post.user_id}`} className="post-author-name Username">
-                <UserName name={post.user_name} userId={post.user_id} />
-              </Link>
+              <div className="post-author-name-row">
+                <Link href={`/users/${post.user_id}`} className="post-author-name Username">
+                  <UserName name={post.user_name} />
+                </Link>
+                <UserGuildChip name={post.user_guild_name} color={post.user_guild_theme_color} isLeader={post.user_is_leader} />
+              </div>
               <div className="post-author-meta">
                 <span>{formatTime(post.created_at)}</span>
                 <span>·</span>

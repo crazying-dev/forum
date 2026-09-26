@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
         destination: `${API_TARGET}/api/:path*`,
       },
       {
-        // 会馆 logo 图片代理：/guild-img/guilds/{id}/logo → 管理端 /api/guilds/{id}/logo
+        // 会馆 logo 图片代理：/guild-img/guilds/{uuid}/logo → 管理端 /api/guilds/{uuid}/logo
         source: "/guild-img/:path*",
         destination: `${ADMIN_TARGET}/api/:path*`,
       },

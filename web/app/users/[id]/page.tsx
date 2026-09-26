@@ -6,12 +6,12 @@ import { useEffect, useState, useCallback } from "react";
 import PostCard from "@/components/PostCard";
 import FollowListModal from "@/components/FollowListModal";
 import UserProfileModal from "@/components/UserProfileModal";
-import { ProfilePrefixBadge } from "@/components/PrefixBadge";
 import CategoryBadge from "@/components/ui/CategoryBadge";
+import SpaceBadge from "@/components/ui/SpaceBadge";
 import { useToast } from "@/components/Toast";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { userApi, postApi, User, Post, UserBrief, ReplyItem, ApiException, GuildMembership } from "@/lib/api";
-import { ageDisplay, themeColor, themeTint } from "@/lib/constants";
+import { ageDisplay, contrastText, isVip, themeColor } from "@/lib/constants";
 import { useStore } from "@/lib/store";
 
 function fmtDate(v?: string) {
@@ -137,11 +137,8 @@ export default function UserPage() {
   if (loading) return <div className="loading-text" style={{ padding: 40 }}>加载中...</div>;
   if (!profile) return <div className="loading-text" style={{ padding: 40 }}>用户不存在</div>;
 
-  const vipIcon = profile.vip && profile.vip !== "0" ? (
-    <span className="user-vip-icon" style={{ display: "inline-flex" }}>
-      <i className="fa fa-diamond" style={{ color: "#f59e0b", fontSize: 18 }}></i>
-    </span>
-  ) : null;
+  // VIP 徽章统一展示在头像右下角（与前缀徽标同一角落体系）
+  const vip = isVip(profile.vip);
 
   return (
     <>
@@ -149,16 +146,21 @@ export default function UserPage() {
         <div className="user-profile-card">
           <div className="user-profile-avatar-wrapper">
             <div className="user-profile-avatar">
-              <UserAvatar src={profile.avatar} alt="用户头像" imgId="user-profile-avatar-img" fallbackClassName="avatar-fallback avatar-fallback-lg" />
+              <UserAvatar
+                src={profile.avatar}
+                alt="用户头像"
+                imgId="user-profile-avatar-img"
+                fallbackClassName="avatar-fallback avatar-fallback-lg"
+                userId={profile.id}
+                vip={vip}
+              />
             </div>
-            <ProfilePrefixBadge prefix={profile.prefix} />
           </div>
           <div className="user-profile-info">
             <h2>
               <div id="user-profile-name" className="user-name-clickable Username" title="点击查看详情" onClick={() => setShowProfileModal(true)}>
                 {profile.name}
               </div>
-              {vipIcon}
             </h2>
             <p className="user-profile-intro" id="user-profile-intro">{profile.intro || "这个人很懒，什么都没留下~"}</p>
             <div className="user-profile-meta">
@@ -187,12 +189,12 @@ export default function UserPage() {
                     className="user-guild-tag"
                     href={`/huiguan/${guild.slug}`}
                     title={`进入会馆「${guild.name}」`}
-                    style={{ background: themeTint(guild.theme_color), color: themeColor(guild.theme_color) }}
+                    style={{ background: themeColor(guild.theme_color), color: contrastText(themeColor(guild.theme_color)) }}
                   >
                     <i className="fa fa-home"></i> {guild.name}
                   </Link>
                   {isLeader && (
-                    <span className="user-guild-leader-tag" style={{ background: themeTint(guild.theme_color), color: themeColor(guild.theme_color) }}>
+                    <span className="user-guild-chip user-leader-chip">
                       <i className="fa fa-crown"></i> 馆长
                     </span>
                   )}
@@ -276,7 +278,10 @@ export default function UserPage() {
                     <h3 className="post-item-title">{p.title}</h3>
                     <p className="post-item-summary">{(p.summary || "").replace(/<[^>]+>/g, "").substring(0, 200)}</p>
                     <div className="post-item-footer">
-                      <CategoryBadge category={p.category} className="post-item-category" />
+                      <div className="post-item-tags">
+                        <CategoryBadge category={p.category} className="post-item-category" />
+                        <SpaceBadge name={p.guild_name} color={p.guild_theme_color} />
+                      </div>
                       <div className="post-item-stats">
                         <span><i className="fa fa-eye"></i> {p.views || 0}</span>
                         <span><i className="fa fa-thumbs-up"></i> {p.likes || 0}</span>
@@ -298,12 +303,15 @@ export default function UserPage() {
                   favorites.map((p) => (
                     <div className="post-item" key={p.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/post/${p.id}`)}>
                       <div className="post-item-header">
-                        <img className="post-item-avatar" src={p.user_avatar} alt="" />
+                        <div className="post-item-avatar">
+                          <UserAvatar src={p.user_avatar} userId={p.user_id} />
+                        </div>
                         <div className="post-item-header-body">
                           <h3 className="post-item-title">{p.title}</h3>
                           <div className="post-item-sub-meta">
                             <span className="post-item-author Username"><i className="fa fa-user-circle-o"></i> {p.user_name}</span>
                             <CategoryBadge category={p.category} className="post-item-category" />
+                            <SpaceBadge name={p.guild_name} color={p.guild_theme_color} />
                           </div>
                         </div>
                       </div>
@@ -337,7 +345,7 @@ export default function UserPage() {
                   title="点击跳转到该评论"
                 >
                   <div className="comment-avatar">
-                    <img src={c.user_avatar} alt="" />
+                    <UserAvatar src={c.user_avatar} userId={c.user_id} />
                   </div>
                   <div className="comment-body">
                     <div className="comment-header">

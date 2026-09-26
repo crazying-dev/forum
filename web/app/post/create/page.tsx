@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import GlobalLoading from "@/components/GlobalLoading";
 import Markdown from "@/components/Markdown";
+import { useToast } from "@/components/Toast";
 import BackButton from "@/components/ui/BackButton";
 import { postApi, userApi, guildApi, ApiException, GuildMembership } from "@/lib/api";
-import { POST_CATEGORIES, themeColor, themeTint } from "@/lib/constants";
+import { POST_CATEGORIES, contrastText, themeColor, themeInk, themeTint } from "@/lib/constants";
 
 const COMPLIANCE = [
   "遵守中华人民共和国相关法律法规，不得发布违法违规内容",
@@ -18,9 +20,30 @@ const COMPLIANCE = [
   "违反以上规定的帖子将被删除，情节严重者将封禁账号",
 ];
 
-/** 发帖页：发布到（公共空间 / 我的会馆）+ 分类联动 + 桌面左右排版 */
+/**
+ * 发帖页（useSearchParams 需在 Suspense 内，遵循 Next.js App Router 规范）：
+ * 发布到（公共空间 / 我的会馆）+ 分类联动 + 桌面左右排版；支持 ?guild=slug 预选会馆。
+ */
 export default function PostCreatePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="route-loading">
+          <GlobalLoading />
+        </div>
+      }
+    >
+      <PostCreateForm />
+    </Suspense>
+  );
+}
+
+function PostCreateForm() {
   const router = useRouter();
+  const params = useSearchParams();
+  const { toast } = useToast();
+  // ?guild=slug：由会馆页「发帖」入口传入，与用户所属会馆匹配时预选该会馆
+  const guildSlug = params.get("guild") || "";
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [pubCat, setPubCat] = useState(POST_CATEGORIES[0].key);
@@ -40,28 +63,38 @@ export default function PostCreatePage() {
         const r = await userApi.me();
         if (!r.guild) return;
         setGuild(r.guild);
-        setTarget("guild");
         const d = await guildApi.detail(r.guild.slug);
         const names = (d.guild.categories || []).map((c) => c.name);
         setGuildCats(names);
         setGuildCat(names[0] || "");
+        // 未指定会馆：沿用「已加入则默认发到会馆」；指定了非本人所属会馆：退回公共空间
+        if (!guildSlug || guildSlug === r.guild.slug) setTarget("guild");
+        else setTarget("public");
       } catch {
         /* 未登录或接口异常：仅公共空间 */
       }
     })();
-  }, []);
+  }, [guildSlug]);
 
   const category = target === "guild" ? guildCat : pubCat;
   const chips = target === "guild" ? guildCats : POST_CATEGORIES.map((c) => c.key);
   const theme = themeColor(guild?.theme_color);
+  const themeFg = contrastText(theme);
+  const inkStyle = { "--guild-ink": themeInk(theme) } as React.CSSProperties;
 
   const submit = async () => {
     if (!title.trim()) return setErr("请输入标题");
     if (!content.trim()) return setErr("请输入内容");
+    // 目标为会馆时必须携带会馆 uuid：缺失说明会馆数据异常，明确报错阻断，
+    // 避免静默降级成发布到公共空间
+    if (target === "guild" && !guild?.uuid) {
+      toast("会馆标识缺失，请刷新重试", "error");
+      return;
+    }
     setBusy(true);
     setErr("");
     try {
-      const r = await postApi.create(title.trim(), content, category, target === "guild" && guild ? guild.id : undefined);
+      const r = await postApi.create(title.trim(), content, category, target === "guild" && guild ? guild.uuid : undefined);
       router.push(`/post/${r.id}`);
     } catch (e) {
       setErr(e instanceof ApiException ? e.message : "发布失败");
@@ -94,7 +127,11 @@ export default function PostCreatePage() {
               {guild && (
                 <button
                   className={`post-target-btn ${target === "guild" ? "active" : ""}`}
-                  style={target === "guild" ? { background: theme, borderColor: theme } : undefined}
+                  style={
+                    target === "guild"
+                      ? ({ background: theme, borderColor: theme, "--guild-btn-fg": themeFg } as React.CSSProperties)
+                      : undefined
+                  }
                   onClick={() => setTarget("guild")}
                 >
                   <i className="fa fa-home"></i> 我的会馆（{guild.name}）
@@ -102,7 +139,7 @@ export default function PostCreatePage() {
               )}
             </div>
             {target === "guild" && guild && (
-              <p className="post-target-hint" style={{ color: theme }}>
+              <p className="post-target-hint theme-ink" style={inkStyle}>
                 <i className="fa fa-info-circle"></i> 帖子将发布到会馆「{guild.name}」，所有访客可见
               </p>
             )}
@@ -121,7 +158,7 @@ export default function PostCreatePage() {
                       key={key}
                       className={`category-chip ${active ? "active" : ""}`}
                       data-value={key}
-                      style={active && target === "guild" ? { background: theme } : undefined}
+                      style={active && target === "guild" ? { background: theme, color: themeFg } : undefined}
                       onClick={() => (target === "guild" ? setGuildCat(key) : setPubCat(key))}
                     >
                       {label}
@@ -176,7 +213,13 @@ export default function PostCreatePage() {
 
           <div className="form-actions">
             <button className="btn-cancel" onClick={() => router.back()}>取消</button>
-            <button className="btn-submit" id="post-submit-btn" disabled={busy} onClick={submit} style={target === "guild" ? { background: theme } : undefined}>
+            <button
+              className="btn-submit"
+              id="post-submit-btn"
+              disabled={busy}
+              onClick={submit}
+              style={target === "guild" ? { background: theme, color: themeFg } : undefined}
+            >
               <i className="fa fa-paper-plane"></i> {busy ? "发布中..." : "发布"}
             </button>
           </div>

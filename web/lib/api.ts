@@ -45,10 +45,14 @@ export interface Post {
   created_at?: string;
   user_name: string;
   user_avatar: string;
-  // 会馆归属（null/undefined 表示公共空间）
+  // 会馆（null/undefined 表示公共空间）
   guild_id?: number | null;
   guild_name?: string;
   guild_theme_color?: string;
+  // 作者身份标签（后端契约）：所属会馆 + 是否馆长
+  user_guild_name?: string | null;
+  user_guild_theme_color?: string | null;
+  user_is_leader?: boolean;
 }
 
 export interface Comment {
@@ -62,6 +66,10 @@ export interface Comment {
   created_at?: string;
   user_name: string;
   user_avatar: string;
+  // 作者身份标签（后端契约）：所属会馆 + 是否馆长
+  user_guild_name?: string | null;
+  user_guild_theme_color?: string | null;
+  user_is_leader?: boolean;
 }
 
 // 评论列表项：带所属帖子标题（个人中心评论列表用）
@@ -83,6 +91,7 @@ export interface GuildLeader {
 // 会馆列表项
 export interface GuildListItem {
   id: number;
+  uuid: string;
   slug: string;
   name: string;
   intro: string;
@@ -114,6 +123,7 @@ export interface GuildAnnouncement {
 // 会馆详情（logo_file_id 为管理端内部字段，接口不下发）
 export interface GuildDetail {
   id: number;
+  uuid: string;
   slug: string;
   name: string;
   intro: string;
@@ -156,6 +166,9 @@ export interface FeedItem {
   guild_id?: number | null;
   guild_name?: string | null;
   guild_theme_color?: string | null;
+  user_guild_name?: string | null;
+  user_guild_theme_color?: string | null;
+  user_is_leader?: boolean;
   author?: GuildLeader | null;
   participants_count: number;
 }
@@ -199,6 +212,7 @@ export interface UserBrief {
 // 用户所在会馆概要（个人中心标签）
 export interface GuildMembership {
   id: number;
+  uuid: string;
   slug: string;
   name: string;
   theme_color: string;
@@ -297,11 +311,11 @@ export const postApi = {
   random: () => request<{ posts: Post[] }>("/posts/random"),
   detail: (id: string) =>
     request<{ post: Post; comments: Comment[]; liked: boolean; favorited: boolean }>(`/posts/${id}`),
-  // guildId 传入时帖子归属该会馆（需为该馆成员），否则发到公共空间
-  create: (title: string, content: string, category: string, guildId?: number) =>
+  // guildUuid 传入时帖子归属该会馆（需为该馆成员），否则发到公共空间
+  create: (title: string, content: string, category: string, guildUuid?: string) =>
     request<{ id: string }>("/posts", {
       method: "POST",
-      body: JSON.stringify(guildId ? { title, content, category, guild_id: guildId } : { title, content, category }),
+      body: JSON.stringify(guildUuid ? { title, content, category, guild_uuid: guildUuid } : { title, content, category }),
     }),
   like: (id: string) => request<{ liked: boolean; likes: number }>(`/posts/${id}/like`, { method: "POST" }),
   favorite: (id: string) => request<{ favorited: boolean }>(`/posts/${id}/favorite`, { method: "POST" }),
@@ -322,7 +336,7 @@ export const guildApi = {
   detail: (slug: string) =>
     request<{ guild: GuildDetail; my_state: GuildMyState | null }>(`/guilds/${encodeURIComponent(slug)}`),
   feed: (slug: string, page = 1, pageSize = 20, category = "") =>
-    request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; guild: { id: number; slug: string; name: string; theme_color: string } }>(
+    request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; guild: { id: number; uuid?: string; slug: string; name: string; theme_color: string } }>(
       `/guilds/${encodeURIComponent(slug)}/feed?page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`
     ),
   article: (id: string) =>

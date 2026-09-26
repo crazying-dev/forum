@@ -5,11 +5,11 @@ import CategoryBadge from "./ui/CategoryBadge";
 import SpaceBadge from "./ui/SpaceBadge";
 import { UserAvatar, UserName } from "./ui/UserAvatar";
 
-/** 帖子卡片（与 legacy renderPostCard 结构 1:1）；showSpace 开启后显示会馆/公共空间标签 */
+/** 帖子卡片（与 legacy renderPostCard 结构 1:1）；showSpace 默认开启，展示会馆/公共空间标签 */
 export default function PostCard({
   post,
   showTime = true,
-  showSpace = false,
+  showSpace = true,
 }: {
   post: Post;
   showTime?: boolean;
@@ -21,7 +21,7 @@ export default function PostCard({
     <Link className="post-card" href={`/post/${post.id}`}>
       <div className="post-card-left">
         <div className="post-card-avatar">
-          <UserAvatar src={post.user_avatar} />
+          <UserAvatar src={post.user_avatar} userId={post.user_id} />
         </div>
       </div>
       <div className="post-card-body">
@@ -29,7 +29,7 @@ export default function PostCard({
           <CategoryBadge category={post.category} />
           {showSpace && <SpaceBadge name={post.guild_name} color={post.guild_theme_color} />}
           <span className="post-card-author Username">
-            <UserName name={post.user_name} userId={post.user_id} />
+            <UserName name={post.user_name} />
           </span>
           {showTime && <span className="post-card-time">{timeAgo(post.created_at)}</span>}
         </div>

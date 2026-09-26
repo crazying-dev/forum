@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ArticleCard from "@/components/ArticleCard";
 import GlobalLoading from "@/components/GlobalLoading";
@@ -9,15 +9,17 @@ import PostCard from "@/components/PostCard";
 import { useToast } from "@/components/Toast";
 import GuildLogo from "@/components/ui/GuildLogo";
 import { ListEmpty, LoadMoreButton } from "@/components/ui/ListState";
+import Modal from "@/components/ui/Modal";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { ApiException, guildApi, FeedItem, GuildDetail, GuildMyState } from "@/lib/api";
-import { formatUserTime, themeColor, themeTint, timeAgo } from "@/lib/constants";
+import { contrastText, formatUserTime, guildForeground, isLightHex, themeColor, themeInk, themeTint, timeAgo } from "@/lib/constants";
 import { feedItemToPost } from "@/lib/feed";
 import { useCarousel } from "@/lib/useCarousel";
 
 /** 会馆详情：信息卡 + 馆长条 + 公告轮播 + 分类筛选 + 帖子/文章混合流 */
 export default function GuildDetailPage() {
   const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
   const { toast } = useToast();
   // 按 slug 记录加载结果：切换会馆时旧数据自动失效（无需在 effect 内重置）
   const [data, setData] = useState<{ slug: string; guild: GuildDetail | null; myState: GuildMyState | null; failed: boolean } | null>(null);
@@ -28,6 +30,7 @@ export default function GuildDetailPage() {
   const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [bioOpen, setBioOpen] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const pageRef = useRef(1);
 
   // 会馆详情（my_state：未登录为 null）
@@ -125,12 +128,14 @@ export default function GuildDetailPage() {
     }
   };
 
+  // 退出会馆：先二次确认再调接口（取消则不动作）
   const doLeave = async () => {
     setBusy(true);
     try {
       await guildApi.leave(slug);
       if (myState) patchData({ myState: { ...myState, is_member: false, is_leader: false } });
       if (guild) patchData({ guild: { ...guild, member_count: Math.max(0, guild.member_count - 1) } });
+      setConfirmLeave(false);
       toast("已退出会馆", "success");
     } catch (e) {
       // 馆长需先卸任等由后端返回 message
@@ -138,6 +143,19 @@ export default function GuildDetailPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  // 分类行右侧「发帖」：未登录→登录页；已加入→发帖页预选本会馆；未加入→提示
+  const onCreatePost = () => {
+    if (!myState) {
+      router.push("/auth");
+      return;
+    }
+    if (!isMember) {
+      toast("加入会馆后才能发帖", "warning");
+      return;
+    }
+    router.push(`/post/create?guild=${encodeURIComponent(slug)}`);
   };
 
   if (failed) {
@@ -163,14 +181,28 @@ export default function GuildDetailPage() {
   }
 
   const theme = themeColor(guild.theme_color);
+  const ink = themeInk(theme);
+  // 卡片底上的主题色文字/链接：日间用可读 ink，夜间由 .theme-ink 规则提亮
+  const inkStyle = { "--guild-ink": ink } as React.CSSProperties;
+  // hero 前景色：亮色会馆用深字，暗色会馆用白字（退出按钮/撤回链接/文字/遮罩均改用该变量）
+  const fg = guildForeground(theme);
+  const lightTheme = isLightHex(theme);
+  const heroVars = {
+    "--guild-fg": fg,
+    "--guild-fg-soft": lightTheme ? "rgba(23, 50, 58, 0.10)" : "rgba(255, 255, 255, 0.18)",
+    "--guild-shade": lightTheme
+      ? "linear-gradient(135deg, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0.42) 100%)"
+      : "linear-gradient(135deg, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.28) 100%)",
+    "--guild-ts": lightTheme ? "none" : "0 1px 2px rgba(0, 0, 0, 0.28)",
+  } as React.CSSProperties;
 
   return (
     <div className="guild-page guild-detail-page" style={{ background: `linear-gradient(180deg, ${themeTint(theme, "26")} 0%, transparent 340px)` }}>
       {/* 信息卡 */}
-      <div className="guild-detail-hero" style={{ background: theme }}>
+      <div className="guild-detail-hero" style={{ background: theme, ...heroVars }}>
         <div className="guild-hero-shade"></div>
         <GuildLogo
-          id={guild.id}
+          uuid={guild.uuid}
           name={guild.name}
           hasLogo={guild.has_logo}
           logoVersion={guild.logo_version}
@@ -205,7 +237,7 @@ export default function GuildDetailPage() {
               <span className="guild-joined-badge">
                 <i className="fa fa-check"></i> 已加入
               </span>
-              <button className="guild-leave-btn" disabled={busy} onClick={doLeave}>
+              <button className="guild-leave-btn" disabled={busy} onClick={() => setConfirmLeave(true)}>
                 {busy ? "处理中..." : "退出会馆"}
               </button>
             </>
@@ -236,7 +268,7 @@ export default function GuildDetailPage() {
             <div className="guild-leader-text">
               <div className="guild-leader-name">
                 {guild.leader.name}
-                <span className="guild-leader-tag" style={{ background: themeTint(theme), color: theme }}>
+                <span className="guild-leader-tag" style={{ background: theme, color: contrastText(theme) }}>
                   <i className="fa fa-crown"></i> 馆长
                 </span>
               </div>
@@ -246,11 +278,11 @@ export default function GuildDetailPage() {
           </button>
           {bioOpen && (
             <div className="guild-leader-zone">
-              <div className="guild-leader-zone-title" style={{ color: theme }}>
+              <div className="guild-leader-zone-title theme-ink" style={inkStyle}>
                 <i className="fa fa-star"></i> 馆长专区
               </div>
               <p className="guild-leader-bio">{guild.leader_bio || "馆长还没有留下寄语～"}</p>
-              <Link className="guild-leader-link" href={`/users/${guild.leader.id}`} style={{ color: theme }}>
+              <Link className="guild-leader-link theme-ink" href={`/users/${guild.leader.id}`} style={inkStyle}>
                 查看馆长主页 <i className="fa fa-arrow-right"></i>
               </Link>
             </div>
@@ -300,24 +332,31 @@ export default function GuildDetailPage() {
         </div>
       )}
 
-      {/* 分类 chips（无分类则隐藏） */}
-      {guild.categories.length > 0 && (
+      {/* 分类行：单行横向滚动 + 右侧固定「发帖」按钮 */}
+      <div className="guild-feed-bar">
         <div className="guild-feed-cats">
-          <button className={`guild-cat-chip ${category === "" ? "active" : ""}`} style={category === "" ? { background: theme } : undefined} onClick={() => setCategoryChip("")}>
+          <button
+            className={`guild-cat-chip ${category === "" ? "active" : ""}`}
+            style={category === "" ? { background: theme, color: contrastText(theme) } : undefined}
+            onClick={() => setCategoryChip("")}
+          >
             全部
           </button>
           {guild.categories.map((c) => (
             <button
               key={c.id}
               className={`guild-cat-chip ${category === c.name ? "active" : ""}`}
-              style={category === c.name ? { background: theme } : undefined}
+              style={category === c.name ? { background: theme, color: contrastText(theme) } : undefined}
               onClick={() => setCategoryChip(c.name)}
             >
               {c.name}
             </button>
           ))}
         </div>
-      )}
+        <button className="guild-feed-post-btn" style={{ background: theme, color: contrastText(theme) }} onClick={onCreatePost}>
+          <i className="fa fa-pencil"></i> 发帖
+        </button>
+      </div>
 
       {/* 内容混合流 */}
       <div className="guild-feed-list">
@@ -337,6 +376,30 @@ export default function GuildDetailPage() {
       </div>
 
       {hasMore && <LoadMoreButton loading={loadingMore} onClick={loadMore} id="guild-load-more" />}
+
+      {/* 退出会馆二次确认（取消不动作） */}
+      {confirmLeave && (
+        <Modal
+          open
+          onClose={() => {
+            if (!busy) setConfirmLeave(false);
+          }}
+          cardStyle={{ maxWidth: 360 }}
+        >
+          <h3 className="donate-title">
+            <i className="fa fa-sign-out"></i> 退出会馆
+          </h3>
+          <p className="guild-confirm-text">确定要退出「{guild.name}」吗？退出后将失去会馆成员身份，可重新申请加入。</p>
+          <div className="report-actions">
+            <button className="report-cancel" disabled={busy} onClick={() => setConfirmLeave(false)}>
+              取消
+            </button>
+            <button className="report-submit" disabled={busy} onClick={doLeave}>
+              {busy ? "处理中..." : "确定退出"}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

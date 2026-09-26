@@ -1,8 +1,8 @@
 import { themeColor, themeTint } from "@/lib/constants";
 
-/** 会馆 Logo 图片地址（经 next.config rewrites 的 /guild-img 代理到管理端） */
-export function guildLogoUrl(id: number, logoVersion?: number): string {
-  return `/guild-img/guilds/${id}/logo?v=${logoVersion || 0}`;
+/** 会馆 Logo 图片地址（经 next.config rewrites 的 /guild-img 代理到管理端，按 uuid 定位） */
+export function guildLogoUrl(uuid?: string | null, logoVersion?: number): string {
+  return `/guild-img/guilds/${uuid || ""}/logo?v=${logoVersion || 0}`;
 }
 
 /**
@@ -10,7 +10,7 @@ export function guildLogoUrl(id: number, logoVersion?: number): string {
  * 轮播 / 详情 / 列表统一使用本组件。
  */
 export default function GuildLogo({
-  id,
+  uuid,
   name,
   hasLogo,
   logoVersion,
@@ -18,7 +18,7 @@ export default function GuildLogo({
   size = 64,
   className = "guild-logo",
 }: {
-  id: number;
+  uuid?: string | null;
   name: string;
   hasLogo?: boolean;
   logoVersion?: number;
@@ -28,10 +28,10 @@ export default function GuildLogo({
 }) {
   const c = themeColor(color);
 
-  if (hasLogo) {
+  if (hasLogo && uuid) {
     return (
       <div className={`${className} guild-logo-img`} style={{ width: size, height: size }}>
-        <img src={guildLogoUrl(id, logoVersion)} alt={name} />
+        <img src={guildLogoUrl(uuid, logoVersion)} alt={name} />
       </div>
     );
   }

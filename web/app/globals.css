@@ -2963,34 +2963,6 @@ input {
     box-sizing: border-box;
 }
 
-.prefix-badge {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 22px;
-    height: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-}
-
-.prefix-badge-inline {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 4px;
-    width: 16px;
-    height: 16px;
-}
-
-.prefix-badge svg,
-.prefix-badge-inline svg {
-    all: unset !important;
-    width: 100%;
-    height: 100%;
-    display: block !important;
-}
-
 .user-profile-info {
     flex: 1;
     min-width: 200px;
@@ -3015,7 +2987,6 @@ input {
     flex-shrink: 1;
 }
 
-.user-profile-info h2 .prefix-badge-inline,
 .user-profile-info h2 .user-vip-icon,
 .user-profile-info h2 .email-verified-badge {
     flex-shrink: 0;
@@ -3284,8 +3255,15 @@ input {
 .post-item-sub-meta {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-top: 6px;
+}
+
+/* 个人中心帖子列表：分类 ↔ 空间标签固定小间距（与主卡片头部一致） */
+.post-item-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .post-item-footer-right {
@@ -4005,9 +3983,9 @@ input {
 }
 
 .post-card-category {
-    padding: 2px 10px;
+    padding: 3px 11px;
     border-radius: 10px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
 }
 
@@ -6335,11 +6313,12 @@ input {
     animation: globalLoadingBreath 1.9s ease-in-out infinite;
 }
 
-.global-loading-char {
-    color: #fff !important;
-    line-height: 1;
-    font-weight: 600;
-    letter-spacing: 2px;
+.global-loading-logo img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
 }
 
 .global-loading-dots {
@@ -6411,9 +6390,9 @@ input {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 9px;
+    padding: 3px 10px;
     border-radius: 10px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
     background: var(--color-bg-icon);
     color: var(--color-text-tertiary);
@@ -6421,12 +6400,13 @@ input {
 }
 
 .space-badge i {
-    font-size: 10px;
+    font-size: 11px;
 }
 
 .article-badge {
-    background: rgba(139, 92, 246, 0.14);
-    color: #8b5cf6;
+    /* 实底 + 白字（#7c3aed 对比度 ≈ 5.7），不再透出下层背景 */
+    background: #7c3aed;
+    color: #fff;
 }
 
 .article-card-icon {
@@ -6519,7 +6499,7 @@ input {
 }
 
 .guild-hero-logo {
-    border: 2px solid rgba(255, 255, 255, 0.55);
+    border: 2px solid color-mix(in srgb, var(--guild-fg, #fff) 60%, transparent);
 }
 
 .guild-list-logo {
@@ -6536,6 +6516,8 @@ input {
     align-items: center;
     justify-content: center;
     gap: 14px;
+    /* 作为 popLayout 离场卡的绝对定位基准，同时建立手牌/主卡的层叠上下文 */
+    position: relative;
 }
 
 .guild-carousel-card {
@@ -6589,9 +6571,9 @@ input {
 
 .guild-card-id,
 .guild-list-id {
-    padding: 1px 8px;
+    padding: 2px 9px;
     border-radius: 8px;
-    font-size: 11px;
+    font-size: 12px;
     white-space: nowrap;
 }
 
@@ -6667,12 +6649,14 @@ input {
     background: transparent;
     cursor: pointer;
     opacity: 0.6;
-    transition: all 0.25s ease;
+    /* 扇形手牌：位于中央卡之下，位移/倾斜由 motion 承担，CSS 只管透明度 */
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.25s ease;
 }
 
 .guild-carousel-thumb:hover {
     opacity: 1;
-    transform: translateY(-2px);
 }
 
 .guild-thumb-name {
@@ -6700,7 +6684,8 @@ input {
     border-radius: 50%;
     background: var(--color-border-search);
     cursor: pointer;
-    transition: all 0.2s ease;
+    /* scale 由 motion 过渡，CSS 只保留颜色过渡，避免两者叠乘 */
+    transition: background-color 0.2s ease;
 }
 
 .guild-carousel-dot.active {
@@ -6728,7 +6713,6 @@ input {
 }
 
 .guild-list-item:hover {
-    transform: translateY(-2px);
     border-color: var(--color-border-focus);
 }
 
@@ -6832,7 +6816,8 @@ input {
 .guild-hero-shade {
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.28) 100%);
+    /* 主题亮色时改用浅色遮罩（由 --guild-shade 提供） */
+    background: var(--guild-shade, linear-gradient(135deg, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.28) 100%));
     pointer-events: none;
 }
 
@@ -6853,24 +6838,26 @@ input {
     font-size: 24px;
     font-weight: 400;
     letter-spacing: 3px;
-    color: #fff !important;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
 }
 
 .guild-hero-id {
     padding: 1px 8px;
     border-radius: 8px;
     font-size: 12px;
-    background: rgba(255, 255, 255, 0.22);
-    color: #fff !important;
+    background: var(--guild-fg-soft, rgba(255, 255, 255, 0.22));
+    color: var(--guild-fg, #fff) !important;
 }
 
 .guild-hero-intro {
     font-size: 13px;
     line-height: 1.7;
-    color: #fff !important;
+    color: var(--guild-fg, #fff) !important;
     opacity: 0.92;
     margin-bottom: 10px;
     word-break: break-word;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
 }
 
 .guild-hero-meta {
@@ -6878,8 +6865,9 @@ input {
     flex-wrap: wrap;
     gap: 6px 16px;
     font-size: 12px;
-    color: #fff !important;
+    color: var(--guild-fg, #fff) !important;
     opacity: 0.9;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
 }
 
 /* 详情：加入区 */
@@ -6898,24 +6886,31 @@ input {
     gap: 8px;
     padding: 10px 24px;
     border-radius: 22px;
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    background: rgba(255, 255, 255, 0.94);
-    color: var(--color-text-secondary) !important;
+    /* 白底 + 固定深字 + 细边框 + 阴影：在任意站主题 / 会馆色系下都清晰 */
+    border: 1px solid rgba(23, 50, 58, 0.16);
+    background: #ffffff;
+    color: #2E4659 !important;
     font-size: 14px;
     font-family: inherit;
     text-decoration: none;
     cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
     transition: all 0.2s ease;
 }
 
+.guild-join-btn i {
+    color: #2E4659 !important;
+}
+
 .guild-join-btn:hover:not(:disabled) {
-    background: #fff;
+    background: #ffffff;
     transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
 }
 
 .guild-join-btn.pending,
 .guild-join-btn:disabled {
-    opacity: 0.75;
+    opacity: 0.88;
     cursor: default;
 }
 
@@ -6925,7 +6920,8 @@ input {
     gap: 6px;
     padding: 9px 22px;
     border-radius: 22px;
-    background: rgba(16, 185, 129, 0.92);
+    /* 深绿实底：#047857 与之上的白字对比度 ≈ 5.48，满足 WCAG ≥ 4.5 */
+    background: #047857;
     color: #fff !important;
     font-size: 14px;
 }
@@ -6937,9 +6933,10 @@ input {
 .guild-leave-btn {
     padding: 7px 18px;
     border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    /* 边框/文字随 hero 前景色（--guild-fg 由页面按会馆色亮度设置） */
+    border: 1px solid currentColor;
     background: transparent;
-    color: #fff !important;
+    color: var(--guild-fg, #fff) !important;
     font-size: 12px;
     font-family: inherit;
     cursor: pointer;
@@ -6947,7 +6944,7 @@ input {
 }
 
 .guild-leave-btn:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--guild-fg-soft, rgba(255, 255, 255, 0.18));
 }
 
 .guild-leave-btn:disabled {
@@ -6959,7 +6956,7 @@ input {
     background: none;
     border: none;
     padding: 0;
-    color: #fff !important;
+    color: var(--guild-fg, #fff) !important;
     font-size: 12px;
     font-family: inherit;
     opacity: 0.9;
@@ -7025,9 +7022,9 @@ input {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 1px 8px;
+    padding: 2px 9px;
     border-radius: 8px;
-    font-size: 11px;
+    font-size: 12px;
     white-space: nowrap;
 }
 
@@ -7152,15 +7149,43 @@ input {
     margin-top: 12px;
 }
 
-/* 详情：分类 chips + 混合流 */
-.guild-feed-cats {
+/* 详情：分类行（单行横向滚动 + 右侧不随滚动的发帖按钮） */
+.guild-feed-bar {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 10px;
     padding: 18px 0 2px;
 }
 
+.guild-feed-cats {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-search) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+.guild-feed-cats::-webkit-scrollbar {
+    height: 4px;
+}
+
+.guild-feed-cats::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.guild-feed-cats::-webkit-scrollbar-thumb {
+    background: var(--color-border-search);
+    border-radius: 4px;
+}
+
 .guild-cat-chip {
+    flex: 0 0 auto;
     padding: 7px 16px;
     border: none;
     border-radius: 18px;
@@ -7169,6 +7194,7 @@ input {
     font-size: 13px;
     font-family: inherit;
     cursor: pointer;
+    white-space: nowrap;
     transition: all 0.2s ease;
 }
 
@@ -7176,9 +7202,35 @@ input {
     background: var(--color-bg-icon-hover);
 }
 
+/* 选中态背景为主题色，字色由内联按 WCAG 对比度给出（不再强制白字） */
 .guild-cat-chip.active {
     background: var(--color-primary);
-    color: #fff !important;
+}
+
+.guild-feed-post-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 18px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 3px 10px var(--color-shadow-search);
+    transition: all 0.2s ease;
+}
+
+.guild-feed-post-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px var(--color-shadow-search-hover);
+}
+
+.guild-feed-post-btn i {
+    color: inherit !important;
 }
 
 .guild-feed-list {
@@ -7195,14 +7247,16 @@ input {
     padding: 26px 20px 48px;
 }
 
+/* 三栏网格：正文列始终居中（无目录时也居中），目录固定在右栏 */
 .article-layout {
-    display: flex;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 880px) minmax(0, 1fr);
     gap: 28px;
+    align-items: start;
 }
 
 .article-main {
-    flex: 1 1 auto;
+    grid-column: 2;
     min-width: 0;
     max-width: 880px;
 }
@@ -7313,10 +7367,11 @@ input {
 }
 
 .article-toc {
+    grid-column: 3;
+    justify-self: start;
     position: sticky;
     top: 96px;
     width: 220px;
-    flex-shrink: 0;
     max-height: calc(100vh - 140px);
     overflow: auto;
     padding: 14px 16px;
@@ -7508,7 +7563,10 @@ input {
         display: none;
     }
     .article-layout {
-        flex-direction: column;
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .article-main {
+        grid-column: 1;
     }
 }
 
@@ -7615,7 +7673,7 @@ input {
 .forum-guild-option-id,
 .forum-guild-option-count {
     flex-shrink: 0;
-    font-size: 11px;
+    font-size: 12px;
     color: var(--color-text-tertiary);
 }
 
@@ -7630,6 +7688,17 @@ input {
     align-items: center;
     gap: 8px;
     margin-top: 10px;
+}
+
+/* 「会馆行」内会馆标签与馆长 chip 统一规格：同高 / 同内距 / 同圆角 / 同字号 */
+.user-guild-row .user-guild-tag,
+.user-guild-row .user-guild-chip {
+    box-sizing: border-box;
+    height: 22px;
+    padding: 0 11px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1;
 }
 
 .user-guild-tag {
@@ -7672,12 +7741,31 @@ input {
         padding: 22px 18px;
         min-height: 260px;
     }
+    /* 移动端：信息卡纵向排布并整体居中（桌面端布局不变） */
+    .guild-detail-hero {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
     .guild-hero-body {
-        flex: 1 1 100%;
+        flex: 0 0 auto;
+        width: 100%;
+    }
+    .guild-hero-name-row {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .guild-hero-intro {
+        text-align: center;
+    }
+    .guild-hero-meta {
+        justify-content: center;
     }
     .guild-join-area {
         width: 100%;
-        align-items: flex-start;
+        align-items: center;
     }
     .guild-leader-zone {
         padding: 14px 16px 16px;
@@ -7688,4 +7776,223 @@ input {
     .article-content {
         padding: 16px;
     }
+}
+
+/* ======================== UI 细节修复（角标 / 身份 chip / 主题色可读性） ======================== */
+
+/* 文章正文列居中：<1400 隐藏章节导航，正文仍然居中 */
+@media (max-width: 1399px) {
+    .article-toc {
+        display: none;
+    }
+}
+
+/* 头像右下角角标：包裹容器 + 角标（VIP 优先靠角，前缀徽标向左并排） */
+.avatar-corner-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.avatar-corner-badges {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    /* 高度取头像尺寸的 36%（绝对定位百分比基于外层头像容器）；角标等宽 */
+    height: 36%;
+    max-height: 26px;
+    pointer-events: none;
+}
+
+.avatar-corner-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    background: var(--color-bg-card);
+    box-shadow: 0 0 0 1px var(--color-border-card);
+    overflow: hidden;
+}
+
+.avatar-corner-badge svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.avatar-corner-badge img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+/* VIP 图标为深色六边形 + 金色 V，固定用浅底保证日/夜模式都可辨识 */
+.avatar-corner-badge-vip {
+    background: #ffffff;
+    box-shadow: 0 0 0 1px rgba(23, 50, 58, 0.18);
+}
+
+/* 角标需要溢出容器，否则会被圆形头像的 overflow:hidden 裁掉（图片本身已是圆形） */
+.post-card-avatar,
+.post-author-avatar,
+.comment-avatar,
+.user-profile-avatar,
+.search-user-avatar-wrapper,
+.guild-leader-avatar,
+.post-item-avatar {
+    position: relative;
+    overflow: visible !important;
+}
+
+/* 用户身份 chip：会馆名（主题色实底 + 对比字）/ 馆长（低饱和墨绿实底 + 白字） */
+.user-guild-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.user-guild-chip i {
+    font-size: 11px;
+    color: inherit !important;
+}
+
+/* 馆长 chip：低饱和墨绿 #5b736e 实底 + 白字（对比度 ≈ 5.1），图标随字色 */
+.user-leader-chip {
+    background: #5b736e;
+    color: #fff;
+}
+
+.user-leader-chip i {
+    color: inherit !important;
+}
+
+/* 主题色作为卡片底上的文字/图标色：--guild-ink 由内联提供，夜间自动提亮 */
+.theme-ink {
+    color: var(--guild-ink, var(--color-primary));
+}
+
+.night-mode .theme-ink {
+    color: color-mix(in srgb, var(--guild-ink, var(--color-primary)) 45%, #ffffff);
+}
+
+.article-toc-item.theme-ink {
+    color: var(--guild-ink, var(--color-primary));
+}
+
+.night-mode .article-toc-item.theme-ink {
+    color: color-mix(in srgb, var(--guild-ink, var(--color-primary)) 45%, #ffffff);
+}
+
+/* 发帖页：会馆目标按钮/发布按钮的对比字（默认仍为白字，旧行为不变） */
+.post-target-btn.active {
+    color: var(--guild-btn-fg, #fff) !important;
+}
+
+.post-target-btn.active i {
+    color: var(--guild-btn-fg, #fff) !important;
+}
+
+/* 会馆退出二次确认文案 */
+.guild-confirm-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+}
+
+/* 帖子详情：作者行姓名 + 身份 chip 并排；顶部徽章行（分类 + 空间） */
+.post-author-name-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.post-author-name-row .post-author-name {
+    margin-bottom: 0;
+}
+
+.post-meta-top {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* 卡片头部：加入身份 chip 后允许换行，作者名过长省略 */
+.post-card-header {
+    flex-wrap: wrap;
+    row-gap: 6px;
+}
+
+.post-card-author {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 文章卡作者名后的身份小图标：PrefixBadge SVG（16px），夜间加浅色描边保证可辨 */
+.post-card-prefix-badge {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+}
+
+.post-card-prefix-badge svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+.night-mode .post-card-prefix-badge {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+/* 个人中心收藏列表：头像改为容器 + UserAvatar */
+.post-item-avatar img,
+.post-item-avatar .avatar-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.post-item-sub-meta {
+    flex-wrap: wrap;
+}
+
+/* 会馆广场：轮播主卡外层（承载 motion 动效，内层保留 CSS hover）与列表项外层 */
+.guild-carousel-card-wrap {
+    flex: 1 1 auto;
+    max-width: 560px;
+    min-width: 0;
+    display: flex;
+    /* 位于两侧扇形手牌之上 */
+    position: relative;
+    z-index: 2;
+}
+
+.guild-carousel-card-wrap .guild-carousel-card {
+    width: 100%;
+}
+
+.guild-list-cell {
+    display: block;
 }

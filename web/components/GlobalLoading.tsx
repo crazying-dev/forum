@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * 全局加载动图：呼吸的「妖」字圆点 Logo + 三点脉冲 + 文案。
+ * 全局加载动图：呼吸的站点 logo（favicon.png，圆形） + 三点脉冲 + 文案。
  * 用于路由切换（app/loading.tsx）与各列表加载态（ListLoading）。
  */
 export default function GlobalLoading({
@@ -15,8 +15,8 @@ export default function GlobalLoading({
 }) {
   return (
     <div className={`global-loading ${className}`.trim()} role="status" aria-live="polite">
-      <div className="global-loading-logo" style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}>
-        <span className="global-loading-char">妖</span>
+      <div className="global-loading-logo" style={{ width: size, height: size }}>
+        <img src="/assets/img/favicon.png" alt="" />
       </div>
       <div className="global-loading-dots">
         <span></span>
