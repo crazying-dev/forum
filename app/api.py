@@ -118,9 +118,16 @@ class _Task(QRunnable):
             value = self._fn()
         except Exception as exc:  # noqa: BLE001
             _log.error("异步任务异常：%s", exc, exc_info=True)
-            self.signals.failed.emit(str(exc))
+            try:
+                self.signals.failed.emit(str(exc))
+            except RuntimeError:
+                pass
             return
-        self.signals.done.emit(value)
+        try:
+            self.signals.done.emit(value)
+        except RuntimeError:
+            # 解释器退出阶段信号对象可能已被回收
+            pass
 
 
 _alive: set = set()
@@ -513,7 +520,8 @@ class ForumApi:
     def random_posts(self, limit: int = 200) -> Result:
         return self.get("/api/posts/random", limit=limit)
 
-    def post(self, post_id: str) -> Result:
+    def get_post(self, post_id: str) -> Result:
+        """帖子详情（注意：与通用 ``post(path, payload)`` 区分）。"""
         return self.get("/api/posts/%s" % post_id)
 
     def create_post(self, title: str, content: str, category: str = "general") -> Result:

@@ -909,6 +909,7 @@ def _encode_ani(frames, delays, name: str) -> bytes:
 
 
 def _write_cursor_files(pack: CursorPack, variant: str, out_dir: Path):
+    out_dir = Path(out_dir)          # 容忍 str（安装入口传进来的可能是字符串）
     roles = pack.roles(variant)
     if not roles:
         return None, "变体缺少指针数据：%s" % variant

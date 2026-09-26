@@ -186,7 +186,7 @@ class PostDetailPage(Page):
             return
         self.hint.setText("加载中…")
         pid = self._post_id
-        self.run(lambda: self.api.post(pid), self._on_loaded, label="帖子详情")
+        self.run(lambda: self.api.get_post(pid), self._on_loaded, label="帖子详情")
 
     # ────────────────────── 渲染 ──────────────────────
     def _on_loaded(self, result) -> None:

@@ -346,6 +346,21 @@ def _build_tree(comments: list) -> list[dict]:
         if node["children"]:
             node["children"].sort(key=lambda c: (yearmode.parse_time(c.get("created_at"))
                                                  or yearmode.parse_time("1970-01-01")))
+    # 环状 parent_id（A→B→A）会让所有结点都不是根，评论会整体消失：
+    # 把“从根出发不可达”的结点提升为根。
+    reachable: set[int] = set()
+    stack = list(roots)
+    while stack:
+        node = stack.pop()
+        if id(node) in reachable:
+            continue
+        reachable.add(id(node))
+        stack.extend(node["children"])
+    for cid in order:
+        node = nodes[cid]
+        if id(node) not in reachable:
+            roots.append(node)
+            reachable.add(id(node))
     _flatten_orphans(roots, nodes)
     return roots
 
