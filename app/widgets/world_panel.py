@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QScrollArea
 
 from .. import api as api_mod
 from .. import config, constants, logger, theme, yearmode
-from .common import button, hbox, vbox
+from .common import UserLink, button, hbox, vbox
 from .images import Avatar
 from .toast import toast
 
@@ -26,18 +26,30 @@ _log = logger.get_logger("world")
 class WorldMessage(QFrame):
     """单条世界消息。"""
 
-    def __init__(self, message: dict, mine: bool = False, parent: QWidget | None = None) -> None:
+    def __init__(self, message: dict, mine: bool = False, parent: QWidget | None = None,
+                 on_user=None) -> None:
         super().__init__(parent)
         self.setObjectName("WorldMsg")
         self.setProperty("mine", "true" if mine else "false")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        sender_id = str(message.get("sender_id") or "")
+        sender_name = str(message.get("sender_name") or "匿名")
+        clickable = on_user is not None and bool(sender_id)
         row = hbox(self, margins=(8, 6, 8, 6), spacing=8)
         avatar = Avatar(26)
         avatar.set_url(str(message.get("sender_avatar") or ""))
+        if clickable:
+            avatar.setToolTip("查看 %s 的主页" % sender_name)
+            avatar.clicked.connect(lambda: on_user(sender_id))
         row.addWidget(avatar, 0, Qt.AlignmentFlag.AlignTop)
         body = vbox(spacing=2)
-        name = QLabel(str(message.get("sender_name") or "匿名"))
-        name.setObjectName("WorldName")
+        if clickable:
+            name = UserLink(sender_id, sender_name)
+            name.setObjectName("WorldName")
+            name.activated.connect(on_user)
+        else:
+            name = QLabel(sender_name)
+            name.setObjectName("WorldName")
         body.addWidget(name)
         content = QLabel(str(message.get("content") or ""))
         content.setWordWrap(True)
@@ -243,7 +255,7 @@ class WorldPanel(QFrame):
         for message in reversed(self._messages):
             mine = bool(self._my_id) and str(message.get("sender_id") or "") == self._my_id
             self._box.insertWidget(max(self._box.count() - 1, 0),
-                                   WorldMessage(message, mine))
+                                   WorldMessage(message, mine, on_user=self._open_user))
         bar = self.scroll.verticalScrollBar()
         QTimer.singleShot(0, lambda: bar.setValue(bar.maximum()))
 
@@ -279,3 +291,14 @@ class WorldPanel(QFrame):
             host = host.parent()
         if host is not None:
             host.navigate("world")
+
+    def _open_user(self, user_id: str) -> None:
+        """点击头像 / 昵称 → 打开该用户主页（与帖子卡片行为一致）。"""
+        user_id = str(user_id or "")
+        if not user_id:
+            return
+        host = self.parent()
+        while host is not None and not hasattr(host, "navigate"):
+            host = host.parent()
+        if host is not None:
+            host.navigate("user", user_id=user_id)

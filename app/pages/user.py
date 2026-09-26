@@ -326,7 +326,8 @@ class UserPage(Page):
         self._user = user
         self._following = bool(user.get("is_following"))
         self._render_profile()
-        self._reset_view()
+        for pane in (self.posts_pane, self.favorites_pane, self.comments_pane):
+            pane.reset()
         self._load_current_tab()
 
     # ────────────────────── 渲染 ──────────────────────

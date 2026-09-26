@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QFrame, QLabel, QLineEdit, QScrollArea, QWidget
 
 from .. import api as api_mod
 from .. import constants, logger, theme, yearmode
-from ..widgets import button, hbox, vbox
+from ..widgets import UserLink, button, hbox, vbox
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -34,16 +34,24 @@ class WorldMessageRow(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         row = hbox(self, margins=(8, 6, 8, 6), spacing=8)
+        sender_id = str(message.get("sender_id") or "")
+        sender_name = str(message.get("sender_name") or "匿名")
+        clickable = on_user is not None and bool(sender_id)
         avatar = Avatar(28)
         avatar.set_url(str(message.get("sender_avatar") or ""))
-        if on_user is not None:
-            sender_id = str(message.get("sender_id") or "")
+        if clickable:
+            avatar.setToolTip("查看 %s 的主页" % sender_name)
             avatar.clicked.connect(lambda: on_user(sender_id))
         row.addWidget(avatar, 0, Qt.AlignmentFlag.AlignTop)
 
         body = vbox(spacing=2)
-        name = QLabel(str(message.get("sender_name") or "匿名"))
-        name.setObjectName("WorldName")
+        if clickable:
+            name = UserLink(sender_id, sender_name)
+            name.setObjectName("WorldName")
+            name.activated.connect(on_user)
+        else:
+            name = QLabel(sender_name)
+            name.setObjectName("WorldName")
         body.addWidget(name)
         content = QLabel(str(message.get("content") or ""))
         content.setWordWrap(True)
