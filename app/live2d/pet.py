@@ -261,6 +261,9 @@ class PetController(QObject):
 
     started = pyqtSignal()
     stopped = pyqtSignal()
+    # 下载/准备进度从工作线程排队回主线程（控件只能在主线程碰）
+    model_progress = pyqtSignal(int, int)
+    model_message = pyqtSignal(str)
 
     def __init__(self, shell=None, parent: QObject | None = None,
                  provider: Live2DProvider | None = None) -> None:
@@ -271,6 +274,8 @@ class PetController(QObject):
         self._loading = False
         self._model_path = ""
         self._started = False
+        self.model_progress.connect(self._ui_progress)
+        self.model_message.connect(self._ui_message)
 
     # ────────────────────── 状态 ──────────────────────
     @property
@@ -323,6 +328,18 @@ class PetController(QObject):
             self._window.apply_config()
             self._window.restore_position()
 
+    # ────────────────────── 主线程 UI 槽 ──────────────────────
+    def _ui_progress(self, done: int, total: int) -> None:
+        window = self._window
+        if window is None or total <= 0:
+            return
+        window.set_status("正在下载 Live2D 模型…",
+                          progress=int(done * 100 / total))
+
+    def _ui_message(self, text: str) -> None:
+        if self._window is not None:
+            self._window.set_status(text)
+
     # ────────────────────── 模型 ──────────────────────
     def _prepare_model(self, *, force: bool = False) -> None:
         if self._loading:
@@ -336,13 +353,13 @@ class PetController(QObject):
         window.set_status("正在准备 Live2D 模型…", progress=0)
 
         def _log_cb(level, text):
+            # 只写日志（线程安全），不碰任何控件
             if level in ("ERROR", "WARNING"):
                 _log.warning("[模型] %s", text)
 
         def _progress(done, total):
-            if total:
-                percent = int(done * 100 / total)
-                window.set_status("正在下载 Live2D 模型…", progress=percent)
+            # 本回调在下载线程里执行 → 只能发信号，不能直接改界面
+            self.model_progress.emit(int(done), int(total))
 
         def _work():
             return self.provider.ensure(on_progress=_progress, on_log=_log_cb, force=force)
@@ -354,7 +371,7 @@ class PetController(QObject):
 
         def _fail(message):
             self._loading = False
-            window.set_status("Live2D 模型不可用：%s" % message)
+            self.model_message.emit("Live2D 模型不可用：%s" % message)
             _log.error("桌宠模型准备失败：%s", message)
 
         api_mod.run_async(_work, _done, _fail, label="Live2D 模型")
@@ -370,7 +387,7 @@ class PetController(QObject):
             except Exception as exc:  # noqa: BLE001
                 _log.warning("清理模型缓存失败：%s", exc)
         if self._window is not None:
-            self._window.set_status("正在重新准备模型…")
+            self.model_message.emit("正在重新准备模型…")
         self._prepare_model(force=True)
 
     def prepare_async(self, on_done=None, on_error=None) -> None:

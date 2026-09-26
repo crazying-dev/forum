@@ -319,9 +319,12 @@ class ForumApi:
             except Exception:
                 pass
             if status == 401 and notify_401:
+                # 只有“本来有登录态”才算掉线，否则首次启动未登录也会误导报错
+                had_session = bool(self._user) or self.store.has_credentials
                 self._user = None
                 self.store.save(self._collect_cookies(), None)
-                self._notify_unauthorized()
+                if had_session:
+                    self._notify_unauthorized()
             if parsed is None and status < 400 and text.strip():
                 return Result(status, None, PARSE_ERROR_TEXT, url)
             return Result(status, parsed, None, url)
