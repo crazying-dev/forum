@@ -10,7 +10,8 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 
 export const metadata: Metadata = {
-  // 规范域名：SITE_URL → NEXT_PUBLIC_SITE_URL → https://yjlt.top（服务端运行期生效，无需重新构建）
+  // 规范域名：SITE_URL → NEXT_PUBLIC_SITE_URL → https://yjlt.top
+  // 预渲染页（首页/静态页/robots.txt）在构建期固化，建议构建前配置；动态详情页与 sitemap 运行期生效
   metadataBase: new URL(siteUrl()),
   title: {
     default: SITE_TITLE,
@@ -35,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [OG_IMAGE.url],
+    images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
   },
 };
 

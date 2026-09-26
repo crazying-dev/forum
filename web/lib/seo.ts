@@ -6,9 +6,19 @@ import type { Metadata } from "next";
 
 const SITE_FALLBACK = "https://yjlt.top";
 
-/** 站点规范域名：SITE_URL → NEXT_PUBLIC_SITE_URL → https://yjlt.top（去尾斜杠） */
+/**
+ * 站点规范域名：SITE_URL → NEXT_PUBLIC_SITE_URL → https://yjlt.top。
+ * - 非法值（如缺 http(s)://）安全回退，避免 new URL() 抛错导致全站 500；
+ * - 注意：预渲染路由（首页/静态页/robots.txt）在构建期固化该值，动态详情页与 sitemap 在运行期读取。
+ */
 export function siteUrl(): string {
-  return (process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || SITE_FALLBACK).replace(/\/+$/, "");
+  const raw = (process.env.SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || SITE_FALLBACK).trim();
+  try {
+    return new URL(raw).origin;
+  } catch {
+    console.warn(`[seo] 站点域名非法（需含 http(s)://）：${raw}，已回退 ${SITE_FALLBACK}`);
+    return SITE_FALLBACK;
+  }
 }
 
 /** 相对路径转绝对 URL（已是绝对 URL 时原样返回） */
@@ -37,25 +47,48 @@ export async function fetchApi<T = unknown>(path: string, revalidate = 300): Pro
     const res = await fetch(apiBase() + path, {
       next: { revalidate },
       headers: { Accept: "application/json" },
+      // 超时保护：上游挂起时不拖住页面渲染 / sitemap 生成（Node fetch 默认超时为分钟级）
+      signal: AbortSignal.timeout(4000),
     });
-    if (!res.ok) return { ok: false, status: res.status, data: null };
+    if (!res.ok) {
+      console.warn(`[seo] fetchApi ${path} 返回 HTTP ${res.status}`);
+      return { ok: false, status: res.status, data: null };
+    }
     const data = (await res.json().catch(() => null)) as (T & { success?: boolean }) | null;
-    if (!data || data.success === false) return { ok: false, status: res.status, data: null };
+    if (!data || data.success === false) {
+      console.warn(`[seo] fetchApi ${path} 响应无效或 success=false`);
+      return { ok: false, status: res.status, data: null };
+    }
     return { ok: true, status: res.status, data };
-  } catch {
+  } catch (e) {
+    console.warn(`[seo] fetchApi ${path} 失败：${e instanceof Error ? e.message : String(e)}`);
     return { ok: false, status: 0, data: null };
   }
 }
 
-/** 去除 HTML 标签并压缩空白（生成 description 用） */
+const HTML_ENTITIES: Record<string, string> = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&nbsp;": " ",
+};
+
+/** 去除 HTML 标签、解码常见实体并压缩空白（生成 description 用） */
 export function stripHtml(input?: string | null): string {
-  return (input || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return (input || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(?:amp|lt|gt|quot|#39|nbsp);/g, (m) => HTML_ENTITIES[m] ?? m)
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-/** 截断到 max 字符（超长补省略号），默认 140 */
+/** 截断到 max 个字符（按码点，避免截断 emoji 代理对；超长补省略号），默认 140 */
 export function truncate(input: string, max = 140): string {
   const s = (input || "").trim();
-  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+  const chars = Array.from(s);
+  return chars.length > max ? `${chars.slice(0, max - 1).join("")}…` : s;
 }
 
 // ===== 共享 metadata 片段 =====
@@ -117,7 +150,7 @@ export function pageMetadata(opts: PageSeoOptions): Metadata {
       card: "summary_large_image",
       title: opts.title,
       description: opts.description,
-      images: [OG_IMAGE.url],
+      images: [{ url: OG_IMAGE.url, alt: OG_IMAGE.alt }],
     },
   };
 }

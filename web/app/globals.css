@@ -224,7 +224,8 @@ header{
 
 /* 品牌角标：ov2 上标小字（弱化色、随各断点字号等比缩放） */
 #header h1 .header-brand-badge {
-    font-size: 0.45em;
+    /* 移动端最小 9px，避免 16px 字号下缩到不可读 */
+    font-size: max(0.45em, 9px);
     font-weight: 400;
     letter-spacing: 0;
     vertical-align: super;

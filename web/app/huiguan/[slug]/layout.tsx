@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+import { notFound } from "next/navigation";
 import JsonLd from "@/components/ui/JsonLd";
 import { absoluteUrl, fetchApi, pageMetadata, truncate } from "@/lib/seo";
 
@@ -46,7 +47,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function GuildDetailLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { guild } = await getGuild(slug);
+  const { ok, status, guild } = await getGuild(slug);
+  // 会馆不存在（HTTP 404）→ 渲染 404 页（流式渲染下状态码保持 200，由自动注入 + 兜底 noindex 防收录）；临时故障不触发（避免误伤）
+  if (!ok && status === 404) notFound();
   return (
     <>
       {children}

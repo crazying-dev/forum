@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+import { notFound } from "next/navigation";
 import JsonLd from "@/components/ui/JsonLd";
 import { absoluteUrl, fetchApi, pageMetadata, truncate } from "@/lib/seo";
 
@@ -42,7 +43,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function UserProfileLayout({ children, params }: { children: React.ReactNode; params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { user } = await getUser(id);
+  const { ok, status, user } = await getUser(id);
+  // 用户不存在（HTTP 404）→ 渲染 404 页（流式渲染下状态码保持 200，由自动注入 + 兜底 noindex 防收录）；临时故障不触发（避免误伤）
+  if (!ok && status === 404) notFound();
   return (
     <>
       {children}
