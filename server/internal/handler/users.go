@@ -179,20 +179,40 @@ func (h *AuthHandler) followList(c *gin.Context, kind string) {
 	id := c.Param("id")
 	page, pageSize := parsePage(c)
 	var (
-		users []models.UserBrief
-		err   error
+		users   []models.UserBrief
+		hasMore bool
+		err     error
 	)
 	viewer := h.CurrentUserFromCookie(c)
 	if kind == "following" {
-		users, err = h.DB.GetFollowingList(c.Request.Context(), id, viewer, page, pageSize)
+		users, hasMore, err = h.DB.GetFollowingList(c.Request.Context(), id, viewer, page, pageSize)
 	} else {
-		users, err = h.DB.GetFollowerList(c.Request.Context(), id, viewer, page, pageSize)
+		users, hasMore, err = h.DB.GetFollowerList(c.Request.Context(), id, viewer, page, pageSize)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "users": users, "page": page, "page_size": pageSize})
+	c.JSON(http.StatusOK, gin.H{"success": true, "users": users, "page": page, "page_size": pageSize, "has_more": hasMore})
+}
+
+// ---- GET /api/v1/users/:id/mutual ----
+
+// Mutual 共同关注（viewer 来自 cookie；匿名或看自己时返回空列表）。
+func (h *AuthHandler) Mutual(c *gin.Context) {
+	id := c.Param("id")
+	page, pageSize := parsePage(c)
+	users := []models.UserBrief{}
+	hasMore := false
+	if viewer := h.CurrentUserFromCookie(c); viewer != "" && viewer != id {
+		var err error
+		users, hasMore, err = h.DB.GetMutualList(c.Request.Context(), id, viewer, page, pageSize)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "users": users, "page": page, "page_size": pageSize, "has_more": hasMore})
 }
 
 // ---- GET /api/v1/users/me/replies ----
@@ -241,15 +261,20 @@ func (h *AuthHandler) UserFavorites(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "posts": posts, "page": page, "page_size": pageSize})
 }
 
-// parsePage 解析 page/page_size。
+// parsePage 解析 page/page_size（默认每页 20，上限 100）。
 func parsePage(c *gin.Context) (int, int) {
+	return parsePageWithDefault(c, 20)
+}
+
+// parsePageWithDefault 解析 page/page_size（默认值可定制，上限 100）。
+func parsePageWithDefault(c *gin.Context, defaultSize int) (int, int) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", strconv.Itoa(defaultSize)))
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+		pageSize = defaultSize
 	}
 	return page, pageSize
 }

@@ -7,7 +7,8 @@ import (
 	"yj-forum/server/internal/models"
 )
 
-const userCols = `id, name, avatar, email, gender, age, intro, vip, prefix, is_banned, email_verified, created_at, last_login`
+// 注：gender/age/intro/prefix 可为 NULL（历史数据，如个别账号 prefix 未写），读取时统一 COALESCE 兜底
+const userCols = `id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login`
 
 func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 	var u models.User
@@ -32,7 +33,7 @@ func (d *DB) GetUserByName(ctx context.Context, name string) (*models.User, stri
 	var u models.User
 	var pwd string
 	var createdAt, lastLogin *time.Time
-	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, gender, age, intro, vip, prefix, is_banned, email_verified, created_at, last_login, password
+	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, password
 		FROM users WHERE name=$1`, name).
 		Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.VIP,
 			&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin, &pwd)
@@ -49,7 +50,7 @@ func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, st
 	var u models.User
 	var pwd string
 	var createdAt, lastLogin *time.Time
-	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, gender, age, intro, vip, prefix, is_banned, email_verified, created_at, last_login, password
+	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, password
 		FROM users WHERE email=$1`, email).
 		Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.VIP,
 			&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin, &pwd)
@@ -240,17 +241,19 @@ func (d *DB) GetFollowStats(ctx context.Context, userID string) (models.FollowSt
 	return fs, nil
 }
 
-// GetFollowingList 关注列表。
-func (d *DB) GetFollowingList(ctx context.Context, userID, viewerID string, page, pageSize int) ([]models.UserBrief, error) {
+// GetFollowingList 关注列表（has_more 用 pageSize+1 探测；is_mutual 为 viewer 是否回关）。
+func (d *DB) GetFollowingList(ctx context.Context, userID, viewerID string, page, pageSize int) ([]models.UserBrief, bool, error) {
 	return d.followList(ctx, "follower_id", userID, viewerID, page, pageSize)
 }
 
-// GetFollowerList 粉丝列表。
-func (d *DB) GetFollowerList(ctx context.Context, userID, viewerID string, page, pageSize int) ([]models.UserBrief, error) {
+// GetFollowerList 粉丝列表（has_more 用 pageSize+1 探测；is_mutual 恒 false）。
+func (d *DB) GetFollowerList(ctx context.Context, userID, viewerID string, page, pageSize int) ([]models.UserBrief, bool, error) {
 	return d.followList(ctx, "following_id", userID, viewerID, page, pageSize)
 }
 
-func (d *DB) followList(ctx context.Context, side, userID, viewerID string, page, pageSize int) ([]models.UserBrief, error) {
+// followList side=follower_id 为「关注列表」，side=following_id 为「粉丝列表」。
+// is_mutual 仅关注列表有意义：viewer 非空且非本人时，表示 viewer 也关注了该行用户。
+func (d *DB) followList(ctx context.Context, side, userID, viewerID string, page, pageSize int) ([]models.UserBrief, bool, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -262,25 +265,79 @@ func (d *DB) followList(ctx context.Context, side, userID, viewerID string, page
 	if side == "following_id" {
 		col = "follower_id"
 	}
-	rows, err := d.Query(ctx, `SELECT u.id, u.name, u.avatar, u.vip, u.prefix, u.intro,
+	// 粉丝列表无互关语义，恒 false
+	mutual := "FALSE"
+	if side == "follower_id" {
+		mutual = `(COALESCE($4, '') <> '' AND $4 <> $1 AND EXISTS(
+			SELECT 1 FROM user_follows f3 WHERE f3.follower_id = $4 AND f3.following_id = u.id))`
+	}
+	// 历史数据中 name/avatar/vip/prefix/intro 可能为 NULL（如个别账号 prefix 未写），统一 COALESCE 兜底
+	rows, err := d.Query(ctx, `SELECT u.id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.vip, '0'), COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
 		(u.id = $4) AS is_self,
-		EXISTS(SELECT 1 FROM user_follows f2 WHERE f2.follower_id = $4 AND f2.following_id = u.id) AS is_following
+		EXISTS(SELECT 1 FROM user_follows f2 WHERE f2.follower_id = $4 AND f2.following_id = u.id) AS is_following,
+		`+mutual+` AS is_mutual
 		FROM user_follows f JOIN users u ON u.id = f.`+col+`
 		WHERE f.`+side+` = $1 ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
-		userID, pageSize, offset, viewerID)
+		userID, pageSize+1, offset, viewerID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer rows.Close()
-	var users []models.UserBrief
+	users := []models.UserBrief{}
 	for rows.Next() {
 		var u models.UserBrief
-		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing); err != nil {
-			return nil, err
+		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing, &u.IsMutual); err != nil {
+			return nil, false, err
 		}
 		users = append(users, u)
 	}
-	return users, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(users) > pageSize
+	if hasMore {
+		users = users[:pageSize]
+	}
+	return users, hasMore, nil
+}
+
+// GetMutualList 共同关注：user 与 viewer 都关注的用户（按 user 的关注时间倒序）；has_more 用 pageSize+1 探测。
+func (d *DB) GetMutualList(ctx context.Context, userID, viewerID string, page, pageSize int) ([]models.UserBrief, bool, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+	// 同 followList：nullable 列统一 COALESCE 兜底
+	rows, err := d.Query(ctx, `SELECT u.id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.vip, '0'), COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
+		(u.id = $4) AS is_self, TRUE AS is_following, TRUE AS is_mutual
+		FROM user_follows a JOIN user_follows b ON b.following_id = a.following_id
+		JOIN users u ON u.id = a.following_id
+		WHERE a.follower_id = $4 AND b.follower_id = $1
+		ORDER BY b.created_at DESC LIMIT $2 OFFSET $3`,
+		userID, pageSize+1, offset, viewerID)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	users := []models.UserBrief{}
+	for rows.Next() {
+		var u models.UserBrief
+		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing, &u.IsMutual); err != nil {
+			return nil, false, err
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(users) > pageSize
+	if hasMore {
+		users = users[:pageSize]
+	}
+	return users, hasMore, nil
 }
 
 // GetFollowerEmails 粉丝邮箱（发帖通知）。

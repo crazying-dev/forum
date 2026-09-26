@@ -23,7 +23,7 @@ func strVal(s *string) string {
 
 // ListGuilds 会馆列表（id 升序，含成员数与馆长摘要）。
 func (d *DB) ListGuilds(ctx context.Context) ([]models.GuildListItem, error) {
-	rows, err := d.Query(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, g.intro, g.theme_color, g.logo_version,
+	rows, err := d.Query(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, COALESCE(g.intro, ''), COALESCE(g.theme_color, ''), g.logo_version,
 		(COALESCE(g.logo_file_id, '') <> '') AS has_logo,
 		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
 		g.created_at,
@@ -56,17 +56,17 @@ func (d *DB) ListGuilds(ctx context.Context) ([]models.GuildListItem, error) {
 // GetGuildBySlug 按 slug 取会馆详情（含馆长、分类、公告）；不存在返回 (nil, nil)。
 func (d *DB) GetGuildBySlug(ctx context.Context, slug string) (*models.GuildDetail, error) {
 	var det models.GuildDetail
-	var leaderID, leaderName, leaderAvatar, leaderIntro *string
+	var leaderID, leaderName, leaderAvatar, leaderIntro, leaderTitle *string
 	var createdAt, updatedAt *time.Time
-	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, g.intro, g.logo_file_id, g.logo_version, g.theme_color,
-		g.leader_user_id, g.leader_bio, g.created_at, g.updated_at,
+	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, COALESCE(g.intro, ''), g.logo_file_id, g.logo_version, COALESCE(g.theme_color, ''),
+		g.leader_user_id, COALESCE(g.leader_bio, ''), g.leader_title, g.created_at, g.updated_at,
 		(COALESCE(g.logo_file_id, '') <> '') AS has_logo,
 		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
 		u.id, u.name, u.avatar, u.intro
 		FROM guilds g LEFT JOIN users u ON u.id = g.leader_user_id
 		WHERE g.slug = $1`, slug).
 		Scan(&det.ID, &det.UUID, &det.Slug, &det.Name, &det.Intro, &det.LogoFileID, &det.LogoVersion, &det.ThemeColor,
-			&det.LeaderUserID, &det.LeaderBio, &createdAt, &updatedAt, &det.HasLogo, &det.MemberCount,
+			&det.LeaderUserID, &det.LeaderBio, &leaderTitle, &createdAt, &updatedAt, &det.HasLogo, &det.MemberCount,
 			&leaderID, &leaderName, &leaderAvatar, &leaderIntro)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -78,11 +78,35 @@ func (d *DB) GetGuildBySlug(ctx context.Context, slug string) (*models.GuildDeta
 	det.UpdatedAt = updatedAt
 	if leaderID != nil {
 		det.Leader = &models.GuildLeaderInfo{ID: *leaderID, Name: strVal(leaderName),
-			Avatar: strVal(leaderAvatar), Intro: strVal(leaderIntro), Bio: det.LeaderBio}
+			Avatar: strVal(leaderAvatar), Intro: strVal(leaderIntro), Bio: det.LeaderBio, Title: strVal(leaderTitle)}
 	}
 	det.Categories, _ = d.ListCategories(ctx, det.ID)
 	det.Announcements, _ = d.ListAnnouncements(ctx, det.ID)
 	return &det, nil
+}
+
+// GetGuildLeaderPage 馆长页（会馆概要 + 馆长摘要 + 寄语 + 正文）；不存在返回 (nil, nil)。
+func (d *DB) GetGuildLeaderPage(ctx context.Context, slug string) (*models.GuildLeaderPage, error) {
+	var pg models.GuildLeaderPage
+	var leaderID, leaderName, leaderAvatar, leaderIntro, leaderTitle, themeColor *string
+	err := d.QueryRow(ctx, `SELECT g.uuid::text, g.slug, g.name, COALESCE(g.theme_color, ''), COALESCE(g.leader_bio, ''), g.leader_title, g.leader_page_content,
+		u.id, u.name, u.avatar, u.intro
+		FROM guilds g LEFT JOIN users u ON u.id = g.leader_user_id
+		WHERE g.slug = $1`, slug).
+		Scan(&pg.Guild.UUID, &pg.Guild.Slug, &pg.Guild.Name, &themeColor, &pg.LeaderBio, &leaderTitle, &pg.Content,
+			&leaderID, &leaderName, &leaderAvatar, &leaderIntro)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	pg.Guild.ThemeColor = strVal(themeColor)
+	if leaderID != nil {
+		pg.Leader = &models.GuildLeaderInfo{ID: *leaderID, Name: strVal(leaderName), Avatar: strVal(leaderAvatar),
+			Intro: strVal(leaderIntro), Bio: pg.LeaderBio, Title: strVal(leaderTitle)}
+	}
+	return &pg, nil
 }
 
 // GetGuildIDByUUID 按会馆 UUID 查数字 id（发帖 guild_uuid 契约用）；不存在返回 (nil, nil)。
@@ -163,7 +187,7 @@ func (d *DB) ResolveGuildCategory(ctx context.Context, guildID int64, want strin
 // GetUserGuildMembership 用户所在会馆概要（含是否馆长）；未入馆返回 (nil, nil)。
 func (d *DB) GetUserGuildMembership(ctx context.Context, userID string) (*models.GuildMembership, error) {
 	var m models.GuildMembership
-	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, g.theme_color,
+	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, COALESCE(g.theme_color, ''),
 		(COALESCE(g.leader_user_id, '') = $1) AS is_leader
 		FROM guild_members gm JOIN guilds g ON g.id = gm.guild_id
 		WHERE gm.user_id = $1`, userID).
@@ -182,8 +206,8 @@ func (d *DB) GetUserGuildInfo(ctx context.Context, userID string) (*models.Guild
 	var g models.Guild
 	var isLeader bool
 	var createdAt, updatedAt *time.Time
-	err := d.QueryRow(ctx, `SELECT g.id, g.slug, g.name, g.intro, g.logo_file_id, g.logo_version, g.theme_color,
-		g.leader_user_id, g.leader_bio, g.created_at, g.updated_at,
+	err := d.QueryRow(ctx, `SELECT g.id, g.slug, g.name, COALESCE(g.intro, ''), g.logo_file_id, g.logo_version, COALESCE(g.theme_color, ''),
+		g.leader_user_id, COALESCE(g.leader_bio, ''), g.created_at, g.updated_at,
 		(COALESCE(g.leader_user_id, '') = $1) AS is_leader
 		FROM guild_members gm JOIN guilds g ON g.id = gm.guild_id
 		WHERE gm.user_id = $1`, userID).
@@ -198,6 +222,45 @@ func (d *DB) GetUserGuildInfo(ctx context.Context, userID string) (*models.Guild
 	g.CreatedAt = createdAt
 	g.UpdatedAt = updatedAt
 	return &g, isLeader, nil
+}
+
+// ListGuildMembers 会馆成员（馆长优先，其次按加入时间）；has_more 用 pageSize+1 探测。
+func (d *DB) ListGuildMembers(ctx context.Context, guildID int64, page, pageSize int) ([]models.GuildMember, bool, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 24
+	}
+	offset := (page - 1) * pageSize
+	rows, err := d.Query(ctx, `SELECT m.user_id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.vip, '0'),
+		COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
+		COALESCE(g.leader_user_id = m.user_id, false) AS is_leader, m.joined_at
+		FROM guild_members m JOIN guilds g ON g.id = m.guild_id
+		LEFT JOIN users u ON u.id = m.user_id
+		WHERE m.guild_id = $1
+		ORDER BY COALESCE(g.leader_user_id = m.user_id, false) DESC, m.joined_at ASC NULLS LAST, m.user_id ASC
+		LIMIT $2 OFFSET $3`, guildID, pageSize+1, offset)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	members := []models.GuildMember{}
+	for rows.Next() {
+		var m models.GuildMember
+		if err := rows.Scan(&m.ID, &m.Name, &m.Avatar, &m.VIP, &m.Prefix, &m.Intro, &m.IsLeader, &m.JoinedAt); err != nil {
+			return nil, false, err
+		}
+		members = append(members, m)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(members) > pageSize
+	if hasMore {
+		members = members[:pageSize]
+	}
+	return members, hasMore, nil
 }
 
 // IsGuildMember 是否为该会馆成员。

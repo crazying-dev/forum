@@ -51,6 +51,7 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.POST("/users/:id/follow", authH.AuthRequired(), authH.ToggleFollow)
 	api.GET("/users/:id/following", authH.Following)
 	api.GET("/users/:id/followers", authH.Followers)
+	api.GET("/users/:id/mutual", authH.Mutual)
 
 	// ---- 帖子 ----
 	api.GET("/posts", postsH.List)
@@ -72,6 +73,8 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.GET("/guilds", guildsH.List)
 	api.GET("/guilds/:slug", guildsH.Detail)
 	api.GET("/guilds/:slug/feed", guildsH.Feed)
+	api.GET("/guilds/:slug/members", guildsH.Members)
+	api.GET("/guilds/:slug/leader", guildsH.LeaderPage)
 	api.POST("/guilds/:slug/join", authH.AuthRequired(), guildsH.Join)
 	api.POST("/guilds/:slug/join/cancel", authH.AuthRequired(), guildsH.CancelJoin)
 	api.POST("/guilds/:slug/leave", authH.AuthRequired(), guildsH.Leave)

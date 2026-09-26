@@ -30,6 +30,7 @@ type UserBrief struct {
 	Intro       string `json:"intro"`
 	IsSelf      bool   `json:"is_self"`
 	IsFollowing bool   `json:"is_following"`
+	IsMutual    bool   `json:"is_mutual"` // 共同关注：viewer 是否也关注了该用户（仅 following 列表下发；粉丝列表/匿名/本人恒 false）
 }
 
 // Post 帖子。
@@ -128,6 +129,23 @@ type GuildLeaderInfo struct {
 	Avatar string `json:"avatar"`
 	Intro  string `json:"intro"`
 	Bio    string `json:"bio"`
+	Title  string `json:"title"`
+}
+
+// GuildSummary 会馆概要（馆长页用）。
+type GuildSummary struct {
+	UUID       string `json:"uuid"`
+	Slug       string `json:"slug"`
+	Name       string `json:"name"`
+	ThemeColor string `json:"theme_color"`
+}
+
+// GuildLeaderPage 馆长页数据（会馆概要 + 馆长摘要 + 寄语 + 正文）。
+type GuildLeaderPage struct {
+	Guild     GuildSummary     `json:"guild"`
+	Leader    *GuildLeaderInfo `json:"leader"`
+	LeaderBio string           `json:"leader_bio"`
+	Content   string           `json:"content"`
 }
 
 // GuildListItem 会馆列表项。
@@ -184,6 +202,18 @@ type GuildMembership struct {
 	Name       string `json:"name"`
 	ThemeColor string `json:"theme_color"`
 	IsLeader   bool   `json:"is_leader"`
+}
+
+// GuildMember 会馆成员（列表用）。
+type GuildMember struct {
+	ID       string     `json:"id"`
+	Name     string     `json:"name"`
+	Avatar   string     `json:"avatar"`
+	VIP      string     `json:"vip"`
+	Prefix   string     `json:"prefix"`
+	Intro    string     `json:"intro"`
+	IsLeader bool       `json:"is_leader"`
+	JoinedAt *time.Time `json:"joined_at"`
 }
 
 // GuildJoinRequest 入馆申请。

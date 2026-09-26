@@ -196,7 +196,7 @@ func (d *DB) SearchUsers(ctx context.Context, keyword string, page, pageSize int
 	var total int
 	_ = d.QueryRow(ctx, "SELECT COUNT(*) FROM users "+where, args...).Scan(&total)
 	// 相关性排序简化为 created_at（保持与 legacy 近似行为）
-	rows, err := d.Query(ctx, `SELECT id, name, avatar, vip, prefix, intro FROM users `+where+` ORDER BY created_at DESC LIMIT $`+itoa(len(args)+1)+` OFFSET $`+itoa(len(args)+2),
+	rows, err := d.Query(ctx, `SELECT id, name, avatar, vip, COALESCE(prefix, ''), COALESCE(intro, '') FROM users `+where+` ORDER BY created_at DESC LIMIT $`+itoa(len(args)+1)+` OFFSET $`+itoa(len(args)+2),
 		append(args, pageSize, offset)...)
 	if err != nil {
 		return nil, 0, false, err

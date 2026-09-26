@@ -124,6 +124,40 @@ func (h *GuildsHandler) Feed(c *gin.Context) {
 		"guild": gin.H{"id": g.ID, "slug": g.Slug, "name": g.Name, "theme_color": g.ThemeColor}})
 }
 
+// ---- GET /api/v1/guilds/:slug/members ----
+
+// Members 会馆成员列表（公开，无缓存；page_size 默认 24）。
+func (h *GuildsHandler) Members(c *gin.Context) {
+	g, ok := h.resolveGuild(c)
+	if !ok {
+		return
+	}
+	page, pageSize := parsePageWithDefault(c, 24)
+	members, hasMore, err := h.DB.ListGuildMembers(c.Request.Context(), g.ID, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "members": members, "page": page, "page_size": pageSize, "has_more": hasMore})
+}
+
+// ---- GET /api/v1/guilds/:slug/leader ----
+
+// LeaderPage 馆长页（公开，无缓存；无馆长时 leader 为 null）。
+func (h *GuildsHandler) LeaderPage(c *gin.Context) {
+	pg, err := h.DB.GetGuildLeaderPage(c.Request.Context(), c.Param("slug"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	if pg == nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "会馆不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "guild": pg.Guild, "leader": pg.Leader,
+		"leader_bio": pg.LeaderBio, "content": pg.Content})
+}
+
 // ---- GET /api/v1/feed ----
 
 // GlobalFeed 全站信息流：space=all/public/guild。
