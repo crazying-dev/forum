@@ -14,11 +14,14 @@ from .common import (Card, CardTitle, Chip, Divider, ElidedLabel, EmptyHint, Flo
                      button, chip, clear_layout, divider, ghost_button, hbox,
                      set_active, set_variant, vbox)
 from .dialogs import (REPORT_REASONS, BaseDialog, BugReportDialog,
-                      ExternalLinkDialog, ReportDialog, UserListDialog, confirm)
+                      ExternalLinkDialog, ReportDialog, UserListDialog, confirm,
+                      info_box)
 from .images import AsyncImage, Avatar, avatar_cache, image_cache
 from .markdown import MarkdownView, markdown_to_html
 from .post_card import PostCard
 from .toast import Toast, ToastManager, toast
+from .update import (DownloadDialog, UpdateDialog, ask_update, check_and_prompt,
+                     download_and_install, eta_text, progress_text)
 from .world_panel import WorldMessage, WorldPanel
 
 __all__ = [
@@ -27,11 +30,13 @@ __all__ = [
     "button", "chip", "clear_layout", "divider", "ghost_button", "hbox",
     "set_active", "set_variant", "vbox",
     "REPORT_REASONS", "BaseDialog", "BugReportDialog", "ExternalLinkDialog",
-    "ReportDialog", "UserListDialog", "confirm",
+    "ReportDialog", "UserListDialog", "confirm", "info_box",
     "AsyncImage", "Avatar", "avatar_cache", "image_cache",
     "MarkdownView", "markdown_to_html",
     "PostCard",
     "Toast", "ToastManager", "toast",
+    "DownloadDialog", "UpdateDialog", "ask_update", "check_and_prompt",
+    "download_and_install", "eta_text", "progress_text",
     "WorldMessage", "WorldPanel",
     "CommentItem", "CommentList",
 ]

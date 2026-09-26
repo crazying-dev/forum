@@ -691,41 +691,14 @@ class SettingsPage(Page):
         self._set_quietly(box, registered)
 
     def _check_update(self) -> None:
+        """检查更新：发现新版本时弹窗询问是否下载（三处入口共用交互）。"""
         try:
-            from .. import updater
-        except ImportError:
-            self.toast("更新模块尚未就绪")
-            return
-        check = getattr(updater, "check_async", None)
-        if not callable(check):
-            self.toast("更新模块尚未就绪")
-            return
-        self.toast("正在检查更新…")
-
-        def _done(info) -> None:
-            try:
-                if getattr(info, "available", False):
-                    version = str(getattr(info, "version", "") or "")
-                    self.toast("发现新版本 v%s" % version if version
-                               else "发现新版本")
-                else:
-                    text = (getattr(info, "message", "")
-                            or getattr(updater, "LATEST_TEXT", "当前已是最新版本"))
-                    self.toast(text)
-            except Exception as exc:  # noqa: BLE001
-                _log.warning("处理更新结果失败：%s", exc)
-
-        try:
-            check(_done)
-        except TypeError:
-            try:
-                check(lambda *_: None)  # 旧签名兜底
-            except Exception as exc:  # noqa: BLE001
-                _log.warning("检查更新失败：%s", exc)
-                self.toast("检查更新失败")
+            from ..widgets import update as update_ui
         except Exception as exc:  # noqa: BLE001
-            _log.warning("检查更新失败：%s", exc)
-            self.toast("检查更新失败")
+            _log.warning("加载更新组件失败：%s", exc)
+            self.toast("更新模块尚未就绪")
+            return
+        update_ui.check_and_prompt(self, on_status=self.toast)
 
     # ── 数据与诊断 ──
     def _build_diagnostics(self) -> None:

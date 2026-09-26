@@ -465,21 +465,20 @@ class DownloadPage(Page):
 
     # ────────────────────── 更新检查 / 发布页 ──────────────────────
     def _check_update(self) -> None:
-        self._state_label.setText("正在检查更新…")
-
-        def _done(info) -> None:
-            info = info or updater.UpdateInfo(available=False, message="检查更新失败")
-            message = info.message or ("发现新版本" if info.available else "当前已是最新版本")
-            self._state_label.setText(message)
-            if info.available:
-                self.toast(message)
+        """检查更新：发现新版本时弹窗询问是否下载（三处入口共用交互）。"""
+        def _status(text: str) -> None:
+            try:
+                self._state_label.setText(text)
+            except RuntimeError:
+                pass
 
         try:
-            updater.check_async(_done)
+            from ..widgets import update as update_ui
         except Exception as exc:  # noqa: BLE001
-            _log.warning("检查更新失败：%s", exc)
-            self._state_label.setText("检查更新失败")
-            self.toast("检查更新失败")
+            _log.warning("加载更新组件失败：%s", exc)
+            self.toast("更新模块尚未就绪")
+            return
+        update_ui.check_and_prompt(self, on_status=_status)
 
     def _open_release_page(self) -> None:
         url = constants.absolute(constants.APP_DOWNLOAD_PAGE)

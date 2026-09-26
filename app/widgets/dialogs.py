@@ -91,6 +91,17 @@ def confirm(parent: QWidget | None, title: str, text: str, *,
     return dialog.exec() == QDialog.DialogCode.Accepted
 
 
+def info_box(parent: QWidget | None, title: str, text: str, *,
+             ok_text: str = "知道了") -> None:
+    """信息提示弹窗（只有确认按钮），与 :func:`confirm` 同一套主题风格。"""
+    dialog = BaseDialog(parent, title=title, width=380)
+    message = QLabel(text)
+    message.setWordWrap(True)
+    dialog.body.addWidget(message)
+    dialog.add_action(ok_text, "primary", dialog.accept)
+    dialog.exec()
+
+
 # ────────────────────────── 外链安全确认 ──────────────────────────
 
 

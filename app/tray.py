@@ -11,10 +11,9 @@
 from __future__ import annotations
 
 from PyQt6.QtGui import QAction, QActionGroup, QIcon
-from PyQt6.QtWidgets import (QMenu, QMessageBox, QProgressDialog,
-                             QSystemTrayIcon)
+from PyQt6.QtWidgets import QMenu, QMessageBox, QSystemTrayIcon
 
-from . import config, constants, logger, paths, updater, util, yearmode
+from . import config, constants, logger, paths, util, yearmode
 
 _log = logger.get_logger("tray")
 
@@ -58,8 +57,6 @@ class TrayIcon(QSystemTrayIcon):
         super().__init__(parent)
         self._app = app
         self._shell = shell
-        self._update_info = None
-        self._progress = None
 
         self.setIcon(_tray_icon())
         self.setToolTip("%s 客户端" % constants.APP_NAME)
@@ -327,89 +324,14 @@ class TrayIcon(QSystemTrayIcon):
     # ────────────────────── 检查更新 / 下载 ──────────────────────
 
     def _check_update(self) -> None:
-        """检查更新（异步，不阻塞界面）。"""
-        self._set_status("正在检查更新…")
+        """检查更新：发现新版本时弹窗询问是否下载。
+
+        与「下载」页、「设置·关于」共用 :mod:`app.widgets.update` 的交互。
+        """
         try:
-            updater.check_async(self._on_update_checked, label="检查更新")
+            from .widgets import update as update_ui
         except Exception as exc:  # noqa: BLE001
-            _log.error("检查更新失败：%s", exc, exc_info=True)
+            _log.error("加载更新组件失败：%s", exc, exc_info=True)
             self._set_status("检查更新失败：%s" % exc)
-
-    def _on_update_checked(self, info) -> None:
-        info = info or updater.UpdateInfo(available=False, message="检查更新失败")
-        message = info.message or ("发现新版本" if info.available else "当前已是最新版本")
-        self._set_status(message)
-        if not info.available:
-            if info.message == updater.UNAVAILABLE_TEXT:
-                # 更新服务不可达：只给气泡与状态栏，不弹错误弹窗
-                self.notify(message)
-            else:
-                QMessageBox.information(self._shell, "检查更新", message)
             return
-
-        self._update_info = info
-        self.notify(message, msecs=8000)
-        text = "%s\n\n是否现在下载并安装？" % message
-        try:
-            from .widgets.dialogs import confirm
-            accepted = confirm(self._shell, "检查更新", text, ok_text="下载", cancel_text="稍后")
-        except Exception as exc:  # noqa: BLE001
-            _log.warning("更新确认弹窗失败：%s", exc)
-            accepted = False
-        if not accepted:
-            return
-        self._start_download(info)
-
-    def _start_download(self, info) -> None:
-        dialog = None
-        try:
-            dialog = QProgressDialog("正在下载更新…", "取消", 0, 100, self._shell)
-            dialog.setWindowTitle("下载更新")
-            dialog.setCancelButton(None)
-            dialog.setMinimumDuration(0)
-            dialog.setAutoClose(False)
-            dialog.setValue(0)
-            dialog.show()
-        except Exception as exc:  # noqa: BLE001
-            _log.warning("进度窗口创建失败：%s", exc)
-            dialog = None
-        self._progress = dialog
-
-        def _on_progress(done: int, total: int) -> None:
-            if self._progress is not None:
-                try:
-                    if total > 0:
-                        self._progress.setRange(0, 100)
-                        self._progress.setValue(int(min(100, done * 100 // total)))
-                    else:
-                        self._progress.setRange(0, 0)  # 大小未知→忙等指示
-                except Exception:  # noqa: BLE001
-                    pass
-            if total > 0:
-                self._set_status("正在下载更新… %s / %s" % (
-                    util.human_size(done), util.human_size(total)))
-            else:
-                self._set_status("正在下载更新… %s" % util.human_size(done))
-
-        def _on_done(path, error) -> None:
-            if self._progress is not None:
-                try:
-                    self._progress.close()
-                except Exception:  # noqa: BLE001
-                    pass
-                self._progress = None
-            if error or not path:
-                text = "更新包下载失败：%s" % (error or "未知错误")
-                self._set_status(text)
-                QMessageBox.warning(self._shell, "检查更新", text)
-                return
-            ok, message = updater.launch_installer(path)
-            self._set_status(message)
-            if not ok:
-                QMessageBox.warning(self._shell, "检查更新", message)
-
-        try:
-            updater.download_update(info, on_progress=_on_progress, on_done=_on_done)
-        except Exception as exc:  # noqa: BLE001
-            _log.error("启动下载失败：%s", exc, exc_info=True)
-            _on_done(None, str(exc))
+        update_ui.check_and_prompt(self._shell, on_status=self._set_status)
