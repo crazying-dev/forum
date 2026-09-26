@@ -248,3 +248,119 @@ def test_online_ensure_downloads_and_caches():
     assert provider.info()["model"] is True
     again = provider.ensure()
     assert str(again) == str(path)
+
+
+# ────────────────────── 多版本切换 ──────────────────────
+
+
+def test_live2d_model_catalog_covers_five_versions():
+    from app import constants
+    keys = [spec["key"] for spec in constants.LIVE2D_MODELS]
+    assert keys == ["1.1", "2.3", "3.0.1", "3.0.2", "4.0"]
+    assert constants.LIVE2D_MODEL_DEFAULT == "4.0"
+    assert constants.live2d_model_choices() == (
+        ("1.1", "1.1"), ("2.3", "2.3"), ("3.0.1", "3.0.1"),
+        ("3.0.2", "3.0.2"), ("4.0", "4.0"))
+    for spec in constants.LIVE2D_MODELS:
+        assert spec["size"] > 1_000_000, spec["key"]
+        assert len(spec["sha256"]) == 64, spec["key"]
+        assert spec["remotes"], spec["key"]
+        assert spec["lpk_name"].lower().endswith(".lpk")
+
+
+def test_live2d_model_key_normalization():
+    from app import constants
+    cases = {
+        "1.1": "1.1", "HEI1.1": "1.1", "hei11": "1.1",
+        "2.3": "2.3", "HEI2.3": "2.3",
+        "3.0.1": "3.0.1", "HEI301": "3.0.1", "HEI3.0.1": "3.0.1",
+        "3.0.2": "3.0.2", "HEI3.0.2": "3.0.2",
+        "4.0": "4.0", "HEI4.0": "4.0", "hei40": "4.0",
+    }
+    for raw, expect in cases.items():
+        assert constants.live2d_model(raw)["key"] == expect, raw
+    assert constants.live2d_model("")["key"] == constants.LIVE2D_MODEL_DEFAULT
+    assert constants.live2d_model(None)["key"] == constants.LIVE2D_MODEL_DEFAULT
+    assert constants.live2d_model("不存在")["key"] == constants.LIVE2D_MODEL_DEFAULT
+
+
+def test_config_pet_model_default_and_normalization():
+    from app import config as config_mod
+    from app import constants
+    assert config_mod.DEFAULTS["pet"]["model"] == constants.LIVE2D_MODEL_DEFAULT
+    cfg = config_mod.Config(path=os.path.join(tempfile.mkdtemp(), "config.json"))
+    assert cfg.pet_model == constants.LIVE2D_MODEL_DEFAULT
+    cfg.set("pet.model", "HEI2.3")
+    assert cfg.pet_model == "2.3"
+
+
+def test_provider_per_version_paths():
+    from app import constants
+    for spec in constants.LIVE2D_MODELS:
+        provider = Live2DProvider(data_dir=tempfile.mkdtemp(), model=spec["key"])
+        assert provider.key == spec["key"]
+        assert provider.model_name == spec["name"]
+        assert provider.lpk_name == spec["lpk_name"]
+        assert str(provider.lpk_path).endswith(spec["lpk_name"])
+        assert provider.model_dir.name == spec["name"]
+        assert str(provider.model_json).endswith(spec["name"] + ".model3.json")
+
+
+def test_provider_lpk_urls_cover_remotes():
+    provider = Live2DProvider(data_dir=tempfile.mkdtemp(), model="4.0")
+    urls = provider.lpk_urls()
+    assert len(urls) == 2
+    assert urls[0].endswith("/static/live2d/HEI40.lpk")
+    assert urls[1].endswith("/static/live2d/HEI.lpk")
+    assert provider.lpk_url == urls[0]
+    one = Live2DProvider(data_dir=tempfile.mkdtemp(), model="1.1")
+    assert len(one.lpk_urls()) == 1
+    assert one.lpk_urls()[0].endswith("/static/live2d/HEI11.lpk")
+
+
+def test_provider_list_models_matches_catalog():
+    from app import constants
+    assert Live2DProvider.list_models() == constants.LIVE2D_MODELS
+
+
+def test_provider_info_reports_model_identity():
+    provider = Live2DProvider(data_dir=tempfile.mkdtemp(), model="3.0.2")
+    info = provider.info()
+    assert info["model_key"] == "3.0.2"
+    assert info["model_name"] == "HEI3.0.2"
+    assert info["lpk_name"] == "HEI3.0.2.lpk"
+    assert info["model"] is False and info["lpk"] is False
+
+
+def test_clear_cache_all_models_removes_every_lpk_and_dir():
+    from app import constants
+    provider = Live2DProvider(data_dir=tempfile.mkdtemp(), model="4.0")
+    provider.root_dir.mkdir(parents=True, exist_ok=True)
+    for spec in constants.LIVE2D_MODELS:
+        (provider.root_dir / spec["name"]).mkdir(exist_ok=True)
+        (provider.root_dir / spec["lpk_name"]).write_bytes(b"x")
+    provider.clear_cache(all_models=True)
+    for spec in constants.LIVE2D_MODELS:
+        assert not (provider.root_dir / spec["name"]).exists()
+        assert not (provider.root_dir / spec["lpk_name"]).exists()
+
+
+def test_pet_controller_set_model_version_switches_provider():
+    from PyQt6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from app import config as config_mod
+    from app import constants
+    from app.live2d import pet as pet_mod
+    controller = pet_mod.PetController()
+    try:
+        controller.set_model_version("1.1")
+        assert controller.model_key == "1.1"
+        assert controller.provider.key == "1.1"
+        assert controller.provider.lpk_name == "HEI1.1.lpk"
+        assert config_mod.current().pet_model == "1.1"
+    finally:
+        try:
+            config_mod.current().set("pet.model", constants.LIVE2D_MODEL_DEFAULT)
+        except Exception:  # noqa: BLE001
+            pass
+        controller.deleteLater()

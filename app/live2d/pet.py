@@ -15,7 +15,7 @@ from __future__ import annotations
 import os
 
 from PyQt6.QtCore import QObject, QPoint, QTimer, Qt, pyqtSignal
-from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtGui import QActionGroup, QGuiApplication
 from PyQt6.QtWidgets import (QLabel, QMenu, QProgressBar, QVBoxLayout, QWidget)
 
 from .. import api as api_mod
@@ -264,6 +264,17 @@ class PetWindow(QWidget):
         controller = getattr(self, "controller", None)
         if controller is not None:
             menu.addAction("重新下载模型", lambda: controller.reload_model(force=True))
+            version_menu = menu.addMenu("模型版本")
+            current = str(getattr(controller, "model_key", "") or "")
+            group = QActionGroup(version_menu)
+            group.setExclusive(True)
+            for key, label in constants.live2d_model_choices():
+                action = version_menu.addAction(label)
+                action.setCheckable(True)
+                action.setChecked(key == current)
+                action.triggered.connect(
+                    lambda _checked=False, k=key: controller.set_model_version(k))
+                group.addAction(action)
         menu.addAction("打开设置", self._open_settings)
         menu.addSeparator()
         menu.addAction("退出客户端", self._quit)
@@ -309,7 +320,9 @@ class PetController(QObject):
                  provider: Live2DProvider | None = None) -> None:
         super().__init__(parent)
         self.shell = shell
-        self.provider = provider or Live2DProvider()
+        self._injected_provider = provider is not None
+        self.provider = provider or Live2DProvider(model=self._config_model_key())
+        self._model_key = str(getattr(self.provider, "key", constants.LIVE2D_MODEL_DEFAULT))
         self._window: PetWindow | None = None
         self._loading = False
         self._model_path = ""
@@ -329,6 +342,19 @@ class PetController(QObject):
     @property
     def model_json(self) -> str:
         return self._model_path
+
+    @property
+    def model_key(self) -> str:
+        """当前桌宠模型版本号。"""
+        return str(self._model_key or constants.LIVE2D_MODEL_DEFAULT)
+
+    @staticmethod
+    def _config_model_key() -> str:
+        try:
+            return str(config.current().get("pet.model", constants.LIVE2D_MODEL_DEFAULT)
+                       or constants.LIVE2D_MODEL_DEFAULT)
+        except Exception:  # noqa: BLE001
+            return constants.LIVE2D_MODEL_DEFAULT
 
     # ────────────────────── 启停 ──────────────────────
     def start(self) -> None:
@@ -364,6 +390,12 @@ class PetController(QObject):
             self._window.hide()
 
     def apply_config(self) -> None:
+        key = str(constants.live2d_model(self._config_model_key())["key"])
+        if key != self._model_key and not self._injected_provider:
+            self.set_model_version(key)
+            if self._window is not None:
+                self._window.apply_config()
+            return
         if self._window is not None:
             self._window.apply_config()
             self._window.restore_position()
@@ -429,6 +461,29 @@ class PetController(QObject):
         if self._window is not None:
             self.model_message.emit("正在重新准备模型…")
         self._prepare_model(force=True)
+
+    def set_model_version(self, key: str) -> None:
+        """切换桌宠模型版本（重建 provider → 需要时重新准备模型）。"""
+        target = str(constants.live2d_model(key)["key"])
+        if target == self._model_key and self.provider.is_ready():
+            return
+        self._model_key = target
+        try:
+            config.current().set("pet.model", target)
+        except Exception as exc:  # noqa: BLE001
+            _log.debug("保存桌宠模型版本失败：%s", exc)
+        if not self._injected_provider:
+            self.provider = Live2DProvider(model=target)
+        self._model_path = ""
+        if self.running:
+            self._prepare_model()
+
+    def clear_all_models(self) -> None:
+        """清理所有版本的桌宠模型缓存。"""
+        try:
+            self.provider.clear_cache(all_models=True)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("清理全部模型缓存失败：%s", exc)
 
     def prepare_async(self, on_done=None, on_error=None) -> None:
         """供 WIKI·Live2D 页等其他入口复用。"""

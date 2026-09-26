@@ -402,6 +402,13 @@ class SettingsPage(Page):
         card.body.addWidget(self._pet_track)
 
         card.body.addWidget(Divider())
+        card.body.addWidget(self._muted("模型版本"))
+        self._chips(card, "pet_model", constants.live2d_model_choices(),
+                    self._on_pet_model)
+        card.body.addWidget(self._muted(
+            "切换后会自动下载并缓存对应模型；不同版本的模型动作、表情略有差异。"))
+
+        card.body.addWidget(Divider())
         self._pet_opacity = QSlider(Qt.Orientation.Horizontal)
         self._pet_opacity.setRange(20, 100)
         self._pet_opacity.valueChanged.connect(self._on_pet_opacity)
@@ -457,6 +464,19 @@ class SettingsPage(Page):
 
     def _on_pet_track(self, checked: bool) -> None:
         self._pet_apply(track=bool(checked))
+
+    def _on_pet_model(self, key: str) -> None:
+        spec = constants.live2d_model(key)
+        config_mod.current().set("pet.model", spec["key"])
+        controller = self._pet_controller()
+        setter = getattr(controller, "set_model_version", None)
+        if callable(setter):
+            try:
+                setter(spec["key"])
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("切换模型版本失败：%s", exc)
+        self._mark("pet_model", spec["key"])
+        self.toast("已切换为模型版本 %s" % spec["label"])
 
     def _on_pet_opacity(self, value: int) -> None:
         self._pet_apply(opacity=round(int(value) / 100.0, 2))
@@ -553,6 +573,8 @@ class SettingsPage(Page):
                              lambda _=False: self._check_update()))
         self._version_label = self._muted("当前版本 v%s" % constants.APP_VERSION)
         row.addWidget(self._version_label)
+        row.addWidget(button("打开下载页", "ghost",
+                             lambda _=False: self.go("download")))
         row.addStretch(1)
         card.body.addLayout(row)
 
@@ -806,6 +828,8 @@ class SettingsPage(Page):
                              lambda _=False: self.go("huiguan")))
         row.addWidget(button("打开 WIKI", "ghost",
                              lambda _=False: self.go("wiki")))
+        row.addWidget(button("下载客户端", "ghost",
+                             lambda _=False: self.go("download")))
         row.addStretch(1)
         card.body.addLayout(row)
 
@@ -821,6 +845,12 @@ class SettingsPage(Page):
         self._mark("year_mode", mode)
         self._mark("cursor_variant",
                    cfg.get("cursor_variant", constants.CURSOR_VARIANT_DEFAULT))
+        try:
+            model_key = constants.live2d_model(
+                cfg.get("pet.model", constants.LIVE2D_MODEL_DEFAULT))["key"]
+        except Exception:  # noqa: BLE001
+            model_key = constants.LIVE2D_MODEL_DEFAULT
+        self._mark("pet_model", model_key)
 
         self._set_quietly(getattr(self, "_cursor_enabled", None),
                           cfg.get("cursor_enabled", True))

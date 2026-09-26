@@ -34,6 +34,7 @@ NAV_ITEMS = (
     ("me", "👤", "我的"),
     ("world", "🌍", "世界"),
     ("wiki", "📖", "WIKI"),
+    ("download", "⬇️", "下载"),
     ("easter_egg", "🎁", "彩蛋"),
     ("settings", "⚙️", "设置"),
 )
@@ -53,6 +54,7 @@ PAGE_MODULES = {
     "privacy": ("app.pages.misc", "PrivacyPage"),
     "huiguan": ("app.pages.misc", "HuiguanPage"),
     "easter_egg": ("app.pages.misc", "EasterEggPage"),
+    "download": ("app.pages.download", "DownloadPage"),
 }
 
 NAV_WIDTH_COLLAPSED = 54
@@ -470,6 +472,9 @@ class Shell(QMainWindow):
             return True
         if stripped == "/privacy":
             self.navigate("privacy")
+            return True
+        if stripped.lower() == "/download":
+            self.navigate("download")
             return True
         if stripped == "/Live2D":
             self.navigate("wiki", kind="live2d")

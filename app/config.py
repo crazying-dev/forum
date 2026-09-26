@@ -40,7 +40,7 @@ DEFAULTS: dict[str, Any] = {
         "passthrough": False,
         "track": True,                     # 视线跟随鼠标（窗口外也生效）
         "fps": 60,
-        "model": "HEI4.0",
+        "model": constants.LIVE2D_MODEL_DEFAULT,
     },
     "window": {
         "w": 1180,
@@ -182,6 +182,12 @@ class Config:
     @property
     def cursor_variant(self) -> str:
         return str(self.get("cursor_variant", constants.CURSOR_VARIANT_DEFAULT))
+
+    @property
+    def pet_model(self) -> str:
+        """归一化后的桌宠模型版本号（兼容历史写法 ``"HEI4.0"``）。"""
+        return constants.live2d_model(
+            self.get("pet.model", constants.LIVE2D_MODEL_DEFAULT))["key"]
 
 
 def _deep_merge(base: dict, extra: dict) -> None:

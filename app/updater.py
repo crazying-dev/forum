@@ -19,7 +19,7 @@ from pathlib import Path
 import requests
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from . import api, constants, logger, paths, util
+from . import api, constants, logger, paths, releases, util
 
 _log = logger.get_logger("updater")
 
@@ -45,6 +45,8 @@ class UpdateInfo:
     url: str = ""
     size: int = 0
     message: str = ""
+    mandatory: bool = False
+    notes: tuple = ()
 
 
 # ────────────────────────── 版本 / 本地记录 ──────────────────────────
@@ -161,9 +163,38 @@ def _probe(url: str, timeout) -> tuple[dict, int]:
 _pending_signature: dict | None = None
 
 
+def _check_release_catalog():
+    """优先用发布清单判定；拿不到清单时返回 None（交给指纹探测兜底）。"""
+    global _pending_signature
+    try:
+        found = releases.check(current_version())
+    except Exception as exc:  # noqa: BLE001
+        _log.info("发布清单检查失败：%s", exc)
+        return None
+    if not found.known:
+        return None
+    release = found.release
+    if not found.available:
+        _pending_signature = None
+        return UpdateInfo(False, version=found.version or "",
+                          url=str(getattr(release, "url", "") or ""),
+                          size=int(getattr(release, "size", 0) or 0),
+                          message=found.message or LATEST_TEXT)
+    url = str(getattr(release, "url", "") or "") or str(constants.UPDATE_EXE_URL)
+    size = int(getattr(release, "size", 0) or 0)
+    notes = str(getattr(release, "notes", "") or "").strip()
+    _pending_signature = None
+    _log.info("发布清单发现新版本：%s", found.version)
+    return UpdateInfo(True, version=found.version or "", url=url, size=size,
+                      message=found.message or ("发现新版本（%s）" % found.version),
+                      mandatory=bool(getattr(release, "mandatory", False)),
+                      notes=(notes,) if notes else ())
+
+
 def check_for_update(*, manifest_url=None, timeout=DEFAULT_TIMEOUT) -> UpdateInfo:
     """检查更新（阻塞，不抛异常）。
 
+    优先用发布清单（``/api/app/releases``）判定；拿不到清单时再用远端文件指纹探测。
     端点 404/403/不可达 → ``available=False`` 且 ``message="更新服务暂不可用"``；
     远端签名与本地记录一致 → ``available=False`` 且 ``message="当前已是最新版本"``。
     """
@@ -171,6 +202,10 @@ def check_for_update(*, manifest_url=None, timeout=DEFAULT_TIMEOUT) -> UpdateInf
     url = str(manifest_url or constants.UPDATE_EXE_URL or "").strip()
     if not url:
         return UpdateInfo(False, message=UNAVAILABLE_TEXT)
+
+    from_catalog = _check_release_catalog()
+    if from_catalog is not None:
+        return from_catalog
 
     try:
         headers, size = _probe(url, timeout)
@@ -265,6 +300,96 @@ class _ProgressRelay(QObject):
             _log.debug("进度回调失败：%s", exc)
 
 
+def download_to(url: str, dest, *, expected: int = 0, resume: bool = True,
+                on_progress=None, timeout=DOWNLOAD_TIMEOUT,
+                chunk_size: int = CHUNK_SIZE) -> tuple[bool, str]:
+    """流式下载到 ``dest``（支持 Range 断点续传），返回 ``(ok, 中文错误)``。
+
+    * 先写 ``dest.part``；若已存在且 ``resume=True``，带 ``Range`` 续传
+    * 服务器不支持断点时（回 200 而非 206）自动从头重下
+    * 完成后原子替换为 ``dest``
+    """
+    target = Path(dest)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        return False, "无法创建下载目录：%s" % exc
+    part = target.with_suffix(target.suffix + ".part")
+
+    offset = 0
+    if resume and part.is_file():
+        try:
+            offset = int(part.stat().st_size)
+        except OSError:
+            offset = 0
+    if expected > 0 and offset >= expected:
+        try:
+            os.replace(part, target)
+            if on_progress is not None:
+                try:
+                    on_progress(expected, expected)
+                except Exception:  # noqa: BLE001
+                    pass
+            return True, ""
+        except OSError:
+            offset = 0
+
+    headers = {"User-Agent": constants.CLIENT_UA}
+    mode = "wb"
+    if offset > 0:
+        headers["Range"] = "bytes=%d-" % offset
+        mode = "ab"
+
+    done = offset
+    try:
+        with requests.get(url, timeout=timeout, headers=headers,
+                          stream=True, allow_redirects=True) as resp:
+            if resp.status_code >= 400:
+                return False, "下载失败（HTTP %s）" % resp.status_code
+            if offset > 0 and resp.status_code != 206:
+                # 服务器不支持断点续传 → 从头来
+                offset = 0
+                mode = "wb"
+            length = str(resp.headers.get("Content-Length") or "").strip()
+            remaining = int(length) if length.isdigit() else 0
+            if expected > 0:
+                total = expected
+            elif remaining > 0:
+                total = offset + remaining
+            else:
+                total = 0
+            done = offset
+            if on_progress is not None:
+                try:
+                    on_progress(done, total)
+                except Exception:  # noqa: BLE001
+                    pass
+            with open(part, mode) as handle:
+                for chunk in resp.iter_content(chunk_size):
+                    if not chunk:
+                        continue
+                    handle.write(chunk)
+                    done += len(chunk)
+                    if on_progress is not None:
+                        try:
+                            on_progress(done, total)
+                        except Exception:  # noqa: BLE001
+                            pass
+    except Exception as exc:  # noqa: BLE001
+        return False, "下载失败：%s" % exc
+
+    if done <= 0:
+        return False, "更新包内容为空"
+    if expected > 0 and done < expected:
+        return False, "下载不完整（%s / %s）" % (util.human_size(done),
+                                                util.human_size(expected))
+    try:
+        os.replace(part, target)
+    except OSError as exc:
+        return False, "写入更新包失败：%s" % exc
+    return True, ""
+
+
 def download_update(info, on_progress=None, on_done=None) -> None:
     """异步下载更新包到 ``~/.Cr/forum/update/forum_new.exe``。
 
@@ -276,31 +401,16 @@ def download_update(info, on_progress=None, on_done=None) -> None:
     relay = _ProgressRelay(on_progress)
 
     def _work() -> str:
-        target_dir = paths.update_dir()
-        target_dir.mkdir(parents=True, exist_ok=True)
-        part = target_dir / PART_NAME
-        final = target_dir / EXE_NAME
-        done = 0
-        request_headers = {"User-Agent": constants.CLIENT_UA}
-        with requests.get(url, timeout=DOWNLOAD_TIMEOUT, headers=request_headers,
-                          stream=True) as resp:
-            resp.raise_for_status()
-            length = str(resp.headers.get("Content-Length") or "").strip()
-            total = int(length) if length.isdigit() else expected
-            with open(part, "wb") as handle:
-                for chunk in resp.iter_content(CHUNK_SIZE):
-                    if not chunk:
-                        continue
-                    handle.write(chunk)
-                    done += len(chunk)
-                    relay.emit_progress(done, total)
-        if done <= 0:
-            raise RuntimeError("更新包内容为空")
-        os.replace(part, final)
+        final = paths.update_dir() / EXE_NAME
+        ok, error = download_to(url, final, expected=expected, resume=True,
+                                on_progress=relay.emit_progress)
+        if not ok:
+            raise RuntimeError(error or "下载失败")
         return str(final)
 
     def _ok(path) -> None:
-        _write_manifest(**_pending_download_signature())
+        if _pending_signature:
+            _write_manifest(**_pending_download_signature())
         _log.info("更新包已下载：%s", path)
         _emit(on_done, str(path), "")
 

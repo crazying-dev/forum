@@ -20,6 +20,7 @@ wiki_personal  WIKI·个人
 wiki_mouse     WIKI·鼠标
 wiki_mouse_linux  WIKI·鼠标 Linux 版
 auth           登录 / 注册 / 找回密码
+download       下载（客户端安装包 / 发布页，按平台分组）
 settings       设置（主题 / 年制 / 鼠标 / 桌宠 / 日志 / 关于）
 privacy        隐私政策
 huiguan        会馆列表
@@ -30,4 +31,5 @@ easter_egg     彩蛋 / 每日一言
 from __future__ import annotations
 
 __all__ = ["base", "home", "forum", "post_detail", "post_create", "search",
-           "user", "profile", "world", "wiki", "auth", "settings", "misc"]
+           "user", "profile", "world", "wiki", "auth", "download", "settings",
+           "misc"]

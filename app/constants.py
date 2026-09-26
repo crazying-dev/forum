@@ -136,9 +136,107 @@ SENTENCE_JSON_URL = SENTENCE_BASE
 EASTER_EGG_PATH = "/Easter-Egg"
 GO_TO_PATH = "/GoTo?to="
 
+# ────────────────────────── 客户端发布 / 更新 ──────────────────────────
+
+APP_RELEASES_API = "/api/app/releases"   # 发布清单接口（服务端 api/release）
+APP_CHECK_API = "/api/app/check"         # 版本校验接口
+APP_DOWNLOAD_PAGE = "/Download"          # 官网发布 / 下载页
+
 # ────────────────────────── 远端静态资源（按需下载 + 本地缓存）──────────────────────────
 
-REMOTE_LPK = "/static/live2d/HEI.lpk"
+REMOTE_LPK = "/static/live2d/HEI.lpk"   # 4.0 的历史直链（兼容旧客户端与旧缓存）
+
+# ── Live2D 桌宠模型版本 ──
+# 模型包统一托管在服务端 /static/live2d/ 下，客户端按需下载 + 本地缓存
+# （延续「不内置模型」原则；见 app/live2d/provider.py）。
+#   key       版本号（配置文件 pet.model 的取值，如 "4.0"）
+#   label     界面展示名
+#   name      归一化后的模型名（目录名 / .model3.json 前缀，如 "HEI4.0"）
+#   lpk_name  本地缓存文件名（4.0 沿用 "HEI.lpk"，以便复用已有缓存）
+#   remotes   远端直链（按顺序尝试；首个为主链接，其余为回退）
+#   size      LPK 字节数（0 表示未知）
+#   sha256    LPK 的 sha256（小写十六进制；空串表示未记录）
+#   note      设置页展示的简短说明
+LIVE2D_MODEL_DEFAULT = "4.0"
+
+LIVE2D_MODELS = (
+    {
+        "key": "1.1", "label": "1.1", "name": "HEI1.1",
+        "lpk_name": "HEI1.1.lpk",
+        "remotes": ("/static/live2d/HEI11.lpk",),
+        "size": 1831276,
+        "sha256": "6dcb2d0f8513ad41fe68c6471b711d71f1e14a09c9e6b383e729d5e9c5576c1c",
+        "note": "最初版本",
+    },
+    {
+        "key": "2.3", "label": "2.3", "name": "HEI2.3",
+        "lpk_name": "HEI2.3.lpk",
+        "remotes": ("/static/live2d/HEI23.lpk",),
+        "size": 1913996,
+        "sha256": "c87da38fe958831995873b5852f5058671b50d69bf2d5a0cf715cfd8ca06a417",
+        "note": "第二代模型",
+    },
+    {
+        "key": "3.0.1", "label": "3.0.1", "name": "HEI3.0.1",
+        "lpk_name": "HEI3.0.1.lpk",
+        "remotes": ("/static/live2d/HEI301.lpk",),
+        "size": 1985322,
+        "sha256": "519f112eb5d4c49161b79717f1c4b740066b3a3ce5e4cd4fd7b57f8b6ae0266d",
+        "note": "第三代模型",
+    },
+    {
+        "key": "3.0.2", "label": "3.0.2", "name": "HEI3.0.2",
+        "lpk_name": "HEI3.0.2.lpk",
+        "remotes": ("/static/live2d/HEI302.lpk",),
+        "size": 1991554,
+        "sha256": "cd54b7030e8604d0ed6e38c63d085206c8b70e56a0bb1f74d6fbffe3d6ece737",
+        "note": "第三代修订",
+    },
+    {
+        "key": "4.0", "label": "4.0", "name": "HEI4.0",
+        "lpk_name": "HEI.lpk",
+        "remotes": ("/static/live2d/HEI40.lpk", "/static/live2d/HEI.lpk"),
+        "size": 2077164,
+        "sha256": "49704e688db0d031297e433c5de7c9d76509a5a2d65f19f15548c25fb5a856c2",
+        "note": "当前默认版本",
+    },
+)
+
+
+def _normalize_model_key(value) -> str:
+    """把任意写法（``"4.0"`` / ``"HEI4.0"`` / ``"hei40"``）归一化为版本号。"""
+    text = str(value or "").strip()
+    if not text:
+        return LIVE2D_MODEL_DEFAULT
+    low = text.lower().replace("_", "").replace("-", "").replace(" ", "")
+    for spec in LIVE2D_MODELS:
+        key = spec["key"]
+        name = spec["name"].lower()
+        if low in (key, name, name.replace(".", ""),
+                   "hei" + key, "hei" + key.replace(".", "")):
+            return key
+    if low.startswith("hei"):
+        tail = low[3:]
+        for spec in LIVE2D_MODELS:
+            if tail in (spec["key"], spec["key"].replace(".", "")):
+                return spec["key"]
+    return LIVE2D_MODEL_DEFAULT
+
+
+def live2d_model(key=None) -> dict:
+    """返回某个模型版本的元数据；未知取值一律回退到默认版本。"""
+    target = _normalize_model_key(key)
+    for spec in LIVE2D_MODELS:
+        if spec["key"] == target:
+            return spec
+    return LIVE2D_MODELS[-1]
+
+
+def live2d_model_choices() -> tuple:
+    """``((版本号, 展示名), ...)``，供设置页 / 右键菜单渲染。"""
+    return tuple((spec["key"], spec["label"]) for spec in LIVE2D_MODELS)
+
+
 REMOTE_MOUSE_ZIP = "/static/mouse/Liunx/罗小黑战记鼠标Linux版.zip"
 REMOTE_MOUSE_LICENSE = "/static/mouse/Liunx/LICENSE"
 REMOTE_MOUSE_README = "/static/mouse/Liunx/README.md"

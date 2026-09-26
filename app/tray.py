@@ -94,6 +94,7 @@ class TrayIcon(QSystemTrayIcon):
 
         self._menu.addSeparator()
 
+        self._add_item("打开下载页", self._open_download)
         self._add_item("打开数据目录", self._open_data_dir)
         self._add_item("检查更新", self._check_update)
         self._add_item("反馈 Bug", self._bug_report)
@@ -277,6 +278,19 @@ class TrayIcon(QSystemTrayIcon):
             ok = False
         if not ok:
             self._set_status("无法打开数据目录")
+
+    def _open_download(self) -> None:
+        """显示主窗口并切到「下载」页。"""
+        try:
+            self._shell.show_window()
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("显示主窗口失败：%s", exc)
+        navigate = getattr(self._shell, "navigate", None)
+        if callable(navigate):
+            try:
+                navigate("download")
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("打开下载页失败：%s", exc)
 
     def _bug_report(self) -> None:
         try:

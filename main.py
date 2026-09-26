@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
 SERVER_NAME = "crforum-windows-single"
 
@@ -28,6 +29,7 @@ def _bootstrap_path() -> None:
 
 _bootstrap_path()
 
+from PyQt6.QtCore import QTimer  # noqa: E402
 from PyQt6.QtGui import QFont, QIcon, QSurfaceFormat  # noqa: E402
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
@@ -192,6 +194,43 @@ def _start_pet(shell: Shell) -> None:
         _log.warning("桌宠启动失败：%s", exc)
 
 
+UPDATE_CHECK_INTERVAL = 6 * 3600  # 启动静默检查的最小间隔（秒）
+
+
+def _start_update_check(app: QApplication, shell: Shell) -> None:
+    """启动后静默检查一次更新（受 ``check_update`` 开关控制，6 小时内不重复）。
+
+    只用于提示；发现新版本时通过托盘气泡告知，具体下载在「下载」页或托盘菜单完成。
+    """
+    try:
+        cfg = config_mod.current()
+        if not cfg.get("check_update", True):
+            return
+        from app import updater
+        try:
+            last = float(cfg.get("last_update_check", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            last = 0.0
+        if time.time() - last < UPDATE_CHECK_INTERVAL:
+            return
+
+        def _done(info) -> None:
+            try:
+                cfg.set("last_update_check", time.time())
+            except Exception:  # noqa: BLE001
+                pass
+            if info is None or not getattr(info, "available", False):
+                return
+            tray = getattr(shell, "tray", None)
+            notify = getattr(tray, "notify", None)
+            if callable(notify):
+                notify(getattr(info, "message", "") or "发现新版本")
+
+        QTimer.singleShot(5000, lambda: updater.check_async(_done, label="启动检查更新"))
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("启动更新检查不可用：%s", exc)
+
+
 # ────────────────────────── 入口 ──────────────────────────
 
 
@@ -219,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     _start_cursors(shell)
     _start_tray(app, shell)
     _start_pet(shell)
+    _start_update_check(app, shell)
 
     for url in urls:
         shell.handle_deeplink(url)

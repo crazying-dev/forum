@@ -90,6 +90,10 @@ dmypy.json
 logs/
 local_config.json
 
+# ── Live2D 模型包（仅本地暂存，用于上传服务器；不入库）──
+# 模型的权威主页在 server 仓的 static/live2d/（见 packaging/upload_live2d_models.ps1）
+/assets/
+
 # ── 临时文件 ──
 *.tmp
 *.bak

@@ -61,15 +61,49 @@ class Live2DProvider:
     """负责：下载 HEI.lpk → 解密解包 → 归一化 → 缓存，全部落在 ~/.Cr/forum/Live2D/ 下。"""
 
     def __init__(self, data_dir: str | Path | None = None,
-                 downloader: DownloadCallback | None = None) -> None:
+                 downloader: DownloadCallback | None = None,
+                 model: str | None = None) -> None:
         """
         :param data_dir: 数据根目录覆盖（测试用，默认 ``~/.Cr/forum``）
         :param downloader: 可注入的下载实现
             ``downloader(url, dest: Path, on_progress) -> (ok: bool, msg: str)``；
             默认用 :class:`app.api.ForumApi`
+        :param model: 模型版本号（``1.1`` / ``2.3`` / ``3.0.1`` / ``3.0.2`` / ``4.0``），
+            默认 :data:`app.constants.LIVE2D_MODEL_DEFAULT`；``"HEI4.0"`` 等旧写法会被归一化
         """
         self._data_dir = Path(data_dir).expanduser() if data_dir else None
         self._downloader = downloader
+        self._spec = constants.live2d_model(model)
+        self.key = str(self._spec["key"])
+        self.model_name = str(self._spec["name"])
+        self.lpk_name = str(self._spec["lpk_name"])
+
+    # ────────────────── 版本 ──────────────────
+
+    @property
+    def spec(self) -> dict:
+        """当前模型版本的元数据（见 :data:`app.constants.LIVE2D_MODELS`）。"""
+        return self._spec
+
+    @staticmethod
+    def list_models() -> tuple:
+        """全部可选的模型版本元数据。"""
+        return constants.LIVE2D_MODELS
+
+    def lpk_urls(self) -> tuple:
+        """候选下载地址（按顺序尝试；首个为主链接）。"""
+        urls: list[str] = []
+        for remote in (self._spec.get("remotes") or ()):
+            url = constants.absolute(remote)
+            if url and url not in urls:
+                urls.append(url)
+        return tuple(urls)
+
+    @property
+    def lpk_url(self) -> str:
+        """主下载地址。"""
+        urls = self.lpk_urls()
+        return urls[0] if urls else LPK_URL
 
     # ────────────────── 路径 ──────────────────
 
@@ -82,10 +116,8 @@ class Live2DProvider:
 
     @property
     def lpk_path(self) -> Path:
-        """模型包路径：``<root>/HEI.lpk``。"""
-        if self._data_dir is not None:
-            return self.root_dir / paths.live2d_lpk_path().name
-        return paths.live2d_lpk_path()
+        """模型包路径：``<root>/<lpk_name>``（默认 4.0 为 ``<root>/HEI.lpk``）。"""
+        return self.root_dir / self.lpk_name
 
     @property
     def tmp_dir(self) -> Path:
@@ -99,13 +131,13 @@ class Live2DProvider:
 
     @property
     def model_dir(self) -> Path:
-        """归一化后的模型目录：``<root>/HEI4.0``。"""
-        return self.root_dir / MODEL_NAME
+        """归一化后的模型目录：``<root>/<model_name>``（默认 ``<root>/HEI4.0``）。"""
+        return self.root_dir / self.model_name
 
     @property
     def model_json(self) -> Path:
-        """归一化后的 ``.model3.json``：``<root>/HEI4.0/HEI4.0.model3.json``。"""
-        return self.model_dir / (MODEL_NAME + ".model3.json")
+        """归一化后的 ``.model3.json``（默认 ``<root>/HEI4.0/HEI4.0.model3.json``）。"""
+        return self.model_dir / (self.model_name + ".model3.json")
 
     @property
     def pointer_path(self) -> Path:
@@ -140,6 +172,9 @@ class Live2DProvider:
             "lpk": self.lpk_path.is_file(),
             "size": size,
             "model": model_ok,
+            "model_key": self.key,
+            "model_name": self.model_name,
+            "lpk_name": self.lpk_name,
             "model_json": str(self.model_json) if model_ok else "",
             "model_dir": str(self.model_dir),
             "lpk_path": str(self.lpk_path),
@@ -167,8 +202,15 @@ class Live2DProvider:
 
         # 1) 模型包：缺才下载
         if force or not self._lpk_cached():
-            self._emit(on_log, "INFO", "开始下载模型包：%s" % LPK_URL)
-            ok, msg = self._download(LPK_URL, self.lpk_path, on_progress)
+            urls = self.lpk_urls() or (LPK_URL,)
+            self._emit(on_log, "INFO", "开始下载模型包（%s）：%s" % (self.key, urls[0]))
+            ok, msg = False, ""
+            for index, url in enumerate(urls):
+                ok, msg = self._download(url, self.lpk_path, on_progress)
+                if ok and self._lpk_cached():
+                    break
+                if index + 1 < len(urls):
+                    self._emit(on_log, "WARNING", "下载源不可用，尝试下一个：%s" % url)
             if not ok:
                 raise LPKError("模型包下载失败：%s" % (msg or "未知原因"))
             if not self._lpk_cached():
@@ -185,15 +227,31 @@ class Live2DProvider:
         self._emit(on_log, "INFO", "模型准备完成：%s" % json_path)
         return json_path
 
-    def clear_cache(self, *, keep_lpk: bool = True) -> None:
-        """清掉模型目录与解包中间产物；``keep_lpk=False`` 时连模型包一起删。"""
+    def clear_cache(self, *, keep_lpk: bool = True, all_models: bool = False) -> None:
+        """清掉模型目录与解包中间产物。
+
+        * ``keep_lpk=False``：连当前模型的模型包一起删
+        * ``all_models=True``：把**所有**版本的模型目录与模型包一并清掉
+        """
+        if all_models:
+            for spec in constants.LIVE2D_MODELS:
+                shutil.rmtree(self.root_dir / spec["name"], ignore_errors=True)
+                self._unlink(self.root_dir / spec["lpk_name"])
+            shutil.rmtree(self.tmp_dir, ignore_errors=True)
+            self._unlink(self.pointer_path)
+            return
         shutil.rmtree(self.model_dir, ignore_errors=True)
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
-        for path in ([self.pointer_path] + ([] if keep_lpk else [self.lpk_path])):
-            try:
-                path.unlink()
-            except OSError:
-                pass
+        self._unlink(self.pointer_path)
+        if not keep_lpk:
+            self._unlink(self.lpk_path)
+
+    @staticmethod
+    def _unlink(path: Path) -> None:
+        try:
+            path.unlink()
+        except OSError:
+            pass
 
     # ────────────────── 内部实现 ──────────────────
 
@@ -217,7 +275,7 @@ class Live2DProvider:
             source = self._find_model_source(self.unpack_dir, subdirs)
             self._emit(on_log, "INFO", "归一化：%s → %s" % (source, self.model_dir))
             shutil.rmtree(self.model_dir, ignore_errors=True)
-            json_path = SetupModel(source, self.model_dir, MODEL_NAME, cleanup_source=False)
+            json_path = SetupModel(source, self.model_dir, self.model_name, cleanup_source=False)
             if not json_path.is_file():
                 raise LPKError("归一化失败：没有生成 %s" % json_path)
             return json_path
@@ -278,7 +336,8 @@ class Live2DProvider:
     def _write_pointer(self, model_json: Path) -> None:
         payload = {
             "kind": "live2d-model-pointer",
-            "model": MODEL_NAME,
+            "model": self.model_name,
+            "model_key": self.key,
             "model_dir": self.model_dir.name,
             "model3": str(model_json),
             "lpk": self.lpk_path.name,
@@ -354,11 +413,14 @@ def _cli(argv: list[str] | None = None) -> int:
     parser.add_argument("--data-dir", default=None,
                         help="覆盖数据目录（默认取 CRFORUM_DATA_DIR 或 ~/.Cr/forum）")
     parser.add_argument("--force", action="store_true", help="忽略缓存，强制重新下载并解包")
+    parser.add_argument("--model", default=None,
+                        help="模型版本号（1.1 / 2.3 / 3.0.1 / 3.0.2 / 4.0，默认 4.0）")
     parser.add_argument("--tree", type=int, default=30, help="目录树展示条目数（默认 30）")
     args = parser.parse_args(argv)
 
-    provider = Live2DProvider(data_dir=args.data_dir)
-    print("模型包地址：%s" % LPK_URL)
+    provider = Live2DProvider(data_dir=args.data_dir, model=args.model)
+    print("模型版本：%s（%s）" % (provider.key, provider.spec.get("note") or ""))
+    print("模型包地址：%s" % provider.lpk_url)
     print("缓存根目录：%s" % provider.root_dir)
     print("模型目录：%s" % provider.model_dir)
 
