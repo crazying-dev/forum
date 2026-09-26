@@ -9,13 +9,13 @@ Browser
 Nginx (宝塔管理 80/443)
   ├── /api/*      → Go 后端  127.0.0.1:8090
   ├── /avatar/*   → Go 后端  127.0.0.1:8090
-  ├── /guild-img/* → 管理端 admin 127.0.0.1:8080（会馆 logo）
+  ├── /guild-img/* → 管理端 admin 127.0.0.1:8080（会馆 logo / 馆长页图片）
   └── 其余        → Next.js  127.0.0.1:3000
 ```
 
 - **渲染层**：Next.js（standalone 产物，Node 直跑）
 - **服务层**：Go（编译二进制，systemd 管理）
-- **管理端**：yj-forum-admin（会馆 logo 存储与入馆申请审批；仅 `/guild-img/*` 对外反代）
+- **管理端**：yj-forum-admin（会馆图片存储与入馆申请审批；仅 `/guild-img/*` 对外反代）
 - **数据库**：开发 = 本机 Docker PGSQL；生产 = **用户提供的外部 PGSQL**（`DATABASE_URL`）
 
 ## 一、数据库准备
@@ -69,9 +69,9 @@ systemctl enable --now yj-web
 > Next.js standalone 部署说明：`pnpm build` 后 `.next/standalone/server.js` 为独立运行入口；
 > 需将 `public/` 与 `.next/static/` 复制到 standalone 目录内（见上）。
 
-### 会馆 logo 代理（ADMIN_TARGET）
+### 会馆图片代理（ADMIN_TARGET）
 
-会馆 logo 由管理端 yj-forum-admin 存储（GridFS），ouo 前端固定请求 `/guild-img/guilds/{id}/logo?v={logo_version}`，两种环境分别处理：
+会馆图片（logo、馆长介绍页图片）由管理端 yj-forum-admin 存储（GridFS），ouo 前端请求 `/guild-img/guilds/{id}/logo?v={logo_version}`（logo）与 `/guild-img/guilds/{id}/leader-images/{fileId}`（馆长页图片），两种环境分别处理：
 
 - **开发（Next.js rewrites）**：`next.config.ts` 将 `/guild-img/*` 重写到 `ADMIN_TARGET`（默认 `http://127.0.0.1:8080`），转发目标为 `${ADMIN_TARGET}/api/*`；管理端不在本机时在 `web/.env` 设 `ADMIN_TARGET=http://<admin-host>:<port>` 即可。
 - **生产（Nginx）**：由 `deploy/nginx/yj-forum.conf` 的 `location /guild-img/` 直接反代到管理端（示例 `proxy_pass http://127.0.0.1:8080/api/;`，需按实际部署地址调整；也支持 upstream 写法，见配置内注释）。请求先命中 Nginx 规则，不再落到 Next.js 代理。
