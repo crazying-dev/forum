@@ -69,9 +69,11 @@ type createPostReq struct {
 	Content  string `json:"content" binding:"required"`
 	Category string `json:"category"`
 	GuildID  *int64 `json:"guild_id"`
+	// GuildUUID 会馆稳定标识（优先于 guild_id）
+	GuildUUID string `json:"guild_uuid"`
 }
 
-// Create 发帖（可选 guild_id：需为会馆成员，分类取自该馆配置）。
+// Create 发帖（可选 guild_uuid/guild_id：需为会馆成员，分类取自该馆配置）。
 func (h *PostsHandler) Create(c *gin.Context) {
 	uid := CurrentUser(c)
 	if uid == "" {
@@ -92,14 +94,28 @@ func (h *PostsHandler) Create(c *gin.Context) {
 		cat     string
 		guildID *int64
 	)
-	if req.GuildID != nil && *req.GuildID > 0 {
+	if gu := strings.TrimSpace(req.GuildUUID); gu != "" {
+		// guild_uuid 优先：按稳定标识反查数字 id
+		id, err := h.DB.GetGuildIDByUUID(c.Request.Context(), gu)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+			return
+		}
+		if id == nil {
+			c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "会馆不存在"})
+			return
+		}
+		guildID = id
+	} else if req.GuildID != nil && *req.GuildID > 0 {
+		guildID = req.GuildID
+	}
+	if guildID != nil {
 		// 会馆帖：仅成员可发，分类自会馆配置取值
-		if !h.DB.IsGuildMember(c.Request.Context(), *req.GuildID, uid) {
+		if !h.DB.IsGuildMember(c.Request.Context(), *guildID, uid) {
 			c.JSON(http.StatusForbidden, gin.H{"success": false, "message": "你还不是该会馆成员，无法发帖"})
 			return
 		}
-		cat = h.DB.ResolveGuildCategory(c.Request.Context(), *req.GuildID, strings.TrimSpace(req.Category))
-		guildID = req.GuildID
+		cat = h.DB.ResolveGuildCategory(c.Request.Context(), *guildID, strings.TrimSpace(req.Category))
 	} else {
 		cat = normalizeCategory(req.Category)
 	}

@@ -24,8 +24,11 @@ func (d *DB) GetPostList(ctx context.Context, page, pageSize int, category strin
 	base := `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
 	       p.created_at, u.name, u.avatar,
 	       (SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
-	       p.guild_id, g.name, g.theme_color
+	       p.guild_id, g.name, g.theme_color,
+	       COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
 	FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN guilds g ON g.id = p.guild_id
+	LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
+	LEFT JOIN guilds ug ON ug.id = ugm.guild_id
 	WHERE p.status = 1`
 	args := []any{}
 	if category != "" {
@@ -47,7 +50,8 @@ func (d *DB) GetPostList(ctx context.Context, page, pageSize int, category strin
 		var guildID *int64
 		var guildName, guildTheme *string
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Summary, &p.Category, &p.Likes, &p.Views, &createdAt, &p.UserName, &p.UserAvatar, &p.CommentCount,
-			&guildID, &guildName, &guildTheme); err != nil {
+			&guildID, &guildName, &guildTheme,
+			&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader); err != nil {
 			return nil, err
 		}
 		p.CreatedAt = createdAt
@@ -65,8 +69,11 @@ func (d *DB) GetRandomPosts(ctx context.Context, limit int) ([]models.PostListIt
 	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
-		p.guild_id, g.name, g.theme_color
+		p.guild_id, g.name, g.theme_color,
+		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
 		FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN guilds g ON g.id = p.guild_id
+		LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
+		LEFT JOIN guilds ug ON ug.id = ugm.guild_id
 		WHERE p.status = 1 ORDER BY RANDOM() LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
@@ -79,7 +86,8 @@ func (d *DB) GetRandomPosts(ctx context.Context, limit int) ([]models.PostListIt
 		var guildID *int64
 		var guildName, guildTheme *string
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Summary, &p.Category, &p.Likes, &p.Views, &createdAt, &p.UserName, &p.UserAvatar, &p.CommentCount,
-			&guildID, &guildName, &guildTheme); err != nil {
+			&guildID, &guildName, &guildTheme,
+			&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader); err != nil {
 			return nil, err
 		}
 		p.CreatedAt = createdAt
@@ -92,15 +100,19 @@ func (d *DB) GetRandomPosts(ctx context.Context, limit int) ([]models.PostListIt
 // GetPost 帖子详情（JOIN 用户与所属会馆）。
 func (d *DB) GetPost(ctx context.Context, postID string) (*models.Post, error) {
 	row := d.QueryRow(ctx, `SELECT p.id, p.user_id, p.title, p.content, p.category, p.likes, p.views, p.status,
-		p.created_at, p.updated_at, u.name, u.avatar, p.guild_id, g.name, g.theme_color
+		p.created_at, p.updated_at, u.name, u.avatar, p.guild_id, g.name, g.theme_color,
+		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
 		FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN guilds g ON g.id = p.guild_id
+		LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
+		LEFT JOIN guilds ug ON ug.id = ugm.guild_id
 		WHERE p.id = $1`, postID)
 	var p models.Post
 	var createdAt, updatedAt *time.Time
 	var guildID *int64
 	var guildName, guildTheme *string
 	err := row.Scan(&p.ID, &p.UserID, &p.Title, &p.Content, &p.Category, &p.Likes, &p.Views, &p.Status,
-		&createdAt, &updatedAt, &p.UserName, &p.UserAvatar, &guildID, &guildName, &guildTheme)
+		&createdAt, &updatedAt, &p.UserName, &p.UserAvatar, &guildID, &guildName, &guildTheme,
+		&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader)
 	if err != nil {
 		return nil, err
 	}
@@ -136,8 +148,11 @@ func (d *DB) GetUserPosts(ctx context.Context, userID string, page, pageSize int
 	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
-		p.guild_id, g.name, g.theme_color
+		p.guild_id, g.name, g.theme_color,
+		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
 		FROM posts p JOIN users u ON p.user_id = u.id LEFT JOIN guilds g ON g.id = p.guild_id
+		LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
+		LEFT JOIN guilds ug ON ug.id = ugm.guild_id
 		WHERE p.user_id = $1 AND p.status = 1 ORDER BY p.created_at DESC LIMIT $2 OFFSET $3`,
 		userID, pageSize, offset)
 	if err != nil {
@@ -151,7 +166,8 @@ func (d *DB) GetUserPosts(ctx context.Context, userID string, page, pageSize int
 		var guildID *int64
 		var guildName, guildTheme *string
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Summary, &p.Category, &p.Likes, &p.Views, &createdAt, &p.UserName, &p.UserAvatar, &p.CommentCount,
-			&guildID, &guildName, &guildTheme); err != nil {
+			&guildID, &guildName, &guildTheme,
+			&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader); err != nil {
 			return nil, err
 		}
 		p.CreatedAt = createdAt

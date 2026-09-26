@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"yj-forum/server/internal/models"
 )
@@ -22,7 +23,7 @@ func strVal(s *string) string {
 
 // ListGuilds 会馆列表（id 升序，含成员数与馆长摘要）。
 func (d *DB) ListGuilds(ctx context.Context) ([]models.GuildListItem, error) {
-	rows, err := d.Query(ctx, `SELECT g.id, g.slug, g.name, g.intro, g.theme_color, g.logo_version,
+	rows, err := d.Query(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, g.intro, g.theme_color, g.logo_version,
 		(COALESCE(g.logo_file_id, '') <> '') AS has_logo,
 		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
 		g.created_at,
@@ -38,7 +39,7 @@ func (d *DB) ListGuilds(ctx context.Context) ([]models.GuildListItem, error) {
 		var it models.GuildListItem
 		var createdAt *time.Time
 		var leaderID, leaderName, leaderAvatar, leaderIntro *string
-		if err := rows.Scan(&it.ID, &it.Slug, &it.Name, &it.Intro, &it.ThemeColor, &it.LogoVersion, &it.HasLogo,
+		if err := rows.Scan(&it.ID, &it.UUID, &it.Slug, &it.Name, &it.Intro, &it.ThemeColor, &it.LogoVersion, &it.HasLogo,
 			&it.MemberCount, &createdAt, &leaderID, &leaderName, &leaderAvatar, &leaderIntro); err != nil {
 			return nil, err
 		}
@@ -57,14 +58,14 @@ func (d *DB) GetGuildBySlug(ctx context.Context, slug string) (*models.GuildDeta
 	var det models.GuildDetail
 	var leaderID, leaderName, leaderAvatar, leaderIntro *string
 	var createdAt, updatedAt *time.Time
-	err := d.QueryRow(ctx, `SELECT g.id, g.slug, g.name, g.intro, g.logo_file_id, g.logo_version, g.theme_color,
+	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, g.intro, g.logo_file_id, g.logo_version, g.theme_color,
 		g.leader_user_id, g.leader_bio, g.created_at, g.updated_at,
 		(COALESCE(g.logo_file_id, '') <> '') AS has_logo,
 		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
 		u.id, u.name, u.avatar, u.intro
 		FROM guilds g LEFT JOIN users u ON u.id = g.leader_user_id
 		WHERE g.slug = $1`, slug).
-		Scan(&det.ID, &det.Slug, &det.Name, &det.Intro, &det.LogoFileID, &det.LogoVersion, &det.ThemeColor,
+		Scan(&det.ID, &det.UUID, &det.Slug, &det.Name, &det.Intro, &det.LogoFileID, &det.LogoVersion, &det.ThemeColor,
 			&det.LeaderUserID, &det.LeaderBio, &createdAt, &updatedAt, &det.HasLogo, &det.MemberCount,
 			&leaderID, &leaderName, &leaderAvatar, &leaderIntro)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -82,6 +83,24 @@ func (d *DB) GetGuildBySlug(ctx context.Context, slug string) (*models.GuildDeta
 	det.Categories, _ = d.ListCategories(ctx, det.ID)
 	det.Announcements, _ = d.ListAnnouncements(ctx, det.ID)
 	return &det, nil
+}
+
+// GetGuildIDByUUID 按会馆 UUID 查数字 id（发帖 guild_uuid 契约用）；不存在返回 (nil, nil)。
+func (d *DB) GetGuildIDByUUID(ctx context.Context, uuid string) (*int64, error) {
+	var id int64
+	err := d.QueryRow(ctx, "SELECT id FROM guilds WHERE uuid = $1", uuid).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	// 非法 UUID 文本（SQLSTATE 22P02）视同不存在，避免外部输入触发 500
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "22P02" {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 // ListCategories 会馆分类（sort 升序）。
@@ -144,11 +163,11 @@ func (d *DB) ResolveGuildCategory(ctx context.Context, guildID int64, want strin
 // GetUserGuildMembership 用户所在会馆概要（含是否馆长）；未入馆返回 (nil, nil)。
 func (d *DB) GetUserGuildMembership(ctx context.Context, userID string) (*models.GuildMembership, error) {
 	var m models.GuildMembership
-	err := d.QueryRow(ctx, `SELECT g.id, g.slug, g.name, g.theme_color,
+	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, g.theme_color,
 		(COALESCE(g.leader_user_id, '') = $1) AS is_leader
 		FROM guild_members gm JOIN guilds g ON g.id = gm.guild_id
 		WHERE gm.user_id = $1`, userID).
-		Scan(&m.ID, &m.Slug, &m.Name, &m.ThemeColor, &m.IsLeader)
+		Scan(&m.ID, &m.UUID, &m.Slug, &m.Name, &m.ThemeColor, &m.IsLeader)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -296,20 +315,26 @@ const feedPostSelect = `SELECT 'post' AS type, p.id, p.title, LEFT(p.content, 20
 	p.likes, p.views, p.created_at, p.updated_at,
 	p.user_id, u.name, u.avatar,
 	p.guild_id, g.name, g.theme_color,
+	COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false),
 	NULL::varchar AS author_id, NULL::varchar AS author_name, NULL::varchar AS author_avatar,
 	(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
 	0::bigint AS participants_count
-	FROM posts p JOIN users u ON u.id = p.user_id LEFT JOIN guilds g ON g.id = p.guild_id`
+	FROM posts p JOIN users u ON u.id = p.user_id LEFT JOIN guilds g ON g.id = p.guild_id
+	LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
+	LEFT JOIN guilds ug ON ug.id = ugm.guild_id`
 
 // feedArticleSelect 文章信息流投影（author 为作者摘要，user_id/user_name 兼容帖子字段）。
 const feedArticleSelect = `SELECT 'article' AS type, a.id, a.title, a.summary, '' AS category,
 	0 AS likes, a.views, a.created_at, a.updated_at,
 	COALESCE(a.author_user_id, ''), COALESCE(au.name, ''), COALESCE(au.avatar, ''),
 	a.guild_id, g.name, g.theme_color,
+	COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = a.author_user_id, false),
 	COALESCE(au.id, ''), COALESCE(au.name, ''), COALESCE(au.avatar, ''),
 	0 AS comment_count,
 	(SELECT COUNT(*) FROM guild_article_participants gp WHERE gp.article_id = a.id) AS participants_count
-	FROM guild_articles a LEFT JOIN users au ON au.id = a.author_user_id LEFT JOIN guilds g ON g.id = a.guild_id`
+	FROM guild_articles a LEFT JOIN users au ON au.id = a.author_user_id LEFT JOIN guilds g ON g.id = a.guild_id
+	LEFT JOIN guild_members ugm ON ugm.user_id = a.author_user_id
+	LEFT JOIN guilds ug ON ug.id = ugm.guild_id`
 
 // queryFeed 执行信息流查询：postWhere 为帖子过滤条件，articleWhere 为空串时不含文章。
 // 两个分支各自按 created_at 倒序截断 page*pageSize+1 条（+1 用于探测 has_more）后再 UNION ALL，
@@ -346,6 +371,7 @@ func (d *DB) queryFeed(ctx context.Context, postWhere string, args []any, articl
 		if err := rows.Scan(&it.Type, &it.ID, &it.Title, &it.Summary, &it.Category, &it.Likes, &it.Views,
 			&createdAt, &updatedAt, &it.UserID, &it.UserName, &it.UserAvatar,
 			&it.GuildID, &it.GuildName, &it.GuildThemeColor,
+			&it.UserGuildName, &it.UserGuildThemeColor, &it.UserIsLeader,
 			&authorID, &authorName, &authorAvatar, &it.CommentCount, &it.ParticipantsCount); err != nil {
 			return nil, false, err
 		}

@@ -180,9 +180,12 @@ func (d *DB) GetUserFavorites(ctx context.Context, userID string, page, pageSize
 	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, LEFT(p.content, 200), p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
-		p.guild_id, g.name, g.theme_color
+		p.guild_id, g.name, g.theme_color,
+		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
 		FROM post_favorites f JOIN posts p ON f.post_id = p.id JOIN users u ON p.user_id = u.id
 		LEFT JOIN guilds g ON g.id = p.guild_id
+		LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
+		LEFT JOIN guilds ug ON ug.id = ugm.guild_id
 		WHERE f.user_id = $1 AND p.status = 1 ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
 		userID, pageSize, offset)
 	if err != nil {
@@ -196,7 +199,8 @@ func (d *DB) GetUserFavorites(ctx context.Context, userID string, page, pageSize
 		var guildID *int64
 		var guildName, guildTheme *string
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Summary, &p.Category, &p.Likes, &p.Views, &createdAt, &p.UserName, &p.UserAvatar, &p.CommentCount,
-			&guildID, &guildName, &guildTheme); err != nil {
+			&guildID, &guildName, &guildTheme,
+			&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader); err != nil {
 			return nil, err
 		}
 		p.CreatedAt = createdAt

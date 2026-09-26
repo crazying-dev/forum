@@ -23,10 +23,16 @@ func (d *DB) AddComment(ctx context.Context, postID, userID, content string, par
 // GetComment 单条评论（JOIN 用户）。
 func (d *DB) GetComment(ctx context.Context, id string) (*models.Comment, error) {
 	row := d.QueryRow(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
-		c.created_at, u.name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = $1`, id)
+		c.created_at, u.name, u.avatar,
+		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false)
+		FROM comments c JOIN users u ON c.user_id = u.id
+		LEFT JOIN guild_members gm ON gm.user_id = c.user_id
+		LEFT JOIN guilds g ON g.id = gm.guild_id
+		WHERE c.id = $1`, id)
 	var c models.Comment
 	var createdAt *time.Time
-	err := row.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar)
+	err := row.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar,
+		&c.UserGuildName, &c.UserGuildThemeColor, &c.UserIsLeader)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +50,11 @@ func (d *DB) GetPostComments(ctx context.Context, postID string, page, pageSize 
 	}
 	offset := (page - 1) * pageSize
 	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
-		c.created_at, u.name, u.avatar FROM comments c JOIN users u ON c.user_id = u.id
+		c.created_at, u.name, u.avatar,
+		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false)
+		FROM comments c JOIN users u ON c.user_id = u.id
+		LEFT JOIN guild_members gm ON gm.user_id = c.user_id
+		LEFT JOIN guilds g ON g.id = gm.guild_id
 		WHERE c.post_id = $1 AND c.status = 1 ORDER BY c.created_at ASC LIMIT $2 OFFSET $3`,
 		postID, pageSize, offset)
 	if err != nil {
@@ -55,7 +65,8 @@ func (d *DB) GetPostComments(ctx context.Context, postID string, page, pageSize 
 	for rows.Next() {
 		var c models.Comment
 		var createdAt *time.Time
-		if err := rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar); err != nil {
+		if err := rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar,
+			&c.UserGuildName, &c.UserGuildThemeColor, &c.UserIsLeader); err != nil {
 			return nil, err
 		}
 		c.CreatedAt = createdAt
@@ -163,10 +174,14 @@ func (d *DB) GetRepliesToMyComments(ctx context.Context, userID string, page, pa
 		WHERE c.parent_id IN (SELECT id FROM comments WHERE user_id = $1 AND status = 1)
 		AND c.status = 1 AND c.user_id <> $1`, userID).Scan(&total)
 	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
-		c.created_at, u.name, u.avatar, p.title
+		c.created_at, u.name, u.avatar,
+		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false),
+		p.title
 		FROM comments c JOIN users u ON c.user_id = u.id
 		JOIN comments pc ON c.parent_id = pc.id
 		JOIN posts p ON c.post_id = p.id
+		LEFT JOIN guild_members gm ON gm.user_id = c.user_id
+		LEFT JOIN guilds g ON g.id = gm.guild_id
 		WHERE pc.user_id = $1 AND c.status = 1 AND c.user_id <> $1
 		ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`, userID, pageSize, offset)
 	if err != nil {
@@ -177,7 +192,8 @@ func (d *DB) GetRepliesToMyComments(ctx context.Context, userID string, page, pa
 	for rows.Next() {
 		var r models.ReplyItem
 		var createdAt *time.Time
-		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar, &r.PostTitle); err != nil {
+		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar,
+			&r.UserGuildName, &r.UserGuildThemeColor, &r.UserIsLeader, &r.PostTitle); err != nil {
 			return nil, 0, err
 		}
 		r.CreatedAt = createdAt
@@ -198,9 +214,13 @@ func (d *DB) GetUserComments(ctx context.Context, userID string, page, pageSize 
 	var total int
 	_ = d.QueryRow(ctx, `SELECT COUNT(*) FROM comments WHERE user_id = $1 AND status = 1`, userID).Scan(&total)
 	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
-		c.created_at, u.name, u.avatar, p.title
+		c.created_at, u.name, u.avatar,
+		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false),
+		p.title
 		FROM comments c JOIN users u ON c.user_id = u.id
 		JOIN posts p ON c.post_id = p.id
+		LEFT JOIN guild_members gm ON gm.user_id = c.user_id
+		LEFT JOIN guilds g ON g.id = gm.guild_id
 		WHERE c.user_id = $1 AND c.status = 1
 		ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`, userID, pageSize, offset)
 	if err != nil {
@@ -211,7 +231,8 @@ func (d *DB) GetUserComments(ctx context.Context, userID string, page, pageSize 
 	for rows.Next() {
 		var r models.ReplyItem
 		var createdAt *time.Time
-		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar, &r.PostTitle); err != nil {
+		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar,
+			&r.UserGuildName, &r.UserGuildThemeColor, &r.UserIsLeader, &r.PostTitle); err != nil {
 			return nil, 0, err
 		}
 		r.CreatedAt = createdAt
