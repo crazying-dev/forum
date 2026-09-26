@@ -17,7 +17,7 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
 
 # ────────────────────────── 后端地址 ──────────────────────────
@@ -102,7 +102,6 @@ PAGE_SIZE = 20
 PAGE_SIZE_MAX = 100
 AVATAR_MAX_BYTES = 5 * 1024 * 1024
 PROFILE_NAME_MAX = 20
-PROFILE_PREFIX_MAX = 32
 EMAIL_MAX = 255
 PASSWORD_MIN = 8
 PASSWORD_MAX = 64

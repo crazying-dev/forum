@@ -2,7 +2,7 @@
 """「我的」页面（对照 Web 端 ``UserView.vue`` 的本人视图）。
 
 * 未登录：只显示登录 / 注册入口
-* 已登录：资料卡（头像 / 昵称 / 称号前缀 / 头衔 / 性别 / 生日 / 简介 / 注册时间）
+* 已登录：资料卡（头像 / 昵称 / 头衔 / 性别 / 生日 / 简介 / 注册时间）
   + 统计行（帖子 / 获赞 / 浏览 + 可点击的「关注」「粉丝」）
   + 账号操作（编辑资料 / 修改密码 / 更换绑定邮箱）
 * 四个页签：我的帖子 / 我的收藏 / 我的评论 / 我的回复，均支持「加载更多」
@@ -217,9 +217,6 @@ class ProfilePage(Page):
         self.name_link = UserLink(bold=True)
         self.name_link.activated.connect(self.open_user)
         name_row.addWidget(self.name_link)
-        self.prefix_chip = Chip("", "category")
-        self.prefix_chip.hide()
-        name_row.addWidget(self.prefix_chip)
         self.title_chip = Chip("", "title")
         self.title_chip.hide()
         name_row.addWidget(self.title_chip)
@@ -451,9 +448,6 @@ class ProfilePage(Page):
         self.avatar.set_url(str(data.get("avatar") or ""))
         self.name_link.set_user(uid, str(data.get("name") or "匿名用户"))
 
-        prefix = str(data.get("prefix") or "").strip()
-        self.prefix_chip.setText(prefix)
-        self.prefix_chip.setVisible(bool(prefix))
         title = str(data.get("title") or "").strip()
         self.title_chip.setText(title)
         self.title_chip.setVisible(bool(title))
@@ -643,11 +637,6 @@ class EditProfileDialog(BaseDialog):
         birth_row.addStretch(1)
         self.field("出生日期", birth_wrap)
 
-        self.prefix_input = QLineEdit(str(user.get("prefix") or ""))
-        self.prefix_input.setMaxLength(constants.PROFILE_PREFIX_MAX)
-        self.prefix_input.setPlaceholderText("如：妖精")
-        self.field("称号前缀", self.prefix_input)
-
         self.intro_input = QPlainTextEdit(str(user.get("intro") or ""))
         self.intro_input.setFixedHeight(80)
         self.intro_input.textChanged.connect(self._on_intro_changed)
@@ -764,10 +753,6 @@ class EditProfileDialog(BaseDialog):
         if not (2 <= len(name) <= constants.PROFILE_NAME_MAX):
             self.show_error("昵称长度需为 2-%d 个字符" % constants.PROFILE_NAME_MAX)
             return
-        prefix = self.prefix_input.text().strip()
-        if len(prefix) > constants.PROFILE_PREFIX_MAX:
-            self.show_error("称号前缀最多 %d 个字符" % constants.PROFILE_PREFIX_MAX)
-            return
         intro = self.intro_input.toPlainText().strip()
         if len(intro) > _INTRO_MAX:
             self.show_error("简介最多 %d 字" % _INTRO_MAX)
@@ -776,7 +761,6 @@ class EditProfileDialog(BaseDialog):
         fields = {
             "name": name,
             "gender": int(self.gender_box.currentData() or 0),
-            "prefix": prefix,
             "intro": intro,
         }
         # 生日只在用户实际改动选择器时提交，格式 YYYYMMDD（与 Web / V1 一致）

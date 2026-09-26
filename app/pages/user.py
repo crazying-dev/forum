@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """用户主页（对照 Web 端 ``UserView.vue``）。
 
-* 资料卡：头像 / 昵称 / 称号前缀 / 头衔 / 性别 / 生日 / 年龄 / 简介 / 注册时间
+* 资料卡：头像 / 昵称 / 头衔 / 性别 / 生日 / 年龄 / 简介 / 注册时间
 * 统计行：帖子、获赞、浏览 + 可点击的「关注」「粉丝」（弹 :class:`UserListDialog`）
 * 右上按钮：自己 → 「编辑资料」（跳到 ``me``）；他人 → 「关注 / 已关注」
 * 三个页签：发布的帖子 / 收藏（仅本人可见）/ 评论，均支持「加载更多」
@@ -179,9 +179,6 @@ class UserPage(Page):
         self.name_link = UserLink(bold=True)
         self.name_link.activated.connect(self.open_user)
         name_row.addWidget(self.name_link)
-        self.prefix_chip = Chip("", "category")
-        self.prefix_chip.hide()
-        name_row.addWidget(self.prefix_chip)
         self.title_chip = Chip("", "title")
         self.title_chip.hide()
         name_row.addWidget(self.title_chip)
@@ -337,7 +334,6 @@ class UserPage(Page):
         """回到「未加载」状态（切换用户 / 刷新前清场）。"""
         self.avatar.clear()
         self.name_link.set_user("", "")
-        self.prefix_chip.hide()
         self.title_chip.hide()
         self.meta.setText("")
         self.stat_posts.setText("帖子 0")
@@ -359,9 +355,6 @@ class UserPage(Page):
         self.avatar.set_url(str(user.get("avatar") or ""))
         self.name_link.set_user(uid, str(user.get("name") or "匿名用户"))
 
-        prefix = str(user.get("prefix") or "").strip()
-        self.prefix_chip.setText(prefix)
-        self.prefix_chip.setVisible(bool(prefix))
         title = str(user.get("title") or "").strip()
         self.title_chip.setText(title)
         self.title_chip.setVisible(bool(title))

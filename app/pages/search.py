@@ -10,7 +10,7 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QLineEdit, QWidget
 
 from .. import constants
-from ..widgets import (Avatar, CardTitle, Chip, PostCard, UserLink, button,
+from ..widgets import (Avatar, CardTitle, PostCard, UserLink, button,
                        clear_layout, hbox, set_active, set_variant)
 from .base import ListPage
 
@@ -150,9 +150,6 @@ class SearchPage(ListPage):
         name = UserLink(uid, str(user.get("name") or "匿名用户"))
         name.activated.connect(self.open_user)
         box.addWidget(name)
-        prefix = str(user.get("prefix") or "").strip()
-        if prefix:
-            box.addWidget(Chip(prefix, "title"))
         box.addStretch(1)
         if uid and not self._is_self(uid):
             following = bool(user.get("is_following"))

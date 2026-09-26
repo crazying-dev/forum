@@ -364,10 +364,6 @@ class UserListDialog(BaseDialog):
         name.activated.connect(self._open)
         line.addWidget(name)
 
-        prefix = str(row.get("prefix") or "").strip()
-        if prefix:
-            from .common import Chip
-            line.addWidget(Chip(prefix, "title"))
         line.addStretch(1)
 
         if uid and uid != me_id:
