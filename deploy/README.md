@@ -9,7 +9,7 @@ Browser
 Nginx (宝塔管理 80/443)
   ├── /api/*      → Go 后端  127.0.0.1:8090
   ├── /avatar/*   → Go 后端  127.0.0.1:8090
-  ├── /guild-img/* → 管理端 admin 127.0.0.1:8080（会馆 logo / 馆长页图片）
+  ├── /guild-img/* → 管理端 admin 127.0.0.1:8080（会馆 logo / 馆长介绍页图片 / 会馆介绍页封面与正文图片）
   └── 其余        → Next.js  127.0.0.1:3000
 ```
 
@@ -50,6 +50,14 @@ systemctl status yj-forum
 ```
 
 > 迁移 SQL 已嵌入二进制：起动时自动执行，不依赖工作目录/迁移文件；首次可使用 `make db-up` 拉起开发数据库。
+> 迁移失败会直接终止启动（fail-fast，避免缺表/缺列打挂读接口），日志为 `[FATAL] 数据库迁移失败，服务退出`。
+
+> **上传目录（`MEDIA_DIR`）**：用户上传的发帖图片存放目录，默认 `/var/yj-forum/media`（开发为 `server/data/media`，见 `server/.env`）。
+> 服务首次上传时会自动创建目录（`os.MkdirAll`）；生产建议部署时预建并授予运行用户写权限（systemd 示例 `User=yoyo`，按实际部署调整）：
+> ```bash
+> mkdir -p /var/yj-forum/media
+> chown yoyo:yoyo /var/yj-forum/media   # 改为实际运行用户
+> ```
 
 ## 三、前端部署（Next.js）
 
@@ -71,7 +79,7 @@ systemctl enable --now yj-web
 
 ### 会馆图片代理（ADMIN_TARGET）
 
-会馆图片（logo、馆长介绍页图片）由管理端 yj-forum-admin 存储（GridFS），ouo 前端请求 `/guild-img/guilds/{id}/logo?v={logo_version}`（logo）与 `/guild-img/guilds/{id}/leader-images/{fileId}`（馆长页图片），两种环境分别处理：
+会馆图片（logo、馆长介绍页图片、会馆介绍页封面与正文图片）由管理端 yj-forum-admin 存储（GridFS：`guild_logos` / `guild_leader_images` / `guild_intro_images`），ouo 前端请求 `/guild-img/guilds/{id}/logo?v={logo_version}`（logo）、`/guild-img/guilds/{id}/leader-images/{fileId}`（馆长介绍页图片）与 `/guild-img/guilds/{id}/intro-images/{fileId}`（会馆介绍页封面/正文图片），两种环境分别处理：
 
 - **开发（Next.js rewrites）**：`next.config.ts` 将 `/guild-img/*` 重写到 `ADMIN_TARGET`（默认 `http://127.0.0.1:8080`），转发目标为 `${ADMIN_TARGET}/api/*`；管理端不在本机时在 `web/.env` 设 `ADMIN_TARGET=http://<admin-host>:<port>` 即可。
 - **生产（Nginx）**：由 `deploy/nginx/yj-forum.conf` 的 `location /guild-img/` 直接反代到管理端（示例 `proxy_pass http://127.0.0.1:8080/api/;`，需按实际部署地址调整；也支持 upstream 写法，见配置内注释）。请求先命中 Nginx 规则，不再落到 Next.js 代理。
@@ -81,7 +89,8 @@ systemctl enable --now yj-web
 1. 宝塔面板创建站点（域名绑定）。
 2. 将 `deploy/nginx/yj-forum.conf` 内容合并入站点配置（注意替换 `server_name` 为实际域名）。
 3. 按实际部署地址校对 `location /guild-img/` 的 `proxy_pass`（默认 `http://127.0.0.1:8080/api/` 指向本机管理端）。
-4. 宝塔内申请 SSL 证书，开启 HTTPS（注释段提供 443 示范）。
+4. 媒体上传（`POST /api/v1/media/images`，图片 ≤5MB；头像 ≤10MB）需 Nginx/反代允许较大请求体：配置已在 `location /api/` 内置 `client_max_body_size 8m;`，若在 http 层统一配置请核对（不足会返回 413；如需完整放行 10MB 头像可调至 ≥10m）。
+5. 宝塔内申请 SSL 证书，开启 HTTPS（注释段提供 443 示范）。
 
 ## 五、验证
 
@@ -101,8 +110,9 @@ curl -I http://127.0.0.1:3000/
 | `SMTP_*` | server/.env | 邮件发送（注册验证码/重置密码/通知） |
 | `CORS_ORIGINS` | server/.env | CORS 白名单（生产建议配置域名） |
 | `AVATAR_DIR` | server/.env | 头像存储目录 |
+| `MEDIA_DIR` | server/.env | 用户上传媒体（发帖图片）存储目录；默认 `/var/yj-forum/media`，开发为 `server/data/media`；需可写（服务首次上传时自动创建） |
 | `PUBLIC_BASE_URL` | server/.env | 邮件中链接的站点地址 |
 | `API_TARGET` | web/.env | 开发时 Next 代理的 Go 地址（生产由 Nginx 分发） |
-| `ADMIN_TARGET` | web/.env | 会馆 logo 代理的管理端地址（默认 `http://127.0.0.1:8080`，仅开发/未配 Nginx 时生效） |
+| `ADMIN_TARGET` | web/.env | 会馆图片（logo / 馆长介绍页 / 会馆介绍页）代理的管理端地址（默认 `http://127.0.0.1:8080`，仅开发/未配 Nginx 时生效） |
 | `SITE_URL` | web/.env | 站点规范域名（SEO：canonical / sitemap.xml / robots.txt / Open Graph；默认 `https://yjlt.top`，回退 `NEXT_PUBLIC_SITE_URL`，非法值自动回退）。注意：预渲染页在构建期固化（建议构建前配置），动态详情页与 sitemap 运行期生效 |
 | `PORT` | web/.env | Next.js 监听端口（默认 3000） |
