@@ -32,7 +32,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-26T14:00:00+08:00",
+    "updated_at": "2026-09-26T15:10:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -42,17 +42,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.2.4",
+                    "version": "1.2.5",
                     "channel": "stable",
                     "date": "2026-09-26",
-                    "size": 48520153,
+                    "size": 48516817,
                     "url": "https://www.yjlt.top/api/app/windows/forum.exe",
-                    "sha256": "9894de8ece1a6d4e91893bf02e0b055fc8302ee49e999c83b6b22133b3f4d7fa",
+                    "sha256": "22b97d03d55f414b51e988c1c9b22d47a791c88b1e9f6bb475ad974ec4e73184",
                     "notes": [
-                        "图标与网页端统一（SVG），移除 APP 端「下载」入口",
-                        "左侧导航整行可点击；悬停 2 秒或点展开按钮才展开",
-                        "修复默认状态下顶部与左侧菜单同时出现的 BUG",
-                        "内置 Live2D 桌宠，支持多版本模型切换",
+                        "检查更新发现新版本时弹窗询问是否下载（V1.2.5）",
+                        "应用内下载安装包，带进度条 / 速度 / 预计剩余时间",
+                        "下载完成后询问「立即安装」，安装即重启客户端",
+                        "托盘 / 下载页 / 设置 三处更新入口统一为同一套弹窗",
                     ],
                     "mandatory": False,
                 }
