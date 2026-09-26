@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Wiki · 官方",
+  description: "《罗小黑战记》官方发布内容信息（因版权问题暂无法发布）。",
+  path: "/WIKI/GuanFang",
+});
+
 export default function GuanFangPage() {
   return (
     <>

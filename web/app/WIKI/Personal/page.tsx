@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import WikiCard from "@/components/ui/WikiCard";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Wiki · 个人开发",
+  description: "《罗小黑战记》个人创作与开发资源：鼠标主题、Live2D 模型等（未经授权禁止商用）。",
+  path: "/WIKI/Personal",
+});
 
 export default function PersonalPage() {
   return (

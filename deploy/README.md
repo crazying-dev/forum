@@ -104,4 +104,5 @@ curl -I http://127.0.0.1:3000/
 | `PUBLIC_BASE_URL` | server/.env | 邮件中链接的站点地址 |
 | `API_TARGET` | web/.env | 开发时 Next 代理的 Go 地址（生产由 Nginx 分发） |
 | `ADMIN_TARGET` | web/.env | 会馆 logo 代理的管理端地址（默认 `http://127.0.0.1:8080`，仅开发/未配 Nginx 时生效） |
+| `SITE_URL` | web/.env | 站点规范域名（SEO：canonical / sitemap.xml / robots.txt / Open Graph；默认 `https://yjlt.top`，服务端运行期生效，回退 `NEXT_PUBLIC_SITE_URL`） |
 | `PORT` | web/.env | Next.js 监听端口（默认 3000） |

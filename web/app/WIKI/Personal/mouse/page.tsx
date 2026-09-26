@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import WikiCard from "@/components/ui/WikiCard";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Wiki · 鼠标主题",
+  description: "《罗小黑战记》鼠标主题下载与说明（未经授权禁止商用）。",
+  path: "/WIKI/Personal/mouse",
+});
 
 export default function MouseIndexPage() {
   return (

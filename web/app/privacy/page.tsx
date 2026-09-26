@@ -1,4 +1,13 @@
 
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "隐私政策",
+  description: "妖精论坛隐私政策：说明我们如何收集、使用、存储和保护您的个人信息。",
+  path: "/privacy",
+});
+
 export default function PrivacyPage() {
   return (
     <>

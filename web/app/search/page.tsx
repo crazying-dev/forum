@@ -51,6 +51,12 @@ function SearchInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params]);
 
+  // 动态标签页标题：与 URL 中的搜索关键词联动（基础标题由 app/search/layout.tsx 提供）
+  useEffect(() => {
+    const k = params.get("k");
+    document.title = k ? `妖精论坛 - 搜索：${k}` : "妖精论坛 - 搜索";
+  }, [params]);
+
   const submit = () => {
     const k = kw.trim();
     if (k.length < 2) return;

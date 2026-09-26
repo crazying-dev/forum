@@ -3,16 +3,40 @@ import "./globals.css";
 import "font-awesome/css/font-awesome.min.css";
 import "github-markdown-css/github-markdown.css";
 import { StoreProvider } from "@/lib/store";
+import { OG_IMAGE, SITE_DESCRIPTION, SITE_TITLE, siteUrl } from "@/lib/seo";
 import { CenterCardProvider } from "@/components/CenterCard";
 import { ToastProvider } from "@/components/Toast";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 
 export const metadata: Metadata = {
-  title: "妖精论坛重构预览版ov2",
-  description: "妖精论坛 - 罗小黑战记社区",
+  // 规范域名：SITE_URL → NEXT_PUBLIC_SITE_URL → https://yjlt.top（服务端运行期生效，无需重新构建）
+  metadataBase: new URL(siteUrl()),
+  title: {
+    default: SITE_TITLE,
+    template: "妖精论坛 - %s",
+  },
+  description: SITE_DESCRIPTION,
+  keywords: ["妖精论坛", "罗小黑战记", "罗小黑", "同人社区", "二次元论坛", "会馆"],
+  applicationName: "妖精论坛",
   // favicon 沿用 app/favicon.ico（Next.js 自动注入 <link rel="icon" type="image/x-icon" href="/favicon.ico">，与 legacy base.html 一致），不再重复声明 png 图标
   manifest: "/manifest.json",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "妖精论坛",
+    locale: "zh_CN",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: "/",
+    images: [OG_IMAGE],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: [OG_IMAGE.url],
+  },
 };
 
 export const viewport: Viewport = {

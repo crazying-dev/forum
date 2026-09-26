@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import WikiCard from "@/components/ui/WikiCard";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "罗小黑战记 Wiki",
+  description: "妖精论坛 Wiki：收录《罗小黑战记》官方资料与个人创作、鼠标主题、Live2D 模型等资源。",
+  path: "/WIKI",
+});
 
 export default function WikiIndexPage() {
   return (

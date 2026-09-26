@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "Wiki · 鼠标主题（Linux 版）",
+  description: "《罗小黑战记》鼠标主题 Linux 版说明与下载（未经授权禁止商用）。",
+  path: "/WIKI/Personal/mouse/Liunx",
+});
+
 export default function LiunxPage() {
   return (
     <>
