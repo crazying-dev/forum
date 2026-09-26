@@ -47,6 +47,10 @@ type Post struct {
 	UpdatedAt  *time.Time `json:"updated_at"`
 	UserName   string     `json:"user_name"`
 	UserAvatar string     `json:"user_avatar"`
+	// 会馆归属（nil 表示公共广场）
+	GuildID         *int64 `json:"guild_id,omitempty"`
+	GuildName       string `json:"guild_name,omitempty"`
+	GuildThemeColor string `json:"guild_theme_color,omitempty"`
 }
 
 // Comment 评论。
@@ -64,17 +68,6 @@ type Comment struct {
 	UserAvatar string     `json:"user_avatar"`
 }
 
-// WorldMessage 世界频道消息。
-type WorldMessage struct {
-	ID           int64      `json:"id"`
-	SenderID     string     `json:"sender_id"`
-	SenderName   string     `json:"sender_name"`
-	SenderAvatar string     `json:"sender_avatar"`
-	Content      string     `json:"content"`
-	ParentID     *int64     `json:"parent_id"`
-	CreatedAt    *time.Time `json:"created_at"`
-}
-
 // PostListItem 列表用帖子（含 summary）。
 type PostListItem struct {
 	ID           string     `json:"id"`
@@ -88,6 +81,10 @@ type PostListItem struct {
 	CreatedAt    *time.Time `json:"created_at"`
 	UserName     string     `json:"user_name"`
 	UserAvatar   string     `json:"user_avatar"`
+	// 会馆归属（nil 表示公共广场）
+	GuildID         *int64 `json:"guild_id,omitempty"`
+	GuildName       string `json:"guild_name,omitempty"`
+	GuildThemeColor string `json:"guild_theme_color,omitempty"`
 }
 
 // ReplyItem 我收到的回复。
@@ -95,6 +92,156 @@ type ReplyItem struct {
 	Comment
 	PostID    string `json:"post_id"`
 	PostTitle string `json:"post_title"`
+}
+
+// Guild 会馆基础信息。
+type Guild struct {
+	ID           int64      `json:"id"`
+	Slug         string     `json:"slug"`
+	Name         string     `json:"name"`
+	Intro        string     `json:"intro"`
+	LogoFileID   string     `json:"logo_file_id,omitempty"`
+	LogoVersion  int        `json:"logo_version"`
+	ThemeColor   string     `json:"theme_color"`
+	LeaderUserID *string    `json:"leader_user_id"`
+	LeaderBio    string     `json:"leader_bio"`
+	CreatedAt    *time.Time `json:"created_at"`
+	UpdatedAt    *time.Time `json:"updated_at"`
+}
+
+// GuildLeaderInfo 馆长摘要。
+type GuildLeaderInfo struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+	Intro  string `json:"intro"`
+	Bio    string `json:"bio"`
+}
+
+// GuildListItem 会馆列表项。
+type GuildListItem struct {
+	ID          int64            `json:"id"`
+	Slug        string           `json:"slug"`
+	Name        string           `json:"name"`
+	Intro       string           `json:"intro"`
+	ThemeColor  string           `json:"theme_color"`
+	MemberCount int              `json:"member_count"`
+	HasLogo     bool             `json:"has_logo"`
+	LogoVersion int              `json:"logo_version"`
+	CreatedAt   *time.Time       `json:"created_at"`
+	Leader      *GuildLeaderInfo `json:"leader"`
+}
+
+// GuildCategory 会馆自定义分类。
+type GuildCategory struct {
+	ID      int64  `json:"id"`
+	GuildID int64  `json:"guild_id"`
+	Name    string `json:"name"`
+	Sort    int    `json:"sort"`
+}
+
+// GuildAnnouncement 会馆公告。
+type GuildAnnouncement struct {
+	ID        int64      `json:"id"`
+	GuildID   int64      `json:"guild_id"`
+	Content   string     `json:"content"`
+	CreatedAt *time.Time `json:"created_at"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// GuildDetail 会馆详情（含馆长、分类、公告）。
+type GuildDetail struct {
+	Guild
+	// LogoFileID 覆盖内嵌 Guild 的同名字段：管理端文件 ID 仅服务端内部使用，不随详情下发 JSON
+	LogoFileID    string              `json:"-"`
+	Leader        *GuildLeaderInfo    `json:"leader"`
+	MemberCount   int                 `json:"member_count"`
+	HasLogo       bool                `json:"has_logo"`
+	Categories    []GuildCategory     `json:"categories"`
+	Announcements []GuildAnnouncement `json:"announcements"`
+}
+
+// GuildMembership 用户与会馆的关系（资料页用）。
+type GuildMembership struct {
+	ID         int64  `json:"id"`
+	Slug       string `json:"slug"`
+	Name       string `json:"name"`
+	ThemeColor string `json:"theme_color"`
+	IsLeader   bool   `json:"is_leader"`
+}
+
+// GuildJoinRequest 入馆申请。
+type GuildJoinRequest struct {
+	ID        int64      `json:"id"`
+	GuildID   int64      `json:"guild_id"`
+	UserID    string     `json:"user_id"`
+	Status    int        `json:"status"`
+	Reason    string     `json:"reason"`
+	HandledBy string     `json:"handled_by"`
+	HandledAt *time.Time `json:"handled_at"`
+	CreatedAt *time.Time `json:"created_at"`
+}
+
+// GuildArticleAuthor 文章作者摘要。
+type GuildArticleAuthor struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+}
+
+// GuildArticleParticipant 文章参与人（name 优先取实时用户名，回退署名快照）。
+type GuildArticleParticipant struct {
+	UserID   string `json:"user_id"`
+	UserName string `json:"user_name"`
+	Avatar   string `json:"avatar"`
+}
+
+// GuildArticle 会馆文章。
+type GuildArticle struct {
+	ID              string                    `json:"id"`
+	GuildID         int64                     `json:"guild_id"`
+	Title           string                    `json:"title"`
+	Summary         string                    `json:"summary"`
+	Content         string                    `json:"content,omitempty"`
+	AuthorUserID    *string                   `json:"author_user_id,omitempty"`
+	Views           int                       `json:"views"`
+	CreatedAt       *time.Time                `json:"created_at"`
+	UpdatedAt       *time.Time                `json:"updated_at"`
+	Author          *GuildArticleAuthor       `json:"author"`
+	Participants    []GuildArticleParticipant `json:"participants"`
+	GuildSlug       string                    `json:"guild_slug,omitempty"`
+	GuildName       string                    `json:"guild_name,omitempty"`
+	GuildThemeColor string                    `json:"guild_theme_color,omitempty"`
+}
+
+// FeedItem 动态流条目（帖子或文章）：公共广场与会馆信息流统一结构。
+type FeedItem struct {
+	Type              string              `json:"type"` // post | article
+	ID                string              `json:"id"`
+	Title             string              `json:"title"`
+	Summary           string              `json:"summary"`
+	Category          string              `json:"category"`
+	Likes             int                 `json:"likes"`
+	Views             int                 `json:"views"`
+	CommentCount      int                 `json:"comment_count"`
+	CreatedAt         *time.Time          `json:"created_at"`
+	UpdatedAt         *time.Time          `json:"updated_at"`
+	UserID            string              `json:"user_id"`
+	UserName          string              `json:"user_name"`
+	UserAvatar        string              `json:"user_avatar"`
+	GuildID           *int64              `json:"guild_id"`
+	GuildName         *string             `json:"guild_name"`
+	GuildThemeColor   *string             `json:"guild_theme_color"`
+	Author            *GuildArticleAuthor `json:"author"`
+	ParticipantsCount int                 `json:"participants_count"`
+}
+
+// GuildMyState 当前用户与会馆的关系（详情页用）。
+type GuildMyState struct {
+	IsMember          bool  `json:"is_member"`
+	IsLeader          bool  `json:"is_leader"`
+	HasPendingRequest bool  `json:"has_pending_request"`
+	RequestID         int64 `json:"request_id,omitempty"`
 }
 
 // Stats 用户统计。

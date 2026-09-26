@@ -68,9 +68,10 @@ type createPostReq struct {
 	Title    string `json:"title" binding:"required"`
 	Content  string `json:"content" binding:"required"`
 	Category string `json:"category"`
+	GuildID  *int64 `json:"guild_id"`
 }
 
-// Create 发帖。
+// Create 发帖（可选 guild_id：需为会馆成员，分类取自该馆配置）。
 func (h *PostsHandler) Create(c *gin.Context) {
 	uid := CurrentUser(c)
 	if uid == "" {
@@ -87,8 +88,22 @@ func (h *PostsHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "标题需1-100字符"})
 		return
 	}
-	cat := normalizeCategory(req.Category)
-	postID, err := h.DB.SendPost(c.Request.Context(), uid, title, req.Content, cat)
+	var (
+		cat     string
+		guildID *int64
+	)
+	if req.GuildID != nil && *req.GuildID > 0 {
+		// 会馆帖：仅成员可发，分类自会馆配置取值
+		if !h.DB.IsGuildMember(c.Request.Context(), *req.GuildID, uid) {
+			c.JSON(http.StatusForbidden, gin.H{"success": false, "message": "你还不是该会馆成员，无法发帖"})
+			return
+		}
+		cat = h.DB.ResolveGuildCategory(c.Request.Context(), *req.GuildID, strings.TrimSpace(req.Category))
+		guildID = req.GuildID
+	} else {
+		cat = normalizeCategory(req.Category)
+	}
+	postID, err := h.DB.SendPost(c.Request.Context(), uid, title, req.Content, cat, guildID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "发布失败"})
 		return

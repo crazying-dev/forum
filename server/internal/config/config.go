@@ -39,7 +39,6 @@ type Config struct {
 	ImageFatherURL string
 	PublicBaseURL  string // 站点对外地址（用于邮件链接）
 	EasterEggPath  string // 彩蛋 JSON 文件路径
-	HuiGuanPath    string // 会馆 JSON 文件路径
 }
 
 // Load 从 .env + 环境变量读取配置，缺省值对齐 legacy api/config.py。
@@ -67,7 +66,6 @@ func Load() *Config {
 		ImageFatherURL: getEnv("IMAGE_FATHER_URL", "https://img.crazying-dev.top/text/one"),
 		PublicBaseURL:  getEnv("PUBLIC_BASE_URL", "localhost:3000"),
 		EasterEggPath:  getEnv("EASTER_EGG_PATH", "main/EasterEgg/1.json"),
-		HuiGuanPath:    getEnv("HUI_GUAN_PATH", "main/huiguan.json"),
 	}
 
 	if cfg.ReceiverAll == "" {

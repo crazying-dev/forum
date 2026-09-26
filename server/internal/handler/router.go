@@ -19,8 +19,10 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	r.Use(middleware.CSRF(cfg.CORSOrigins))
 
 	authH := &AuthHandler{DB: db, Cfg: cfg, Sessions: sessions, Mailer: mailer}
-	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: NewCacheSet(), Mailer: mailer, Sessions: sessions}
+	cacheSet := NewCacheSet()
+	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions}
 	miscH := &MiscHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions}
+	guildsH := &GuildsHandler{DB: db, Cache: cacheSet, Sessions: sessions}
 
 	api := r.Group("/api/v1")
 
@@ -66,9 +68,15 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.DELETE("/comments/:id", postsH.AuthRequired(), postsH.DeleteComment)
 	api.POST("/comments/:id/like", postsH.AuthRequired(), postsH.LikeComment)
 
-	// ---- 世界频道 ----
-	api.GET("/world/messages", postsH.WorldMessages)
-	api.POST("/world/messages", postsH.AuthRequired(), postsH.WorldSend)
+	// ---- 会馆 / 信息流 ----
+	api.GET("/guilds", guildsH.List)
+	api.GET("/guilds/:slug", guildsH.Detail)
+	api.GET("/guilds/:slug/feed", guildsH.Feed)
+	api.POST("/guilds/:slug/join", authH.AuthRequired(), guildsH.Join)
+	api.POST("/guilds/:slug/join/cancel", authH.AuthRequired(), guildsH.CancelJoin)
+	api.POST("/guilds/:slug/leave", authH.AuthRequired(), guildsH.Leave)
+	api.GET("/feed", guildsH.GlobalFeed)
+	api.GET("/articles/:id", guildsH.Article)
 
 	// ---- 搜索 ----
 	api.GET("/search", postsH.Search)
@@ -78,7 +86,6 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.GET("/votes/version/stats", miscH.VoteVersionStats)
 	api.POST("/reports/bug", miscH.ReportBug)
 	api.GET("/easter-egg", miscH.EasterEgg)
-	api.GET("/hui-guan", miscH.HuiGuan)
 
 	api.POST("/users/me/avatar", authH.AuthRequired(), postsH.UploadAvatar)
 	api.GET("/avatar/:filename", postsH.ServeAvatar)

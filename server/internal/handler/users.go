@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,15 @@ import (
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/models"
 )
+
+// guildProfile 用户会馆概要（未入馆返回 nil 与 false）。
+func (h *AuthHandler) guildProfile(ctx context.Context, userID string) (*models.GuildMembership, bool) {
+	ms, err := h.DB.GetUserGuildMembership(ctx, userID)
+	if err != nil || ms == nil {
+		return nil, false
+	}
+	return ms, ms.IsLeader
+}
 
 // ---- /api/v1/users/me ----
 
@@ -26,7 +36,8 @@ func (h *AuthHandler) Me(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "用户不存在"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "user": u})
+	guild, isLeader := h.guildProfile(c.Request.Context(), uid)
+	c.JSON(http.StatusOK, gin.H{"success": true, "user": u, "guild": guild, "is_leader": isLeader})
 }
 
 // ---- GET /api/v1/users/:id ----
@@ -58,7 +69,9 @@ func (h *AuthHandler) UserProfile(c *gin.Context) {
 	if !isSelf {
 		profile.User.Email = ""
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile.User, "stats": stats, "follow_stats": followStats, "is_following": isFollowing, "is_self": isSelf})
+	guild, isLeader := h.guildProfile(c.Request.Context(), id)
+	c.JSON(http.StatusOK, gin.H{"success": true, "user": profile.User, "stats": stats, "follow_stats": followStats, "is_following": isFollowing, "is_self": isSelf,
+		"guild": guild, "is_leader": isLeader})
 }
 
 // ---- GET /api/v1/users/:id/posts ----
@@ -241,10 +254,13 @@ func parsePage(c *gin.Context) (int, int) {
 	return page, pageSize
 }
 
-// normalizeCategory 分类白名单。
+// normalizeCategory 分类白名单（公共广场：英文 + 旧中文）。
 func normalizeCategory(s string) string {
 	s = strings.TrimSpace(s)
-	allowed := map[string]bool{"general": true, "talk": true, "creative": true, "share": true, "求助": true, "创意": true}
+	allowed := map[string]bool{
+		"general": true, "talk": true, "question": true, "share": true, "creative": true,
+		"求助": true, "创意": true,
+	}
 	if s == "" {
 		return "general"
 	}

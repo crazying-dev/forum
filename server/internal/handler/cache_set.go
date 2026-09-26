@@ -11,7 +11,7 @@ type CacheSet struct {
 	Posts      *cache.Cache // 30s / 120s
 	PostDetail *cache.Cache // 60s / 300s
 	UserInfo   *cache.Cache // 300s / 1800s
-	World      *cache.Cache // 2s
+	Guilds     *cache.Cache // 30s
 	Search     *cache.Cache // 120s / 600s
 	Comments   *cache.Cache // 60s / 300s
 }
@@ -22,7 +22,7 @@ func NewCacheSet() *CacheSet {
 		Posts:      cache.New(100, 30*time.Second),
 		PostDetail: cache.New(200, 60*time.Second),
 		UserInfo:   cache.New(200, 300*time.Second),
-		World:      cache.New(50, 2*time.Second),
+		Guilds:     cache.New(100, 30*time.Second),
 		Search:     cache.New(100, 120*time.Second),
 		Comments:   cache.New(200, 60*time.Second),
 	}

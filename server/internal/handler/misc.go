@@ -19,7 +19,7 @@ import (
 	"yj-forum/server/internal/middleware"
 )
 
-// MiscHandler 杂项（投票/Bug/彩蛋/会馆/验证码邮件）。
+// MiscHandler 杂项（投票/Bug/彩蛋/验证码邮件）。
 type MiscHandler struct {
 	DB       *database.DB
 	Cfg      *config.Config
@@ -269,7 +269,7 @@ func (h *MiscHandler) ReportBug(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Bug 提交成功", "id": id})
 }
 
-// ---- 彩蛋 / 会馆 ----
+// ---- 彩蛋 ----
 
 // EasterEgg 随机彩蛋。
 func (h *MiscHandler) EasterEgg(c *gin.Context) {
@@ -289,21 +289,6 @@ func (h *MiscHandler) EasterEgg(c *gin.Context) {
 	}
 	n, _ := rand.Int(rand.Reader, big.NewInt(int64(len(list))))
 	c.JSON(http.StatusOK, list[n.Int64()])
-}
-
-// HuiGuan 会馆列表。
-func (h *MiscHandler) HuiGuan(c *gin.Context) {
-	data, err := os.ReadFile(h.Cfg.HuiGuanPath)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "会馆不存在"})
-		return
-	}
-	var list any
-	if err := json.Unmarshal(data, &list); err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "数据错误"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "list": list})
 }
 
 // VerifyToken 邮箱验证 token 消费（verify-email 页）。
