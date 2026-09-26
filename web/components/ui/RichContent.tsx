@@ -10,6 +10,23 @@ import { escapeHtml, sanitizeHtml } from "@/lib/sanitize";
 const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /**
+ * 异步卸载 roots：绝不在 React 渲染/提交阶段同步调用 root.unmount（React 19 限制）。
+ * 统一用 setTimeout(0) 让出当前同步任务后再卸载；对已脱离文档的容器同样安全。
+ */
+function scheduleUnmount(roots: Root[]) {
+  if (roots.length === 0) return;
+  setTimeout(() => {
+    for (const root of roots) {
+      try {
+        root.unmount();
+      } catch {
+        /* 已卸载/已脱离文档，忽略 */
+      }
+    }
+  }, 0);
+}
+
+/**
  * 富文本渲染（渲染管理端编辑的 HTML，不做 Markdown 解析）。
  * - DOMPurify 净化：移除 script/iframe 等危险标签与 on* 事件属性（与 Markdown 共用 sanitize.ts）
  * - 外部链接改写为 /GoTo?to=... 过渡页
@@ -17,7 +34,9 @@ const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : use
  * - 图片宽度：站点全局 `svg, img { width: inherit }` 会压过 HTML width 属性，
  *   故渲染后把合法 width 应用为内联样式（内联优先级最高）；仅接受纯正整数并上限 2400px，无新增 XSS 面
  * - 引用节点（[data-embed]）：批量解析成一次请求（模块缓存 + 进行中去重）后，
- *   每个节点用 createRoot 隔离渲染 QuoteCard；effect 重跑/卸载先卸载全部旧 roots
+ *   每个节点用 createRoot 隔离渲染 QuoteCard；effect 重跑/卸载时仅“安排异步卸载”旧 roots
+ *   （同步 root.unmount 会因路由切换等渲染时机触发 React 19 的
+ *   「Attempted to synchronously unmount a root while React was already rendering」）
  */
 export default function RichContent({ content, className = "" }: { content?: string | null; className?: string }) {
   const html = useMemo(() => {
@@ -27,7 +46,6 @@ export default function RichContent({ content, className = "" }: { content?: str
   }, [content]);
 
   const ref = useRef<HTMLDivElement>(null);
-  const rootsRef = useRef<Root[]>([]);
 
   useIsoLayoutEffect(() => {
     const root = ref.current;
@@ -42,22 +60,9 @@ export default function RichContent({ content, className = "" }: { content?: str
     });
   }, [html]);
 
-  // 引用节点渲染（useEffect：不在 React 提交阶段调用 root.unmount，避免同步卸载告警）
+  // 引用节点渲染（useEffect：仅“安排异步卸载”，绝不在此同步调用 root.unmount）
   useEffect(() => {
     const container = ref.current;
-
-    /** 卸载全部旧 roots（effect 重跑或卸载时先执行） */
-    const unmountAll = () => {
-      for (const root of rootsRef.current) {
-        try {
-          root.unmount();
-        } catch {
-          /* 已卸载/已脱离文档，忽略 */
-        }
-      }
-      rootsRef.current = [];
-    };
-    unmountAll();
     if (!container) return;
 
     const targets: { el: Element; spec: EmbedSpec }[] = [];
@@ -83,7 +88,6 @@ export default function RichContent({ content, className = "" }: { content?: str
         root.render(<QuoteCardSkeleton variant={spec.variant} />); // 先骨架
         return { key: embedKey(spec.type, spec.id), spec, root };
       });
-      rootsRef.current = roots;
       const data = await loadEmbeds(targets.map((t) => t.spec));
       if (cancelled) return;
       for (const item of mounted) {
@@ -93,7 +97,8 @@ export default function RichContent({ content, className = "" }: { content?: str
 
     return () => {
       cancelled = true;
-      unmountAll();
+      // cleanup 可能发生在路由切换的渲染阶段：只能异步卸载（见 scheduleUnmount 注释）
+      scheduleUnmount(roots);
     };
   }, [html]);
 
