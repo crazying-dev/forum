@@ -17,7 +17,7 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 import requests
-from PyQt6.QtCore import QObject, QRunnable, QThreadPool, pyqtSignal
+from PyQt6.QtCore import QObject, QRunnable, QThreadPool, QTimer, pyqtSignal
 
 from . import constants, logger, session_store
 
@@ -133,7 +133,9 @@ def run_async(fn: Callable[[], Any], on_success: Callable | None = None,
     _alive.add(task)
 
     def _cleanup(*_args) -> None:
-        _alive.discard(task)
+        # 延迟丢弃引用：排队中的信号投递完成前不能释放 _Task.signals，
+        # 否则会报 "wrapped C/C++ object of type _TaskSignals has been deleted"。
+        QTimer.singleShot(100, lambda t=task: _alive.discard(t))
 
     if on_success is not None:
         task.signals.done.connect(on_success)
@@ -145,6 +147,16 @@ def run_async(fn: Callable[[], Any], on_success: Callable | None = None,
             lambda msg, _l=label: _log.error("[%s] %s", _l or "异步请求", msg))
     task.signals.failed.connect(_cleanup)
     QThreadPool.globalInstance().start(task)
+
+
+def wait_for_pending(timeout_ms: int = 5000) -> None:
+    """退出前等后台请求收尾，避免工作线程在解释器销毁时写已释放对象。"""
+    try:
+        pool = QThreadPool.globalInstance()
+        pool.clear()
+        pool.waitForDone(max(int(timeout_ms), 0))
+    except Exception:
+        pass
 
 
 # ────────────────────────── 接口层 ──────────────────────────
@@ -435,7 +447,8 @@ class ForumApi:
                 self.me()
         return result
 
-    def user(self, user_id: str) -> Result:
+    def get_user(self, user_id: str) -> Result:
+        """按 ID 查公开资料（注意：与 :attr:`user` 属性区分，历史命名的坑）。"""
         return self.get("/api/user/%s" % user_id)
 
     def follow(self, user_id: str) -> Result:

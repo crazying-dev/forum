@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "channel": "stable",
+  "app_id": "crforum",
+  "platform": "windows",
+  "exe": "forum.exe",
+  "update_url": "/api/app/windows/forum.exe",
+  "uri_scheme": "Crforum",
+  "min_python": "3.12",
+  "notes": "来源版本清单：仅用于本地比对与构建记录；真实更新地址写在 app/constants.py（已混淆）"
+}
