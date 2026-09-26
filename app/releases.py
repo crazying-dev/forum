@@ -109,6 +109,7 @@ class Release:
     filename: str = ""
     notes: str = ""
     mandatory: bool = False
+    sha256: str = ""
 
     @classmethod
     def from_dict(cls, data: Any) -> "Release":
@@ -123,6 +124,8 @@ class Release:
             filename=_text(data.get("filename") or data.get("file")),
             notes=_notes(data.get("notes") or data.get("note") or data.get("changelog")),
             mandatory=bool(data.get("mandatory") or data.get("force") or False),
+            sha256=_text(data.get("sha256") or data.get("sha256sum")
+                         or data.get("hash") or data.get("digest")),
         )
 
     @property

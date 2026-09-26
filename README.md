@@ -64,7 +64,9 @@ python main.py "Crforum://post/PS..."   # 深链直达
   Live2D/HEI4.0/       解包归一化后的模型（*.model3.json + motions/）
   Live2D/model.json    模型指针（记录版本与路径）
   logs/forum_YYYYMMDD.log   运行日志（保留 14 天）
-  update/              自动更新下载与替换脚本
+  update/manifest.json     更新源指纹记录（etag / 大小 / 上次检查时间）
+  update/pending.json      已登记「退出程序时自动安装」的安装包
+  update/<版本>/           每个版本的安装包（forum_setup.exe[.part]）与安装脚本
 ```
 
 卸载时默认**不删除**该目录（删除请用 `uninstall.cmd /purge`）。

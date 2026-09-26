@@ -231,6 +231,15 @@ def _start_update_check(app: QApplication, shell: Shell) -> None:
         _log.warning("启动更新检查不可用：%s", exc)
 
 
+def _run_pending_update() -> None:
+    """退出时执行「退出时自动安装」（用户在下载完成后选了稍后安装）。"""
+    try:
+        from app import updater
+        updater.run_pending_install()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("退出时自动安装不可用：%s", exc)
+
+
 # ────────────────────────── 入口 ──────────────────────────
 
 
@@ -269,6 +278,7 @@ def main(argv: list[str] | None = None) -> int:
         shell.show()
 
     code = app.exec()
+    _run_pending_update()
     try:
         shell.save_geometry()
         shell.world_panel.stop()

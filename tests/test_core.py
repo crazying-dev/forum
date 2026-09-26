@@ -265,3 +265,26 @@ def test_safe_filename():
     assert "/" not in util.safe_filename("a/b:c*d?e")
     assert util.safe_filename("") == "file"
     assert util.safe_filename("...") == "file"
+
+
+# ────────────────────── 路径（按版本隔离的更新目录） ──────────────────────
+
+
+def test_update_dir_is_per_version():
+    assert paths.update_dir("").name == "update"
+    assert paths.update_dir("1.3.2").name == "1.3.2"
+    assert paths.update_dir("1.3.2") == paths.data_dir() / "update" / "1.3.2"
+    assert paths.update_dir("1.3.2") != paths.update_dir("1.3.1")
+
+
+def test_safe_component_blocks_traversal():
+    assert paths.safe_component("1.3.2") == "1.3.2"
+    assert paths.safe_component("a/b") == "b"
+    assert paths.safe_component("..\\..\\etc") == "etc"
+    assert ".." not in paths.safe_component("../../etc/passwd")
+    assert paths.safe_component("...") == "latest"
+    assert paths.safe_component("") == "latest"
+    assert paths.safe_component("", "") == ""
+    # 版本号里的非法字符会被压成下划线，且不会带出分隔符
+    assert "/" not in paths.safe_component("1.3.2/../../x")
+    assert paths.update_dir("../../x").name == "x"

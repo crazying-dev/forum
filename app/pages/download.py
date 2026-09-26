@@ -285,7 +285,8 @@ class DownloadPage(Page):
             dest = Path(chosen)
         else:
             try:
-                dest = paths.update_dir() / util.safe_filename(filename)
+                dest = (paths.update_dir(getattr(release, "version", ""))
+                        / util.safe_filename(filename))
                 dest.parent.mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 self.toast("无法创建下载目录：%s" % exc)

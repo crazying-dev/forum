@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -91,7 +92,33 @@ def live2d_state_path() -> Path:
     return live2d_dir() / "live2d.json"
 
 
-def update_dir() -> Path:
+_SAFE_COMPONENT_RE = re.compile(r"[^0-9A-Za-z._-]+")
+
+
+def safe_component(name: str, fallback: str = "latest") -> str:
+    """把任意文本清洗成可安全用作「单层」目录 / 文件名组件。
+
+    去掉路径分隔符与穿越（``../``、``..\\``），只保留 ``[0-9A-Za-z._-]``；
+    结果为空时返回 ``fallback``。远端下发的版本号会直接进目录名，必须先清洗。
+    """
+    text = str(name or "").strip().replace("\\", "/").rsplit("/", 1)[-1]
+    text = _SAFE_COMPONENT_RE.sub("_", text).strip(" .")
+    if not text or text in (".", ".."):
+        return str(fallback or "")
+    return text[:64]
+
+
+def update_dir(version: str = "") -> Path:
+    """更新目录：``~/.Cr/forum/update/``。
+
+    给定 ``version`` 时返回该版本的专属子目录
+    （``~/.Cr/forum/update/<版本>/``），让每个版本的安装包彼此隔离，
+    互不污染。
+    """
+    if version:
+        component = safe_component(version)
+        if component:
+            return _sub("update", component)
     return _sub("update")
 
 

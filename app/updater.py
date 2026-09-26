@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
-"""更新检查与下载：探测远端更新包 → 比对本地记录 → 流式下载 → 启动替换脚本。
+"""更新检查与下载：探测远端更新包 → 比对本地记录 → 流式下载 → 静默安装。
 
-* 更新源固定为 :data:`constants.UPDATE_EXE_URL`（常量内已做混淆，本模块不出现明文地址）
+* 主更新源是发布清单里的 GitHub Release 直链（安装包 ``forum_setup.exe``）；
+  拿不到清单时回退到 :data:`constants.UPDATE_EXE_URL` 的指纹探测
 * 本地记录：``~/.Cr/forum/update/manifest.json``（``etag`` / ``last_modified`` / ``size`` / ``checked_at``）
+* 每个版本的安装包单独放在 ``~/.Cr/forum/update/<版本>/`` 下，互不污染
+* 下载物按文件名区分：``forum_setup*.exe`` 走静默安装（``/SILENT``，装完自动重启），
+  其余（旧版裸 exe）走热替换脚本
 * 约定：**对外函数都不抛异常**，失败原因写进 :class:`UpdateInfo.message`（中文，可直接展示）
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -15,6 +20,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from PyQt6.QtCore import QObject, pyqtSignal
@@ -26,10 +32,12 @@ _log = logger.get_logger("updater")
 DEFAULT_TIMEOUT = (5, 12)
 DOWNLOAD_TIMEOUT = (5, 60)
 CHUNK_SIZE = 64 * 1024
-PART_NAME = "forum_new.exe.part"
-EXE_NAME = "forum_new.exe"
+INSTALLER_NAME = "forum_setup.exe"          # 发布清单 / GitHub Release 上的安装包名
 SCRIPT_NAME = "apply_update.cmd"
+PENDING_NAME = "pending.json"               # 「退出时自动安装」的登记文件
 WAIT_SECONDS = 60
+# Inno Setup 静默安装参数（进度条可见、不走向导、装完不自动拉起）
+INSTALLER_ARGS = ("/SILENT", "/NORESTART", "/CLOSEAPPLICATIONS", "/SUPPRESSMSGBOXES")
 
 UNAVAILABLE_TEXT = "更新服务暂不可用"
 FAILED_TEXT = "检查更新失败"
@@ -47,6 +55,8 @@ class UpdateInfo:
     message: str = ""
     mandatory: bool = False
     notes: tuple = ()
+    filename: str = ""
+    sha256: str = ""
 
 
 # ────────────────────────── 版本 / 本地记录 ──────────────────────────
@@ -188,7 +198,9 @@ def _check_release_catalog():
     return UpdateInfo(True, version=found.version or "", url=url, size=size,
                       message=found.message or ("发现新版本（%s）" % found.version),
                       mandatory=bool(getattr(release, "mandatory", False)),
-                      notes=(notes,) if notes else ())
+                      notes=(notes,) if notes else (),
+                      filename=str(getattr(release, "filename", "") or ""),
+                      sha256=str(getattr(release, "sha256", "") or ""))
 
 
 def check_for_update(*, manifest_url=None, timeout=DEFAULT_TIMEOUT) -> UpdateInfo:
@@ -390,22 +402,76 @@ def download_to(url: str, dest, *, expected: int = 0, resume: bool = True,
     return True, ""
 
 
-def download_update(info, on_progress=None, on_done=None) -> None:
-    """异步下载更新包到 ``~/.Cr/forum/update/forum_new.exe``。
+def _basename_from_url(url: str) -> str:
+    """取 URL 路径末段（GitHub 直链 → ``forum_setup.exe``）。"""
+    try:
+        return str(Path(urlparse(str(url or "")).path).name)
+    except Exception:  # noqa: BLE001
+        return ""
 
+
+def asset_name(url: str, filename: str = "") -> str:
+    """下载后的本地文件名：清单 filename > URL 末段 > 安装包默认名。
+
+    只接受 ``.exe``（避开远端下发奇怪后缀），名字统一走
+    :func:`paths.safe_component` 清洗，杜绝路径穿越。
+    """
+    for candidate in (filename, _basename_from_url(url)):
+        name = paths.safe_component(candidate, "")
+        if name and name.lower().endswith(".exe"):
+            return name
+    return INSTALLER_NAME
+
+
+def download_dir(info) -> Path:
+    """该版本的下载目录：``~/.Cr/forum/update/<版本>/``（版本缺失则退回上级）。"""
+    return paths.update_dir(str(getattr(info, "version", "") or "").strip())
+
+
+def _sha256_file(path) -> str:
+    hasher = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def _discard(path) -> None:
+    """删掉校验失败的下载物（含断点文件），避免下次续传复用坏包。"""
+    for candidate in (Path(str(path)), Path(str(path) + ".part")):
+        try:
+            if candidate.is_file():
+                candidate.unlink()
+        except OSError as exc:  # noqa: PERF203
+            _log.debug("清理损坏的更新包失败：%s", exc)
+
+
+def download_update(info, on_progress=None, on_done=None) -> None:
+    """异步下载更新包到 ``~/.Cr/forum/update/<版本>/<文件名>``。
+
+    * 文件名优先用发布清单的 ``filename``，其次按 URL 末段推断
+    * 清单提供 ``sha256`` 时会校验，不匹配即删除并报错
     * ``on_progress(done, total)``：主线程回调，``total`` 未知时为 0
     * ``on_done(exe_path, error)``：主线程回调，``error`` 为空串表示成功
     """
     url = str(getattr(info, "url", "") or constants.UPDATE_EXE_URL or "").strip()
     expected = int(getattr(info, "size", 0) or 0)
+    digest = str(getattr(info, "sha256", "") or "").strip().lower()
+    name = asset_name(url, str(getattr(info, "filename", "") or ""))
     relay = _ProgressRelay(on_progress)
 
     def _work() -> str:
-        final = paths.update_dir() / EXE_NAME
+        final = download_dir(info) / name
         ok, error = download_to(url, final, expected=expected, resume=True,
                                 on_progress=relay.emit_progress)
         if not ok:
             raise RuntimeError(error or "下载失败")
+        if digest:
+            actual = _sha256_file(final)
+            if actual.lower() != digest:
+                _log.warning("更新包校验失败：%s ≠ %s", actual, digest)
+                _discard(final)
+                raise RuntimeError("更新包校验失败（校验和不匹配），请重新下载")
         return str(final)
 
     def _ok(path) -> None:
@@ -445,7 +511,7 @@ def _pending_download_signature() -> dict:
 
 
 def _script_text(source: Path, target: Path) -> str:
-    """替换脚本：等主程序退出 → 覆盖可执行文件 → 重新启动。"""
+    """旧版替换脚本：等主程序退出 → 覆盖可执行文件 → 重新启动。"""
     name = target.name
     lines = [
         "@echo off",
@@ -468,6 +534,49 @@ def _script_text(source: Path, target: Path) -> str:
     return "\r\n".join(lines)
 
 
+def _installer_script_text(setup: Path, app: Path) -> str:
+    """安装包脚本：等主程序退出 → 静默安装（进度条可见）→ 重新启动客户端。
+
+    Inno Setup 的 ``[Run]`` 段带 ``skipifsilent``，``/SILENT`` 下安装器
+    不会自己拉起程序，所以装完必须在这里手动 ``start``。
+    """
+    name = app.name
+    args = " ".join(INSTALLER_ARGS)
+    lines = [
+        "@echo off",
+        "setlocal enableextensions",
+        'set "SETUP=' + str(setup) + '"',
+        'set "APP=' + str(app) + '"',
+        "rem wait for the app to exit (max %d seconds), then install silently" % WAIT_SECONDS,
+        "for /L %%i in (1,1,%d) do (" % WAIT_SECONDS,
+        '  tasklist /fi "imagename eq ' + name + '" 2>nul | findstr /i "' + name + '" >nul',
+        "  if errorlevel 1 goto install",
+        "  timeout /t 1 /nobreak >nul",
+        ")",
+        ":install",
+        'start "" /wait "%SETUP%" ' + args,
+        "rem give the installer a moment to finish writing files",
+        "timeout /t 2 /nobreak >nul",
+        'start "" "%APP%"',
+        'del "%~f0" >nul 2>&1',
+        "endlocal",
+        "",
+    ]
+    return "\r\n".join(lines)
+
+
+def _spawn_script(script: Path) -> None:
+    """脱离当前进程启动 .cmd（父进程退出不影响它继续跑）。"""
+    flags = (getattr(subprocess, "DETACHED_PROCESS", 0)
+             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    subprocess.Popen(["cmd", "/c", str(script)], creationflags=flags, close_fds=True)
+
+
+def is_installer(path) -> bool:
+    """下载物是否是安装包（Inno Setup 产物 ``forum_setup*.exe``）。"""
+    return Path(str(path or "")).name.lower().startswith("forum_setup")
+
+
 def _quit_app() -> None:
     try:
         from PyQt6.QtWidgets import QApplication
@@ -479,7 +588,11 @@ def _quit_app() -> None:
 
 
 def launch_installer(exe_path) -> tuple[bool, str]:
-    """启动替换脚本并退出当前进程，返回 ``(是否成功, 中文提示)``。
+    """启动更新并退出当前进程，返回 ``(是否成功, 中文提示)``。
+
+    * 安装包（``forum_setup*.exe``）→ 静默安装（``/SILENT``，进度条可见、
+      不走向导），装完由脚本重新拉起客户端
+    * 其它（旧版裸 exe）→ 保留原有热替换脚本
 
     开发态（``sys.executable`` 是 python.exe）直接拒绝，不做任何替换。
     """
@@ -491,20 +604,101 @@ def launch_installer(exe_path) -> tuple[bool, str]:
         if not source.is_file():
             return (False, "更新包不存在，请重新下载")
 
+        script = paths.update_dir() / SCRIPT_NAME
+        script.parent.mkdir(parents=True, exist_ok=True)
+
+        if is_installer(source):
+            script.write_text(_installer_script_text(source, Path(sys.executable)),
+                              encoding="utf-8", newline="\r\n")
+            _spawn_script(script)
+            _log.info("已启动静默安装：%s", source)
+            _quit_app()
+            return (True, "安装程序已启动，程序将退出，安装完成后会自动重新启动")
+
         target = Path(sys.executable)
         if source.resolve() == target.resolve():
             return (False, "更新包与当前程序路径相同，无需替换")
 
-        script = paths.update_dir() / SCRIPT_NAME
-        script.parent.mkdir(parents=True, exist_ok=True)
-        script.write_text(_script_text(source, target), encoding="utf-8", newline="\r\n")
-
-        flags = (getattr(subprocess, "DETACHED_PROCESS", 0)
-                 | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
-        subprocess.Popen(["cmd", "/c", str(script)], creationflags=flags, close_fds=True)
+        script.write_text(_script_text(source, target), encoding="utf-8",
+                          newline="\r\n")
+        _spawn_script(script)
         _log.info("已启动更新脚本：%s → %s", source, target)
         _quit_app()
         return (True, "更新脚本已启动，程序将退出并自动完成替换")
     except Exception as exc:  # noqa: BLE001
-        _log.error("启动更新脚本失败：%s", exc, exc_info=True)
+        _log.error("启动更新失败：%s", exc, exc_info=True)
         return (False, "启动更新失败：%s" % exc)
+
+
+# ────────────────────── 退出时自动安装 ──────────────────────
+
+
+def pending_install_path() -> Path:
+    """「退出时自动安装」的登记文件（放在 update 根目录，跨版本共用一份）。"""
+    return paths.update_dir() / PENDING_NAME
+
+
+def set_pending_install(path, version: str = "") -> bool:
+    """登记「退出时自动安装」；安装包不存在或写失败时返回 False。"""
+    try:
+        target = Path(str(path or "")).expanduser()
+        if not target.is_file():
+            return False
+        payload = {"path": str(target), "version": str(version or ""),
+                   "created_at": time.time()}
+        dest = pending_install_path()
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_suffix(dest.suffix + ".tmp")
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                       encoding="utf-8")
+        os.replace(tmp, dest)
+        _log.info("已登记退出时自动安装：%s", target)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("登记退出时自动安装失败：%s", exc)
+        return False
+
+
+def pending_install() -> dict | None:
+    """读取未完成的「退出时自动安装」；没有（或安装包已被删）时返回 None。"""
+    try:
+        path = pending_install_path()
+        data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("读取待安装记录失败：%s", exc)
+        data = {}
+    if not isinstance(data, dict):
+        return None
+    target = str(data.get("path") or "").strip()
+    if not target:
+        return None
+    if not Path(target).expanduser().is_file():
+        clear_pending_install()
+        return None
+    return {"path": target, "version": str(data.get("version") or "")}
+
+
+def clear_pending_install() -> None:
+    """清掉「退出时自动安装」登记。"""
+    try:
+        path = pending_install_path()
+        if path.is_file():
+            path.unlink()
+    except Exception as exc:  # noqa: BLE001
+        _log.debug("清理待安装记录失败：%s", exc)
+
+
+def run_pending_install() -> bool:
+    """退出程序时执行「退出时自动安装」；返回是否已把安装移交给脚本。"""
+    info = pending_install()
+    if not info:
+        return False
+    try:
+        ok, message = launch_installer(info["path"])
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("执行退出时安装失败：%s", exc)
+        return False
+    if ok:
+        clear_pending_install()
+        _log.info("已移交退出时安装：%s", message)
+    return bool(ok)

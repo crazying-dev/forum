@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""更新交互组件：发现新版本 → 询问是否下载 → 进度/速度/预计剩余 → 询问是否立即安装。
+"""更新交互组件：发现新版本 → 询问是否下载 → 进度/速度/预计剩余 → 选择安装时机。
 
 托盘菜单、下载页、设置·关于三处「检查更新」共用本模块，保证交互一致。
+* 下载完成后三个选项：立即安装 / 退出时自动安装 / 稍后
 * 所有对外函数都不抛异常（失败走 ``on_status`` / 信息弹窗 / toast）
 * 网络与安装动作全部落在 :mod:`app.updater` 的异步接口上，不阻塞界面
 """
@@ -15,7 +16,7 @@ from PyQt6.QtWidgets import QDialog, QLabel, QProgressBar, QWidget
 
 from .. import logger, updater, util
 from .common import Divider, Muted, TitleLabel, vbox
-from .dialogs import BaseDialog, confirm, info_box
+from .dialogs import BaseDialog, info_box
 from .toast import toast
 
 _log = logger.get_logger("update_ui")
@@ -111,6 +112,46 @@ def ask_update(parent: QWidget | None, info) -> bool:
     except Exception as exc:  # noqa: BLE001
         _log.warning("更新确认弹窗失败：%s", exc)
         return False
+
+
+# ────────────────────────── 选择安装时机 ──────────────────────────
+
+
+class InstallChoiceDialog(BaseDialog):
+    """下载完成：选择「立即安装 / 退出时自动安装 / 稍后」。"""
+
+    def __init__(self, parent: QWidget | None = None, version: str = "") -> None:
+        super().__init__(parent, title="下载完成", width=460)
+        self.choice = "later"
+        head = "更新包已下载完成"
+        if str(version or "").strip():
+            head += "（v%s）" % str(version).strip()
+        head += "。\n\n「立即安装」会关闭当前程序并自动重新启动；"
+        head += "「退出时自动安装」会在你退出程序后再静默安装。"
+        message = QLabel(head)
+        message.setWordWrap(True)
+        self.body.addWidget(message)
+        self.add_action("稍后", None, lambda _=False: self._pick("later"))
+        self.add_action("退出时自动安装", None, lambda _=False: self._pick("pending"))
+        self.add_action("立即安装", "primary", lambda _=False: self._pick("now"))
+
+    def _pick(self, choice: str) -> None:
+        self.choice = str(choice or "later")
+        if self.choice == "later":
+            self.reject()
+        else:
+            self.accept()
+
+
+def install_choice(parent: QWidget | None, version: str = "") -> str:
+    """询问安装时机；返回 ``now`` / ``pending`` / ``later``（异常时当作稍后）。"""
+    try:
+        dialog = InstallChoiceDialog(parent, version)
+        dialog.exec()
+        return str(dialog.choice or "later")
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("安装时机弹窗失败：%s", exc)
+        return "later"
 
 
 # ────────────────────────── 下载进度窗口 ──────────────────────────
@@ -220,11 +261,18 @@ def download_and_install(parent: QWidget | None, info, *, on_status=None) -> Non
             _status(text)
             info_box(parent, "下载更新", text)
             return
+        version = str(getattr(info, "version", "") or "")
         _status("更新包下载完成")
-        if not confirm(parent, "下载完成",
-                       "更新包已下载完成，是否立即安装？\n\n"
-                       "安装会关闭当前程序并重新启动。",
-                       ok_text="立即安装", cancel_text="稍后"):
+        choice = install_choice(parent, version)
+        if choice == "pending":
+            if updater.set_pending_install(path, version):
+                _status("已设定为退出程序时自动安装")
+                toast("已设定：退出程序时将自动安装更新")
+            else:
+                _status("无法登记自动安装，可稍后手动安装")
+                toast("安装包已保存，可在「下载」页手动安装")
+            return
+        if choice != "now":
             toast("安装包已保存，可在「下载」页稍后安装")
             return
         try:

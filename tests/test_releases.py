@@ -89,6 +89,7 @@ def test_release_from_dict_parses_fields():
         "filename": "a.exe",
         "notes": "n",
         "force": True,
+        "sha256": "deadbeef",
     })
     assert release.version == "1.2.3"
     assert release.date == "2026-01-01"
@@ -98,6 +99,7 @@ def test_release_from_dict_parses_fields():
     assert release.filename == "a.exe"
     assert release.notes == "n"
     assert release.mandatory is True
+    assert release.sha256 == "deadbeef"
     assert releases.Release.from_dict("not a dict").version == ""
 
 
