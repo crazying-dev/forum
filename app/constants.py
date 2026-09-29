@@ -17,8 +17,13 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.2"
+APP_VERSION = "1.3.3"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
+
+# ────────────────────────── 启动「支持作者」弹窗 ──────────────────────────
+
+PROMO_QR_URL = "https://img.crazying-dev.top/other/help.png"   # 赞赏码
+PROMO_PROBABILITY = 0.30        # 每次启动弹出「支持作者」弹窗的概率
 
 # ────────────────────────── 后端地址 ──────────────────────────
 
