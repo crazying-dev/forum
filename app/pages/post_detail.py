@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QGuiApplication
 from PyQt6.QtWidgets import QLabel, QPlainTextEdit, QWidget
 
-from .. import constants, yearmode
+from .. import constants, postcache, yearmode
 from ..widgets import (Card, Chip, CommentList, MarkdownView, Muted, ScrollPage,
                        UserLink, button, divider, hbox, set_variant, vbox)
 # CardTitle 未在 widgets/__init__ 的显式导出中，直接取子模块
@@ -184,21 +184,62 @@ class PostDetailPage(Page):
         if not self._post_id:
             self.hint.setText("缺少帖子 ID，无法加载")
             return
-        self.hint.setText("加载中…")
         pid = self._post_id
-        self.run(lambda: self.api.get_post(pid), self._on_loaded, label="帖子详情")
+        cached = postcache.load(pid)
+        if cached:
+            # 本地优先：先秒显缓存，再联网刷新（联网时每次进帖都会重新获取）
+            self._apply_payload(cached)
+            self.hint.setText("已显示本地缓存，正在刷新…")
+        else:
+            self.hint.setText("加载中…")
+        self.run(lambda: self.api.get_post(pid), lambda r: self._on_loaded(r, pid),
+                 label="帖子详情")
 
     # ────────────────────── 渲染 ──────────────────────
-    def _on_loaded(self, result) -> None:
+    def _apply_payload(self, payload: dict) -> None:
+        """用（本地缓存或网络的）数据渲染整页。"""
+        post = dict((payload or {}).get("post") or {})
+        if not post:
+            return
+        self._post = post
+        self._liked = bool(payload.get("liked"))
+        self._favorited = bool(payload.get("favorited"))
+        self._render_post()
+        comments = payload.get("comments")
+        self._render_comments(list(comments) if isinstance(comments, list) else [])
+
+    def _save_cache(self, **fields) -> None:
+        """写回本地缓存（正文 + 互动数据）。"""
+        if not self._post_id or not self._post:
+            return
+        postcache.save(self._post_id, **fields)
+
+    def _sync_cache(self) -> None:
+        """点赞 / 收藏状态变化后同步缓存。"""
+        if not self._post_id or not self._post:
+            return
+        self._post["likes"] = self._likes
+        postcache.save(self._post_id, post=self._post, liked=self._liked,
+                       favorited=self._favorited)
+
+    def _on_loaded(self, result, pid: str = "") -> None:
+        if pid and pid != self._post_id:
+            return          # 回调回来时页面已切走，丢弃过期结果
         if not result.ok:
-            self.hint.setText(result.message or "帖子加载失败")
+            if self._post:
+                self.hint.setText("网络不可用，正在显示本地缓存内容")
+            else:
+                self.hint.setText(result.message or "帖子加载失败")
             return
         self.hint.setText("")
-        self._post = result.get("post") or {}
-        self._liked = bool(result.get("liked"))
-        self._favorited = bool(result.get("favorited"))
-        self._render_post()
-        self._render_comments(result.rows("comments"))
+        payload = {
+            "post": result.get("post") or {},
+            "liked": bool(result.get("liked")),
+            "favorited": bool(result.get("favorited")),
+            "comments": result.rows("comments"),
+        }
+        self._apply_payload(payload)
+        self._save_cache(**payload)
 
     def _render_post(self) -> None:
         post = self._post or {}
@@ -246,7 +287,9 @@ class PostDetailPage(Page):
             if not result.ok:
                 self.toast(result.message)
                 return
-            self._render_comments(result.rows("comments"))
+            rows = result.rows("comments")
+            self._render_comments(rows)
+            self._save_cache(comments=rows)
 
         self.run(lambda: self.api.comments(pid, 1, 50), _done, label="评论")
 
@@ -274,6 +317,7 @@ class PostDetailPage(Page):
                 self._likes = likes
             self._refresh_meta()
             self._refresh_actions()
+            self._sync_cache()
 
         self.run(lambda: self.api.like_post(pid), _done, label="点赞")
 
@@ -292,6 +336,7 @@ class PostDetailPage(Page):
             self._favorited = (bool(favorited) if favorited is not None
                                else not self._favorited)
             self._refresh_actions()
+            self._sync_cache()
             self.toast("已收藏" if self._favorited else "已取消收藏")
 
         self.run(lambda: self.api.favorite_post(pid), _done, label="收藏")
@@ -319,6 +364,7 @@ class PostDetailPage(Page):
             if not result.ok:
                 self.toast(result.message)
                 return
+            postcache.drop(pid)
             self.toast("帖子已删除")
             self.go_back()
 

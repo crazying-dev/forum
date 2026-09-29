@@ -76,6 +76,11 @@ def image_cache_dir() -> Path:
     return _sub("cache", "image")
 
 
+def post_cache_dir() -> Path:
+    """帖子缓存目录：``~/.Cr/forum/cache/post``。"""
+    return _sub("cache", "post")
+
+
 def live2d_dir() -> Path:
     return _sub("Live2D")
 
@@ -141,7 +146,8 @@ def all_dirs() -> list[Path]:
         cache_dir(),
         avatar_cache_dir(),
         image_cache_dir(),
- live2d_dir(),
+        post_cache_dir(),
+        live2d_dir(),
         update_dir(),
         tmp_dir(),
     ]
