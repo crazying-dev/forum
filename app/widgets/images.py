@@ -207,7 +207,12 @@ class Avatar(QWidget):
         if not self._pixmap.isNull():
             self._pixmap = _circular(self._pixmap, self._size)
 
-    def set_url(self, url: str) -> None:
+    def set_url(self, url: str, *, force: bool = False) -> None:
+        """设置头像地址。
+
+        ``force=True`` 时忽略「已命中本地缓存就直接返回」，强制重新下载并覆盖
+        本地缓存（进他人主页时保证头像是最新的）；下载失败则保留旧图。
+        """
         url = str(url or "").strip()
         self._url = url
         if not url:
@@ -218,9 +223,11 @@ class Avatar(QWidget):
         cached = avatar_cache.cached_pixmap(absolute)
         if cached is not None:
             self._set_source(cached)
-            return
-        self._pixmap = QPixmap()
-        self.update()
+            if not force:
+                return
+        else:
+            self._pixmap = QPixmap()
+            self.update()
 
         def _ok(_url, local_path):
             pixmap = QPixmap(local_path)
@@ -229,7 +236,11 @@ class Avatar(QWidget):
             avatar_cache.remember(absolute, pixmap)
             self._set_source(pixmap)
 
-        avatar_cache.fetch(absolute, on_ready=_ok)
+        def _fail(_message):
+            # 强制刷新失败时保留已有缓存图（不清空），静默处理
+            return
+
+        avatar_cache.fetch(absolute, on_ready=_ok, on_error=_fail, force=force)
 
     def _set_source(self, source: QPixmap) -> None:
         self._pixmap = _circular(source, self._size)

@@ -353,7 +353,8 @@ class UserPage(Page):
     def _render_profile(self) -> None:
         user = self._user or {}
         uid = str(user.get("id") or self._user_id)
-        self.avatar.set_url(str(user.get("avatar") or ""))
+        # 进他人（或自己）主页时强制重新下载头像并覆盖本地缓存，保证头像最新
+        self.avatar.set_url(str(user.get("avatar") or ""), force=True)
         self.name_link.set_user(uid, str(user.get("name") or "匿名用户"))
 
         title = str(user.get("title") or "").strip()

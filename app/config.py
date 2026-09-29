@@ -28,6 +28,7 @@ DEFAULTS: dict[str, Any] = {
     "cursor_scale": constants.CURSOR_SCALE_DEFAULT,
     "check_update": True,
     "last_update_check": 0.0,
+    "launch_count": 0,                    # 累计打开次数（「支持作者」弹窗用）
     "last_user": "",
     "pet": {
         "enabled": True,

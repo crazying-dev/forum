@@ -231,6 +231,31 @@ def _start_update_check(app: QApplication, shell: Shell) -> None:
         _log.warning("启动更新检查不可用：%s", exc)
 
 
+PROMO_DELAY_MS = 4000  # 启动后延迟多久考虑弹出「支持作者」弹窗
+
+
+def _start_promo(shell: Shell, minimized: bool = False) -> None:
+    """启动时累计本地打开次数，并按概率弹出「支持作者」弹窗。
+
+    * 次数写入 ``config.json`` 的 ``launch_count``，每次启动 +1（不论是否弹窗）
+    * 概率见 ``constants.PROMO_PROBABILITY``（默认 30%）
+    * 以 ``--minimized`` 收进托盘启动时不打扰
+    """
+    try:
+        from app.widgets.promo import bump_launch_count, maybe_show
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("支持弹窗模块不可用：%s", exc)
+        return
+    try:
+        count = bump_launch_count()
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("打开次数统计失败：%s", exc)
+        return
+    if minimized:
+        return
+    QTimer.singleShot(PROMO_DELAY_MS, lambda: maybe_show(shell, count=count))
+
+
 def _run_pending_update() -> None:
     """退出时执行「退出时自动安装」（用户在下载完成后选了稍后安装）。"""
     try:
@@ -268,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
     _start_tray(app, shell)
     _start_pet(shell)
     _start_update_check(app, shell)
+    _start_promo(shell, minimized)
 
     for url in urls:
         shell.handle_deeplink(url)

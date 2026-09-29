@@ -19,6 +19,7 @@ from .dialogs import (REPORT_REASONS, BaseDialog, BugReportDialog,
 from .images import AsyncImage, Avatar, avatar_cache, image_cache
 from .markdown import MarkdownView, markdown_to_html
 from .post_card import PostCard, with_author
+from .promo import PromoDialog, maybe_show, promo_text
 from .toast import Toast, ToastManager, toast
 from .update import (DownloadDialog, UpdateDialog, ask_update, check_and_prompt,
                      download_and_install, eta_text, progress_text)
@@ -34,6 +35,7 @@ __all__ = [
     "AsyncImage", "Avatar", "avatar_cache", "image_cache",
     "MarkdownView", "markdown_to_html",
     "PostCard", "with_author",
+    "PromoDialog", "maybe_show", "promo_text",
     "Toast", "ToastManager", "toast",
     "DownloadDialog", "UpdateDialog", "ask_update", "check_and_prompt",
     "download_and_install", "eta_text", "progress_text",

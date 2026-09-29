@@ -57,9 +57,10 @@ python main.py "Crforum://post/PS..."   # 深链直达
 ```
 ~/.Cr/forum/
   account.bin          登录凭证（token / ID Cookie，与机器指纹绑定加密）
-  config.json          主题 / 年制 / 导航 / 鼠标 / 桌宠 / 窗口位置等
-  cache/avatar/        头像缓存
-  cache/image/         帖子内嵌图片与 WIKI 图片缓存
+  config.json          主题 / 年制 / 导航 / 鼠标 / 桌宠 / 窗口位置 / 打开次数（启动支持弹窗用）
+  cache/avatar/        头像缓存（进个人主页时会强制重新下载并覆盖）
+  cache/image/         帖子内嵌图片、WIKI 图片与赞赏码缓存
+  cache/post/          帖子正文与互动数据缓存（本地优先，进帖后联网刷新）
   Live2D/HEI.lpk       模型包（只下载一次）
   Live2D/HEI4.0/       解包归一化后的模型（*.model3.json + motions/）
   Live2D/model.json    模型指针（记录版本与路径）
