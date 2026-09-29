@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-09-26T23:30:00+08:00",
+  "updated_at": "2026-09-29T22:40:00+08:00",
   "platforms": [
     {
       "key": "windows",
@@ -10,18 +10,18 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.2",
+          "version": "1.3.3",
           "channel": "stable",
-          "date": "2026-09-26",
-          "size": 48587343,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.2/forum_setup.exe",
+          "date": "2026-09-29",
+          "size": 48547876,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.3/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "d9e21f20a21d1bdd2e59c5b47496a3e751922ddfdafd70c910e26111fc9067f",
+          "sha256": "2301501ab7b698d569ec45519c597a55d1a9dd558ec10823ab96de77babf0938",
           "notes": [
-            "世界频道的头像与昵称现在可以点击，直达该用户主页",
-            "修复查看他人主页时顶部资料卡显示「匿名用户」的问题",
-            "更新包按版本号分目录存放（~/.Cr/forum/update/<版本>/），不再相互覆盖",
-            "更新改为静默安装（显示进度条、不走向导），装完自动重启；可选「退出时自动安装」"
+            "新增启动「支持作者」弹窗：本地记录累计打开次数，随机弹出并附赞赏码",
+            "帖子正文与互动数据本地缓存：进帖先秒显缓存，联网后自动刷新覆盖",
+            "进入他人个人主页时强制重新下载头像，保证头像始终最新",
+            "新增缓存目录 ~/.Cr/forum/cache/post/，与头像/图片缓存并存"
           ],
           "mandatory": false
         }
