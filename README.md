@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.0-Beta**（`versionCode = 1`） |
+| 当前版本 | **V1.0.0**（`versionCode = 1`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -24,7 +24,7 @@
 | JSON | `org.json`（Android 内置） | 不引入 Gson / Moshi / kotlinx-serialization，减少依赖面 |
 | 图片 | Coil 3（`coil-compose` + `coil-network-okhttp`） | 头像加载 |
 | 正文渲染 | `AndroidView` + `TextView` + `HtmlCompat` | 服务端正文存的是 HTML |
-| WebView | **仅用于 WIKI 页** | 其余界面全部 Compose |
+| WebView | **仅用于 WIKI › Live2D 子页** | 其余界面（含 WIKI 其他子页）均为 Compose 原生绘制 |
 
 **版本基线**（已通过真实构建验证）：
 
@@ -57,6 +57,11 @@ coil3 3.2.0  /  okhttp 5.0.0  /  kotlinx-coroutines 1.10.2
 
 `无限年 = 公元年 − 1604`（无限元年 = 公元 1604 年）；公元年 < 1604 时显示「无限前 N 年」。影响帖子 / 评论 / 注册时间的年份显示。
 
+### 图标
+
+启动图标直接使用**原项目图标**（`forum/static/img/favicon.png`，1080×1080，与网站头部 / `apple-touch-icon`、Windows 端 `icon.ico` 同源），
+由 `tools/gen-android-icons.ps1` 生成 `mipmap-*` 五档密度的方形 / 圆形图标，以及 API 26+ 自适应图标的前景层（背景层 `#FFFFFF`）。
+
 ### 接口
 
 全部走 `https://www.yjlt.top` 的 HTTPS 接口，与 Windows 端 `app/api.py` 完全同源：
@@ -85,12 +90,14 @@ forum-Android/
 ├── settings.gradle.kts                    仓库与模块声明
 ├── gradle.properties
 ├── tools/setup-android-env.ps1            环境安装脚本（JDK 17 + Android SDK）
+├── tools/gen-android-icons.ps1            图标生成脚本（原 logo → mipmap + 自适应图标）
 └── app/
     ├── build.gradle.kts
     ├── proguard-rules.pro
     └── src/main/
         ├── AndroidManifest.xml
-        ├── res/values{,night}/             名字、颜色、主题、图标
+        ├── res/values{,night}/             名字、颜色、主题
+        ├── res/mipmap-*/                   启动图标（原 logo 生成：方形 / 圆形 / 自适应前景）
         └── java/top/crazying/forum/
             ├── ForumApp.kt                 Application，初始化单例
             ├── MainActivity.kt             单 Activity
@@ -182,7 +189,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **搜索**：帖子 + 用户，支持「全部 / 帖子 / 用户」筛选
 * **用户主页**：资料卡、关注 / 已关注、帖子 / 收藏 / 评论三个列表
 * **世界频道**：`/api/world/ALL` + 20 秒轮询、发送消息、头像可点进个人主页
-* **WIKI**：WebView 加载 `/WIKI`
+* **WIKI**：原生 Compose 重写（首页 / 官方 / 个人 / 鼠标 / Linux 版）；仅 Live2D 交互模型子页保留“去壳 WebView”（注入样式隐藏网页头部 / 侧边栏 / 页脚，并把 CSS 变量改写为 App 配色）
 * **我的 / 设置**：主题（浅色 / 深色 / 跟随系统）、年制（无限年 / 公元年，含示例）、版本 / 服务端 / 客户端标识、快捷入口
 * **主题**：4 套色板 + 国庆假期强制叠加（与 Web / Windows 三端同语义）
 
@@ -198,13 +205,13 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 2. **世界频道升级为 WebSocket**（当前 20 秒轮询，服务端对发送有 2 秒 / 人 限流）。
 3. **正文内联图片**：`HtmlBody` 目前会剥离 `<img>`，可换成 Coil + `ImageGetter`。
 4. **AGP 9.x 升级**：用 Android Studio 的 AGP Upgrade Assistant 迁移（删除 `org.jetbrains.kotlin.android`，改用内置 Kotlin DSL），并同步升级 Gradle。
-5. **签名与发布**：`keystore.properties` + `signingConfigs`，产出已签名 release APK / AAB。
+5. ~~**签名与发布**~~：已完成 —— 仓库根 `keystore.properties` + `app/build.gradle.kts` 的 `signingConfigs`，`assembleRelease` 直接产出已签名 release APK（凭据已 git-ignore，不入库）。
 
 ---
 
 ## 七、已知限制与注意事项
 
-* **WIKI 页使用 WebView**，这是本工程唯一的 WebView 使用点；其余界面均为 Compose 原生控件。
+* **WIKI 已全面原生化**：首页 / 官方 / 个人 / 鼠标 / Linux 版均为 Compose；仅 **Live2D 交互模型** 子页保留 WebView（网页 canvas + Live2D 运行时，无法用 Compose 复刻），并在 `onPageFinished` 注入样式隐藏网页外壳、改写 CSS 变量为当前 App 配色。
 * **正文内联图片不显示**：`HtmlBody` 主动剥离 `<img>` / `<script>`，只保留文字、段落、粗体、链接、代码块等常用标签。
 * **`auto` 主题语义**：Android 取「跟随系统深色模式」，与 Web / Windows 的「小时切换」不同（有意为之）。
 * **Coil 3 的网络加载器**：依赖 `coil-network-okhttp` 的 ServiceLoader 自动注册；若自定义 `ImageLoader` 需手动装配 `OkHttpNetworkFetcherFactory`。

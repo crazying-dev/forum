@@ -1,6 +1,7 @@
 package top.crazying.forum.ui.components
 
 import android.content.Context
+import android.text.method.LinkMovementMethod
 import android.widget.TextView
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -278,6 +279,8 @@ fun HtmlBody(html: String, modifier: Modifier = Modifier, fontSizeSp: Float = 15
             tv.setTextColor(colors.textPrimary.toArgb())
             tv.textSize = fontSizeSp
             tv.setLinkTextColor(colors.primary.toArgb())
+            // 让 <a> 链接可点击（HtmlCompat 会生成 URLSpan）
+            tv.movementMethod = LinkMovementMethod.getInstance()
         },
     )
 }

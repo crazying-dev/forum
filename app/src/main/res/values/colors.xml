@@ -2,6 +2,8 @@
 <resources>
     <!-- 与 Web 端 :root 主色对齐 -->
     <color name="brand_primary">#6A8C89</color>
+    <!-- 自适应图标（API 26+）背景层：原图标为透明底圆形徽标，垫白底最贴近原始观感 -->
+    <color name="ic_launcher_background">#FFFFFF</color>
     <color name="brand_body_light">#D8E6E4</color>
     <color name="brand_body_night">#325A64</color>
 </resources>

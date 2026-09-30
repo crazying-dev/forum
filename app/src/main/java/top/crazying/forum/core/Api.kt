@@ -369,4 +369,25 @@ class Api(private val prefs: Prefs) {
     // ────────────────── 杂项 ──────────────────
 
     suspend fun healthz(): ApiResult = get(Constants.HEALTHZ_PATH)
+
+    /**
+     * 抓取纯文本资源（WIKI 的 markdown / license 等）。
+     *
+     * 与 [request] 不同：不解析 JSON，直接返回响应正文；任何异常 / 非 2xx 返回 null。
+     */
+    suspend fun fetchText(url: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val absolute = if (url.startsWith("http://") || url.startsWith("https://")) url
+            else Constants.BASE_URL + "/" + url.trimStart('/')
+            val request = Request.Builder()
+                .url(absolute)
+                .header("User-Agent", Constants.CLIENT_UA)
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (response.code in 200..299) response.body?.string() else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
 }

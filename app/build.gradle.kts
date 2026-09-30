@@ -1,3 +1,5 @@
+import java.util.Properties
+
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -15,9 +17,28 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0-Beta"
+        versionName = "1.0.0"
         // 中文优先即可，服务端只返回中文文案
         resourceConfigurations += listOf("zh", "en")
+    }
+
+    // 发布签名：凭据放在仓库根的 keystore.properties（已 gitignore，不入库）。
+    // 文件缺失时 release 回退为未签名产物，方便无凭据的 CI / 克隆直接 assembleDebug。
+    val keystorePropsFile = rootProject.file("keystore.properties")
+    val hasReleaseKey = keystorePropsFile.exists()
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("release") {
+                val props = Properties().apply {
+                    keystorePropsFile.inputStream().use { load(it) }
+                }
+                storeFile = rootProject.file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -32,6 +53,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (hasReleaseKey) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
