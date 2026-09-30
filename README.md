@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.1**（`versionCode = 2`） |
+| 当前版本 | **V1.0.2**（`versionCode = 3`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -25,6 +25,7 @@
 | 图片 | Coil 3（`coil-compose` + `coil-network-okhttp`） | 头像加载 |
 | 正文渲染 | `AndroidView` + `TextView` + `HtmlCompat` | 服务端正文存的是 HTML |
 | WebView | **仅用于 WIKI › Live2D 子页** | 其余界面（含 WIKI 其他子页）均为 Compose 原生绘制 |
+| 应用更新 | 自写 `Updater`（`core/Updater.kt`） | 版本检查 → 三级回退下载 → sha256 校验 → FileProvider 调起系统安装器 |
 
 **版本基线**（已通过真实构建验证）：
 
@@ -76,6 +77,9 @@ coil3 3.2.0  /  okhttp 5.0.0  /  kotlinx-coroutines 1.10.2
        POST /api/user/<id>/follow
 搜索   GET  /api/search
 世界   GET  /api/world/ALL             POST /api/world/Send
+彩蛋   GET  /Easter-Egg
+更新   GET  /api/app/check?platform=android&version=<版本>
+       GET  /api/app/mirror/android/<文件名>      （站内反代 GitHub 直链）
 ```
 
 ---
@@ -107,6 +111,7 @@ forum-Android/
             │   ├── App.kt                  进程级单例（可被 Compose 观察的状态）
             │   ├── Http.kt                 PrefsCookieJar
             │   ├── Api.kt                  ApiResult + Api（全部接口）
+            │   ├── Updater.kt              自更新：检查 / 回退下载 / 校验 / 安装
             │   └── TimeFmt.kt              年制 / 相对时间 / 生日 / 去 HTML
             ├── theme/
             │   ├── Palette.kt              4 套色板（各 28 键）
@@ -115,8 +120,9 @@ forum-Android/
             └── ui/
                 ├── AppNav.kt               Screen / Tab / Navigator
                 ├── ForumRoot.kt            根节点：回退栈 + 底部导航
+                ├── UpdateDialog.kt         「发现新版本」对话框（下载 / 校验 / 安装）
                 ├── components/             通用控件（卡片、按钮、头像、正文…）
-                └── screens/                11 个页面
+                └── screens/                12 个页面
 ```
 
 ---
@@ -149,7 +155,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 
 ```powershell
 .\gradlew.bat assembleDebug        # 产物 app\build\outputs\apk\debug\app-debug.apk
-.\gradlew.bat assembleRelease      # 未开启混淆 / 未签名
+.\gradlew.bat assembleRelease      # 未开启混淆；存在 keystore.properties 时自动签名
 ```
 
 首次构建会自动下载 Gradle 8.14.5（约 138 MB）到 `%USERPROFILE%\.gradle`。
@@ -179,7 +185,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 五、本轮已实现 / 未实现
 
-### 已实现（V1.0.1）
+### 已实现（V1.0.2）
 
 * **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + 密码直注）、退出登录、本地会话恢复与失效清理
 * **首页**：最新发布 / 综合排序 / 随机推荐 / 我的收藏 四个信息流，分页加载
@@ -190,13 +196,15 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **用户主页**：资料卡、关注 / 已关注、帖子 / 收藏 / 评论三个列表
 * **世界频道**：`/api/world/ALL` + 20 秒轮询、发送消息、头像可点进个人主页
 * **WIKI**：原生 Compose 重写（首页 / 官方 / 个人 / 鼠标 / Linux 版）；仅 Live2D 交互模型子页保留“去壳 WebView”（注入样式隐藏网页头部 / 侧边栏 / 页脚，并把 CSS 变量改写为 App 配色）
-* **我的 / 设置**：主题（浅色 / 深色 / 跟随系统）、年制（无限年 / 公元年，含示例）、版本 / 服务端 / 客户端标识、快捷入口
+* **我的 / 设置**：主题（浅色 / 深色 / 跟随系统）、年制（无限年 / 公元年，含示例）、版本 / 服务端 / 客户端标识、**检查更新**、快捷入口
 * **支持作者**：我的页常驻赞赏码区块（远端图床图，由 Coil 落盘缓存，不重复下载）
+* **应用自更新**：冷启动静默检查（每 24 小时最多一次；也可在「我的 › 关于」手动检查）；下载回退链「直连 GitHub → 公共加速（ghproxy.net / gh-proxy.com / ghfast.top）→ 站内反代」，下载后校验体积 + sha256，再经 FileProvider 调起系统安装器（首次会引导「安装未知应用」授权）
+* **彩蛋**：底部第 6 个「彩蛋」标签（对齐网页手机端），每次随机奉上一条 `/Easter-Egg` 彩蛋或「每日一言」
 * **主题**：4 套色板 + 国庆假期强制叠加（与 Web / Windows 三端同语义）
 
 ### 未实现（后续多轮持续补齐）
 
-头像上传、修改密码 / 邮箱、邮箱验证码注册、彩蛋、会馆、举报 / 删除内容、收藏独立页、Live2D 桌宠、鼠标指针、深链、世界频道 WebSocket（当前为轮询）、正文内联图片渲染、富文本编辑器。
+头像上传、修改密码 / 邮箱、邮箱验证码注册、会馆、举报 / 删除内容、收藏独立页、Live2D 桌宠、鼠标指针、深链、世界频道 WebSocket（当前为轮询）、正文内联图片渲染、富文本编辑器。
 
 ---
 
@@ -220,6 +228,8 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **服务端不可达时**：`Api` 对 GET 请求重试 1 次（写操作绝不重试，避免重复发帖 / 评论）；返回 401 会静默清理本地会话。
 * **`local.properties` 严禁入库**（已在 `.gitignore` 中）；`gradle-wrapper.jar` 相反 **必须入库**。
 * **签名材料**（`*.jks` / `*.keystore` / `keystore.properties`）同样已 git-ignore。
+* **自更新的额外出网域名**：应用主体只连 `https://www.yjlt.top`，但自更新下载会额外访问 GitHub 直链与三个公共加速镜像；彩蛋页的「每日一言」还会访问第三方 `dlystc.unknownmp.top`。Android 端**有意不做** Windows 那样的 DoH / DNS 接管（OkHttp 走系统解析，改造收益不值当）。
+* **自动更新的触发时机**：仅冷启动检查一次，且距上次检查不足 24 小时会跳过；用户点过「以后再说」的版本不再自动弹窗（手动「检查更新」仍会显示）。发现新版本后仍需用户在对话框中确认，不会静默安装（Android 也不允许）。
 
 ---
 

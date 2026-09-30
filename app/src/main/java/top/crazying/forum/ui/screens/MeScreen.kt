@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
+import top.crazying.forum.core.CheckResult
 import top.crazying.forum.core.Constants
 import top.crazying.forum.core.TimeFmt
+import top.crazying.forum.core.Updater
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.theme.ThemeResolver
 import top.crazying.forum.ui.Navigator
@@ -46,6 +48,7 @@ fun MeScreen(nav: Navigator) {
     val holiday = ThemeResolver.isNationalDay()
 
     var busy by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -183,6 +186,36 @@ fun MeScreen(nav: Navigator) {
             InfoRow("服务端", Constants.BASE_URL)
             InfoRow("客户端标识", Constants.CLIENT_UA)
             HDivider()
+            PrimaryButton(
+                text = if (checking) "正在检查…" else "检查更新",
+                enabled = !checking,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    if (checking) return@PrimaryButton
+                    checking = true
+                    scope.launch {
+                        // Updater.check 内部已兜底网络异常（CancellationException 会照常抛出）
+                        val outcome = Updater.check(App.api)
+                        checking = false
+                        when (outcome) {
+                            is CheckResult.Success -> {
+                                val info = outcome.info
+                                if (info.available && info.release != null) {
+                                    App.updateInfo.value = info
+                                } else {
+                                    toast(
+                                        context,
+                                        info.message.ifBlank {
+                                            "已是最新版本 " + Constants.APP_VERSION
+                                        },
+                                    )
+                                }
+                            }
+                            is CheckResult.Failure -> toast(context, outcome.message)
+                        }
+                    }
+                },
+            )
             Muted("妖精论坛 Android 客户端。Web / Windows / Android 三端共用同一套服务端接口与主题色板。")
         }
 

@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 仅需联网：所有内容都来自 https://www.yjlt.top 的 HTTPS 接口 -->
+    <!-- 联网：所有内容都来自 https://www.yjlt.top 的 HTTPS 接口 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+      自更新：下载新版 APK 后交给系统安装器安装。
+      该权限只是「允许发起安装」；实际安装仍需用户在系统弹窗里确认，
+      首次使用会先引导到「安装未知应用」授权页。
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:name=".ForumApp"
@@ -28,6 +35,21 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          自更新下载的 APK 放在 App 私有 cacheDir/updates/，系统安装器读不到，
+          必须经 FileProvider 换成 content:// URI 并临时授权。
+          authorities 用 ${applicationId}，debug 版的 .debug 后缀也能各自匹配。
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

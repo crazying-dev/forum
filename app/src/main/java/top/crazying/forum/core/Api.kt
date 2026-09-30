@@ -370,6 +370,25 @@ class Api(private val prefs: Prefs) {
 
     suspend fun healthz(): ApiResult = get(Constants.HEALTHZ_PATH)
 
+    // ────────────────── 应用更新 / 彩蛋 ──────────────────
+
+    /**
+     * 版本检查。
+     *
+     * 服务端读仓库根的 `app_releases.json`，返回
+     * `{available, latest, mandatory, message, release:{version,url,filename,size,sha256,notes}}`。
+     */
+    suspend fun checkUpdate(version: String = Constants.APP_VERSION): ApiResult = get(
+        Constants.CHECK_UPDATE_PATH,
+        mapOf("platform" to Constants.PLATFORM_ANDROID, "version" to version),
+    )
+
+    /** 随机一条彩蛋（服务端从 `EasterEgg/1.json` 抽）。 */
+    suspend fun easterEgg(): ApiResult = get(Constants.EASTER_EGG_PATH)
+
+    /** 抓取站外 JSON（每日一言）；不走本服务的错误口径，失败返回 status=0。 */
+    suspend fun fetchExternalJson(url: String): ApiResult = request("GET", url)
+
     /**
      * 抓取纯文本资源（WIKI 的 markdown / license 等）。
      *

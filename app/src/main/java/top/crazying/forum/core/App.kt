@@ -27,6 +27,14 @@ object App {
     /** 年制：wuxian（无限年，默认）/ ce（公元年）。 */
     val yearMode: MutableState<String> = mutableStateOf(Constants.YEAR_MODE_WUXIAN)
 
+    /**
+     * 发现的新版本（由 [Updater.check] 写入）。
+     *
+     * 非空时 `ForumRoot` 弹出更新对话框；用户点「以后再说」后写回 null，
+     * 同时把版本号记入 `prefs.updateSkipVersion`，避免同一版本反复打扰。
+     */
+    val updateInfo: MutableState<UpdateInfo?> = mutableStateOf(null)
+
     fun init(context: Context) {
         prefs = Prefs(context.applicationContext)
         api = Api(prefs)

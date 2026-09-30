@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -23,8 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import top.crazying.forum.core.App
+import top.crazying.forum.core.Updater
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.screens.AuthScreen
+import top.crazying.forum.ui.screens.EasterEggScreen
 import top.crazying.forum.ui.screens.ForumScreen
 import top.crazying.forum.ui.screens.HomeScreen
 import top.crazying.forum.ui.screens.MeScreen
@@ -53,6 +56,11 @@ fun ForumRoot() {
         LaunchedEffect(Unit) {
             if (App.prefs.userJson.isNotBlank()) {
                 runCatching { App.api.me() }
+            }
+            // 冷启动静默检查更新：距上次检查不足 24 小时会被 `autoCheck` 跳过；
+            // 只有确实发现新版本时才写入状态，弹窗交给 UpdateDialogHost。
+            runCatching { Updater.autoCheck(App.api) }.getOrNull()?.let {
+                App.updateInfo.value = it
             }
         }
 
@@ -99,6 +107,7 @@ fun ForumRoot() {
                     Screen.Forum -> ForumScreen(nav)
                     Screen.World -> WorldScreen(nav)
                     Screen.Wiki -> WikiScreen()
+                    Screen.EasterEgg -> EasterEggScreen(nav)
                     Screen.Me -> MeScreen(nav)
                     is Screen.PostDetail -> PostDetailScreen(nav, s.postId)
                     is Screen.PostCreate -> PostCreateScreen(nav, s.category)
@@ -106,6 +115,9 @@ fun ForumRoot() {
                     is Screen.UserProfile -> UserScreen(nav, s.userId)
                     is Screen.Auth -> AuthScreen(nav, s.register)
                 }
+
+                // 发现新版本时由 App.updateInfo 驱动弹出（冷启动自动检查 / 设置页手动检查）
+                UpdateDialogHost()
             }
         }
     }
@@ -117,5 +129,6 @@ private fun tabIcon(screen: Screen): ImageVector = when (screen) {
     Screen.Forum -> Icons.AutoMirrored.Filled.List
     Screen.World -> Icons.Default.Send
     Screen.Wiki -> Icons.Default.Info
+    Screen.EasterEgg -> Icons.Default.Star
     else -> Icons.Default.Person
 }

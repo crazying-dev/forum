@@ -12,7 +12,7 @@ object Constants {
     const val BASE_URL = "https://www.yjlt.top"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.1"
+    const val APP_VERSION = "1.0.2"
 
     /** 请求 UA，便于服务端日志区分端。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
@@ -31,6 +31,42 @@ object Constants {
     const val MOUSE_README_PATH = "/static/mouse/Liunx/README.md"
 
     const val HEALTHZ_PATH = "/healthz"
+
+    // ────────────────── 应用更新 ──────────────────
+    /** 与发布清单里的平台 key 一致。 */
+    const val PLATFORM_ANDROID = "android"
+
+    /** 版本检查：`GET /api/app/check?platform=android&version=<当前版本>`。 */
+    const val CHECK_UPDATE_PATH = "/api/app/check"
+
+    /** 站内反代前缀：`/api/app/mirror/android/<文件名>`（服务器流式转发 GitHub 直链）。 */
+    const val MIRROR_PATH = "/api/app/mirror"
+
+    /** 冷启动自动检查的最小间隔：24 小时（手动点「检查更新」不受此限制）。 */
+    const val UPDATE_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
+
+    /** 安装包存放目录（App 私有缓存，下载后交给系统安装器，装完可丢）。 */
+    const val UPDATE_DIR = "updates"
+
+    /**
+     * GitHub 直链的公共加速前缀（与 Windows 端 `constants.ACCELERATOR_MIRRORS` 同源）。
+     *
+     * Android 端不做 DoH DNS 接管（OkHttp 走系统解析，改造收益不值当），
+     * 因此下载回退链是「直连 → 公共加速 → 站内反代」，见 [Updater.downloadAttempts]。
+     */
+    val ACCELERATOR_MIRRORS = listOf(
+        "https://ghproxy.net/",
+        "https://gh-proxy.com/",
+        "https://ghfast.top/",
+    )
+
+    // ────────────────── 彩蛋 ──────────────────
+    /** 随机一条彩蛋（服务端从 `EasterEgg/1.json` 抽）。 */
+    const val EASTER_EGG_PATH = "/Easter-Egg"
+
+    /** 每日一言（第三方，与网页端 `AfterBody.js` 用的是同一个接口）。 */
+    const val SENTENCE_TEXT_URL = "https://dlystc.unknownmp.top/api/v2/sentence/text?format=full"
+    const val SENTENCE_JSON_URL = "https://dlystc.unknownmp.top/api/v2/sentence"
 
     // ────────────────── 赞赏码（常驻入口用） ──────────────────
     // 远端图床地址；“我的”页直接展示，Coil 会自动落盘缓存，无需每次重新下载。
