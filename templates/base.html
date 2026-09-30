@@ -147,6 +147,9 @@
   <div class="setting-divider"></div>
   <button class="setting-item" id="wuxianCalcBtn"><i class="fa fa-calendar"></i> 无限年换算</button>
   <div class="setting-divider"></div>
+  <!-- 赞赏码常驻入口（设置下拉）：与页脚 [data-support] 共用同一个弹窗 -->
+  <button class="setting-item" data-support><i class="fa fa-heart-o"></i> 赞赏支持</button>
+  <div class="setting-divider"></div>
   <button class="setting-item" id="logoutItem" style="display:none;"><i class="fa fa-sign-out"></i> 退出登录</button>
 </div>
 
@@ -174,6 +177,8 @@
     <div class="footer-links">
       <a href="/privacy">隐私</a>
       <a href="javascript:void(0)" id="bugReportBtn" data-bug-report>反馈 Bug</a>
+      <!-- 赞赏码常驻入口（页脚）：与设置下拉 [data-support] 共用同一个弹窗 -->
+      <a href="javascript:void(0)" data-support>赞赏支持</a>
       <a href="https://github.com/crazying-dev" target="_blank" rel="noopener">Github</a>
       <a href="https://crazying-dev.top" target="_blank" rel="noopener">crazying-dev.top</a>
     </div>
@@ -253,6 +258,25 @@
     <div class="modal-actions">
       <button class="btn btn-outline" id="bugCancel">取消</button>
       <button class="btn btn-primary" id="bugSubmit">提交反馈</button>
+    </div>
+  </div>
+</div>
+
+<!-- 赞赏码弹窗（页脚 / 设置下拉 [data-support] 统一触发） -->
+<div class="modal-mask" id="supportModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3><i class="fa fa-heart"></i> 支持妖精论坛</h3>
+      <button class="modal-close" id="supportClose">&times;</button>
+    </div>
+    <p class="support-text">妖精论坛是纯公益的粉丝二创项目，服务器与开发全凭热爱维持。<br>如果它帮到了你，请我喝杯奶茶就好～</p>
+    <div class="support-qr-wrap">
+      <!-- 首次打开才真正拉取图片（data-src → src），之后走浏览器 HTTP 缓存 -->
+      <img class="support-qr" id="supportQr" alt="作者赞赏码" loading="lazy" data-src="https://img.crazying-dev.top/other/help.png">
+    </div>
+    <p class="form-hint">扫码即可赞赏，金额随意，感谢每一位支持者。</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" id="supportCancel">关闭</button>
     </div>
   </div>
 </div>

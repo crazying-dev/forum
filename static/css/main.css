@@ -1649,6 +1649,27 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .dl-notes { margin: 10px 0 0 18px; font-size: 13px; line-height: 1.8; color: var(--color-text-secondary); }
 .dl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
 .dl-via { margin: 10px 0 0; font-size: 12px; line-height: 1.7; color: var(--color-text-tertiary); }
+
+/* ── 赞赏码弹窗（页脚 / 设置下拉 [data-support]） ── */
+.support-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+.support-qr-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 10px;
+}
+.support-qr {
+  display: block;
+  width: 210px;
+  max-width: 68vw;
+  height: auto;
+  border-radius: 10px;
+  background: var(--color-bg-input);
+}
 .dl-foot { margin: 20px 0 8px; font-size: 12px; text-align: center; color: var(--color-text-tertiary); }
 .dl-foot a { color: var(--color-primary); }
 .dl-foot code { font-size: 12px; }

@@ -1691,6 +1691,31 @@
     });
   }
 
+  // ── 赞赏码弹窗（页脚 / 设置下拉 [data-support] 统一触发）──
+  // 图片地址只写在 base.html 的 data-src 上（AfterBody.js 禁止引用外站域名）；
+  // 首次打开才真正拉取（data-src → src），避免每个页面都下载 200KB；
+  // 首次之后浏览器 HTTP 缓存命中，而 Windows / Android 端各自走自身磁盘缓存。
+  function initSupportModal() {
+    var modal = el('supportModal');
+    if (!modal) return;
+    var triggers = Array.prototype.slice.call(document.querySelectorAll('[data-support]'));
+    if (!triggers.length) return;
+    var img = el('supportQr');
+    function show() {
+      if (img && !img.getAttribute('src')) {
+        var url = img.getAttribute('data-src');
+        if (url) img.src = url;
+      }
+      modal.style.display = 'flex';
+    }
+    function hide() { modal.style.display = 'none'; }
+    triggers.forEach(function (b) { b.addEventListener('click', show); });
+    var close = el('supportClose'), cancel = el('supportCancel');
+    if (close) close.addEventListener('click', hide);
+    if (cancel) cancel.addEventListener('click', hide);
+    modal.addEventListener('click', function (e) { if (e.target === modal) hide(); });
+  }
+
   // ── 无限年 / 公元年换算组件：点「换算」按钮执行双向换算，支持「无限前」 ──
   function initWuxianConverter() {
     var modal = el('wuxianModal');
@@ -1918,6 +1943,7 @@
     initUserListModal();
     initReportModal();
     initBugModal();
+    initSupportModal();
     initWuxianConverter();
     initPWA();
     initContextMenu();
