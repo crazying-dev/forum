@@ -1,103 +1,32 @@
-# ──────────────────────────────────────────────
-#  妖精论坛 Windows 客户端 .gitignore
-# ──────────────────────────────────────────────
-
-# ── Python 字节码 ──
-__pycache__/
-*.py[cod]
-*$py.class
-
-# ── C 扩展 ──
-*.so
-
-# ── 分发 / 打包元数据 ──
-.Python
+# ── Gradle / Android ──
+.gradle/
 build/
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+/app/build/
+/local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
 
-# ── 打包产物（PyInstaller / Nuitka / 安装包）──
-# 构建目录、产物目录一律不入库；打包配置（build.ps1 / forum.spec / *.iss）保留
-*.manifest
-*.pdb
-*.exp
-*.lib
-*.obj
-*.asm
-*.build/
-*.dist/
-*.onefile-build/
-packaging/output/
-packaging/installer/output/
-installer_output/
-
-# ── 虚拟环境 ──
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# ── 测试 / 覆盖率 ──
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# ── 编辑器 / IDE ──
+# ── IDE ──
+*.iml
 .idea/
 .vscode/
-.spyderproject/
-.spyproject/
-.ropeproject/
-.mypy_cache/
-.dmypy.json
-dmypy.json
-.pyre/
-.pytype/
-.ruff_cache/
-.pypirc
-.cursorignore
-.cursorindexingignore
 
-# ── 运行时数据（真实数据目录在 ~/.Cr/forum/，此处仅兜底）──
-*.local
-*.log
-logs/
-local_config.json
-
-# ── Live2D 模型包（仅本地暂存，用于上传服务器；不入库）──
-# 模型的权威主页在 server 仓的 static/live2d/（见 packaging/upload_live2d_models.ps1）
-/assets/
-
-# ── 临时文件 ──
-*.tmp
-*.bak
-~$*
+# ── OS ──
+.DS_Store
 Thumbs.db
-desktop.ini
-Desktop.ini
+
+# ── 签名材料（严禁入库）──
+*.jks
+*.keystore
+!debug.keystore
+keystore.properties

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与 Web 端 :root 主色对齐 -->
+    <color name="brand_primary">#6A8C89</color>
+    <color name="brand_body_light">#D8E6E4</color>
+    <color name="brand_body_night">#325A64</color>
+</resources>

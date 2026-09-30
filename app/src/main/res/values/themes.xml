@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 全部界面由 Compose 绘制，这里只需一个无 ActionBar 的宿主主题；
+         首帧背景色与 Web 端亮色底保持一致，避免启动闪白。 -->
+    <style name="Theme.Forum" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/brand_body_light</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

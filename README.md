@@ -1,196 +1,202 @@
-# 妖精论坛 · Windows 客户端
+# 妖精论坛 · Android 客户端
 
-「妖精论坛」官方桌面客户端。基于 **Python 3.12 + PyQt6** 原生实现，与官网 `https://www.yjlt.top` 的
-网页功能保持一致，无需浏览器即可完成看帖、发帖、评论、世界频道、WIKI、桌宠等全部操作。
+原生 **Kotlin + Jetpack Compose** 重写版，与 Web 端（`forum`）和 Windows 端（`forum-windows`）共用同一套服务端与主题色板。
 
-> 本仓库是 `forum` 仓库的 **`windows` 分支**，只包含 Windows 客户端；
-> Web 前后端已移除（`main` 分支继续维护网页端）。
+| 项 | 值 |
+| --- | --- |
+| 当前版本 | **V1.0.0-Beta**（`versionCode = 1`） |
+| 分支 | `Android` |
+| 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
+| 服务端 | `https://www.yjlt.top` |
+| 最低 / 目标 SDK | 24（Android 7.0） / 36（Android 16） |
 
----
-
-## 一、功能
-
-| 模块 | 说明 |
-|------|------|
-| 认证 | 登录（昵称或邮箱）/ 注册（邮箱验证码）/ 找回密码（两步式：邮箱 → 验证码 + 新密码） |
-| 首页 | 最新发布 / 随机推荐 / 综合排序 三个信息流 + 我的收藏 |
-| 论坛 | 分区标签（综合/闲聊/求助/分享/创作）+ 排序 + 分页加载 |
-| 帖子 | 详情（Markdown 正文）、点赞、收藏、举报、删除（作者）、分享链接 |
-| 发帖 | 标题 + 分区 + Markdown 编辑/预览双标签 + 发帖须知 |
-| 评论 | 楼中楼、折叠、点赞、回复、举报、删除（作者） |
-| 搜索 | 帖子 / 用户 / 全部，关键词 ≥ 2 字符，支持分页 |
-| 用户 | 资料卡（头像/头衔/前缀/性别/生日/年龄/简介/统计）、关注/粉丝列表、帖子/收藏/评论 |
-| 我的 | 改资料（含头像上传）、改密码（仅邮箱验证码）、改邮箱（旧邮箱 + 新邮箱双重验证） |
-| 世界频道 | 右侧常驻面板（3 秒轮询、可拖拽调宽 240-560、可收起）+ 独立整页 |
-| WIKI | 总览 / 官方 / 个人 / 鼠标 / 鼠标 Linux 版 / Live2D 六页（与网页一致） |
-| 彩蛋 | 每日一言与 `/Easter-Egg` 随机展示 |
-| 其他 | 会馆列表、隐私政策、Bug 反馈、外链安全确认 |
-| 外观 | 日间 / 夜间 / 跟随时间，对齐网页端配色 |
-| 年制 | 无限年 ⇄ 公元年（无限元年 = 公元 1604 年），全站时间显示随之切换 |
-| 鼠标指针 | 内置三套「罗小黑」指针包（普通 / 放大·动态 / 放大·静态），可在主窗口内启用，也可一键安装为 Windows 系统鼠标 |
-| Live2D 桌宠 | 无边框、透明、置顶的桌面小窗，**原生渲染**（非网页）；可拖动、鼠标穿透、点击触发动作、视线跟随；模型只从网络下载一次并缓存 |
-| 托盘 | 显示/隐藏主窗口、世界频道、桌宠开关、主题、年制、打开数据目录、检查更新、关于、退出 |
-| 深链 | `Crforum://post/PS...`、`Crforum://user/RL...`、`Crforum://wiki?kind=live2d` 等 |
-| 自动更新 | 从官网更新端点下载新版并自动替换重启 |
+> 本目录是 **从零重写** 的原生工程：旧 PyQt6 移植版已整体移除，不再保留任何 Python 代码。
 
 ---
 
-## 二、快速开始（开发态）
+## 一、技术选型
 
-```powershell
-# 1. 安装依赖（Python 3.12+）
-python -m pip install -r requirements.txt
+| 层面 | 选型 | 说明 |
+| --- | --- | --- |
+| 语言 / UI | Kotlin 2.4.20 + Jetpack Compose（Material 3） | 单 Activity + 自实现回退栈 |
+| 导航 | 自写 `Navigator`（`ui/AppNav.kt`） | 有意 **不引入** `navigation-compose`，避免导航库与 Compose 版本绑定带来的升级风险 |
+| 网络 | OkHttp 5.5.0（手写 `Api` / `ApiResult`） | 仅一个出网入口；Cookie 持久化由 `PrefsCookieJar` 完成 |
+| JSON | `org.json`（Android 内置） | 不引入 Gson / Moshi / kotlinx-serialization，减少依赖面 |
+| 图片 | Coil 3（`coil-compose` + `coil-network-okhttp`） | 头像加载 |
+| 正文渲染 | `AndroidView` + `TextView` + `HtmlCompat` | 服务端正文存的是 HTML |
+| WebView | **仅用于 WIKI 页** | 其余界面全部 Compose |
 
-# 2. 运行
-python main.py
-
-# 常用参数
-python main.py --debug          # 控制台输出 DEBUG 日志
-python main.py --minimized      # 启动后直接收进托盘
-python main.py "Crforum://post/PS..."   # 深链直达
-```
-
-### 用户数据目录
-
-所有本地状态都在 **`~/.Cr/forum/`**（Windows 即 `C:\Users\<你>\.Cr\forum`）：
+**版本基线**（均取 Maven 元数据的当前稳定版，见 `build.gradle.kts` 注释）：
 
 ```
-~/.Cr/forum/
-  account.bin          登录凭证（token / ID Cookie，与机器指纹绑定加密）
-  config.json          主题 / 年制 / 导航 / 鼠标 / 桌宠 / 窗口位置等
-  cache/avatar/        头像缓存
-  cache/image/         帖子内嵌图片与 WIKI 图片缓存
-  Live2D/HEI.lpk       模型包（只下载一次）
-  Live2D/HEI4.0/       解包归一化后的模型（*.model3.json + motions/）
-  Live2D/model.json    模型指针（记录版本与路径）
-  logs/forum_YYYYMMDD.log   运行日志（保留 14 天）
-  update/manifest.json     更新源指纹记录（etag / 大小 / 上次检查时间）
-  update/pending.json      已登记「退出程序时自动安装」的安装包
-  update/<版本>/           每个版本的安装包（forum_setup.exe[.part]）与安装脚本
+AGP 8.13.2  /  Gradle 8.14.5  /  Kotlin 2.4.20  /  Compose BOM 2026.09.00
+core-ktx 1.19.1  /  activity-compose 1.13.0  /  lifecycle 2.11.0
+coil3 3.6.3  /  okhttp 5.5.0  /  kotlinx-coroutines 1.11.0
 ```
 
-卸载时默认**不删除**该目录（删除请用 `uninstall.cmd /purge`）。
+> **为什么不直接上 AGP 9.x？** AGP 9 已改为「内置 Kotlin」（需要删掉 `org.jetbrains.kotlin.android` 插件并改用新的 Compose 开关 DSL）。为降低首次构建失败的概率，本轮锁定在成熟的 8.x 线；升级路线见「六、后续计划」。
+
+---
+
+## 二、三端一致性
+
+### 主题
+
+| 偏好（可手动选择） | 平日 | 国庆假期内（10-01 00:00 ~ 10-07 24:00） |
+| --- | --- | --- |
+| 浅色 `day` | 浅色 | **国庆浅色**（暖白米底 + 中国红 + 五星金） |
+| 深色 `night` | 深色 | **国庆深色**（暗红底 + 亮金） |
+| 跟随系统 `auto` | 跟随系统深浅色 | **恒为国庆浅色** |
+
+* 国庆浅/深属于 **假期内的强制叠加层**：设置页里看不到、不可手动选择，也 **不会** 写进 `SharedPreferences`；落盘的永远是基础值 `day` / `night` / `auto`。
+* 色板 28 个色值与 `forum-windows/app/theme.py` 的 `PALETTES`、Web 端 `static/css/main.css` 逐项对齐。
+* 状态栏 / 导航栏颜色与图标明暗会随主题同步（与 Web 端 `theme-color` 同义）。
+* **与另两端的差异**：`auto` 在 Android 上取「跟随系统深色模式」（`isSystemInDarkTheme()`），而 Web / Windows 用「按小时切换」。这是有意的平台化取舍。
+
+### 年制
+
+`无限年 = 公元年 − 1604`（无限元年 = 公元 1604 年）；公元年 < 1604 时显示「无限前 N 年」。影响帖子 / 评论 / 注册时间的年份显示。
+
+### 接口
+
+全部走 `https://www.yjlt.top` 的 HTTPS 接口，与 Windows 端 `app/api.py` 完全同源：
+
+```
+认证   POST /api/user/login | /api/user/logout | /api/user/register
+       GET  /api/user/info        PUT /api/user/info
+帖子   GET  /api/posts | /api/posts/random | /api/posts/<id>
+       POST /api/posts/create | /api/posts/<id>/like | /favorite | /delete
+评论   GET  /api/posts/<id>/comments        POST .../comments/create
+用户   GET  /api/user/<id> | /posts | /favorites | /comments | /following | /followers
+       POST /api/user/<id>/follow
+搜索   GET  /api/search
+世界   GET  /api/world/ALL             POST /api/world/Send
+```
 
 ---
 
 ## 三、目录结构
 
 ```
-forum-windows/
-  main.py                  程序入口：单实例 / 深链 / OpenGL 格式 / 装配
-  app/
-    constants.py           全局常量（后端地址已混淆）、分区表、限值、资源路径
-    crypto.py              字符串 XOR 混淆 + 本地凭证流加密（纯标准库）
-    paths.py               程序/资源/数据目录解析（打包后自动适配）
-    config.py              本地配置（原子写入、点号路径、变更监听）
-    logger.py              按天写日志 + 信号广播给设置页的日志面板
-    theme.py               亮/暗色板 + 全局 QSS + 文档 CSS
-    yearmode.py            无限年/公元年换算与时间格式
-    util.py                HTML 转义 / 外链判定 / 体积格式化 / 系统打开
-    api.py                 唯一出网入口（宽松解析 / 异步 / 流式下载 / 401 广播）
-    session_store.py       登录凭证持久化
-    shell.py               主窗口：顶部栏 / 侧边导航 / 页面栈 / 世界频道分栏 / 后退
-    deeplink.py            Crforum:// 解析与 HKCU 注册
-    cursors.py             自定义鼠标指针（帧序列 / 动画 / 系统安装）
-    tray.py               系统托盘
-    updater.py            自动更新
-    autostart.py          开机自启
-    widgets/              可复用组件（卡片/头像/Toast/Markdown/帖子卡/评论/弹窗/世界面板）
-    pages/                业务页面（home/forum/post*/search/user/profile/world/wiki/auth/settings/misc）
-    live2d/               Live2D：lpk 解包移植 + provider + 原生渲染控件 + 桌宠窗口
-  resources/              内置资源（图标 / WIKI 图 / 鼠标指针帧 / 致谢）
-  packaging              Nuitka / PyInstaller / Inno Setup / iexpress 打包配置
-  tests/                  单元与冒烟测试（自带运行器，不依赖 pytest）
+forum-Android/
+├── gradlew / gradlew.bat                  Gradle Wrapper（已入库）
+├── gradle/wrapper/gradle-wrapper.jar      Wrapper 引导 jar（官方 8.14.5，sha256 已校验）
+├── build.gradle.kts                       插件版本（apply false）
+├── settings.gradle.kts                    仓库与模块声明
+├── gradle.properties
+├── tools/setup-android-env.ps1            环境安装脚本（JDK 17 + Android SDK）
+└── app/
+    ├── build.gradle.kts
+    ├── proguard-rules.pro
+    └── src/main/
+        ├── AndroidManifest.xml
+        ├── res/values{,night}/             名字、颜色、主题、图标
+        └── java/top/crazying/forum/
+            ├── ForumApp.kt                 Application，初始化单例
+            ├── MainActivity.kt             单 Activity
+            ├── core/
+            │   ├── Constants.kt            服务端地址 / 版本 / 国庆区间 / 年制 / 分类表
+            │   ├── Prefs.kt                SharedPreferences 封装
+            │   ├── App.kt                  进程级单例（可被 Compose 观察的状态）
+            │   ├── Http.kt                 PrefsCookieJar
+            │   ├── Api.kt                  ApiResult + Api（全部接口）
+            │   └── TimeFmt.kt              年制 / 相对时间 / 生日 / 去 HTML
+            ├── theme/
+            │   ├── Palette.kt              4 套色板（各 28 键）
+            │   └── Theme.kt                ThemeMode / ThemeResolver / ForumTheme
+            ├── data/Models.kt              Post / CommentItem / UserItem / WorldMessage
+            └── ui/
+                ├── AppNav.kt               Screen / Tab / Navigator
+                ├── ForumRoot.kt            根节点：回退栈 + 底部导航
+                ├── components/             通用控件（卡片、按钮、头像、正文…）
+                └── screens/                11 个页面
 ```
 
 ---
 
-## 四、测试
+## 四、构建
+
+### 1. 安装环境（只需一次）
 
 ```powershell
-python tests/run_tests.py            # 离线用例
-python tests/run_tests.py --online   # 加上联网用例（会真实访问官网接口）
-python tests/run_tests.py --verbose  # 打印每个用例名
+# 在仓库根目录执行
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 ```
 
-当前共 **89+ 条用例**，覆盖：常量与资源、加密与凭证、配置读写、年制换算、时间解析、
-主题与 QSS、API 语义（含「无 `success` 字段」「端点不被同名方法顶掉」等回归）、
-异步回调线程、会话持久化、鼠标指针帧序列与 `.cur`/`.ani` 编码、Live2D 解包与引用完整性、
-组件构建与整卡点击、评论树与折叠、路由表与深链解析。
+脚本做的事（全部幂等，已存在的会跳过）：
 
----
+1. 查找 / 安装 **JDK 17**（优先复用 `JAVA_HOME`、`Program Files` 下已有的 JDK 17；找不到则 `winget install Microsoft.OpenJDK.17`）
+2. 下载并解压 **Android SDK 命令行工具**（`commandlinetools-win-16111833_latest.zip`，约 155 MB）→ `<SDK>\cmdline-tools\latest`
+3. 自动接受许可证并安装 `platform-tools`、`platforms;android-36`、`build-tools;36.0.0`
+4. 写出 `local.properties`（`sdk.dir=…`，已 git-ignore）
+5. 把 `JAVA_HOME` / `ANDROID_HOME` / `ANDROID_SDK_ROOT` 写入**用户级**环境变量
 
-## 五、打包与安装
+常用开关：`-SdkRoot <path>`、`-JdkHome <path>`、`-SkipJdk`、`-SkipSdk`、`-NoPersistEnv`。
+
+> 若 `winget` 不可用，脚本会提示手动下载 JDK 17，然后用 `-JdkHome <path>` 重跑。
+> SDK 下载总量约 500 MB，请确认能访问 `dl.google.com`。
+
+安装完 **请新开一个终端**（让环境变量生效）。
+
+### 2. 构建 APK
 
 ```powershell
-# 主后端：Nuitka standalone（产物含大量 .pyd/.dll，目录里没有 .pyc）
-powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -InstallDeps
-
-# 备用后端：PyInstaller onedir
-powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstaller
+.\gradlew.bat assembleDebug        # 产物 app\build\outputs\apk\debug\app-debug.apk
+.\gradlew.bat assembleRelease      # 未开启混淆 / 未签名
 ```
 
-产物：
+首次构建会自动下载 Gradle 8.14.5（约 138 MB）到 `%USERPROFILE%\.gradle`。
 
-| 路径 | 说明 |
-|------|------|
-| `packaging\output\forum.dist\` | 客户端目录（`forum.exe` + 依赖 + `resources/`） |
-| `packaging\output\forum_setup.exe` | 自解压安装包（iexpress） |
-| `packaging\installer\output\` | Inno Setup 安装包（装了 ISCC 时优先生成） |
+已安装 Android Studio 的话，直接打开本目录即可（Studio 自带的 JDK 也能满足要求，但请确认 Gradle JDK 为 17）。
 
-安装包写入的注册表（全部 HKCU，**不需要管理员**）：
+### 3. 装到设备
 
-* `HKCU\Software\Classes\Crforum`（`URL Protocol`）→ 支持 `Crforum://` 唤起
-* `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\CrForum` → 卸载入口
-
-详见 [packaging/README.md](packaging/README.md)。
+```powershell
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+```
 
 ---
 
-## 六、实现要点与取舍
+## 五、本轮已实现 / 未实现
 
-1. **后端地址不可修改**：写在 `app/constants.py` 里并以 XOR 字节保存，界面无任何修改入口；
-   开发时想指向本地后端，直接改 `_BASE_BLOB` 并用 `crypto.hide()` 重新生成。
-2. **宽松响应解析**：实测 `/api/posts` 不返回 `success` 字段，因此 `Result.ok` 只要求
-   「HTTP < 400 且能解出 JSON」，同时保留 `success: false` 的兼容分支。
-3. **服务端已知问题必须容忍**：`/INFO` 返回 500、更新端点当前 404，客户端全部优雅降级
-   （设置页显示「更新服务暂不可用」而不是弹错误框）。
-4. **时间口径照搬网页**：后端时间字符串不带时区时按 **UTC** 解析再换算本地显示；
-   无限年 = 公元年 − 1604。
-5. **`.ani` 自己做**：Qt 不支持 Windows 动画光标格式，也没有热区 API，因此指针包在入库时
-   就被解析成 PNG 帧 + `manifest.json`（热区/帧序/每帧延时），运行时用 `QTimer` 逐帧重设 `QCursor`。
-6. **Live2D 一律原生**（不用网页渲染）：`live2d-py` + `QOpenGLWidget`。
-   ⚠️ 关键坑：**不要**给 `QSurfaceFormat` 指定 `3.3 Core/Compatibility`，某些驱动下
-   Cubism 会报 `GL_INVALID_OPERATION` 并且一个像素都不输出；交给驱动默认（本机 4.6
-   CompatibilityProfile）才正常。桌宠透明靠 `WA_TranslucentBackground` + 以 alpha=0 清屏。
-7. **模型只下载一次**：`HEI.lpk` 从官网取一次，解密解包归一化到 `~/.Cr/forum/Live2D/`，
-   之后 `ensure()` 直接命中缓存，不再联网。
-8. **单实例 + 深链**：`QLocalServer` 命名管道，第二个实例把参数转发给已运行的实例后退出。
-9. **异步一律回主线程**：所有阻塞调用走 `app.api.run_async`（QThreadPool + 队列信号），
-   退出前 `wait_for_pending()` 等线程池收尾，避免解释器销毁阶段崩溃。
-10. **打包不出现 `.pyc`**：主后端用 Nuitka `--standalone`（模块编译成 `.pyd`，Qt/live2d-py/numpy
-    以 `.dll` 存在）；`build.ps1` 会打印 dll/pyd 与 pyc 数量供核对。
+### 已实现（V1.0.0-Beta）
+
+* **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + 密码直注）、退出登录、本地会话恢复与失效清理
+* **首页**：最新发布 / 综合排序 / 随机推荐 / 我的收藏 四个信息流，分页加载
+* **论坛**：全部 + 5 个分类（综合 / 闲聊 / 求助 / 分享 / 创作），分页加载
+* **帖子详情**：作者信息、HTML 正文、点赞 / 收藏、评论列表（一层回复缩进）、发评论、回复指定评论
+* **发帖**：分类选择、标题（≤ 100 字）、正文；纯文本按空行分段转 HTML（转义 `& < >`，不做 HTML 注入）
+* **搜索**：帖子 + 用户，支持「全部 / 帖子 / 用户」筛选
+* **用户主页**：资料卡、关注 / 已关注、帖子 / 收藏 / 评论三个列表
+* **世界频道**：`/api/world/ALL` + 20 秒轮询、发送消息、头像可点进个人主页
+* **WIKI**：WebView 加载 `/WIKI`
+* **我的 / 设置**：主题（浅色 / 深色 / 跟随系统）、年制（无限年 / 公元年，含示例）、版本 / 服务端 / 客户端标识、快捷入口
+* **主题**：4 套色板 + 国庆假期强制叠加（与 Web / Windows 三端同语义）
+
+### 未实现（后续多轮持续补齐）
+
+头像上传、修改密码 / 邮箱、邮箱验证码注册、彩蛋、会馆、举报 / 删除内容、收藏独立页、Live2D 桌宠、鼠标指针、深链、世界频道 WebSocket（当前为轮询）、正文内联图片渲染、富文本编辑器。
 
 ---
 
-## 七、服务端依赖
+## 六、后续计划
 
-客户端只访问 `https://www.yjlt.top`，不修改服务端任何数据。以下端点被使用：
-
-* 认证与用户：`/api/user/{login,logout,register,info,password,email,avatar/upload,<id>,<id>/follow,<id>/{posts,favorites,following,followers,comments}}`
-* 邮箱验证码：`/api/email/{send-register-code,send-verify-code,verify-code-email,send-code-reset-password,reset-password-by-code,send-change-password-code,send-change-email-code,send-change-email-old-code}`
-* 帖子与评论：`/api/posts*`、`/api/comments/*`、`/api/users/me/replies`
-* 其他：`/api/world/{ALL,Send}`、`/api/search`、`/api/huiguan`、`/api/report-bug`、`/Easter-Egg`、`/healthz`
-* 静态资源：`/static/live2d/HEI.lpk`、`/static/mouse/Liunx/*`、`/static/live2d/gif/*`
-
-缺邮件服务时注册/改密/改邮箱会提示服务端返回的原因（`503 邮件服务暂不可用…`），功能本身不会崩。
+1. **补齐上述未实现功能**，优先顺序：邮箱验证码注册 → 修改密码 / 邮箱 → 头像上传 → 删除 / 举报 → 收藏独立页。
+2. **世界频道升级为 WebSocket**（当前 20 秒轮询，服务端对发送有 2 秒 / 人 限流）。
+3. **正文内联图片**：`HtmlBody` 目前会剥离 `<img>`，可换成 Coil + `ImageGetter`。
+4. **AGP 9.x 升级**：用 Android Studio 的 AGP Upgrade Assistant 迁移（删除 `org.jetbrains.kotlin.android`，改用内置 Kotlin DSL），并同步升级 Gradle。
+5. **签名与发布**：`keystore.properties` + `signingConfigs`，产出已签名 release APK / AAB。
 
 ---
 
-## 八、致谢
+## 七、已知限制与注意事项
 
-* 鼠标指针素材：**漓翎_cub / RMWCP**（见 `resources/docs/mouse_credits.md`，非商用）
-* Live2D 模型作者：**@盒装现烤奕潞**（见客户端 WIKI·Live2D 页）
-* Live2D 渲染：`live2d-py`（第三方封装，与 Live2D Inc. 无关联）+ 官方 Cubism Native SDK
-
-本项目为粉丝公益创作，与作品版权方无隶属关系。
+* **WIKI 页使用 WebView**，这是本工程唯一的 WebView 使用点；其余界面均为 Compose 原生控件。
+* **正文内联图片不显示**：`HtmlBody` 主动剥离 `<img>` / `<script>`，只保留文字、段落、粗体、链接、代码块等常用标签。
+* **`auto` 主题语义**：Android 取「跟随系统深色模式」，与 Web / Windows 的「小时切换」不同（有意为之）。
+* **Coil 3 的网络加载器**：依赖 `coil-network-okhttp` 的 ServiceLoader 自动注册；若自定义 `ImageLoader` 需手动装配 `OkHttpNetworkFetcherFactory`。
+* **头像无占位图**：URL 为空时渲染「猫」字占位，尚未接入错误 / 占位 painter。
+* **服务端不可达时**：`Api` 对 GET 请求重试 1 次（写操作绝不重试，避免重复发帖 / 评论）；返回 401 会静默清理本地会话。
+* **`local.properties` 严禁入库**（已在 `.gitignore` 中）；`gradle-wrapper.jar` 相反 **必须入库**。
+* **签名材料**（`*.jks` / `*.keystore` / `keystore.properties`）同样已 git-ignore。
+* 本工程源码是在 **无 JDK / 无 SDK 环境** 下编写的，尚未经过真实编译；若首次构建报错，请把完整日志反馈回来（预期仅需小幅修正）。
