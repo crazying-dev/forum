@@ -1,0 +1,14 @@
+# 默认：文本文件统一以 LF 存入版本库
+* text=auto eol=lf
+
+# Windows 批处理必须保持 CRLF
+gradlew.bat text eol=crlf
+
+# Gradle Wrapper 引导 jar（以及其它二进制）严禁被换行符转换
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.keystore binary
+*.jks  binary
