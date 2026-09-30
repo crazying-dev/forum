@@ -36,7 +36,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-30T18:10:00+08:00",
+    "updated_at": "2026-09-30T21:40:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -67,9 +67,28 @@ DEFAULT_MANIFEST: dict = {
             "key": "android",
             "name": "Android",
             "icon": "fa-android",
-            "status": "coming_soon",
-            "requirement": "Android 8.0 及以上",
-            "releases": [],
+            "status": "available",
+            "requirement": "Android 7.0 及以上",
+            "releases": [
+                {
+                    "version": "1.0.0",
+                    "channel": "stable",
+                    "date": "2026-09-30",
+                    "size": 8004404,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.0/forum-android-1.0.0.apk",
+                    "filename": "forum-android-1.0.0.apk",
+                    "sha256": "97216259617994bdebf0cbec62bed88b7f0eaf25ee7a83644210c6e4fa8eb850",
+                    "notes": [
+                        "首个正式版：在 V1.0.0-Beta 基础上完成 WIKI 原生化与应用图标回归",
+                        "WIKI 首页 / 官方 / 个人 / 鼠标 / Linux 版全部改为原生 Compose 界面，不再嵌套网页，不再出现网页菜单栏与网页配色",
+                        "Live2D 页面保留 WebView 但已自动去壳：隐藏顶栏、侧边导航、设置面板、站点公告、页脚、世界面板与全局 Live2D，并跟随应用配色",
+                        "Linux 版说明改为原生 Markdown 渲染，链接可直接点击，下载压缩包由系统浏览器打开",
+                        "恢复原版应用图标（与网页端 favicon 同一图案），按 5 档密度生成位图并提供 Android 8.0+ 自适应图标",
+                        "正文中的超链接现在可以点击跳转",
+                    ],
+                    "mandatory": False,
+                }
+            ],
         },
         {
             "key": "linux",

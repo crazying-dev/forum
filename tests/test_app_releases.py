@@ -1,6 +1,7 @@
 """验证客户端发布 / 更新能力：清单 JSON、只读 API、/Download 页面与导航入口。"""
 import json
 import os
+import re
 import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -71,6 +72,9 @@ def test_manifest_file_valid():
     assert releases, "windows 至少应有 1 个发布版本"
     assert releases[0].get("version"), "windows 发布版本缺少 version"
     assert releases[0].get("url"), "windows 发布版本缺少 url"
+    android = next(p for p in data["platforms"] if p.get("key") == "android")
+    assert android.get("status") == "available", "android 状态应为 available"
+    assert "Android 7.0" in str(android.get("requirement")), "android 系统要求应为 Android 7.0 及以上"
 
 
 def test_release_api_endpoints():
@@ -108,7 +112,10 @@ def test_release_api_endpoints():
     assert body["release"]["version"] == latest
     assert body["message"], "发现新版本时 message 不能为空"
 
-    rv = client.get("/api/app/check?platform=android&version=0.0.1")
+    # 未发布（coming_soon）的平台不应提示可更新
+    pending = next(p for p in _load_manifest()["platforms"]
+                   if p.get("status") != "available")
+    rv = client.get("/api/app/check?platform=%s&version=0.0.1" % pending.get("key"))
     body = rv.get_json()
     assert rv.status_code == 200
     assert body["available"] is False, "coming_soon 平台不应提示可更新"
@@ -174,13 +181,33 @@ def test_version_utils():
 
 
 def test_download_template_and_manifest_status():
-    """下载页模板存在且含未发布态关键字；非 windows 平台均为 coming_soon。"""
+    """下载页模板存在且含未发布态关键字；清单状态与 releases 自洽。"""
     html = _read(DOWNLOAD_TEMPLATE)
     for token in ("coming_soon", "即将推出", "/Download"):
         assert token in html, f"download.html 缺少 {token}"
     for platform in _load_manifest()["platforms"]:
-        if platform.get("key") != "windows":
-            assert platform.get("status") == "coming_soon", f"{platform.get('key')} 应为 coming_soon"
+        status = platform.get("status")
+        releases = platform.get("releases") or []
+        if status == "available":
+            assert releases, f"{platform.get('key')} 为 available 时必须有 releases"
+        else:
+            assert status == "coming_soon", f"{platform.get('key')} 状态非法：{status}"
+            assert not releases, f"{platform.get('key')} 未发布时不应有 releases"
+
+
+def test_android_release_entry():
+    """Android 首个正式版：清单字段与 GitHub Release 直链保持一致。"""
+    android = next(p for p in _load_manifest()["platforms"] if p.get("key") == "android")
+    release = (android.get("releases") or [{}])[0]
+    assert release.get("version") == "1.0.0", "android 版本应为 1.0.0"
+    assert release.get("channel") == "stable"
+    assert release.get("filename") == "forum-android-1.0.0.apk"
+    assert release.get("url") == (
+        "https://github.com/crazying-dev/forum/releases/download/"
+        "Android-V1.0.0/forum-android-1.0.0.apk")
+    assert isinstance(release.get("size"), int) and release["size"] > 0
+    assert re.fullmatch(r"[0-9a-f]{64}", str(release.get("sha256"))), "sha256 应为 64 位小写十六进制"
+    assert release.get("mandatory") is False
 
 
 def test_base_nav_entries():
@@ -210,6 +237,7 @@ if __name__ == "__main__":
         ("test_mirror_target_resolves_manifest_url", test_mirror_target_resolves_manifest_url),
         ("test_version_utils", test_version_utils),
         ("test_download_template_and_manifest_status", test_download_template_and_manifest_status),
+        ("test_android_release_entry", test_android_release_entry),
         ("test_base_nav_entries", test_base_nav_entries),
         ("test_download_page_renders", test_download_page_renders),
     ]
