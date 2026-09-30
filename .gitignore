@@ -30,3 +30,4 @@ Thumbs.db
 *.keystore
 !debug.keystore
 keystore.properties
+keystore/
