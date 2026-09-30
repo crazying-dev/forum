@@ -85,7 +85,7 @@ forum-windows/
     paths.py               程序/资源/数据目录解析（打包后自动适配）
     config.py              本地配置（原子写入、点号路径、变更监听）
     logger.py              按天写日志 + 信号广播给设置页的日志面板
-    theme.py               亮/暗色板 + 全局 QSS + 文档 CSS
+    theme.py               亮/暗/国庆（假期限定）色板 + 全局 QSS + 文档 CSS
     yearmode.py            无限年/公元年换算与时间格式
     util.py                HTML 转义 / 外链判定 / 体积格式化 / 系统打开
     api.py                 唯一出网入口（宽松解析 / 异步 / 流式下载 / 401 广播）
@@ -178,6 +178,12 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     「点了立即更新、程序退出了，但安装器一直不启动」。脚本统一用
     `newline=""` 原样写出（避免二次翻译出 `\r\r\n`），静默装完再手动 `start` 拉回客户端
     （Inno Setup 的 `[Run]` 段带 `skipifsilent`，`/SILENT` 下安装器不会自己拉起程序）。
+12. **国庆节限定主题（v1.3.5）**：假期（本地时间 **10-01 00:00 ~ 10-07 24:00**）内
+    `theme.resolve_mode()` 强制把「白天」映射为国庆浅色（暖白/米底 + 中国红 `#C8102E` + 五星金）、
+    「夜间」映射为国庆深色（暗红 `#3A0D12` 底 + 亮金 `#FFD24A`）、「跟随系统」恒为国庆浅色。
+    两套色板（`constants.THEME_NATIONAL_DAY_LIGHT / _DARK`）只存在于 `theme.PALETTES`，
+    **设置页与托盘菜单不提供入口**；`config.json` 里的 `theme` 始终只记录用户的基础偏好，
+    假期结束自动还原。判定期函数 `theme.is_national_day()`（10-08 00:00 起失效）。
 
 ---
 

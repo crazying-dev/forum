@@ -17,7 +17,7 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.4"
+APP_VERSION = "1.3.5"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
 
 # ────────────────────────── 启动「支持作者」弹窗 ──────────────────────────
@@ -303,6 +303,14 @@ DEFAULT_AVATAR = RES_AVATARS_DIR / "LuoXiaoHei1.png"
 THEME_DAY = "day"
 THEME_NIGHT = "night"
 THEME_AUTO = "auto"
+# 国庆节限定主题：假期（10-01 00:00 ~ 10-07 24:00）内由 theme.resolve_mode 强制映射，
+# 仅作为“渲染结果”存在——设置页/托盘菜单里不可见、不可选，也不会写入 config.json。
+THEME_NATIONAL_DAY_LIGHT = "national_day_light"
+THEME_NATIONAL_DAY_DARK = "national_day_dark"
+# 国庆主题自动生效的假期窗口（本地时间，10-08 00:00 起自动还原）
+NATIONAL_DAY_MONTH = 10
+NATIONAL_DAY_FROM_DAY = 1
+NATIONAL_DAY_TO_DAY = 7
 
 CURSOR_VARIANTS = (
     ("normal", "普通"),

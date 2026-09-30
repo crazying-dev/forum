@@ -213,27 +213,53 @@ def test_strip_markdown():
 # ────────────────────── 主题 ──────────────────────
 
 
+class _HolidayPatch:
+    """临时把「是否国庆假期」判定固定为 False / True。
+
+    国庆主题会随真实日期自动生效，若不固定判定，用例在 10-01 ~ 10-07 跑就会飘，
+    因此这里把 :func:`app.theme.is_national_day` 打桩。
+    """
+
+    def __init__(self, flag: bool) -> None:
+        self.flag = flag
+        self._saved = None
+
+    def __enter__(self):
+        self._saved = theme.is_national_day
+        theme.is_national_day = lambda *a, **k: self.flag
+        return self
+
+    def __exit__(self, *exc):
+        theme.is_national_day = self._saved
+        return False
+
+
 def test_theme_palettes_and_qss():
-    assert theme.resolve_mode("day") == "day"
-    assert theme.resolve_mode("night") == "night"
-    assert theme.resolve_mode("auto") in ("day", "night")
-    day = theme.qss("day")
-    night = theme.qss("night")
-    assert len(day) > 2000 and len(night) > 2000
-    assert "#6A8C89" in day and "#84A8B9" in night
-    # 模板占位符必须全部被替换掉（包括 radius 这种二次替换的）
-    for placeholder in ("{text_primary}", "{bg_card}", "{radius}", "{primary}"):
-        assert placeholder not in day, placeholder
-        assert placeholder not in night, placeholder
-    assert "#E8EEED" in theme.document_css("night")
+    with _HolidayPatch(False):
+        assert theme.resolve_mode("day") == "day"
+        assert theme.resolve_mode("night") == "night"
+        assert theme.resolve_mode("auto") in ("day", "night")
+        day = theme.qss("day")
+        night = theme.qss("night")
+        assert len(day) > 2000 and len(night) > 2000
+        assert "#6A8C89" in day and "#84A8B9" in night
+        # 模板占位符必须全部被替换掉（包括 radius 这种二次替换的）
+        for placeholder in ("{text_primary}", "{bg_card}", "{radius}", "{primary}"):
+            assert placeholder not in day, placeholder
+            assert placeholder not in night, placeholder
+        assert "#E8EEED" in theme.document_css("night")
 
 
 def test_theme_palette_keys_consistent():
-    day = theme.palette("day")
-    night = theme.palette("night")
+    with _HolidayPatch(False):
+        day = theme.palette("day")
+        night = theme.palette("night")
     assert set(day) == set(night)
     for key in ("text_primary", "bg_body", "bg_card", "primary", "border"):
         assert day[key].startswith("#") and night[key].startswith("#")
+    # 国庆两套色板的键必须与基础色板完全一致，否则 QSS/文档 CSS 会出现未替换占位符
+    for mode in (constants.THEME_NATIONAL_DAY_LIGHT, constants.THEME_NATIONAL_DAY_DARK):
+        assert set(theme.PALETTES[mode]) == set(day), mode
 
 
 # ────────────────────── 工具 ──────────────────────

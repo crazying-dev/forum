@@ -185,11 +185,18 @@ def test_toast_manager():
 def test_theme_apply_and_widgets():
     app = _app_instance()
     from app import theme
-    applied = theme.apply(app, constants.THEME_DAY)
-    assert applied == "day"
-    assert len(app.styleSheet()) > 2000
-    applied = theme.apply(app, constants.THEME_NIGHT)
-    assert applied == "night"
+    # 国庆假期（10-01 ~ 10-07，真实日期驱动）会把 day/night 映射为国庆主题，
+    # 这里先固定为非假期，保证断言不随日期飘。
+    saved = theme.is_national_day
+    theme.is_national_day = lambda *a, **k: False
+    try:
+        applied = theme.apply(app, constants.THEME_DAY)
+        assert applied == "day"
+        assert len(app.styleSheet()) > 2000
+        applied = theme.apply(app, constants.THEME_NIGHT)
+        assert applied == "night"
+    finally:
+        theme.is_national_day = saved
 
 
 # ────────────────────── 路由与深链 ──────────────────────

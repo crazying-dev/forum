@@ -1,8 +1,14 @@
 # -*- coding: utf-8 -*-
 """主题：色板 / QSS / 文档 CSS。
 
-色板照搬 Web 端 ``static/css/main.css`` 的 ``:root`` 与 ``.night-mode``，
+色板照搬 Web 端 ``static/css/main.css`` 的 ``:root``、``.night-mode``、
+``.national-day`` 与 ``.night-mode.national-day``，
 半透明色已按底层背景预混为实色（Qt 控件默认不做透明度混合，实色更稳定）。
+
+国庆节限定主题（10-01 00:00 ~ 10-07 24:00）作为**强制叠加层**由 :func:`resolve_mode`
+映射：假期内「白天」→ 国庆浅色、「夜间」→ 国庆深色、「跟随系统」→ 恒为国庆浅色。
+设置页 / 托盘菜单不提供这两个选项，配置里的 ``theme`` 仍只记录用户的**基础偏好**，
+假期结束自动还原。
 """
 
 from __future__ import annotations
@@ -12,6 +18,17 @@ from datetime import datetime
 from . import constants, config
 
 PRIMARY_RADIUS = 8
+
+
+def is_national_day(now: datetime | None = None) -> bool:
+    """是否处于国庆假期（本地时间 10-01 00:00 ~ 10-07 24:00）。
+
+    ``10-07 24:00`` 等价于 ``10-08 00:00``（开区间），因此仅需判断 1 日 ~ 7 日。
+    """
+    d = now or datetime.now()
+    return (d.month == constants.NATIONAL_DAY_MONTH
+            and constants.NATIONAL_DAY_FROM_DAY <= d.day <= constants.NATIONAL_DAY_TO_DAY)
+
 
 PALETTES: dict[str, dict[str, str]] = {
     constants.THEME_DAY: {
@@ -74,6 +91,68 @@ PALETTES: dict[str, dict[str, str]] = {
         "code_bg": "#243435",
         "mark_bg": "#4A4326",
     },
+    # ── 国庆节浅色（暖白/米底 + 中国红主色 + 五星金点缀）──
+    constants.THEME_NATIONAL_DAY_LIGHT: {
+        "text_primary": "#3A1D1D",
+        "text_secondary": "#7A3226",
+        "text_tertiary": "#B49484",
+        "text_light": "#FFF3E0",
+        "text_accent": "#C8102E",
+        "text_muted": "#B49484",
+        "bg_body": "#FBF3E6",
+        "bg_header": "#FEF9EF",
+        "bg_card": "#FFFDF8",
+        "bg_input": "#FFFCF6",
+        "bg_hover": "#FBEAE8",
+        "bg_item_hover": "#FBEAE8",
+        "bg_item_active": "#F7D9DA",
+        "bg_icon": "#F8E1E0",
+        "bg_icon_hover": "#F2C4C8",
+        "bg_footer": "#C8102E",
+        "bg_secondary": "#FFFDF8",
+        "border": "#F2CAC5",
+        "border_divider": "#F6DCD4",
+        "border_focus": "#C8102E",
+        "primary": "#C8102E",
+        "primary_hover": "#A50D24",
+        "primary_text": "#FFFFFF",
+        "danger": "#B4544F",
+        "danger_hover": "#9E423D",
+        "shadow": "rgba(150, 40, 30, 0.16)",
+        "code_bg": "#F7E9E4",
+        "mark_bg": "#FFE9A8",
+    },
+    # ── 国庆节深色（暗红底 + 亮金主色）──
+    constants.THEME_NATIONAL_DAY_DARK: {
+        "text_primary": "#FFE8C4",
+        "text_secondary": "#F2CF9B",
+        "text_tertiary": "#C79A63",
+        "text_light": "#FFD98A",
+        "text_accent": "#FFD24A",
+        "text_muted": "#C79A63",
+        "bg_body": "#3A0D12",
+        "bg_header": "#481015",
+        "bg_card": "#310B10",
+        "bg_input": "#380D12",
+        "bg_hover": "#502919",
+        "bg_item_hover": "#502919",
+        "bg_item_active": "#5E371D",
+        "bg_icon": "#562F1A",
+        "bg_icon_hover": "#774F24",
+        "bg_footer": "#4A1219",
+        "bg_secondary": "#310B10",
+        "border": "#5D301C",
+        "border_divider": "#522519",
+        "border_focus": "#FFD24A",
+        "primary": "#FFD24A",
+        "primary_hover": "#FFC01E",
+        "primary_text": "#3A0D12",
+        "danger": "#E78284",
+        "danger_hover": "#D06B6D",
+        "shadow": "rgba(0, 0, 0, 0.45)",
+        "code_bg": "#451419",
+        "mark_bg": "#5C4A18",
+    },
 }
 
 
@@ -81,6 +160,12 @@ def resolve_mode(mode: str | None = None) -> str:
     """把配置里的 day/night/auto 解析为具体主题。
 
     ``auto`` 同 Web 端：本地时间 < 6 点或 ≥ 18 点为夜间。
+
+    国庆假期（10-01 00:00 ~ 10-07 24:00）内强制叠加国庆主题：
+      · ``day``  → :data:`constants.THEME_NATIONAL_DAY_LIGHT`
+      · ``night``→ :data:`constants.THEME_NATIONAL_DAY_DARK`
+      · ``auto`` → 恒为国庆浅色（假期内不按时间切换）
+    传入国庆主题名时原样返回（幂等），便于 ``resolve_mode(resolve_mode(...))``。
     """
     if mode is None:
         try:
@@ -88,10 +173,15 @@ def resolve_mode(mode: str | None = None) -> str:
         except Exception:
             mode = constants.THEME_AUTO
     mode = str(mode or constants.THEME_AUTO)
+    if mode in (constants.THEME_NATIONAL_DAY_LIGHT, constants.THEME_NATIONAL_DAY_DARK):
+        return mode
+    holiday = is_national_day()
     if mode == constants.THEME_DAY:
-        return constants.THEME_DAY
+        return constants.THEME_NATIONAL_DAY_LIGHT if holiday else constants.THEME_DAY
     if mode == constants.THEME_NIGHT:
-        return constants.THEME_NIGHT
+        return constants.THEME_NATIONAL_DAY_DARK if holiday else constants.THEME_NIGHT
+    if holiday:
+        return constants.THEME_NATIONAL_DAY_LIGHT
     hour = datetime.now().hour
     return constants.THEME_NIGHT if (hour < 6 or hour >= 18) else constants.THEME_DAY
 
