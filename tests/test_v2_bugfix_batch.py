@@ -688,7 +688,7 @@ def test_mobile_create_entry_in_header():
     assert "classList.remove('is-authed')" in JS, "未登录/失败时未清除 body.is-authed"
 
 
-# ── 回归 24：手机版底部标签栏最终集合（首页/世界/WIKI/彩蛋/设置）──
+# ── 回归 24：手机版底部标签栏最终集合（首页/世界/WIKI/下载/彩蛋/设置）──
 def test_mobile_bottom_tabs_final_set():
     # 去掉「论坛」「发帖」标签
     assert 'data-navtab="/forum"' not in BASE_HTML, "底部标签栏仍保留「论坛」标签"
@@ -697,9 +697,12 @@ def test_mobile_bottom_tabs_final_set():
     assert 'data-navtab="/WIKI"' in BASE_HTML, "底部标签栏缺少 WIKI 入口"
     assert re.search(r'<a[^>]*class="side-nav-item nav-tab"[^>]*href="/WIKI"', BASE_HTML), \
         "WIKI 入口不是底部标签栏项"
-    # 恰好 5 个底部标签
-    assert BASE_HTML.count('class="side-nav-item nav-tab"') == 5, \
-        "底部标签栏应恰为 5 项（首页/世界/WIKI/彩蛋/设置）"
+    # 桌面端下载入口在手机端被隐藏，故底部标签栏必须有「下载」
+    assert re.search(r'<a[^>]*class="side-nav-item nav-tab"[^>]*href="/Download"', BASE_HTML), \
+        "底部标签栏缺少「下载」入口（手机端将无法进入 /Download）"
+    # 恰好 6 个底部标签
+    assert BASE_HTML.count('class="side-nav-item nav-tab"') == 6, \
+        "底部标签栏应恰为 6 项（首页/世界/WIKI/下载/彩蛋/设置）"
     # 高亮逻辑仍覆盖底部标签
     assert "markActiveTab" in JS and ".nav-tab[data-navtab]" in JS
 

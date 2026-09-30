@@ -13,7 +13,9 @@ BASE_TEMPLATE = os.path.join(PROJECT_ROOT, "templates", "base.html")
 
 
 # 手机端底部标签栏（.nav-tab）数量基线：新增入口不得走这条通道
-SIDE_NAV_TAB_COUNT = 5
+# 例外：/Download 在 ≤900px 时头部 .nav-link 与侧栏竖排项均被 main.css 隐藏，
+# 手机端仅能通过底部标签栏到达，故计入基线（5 → 6）。
+SIDE_NAV_TAB_COUNT = 6
 
 
 def _read(path):
@@ -211,11 +213,19 @@ def test_android_release_entry():
 
 
 def test_base_nav_entries():
-    """base.html 新增 /Download 入口，且不挤占手机端底部标签栏。"""
+    """base.html 新增 /Download 入口，且底部标签栏数量稳定（手机端可达性见下）。"""
     html = _read(BASE_TEMPLATE)
     assert 'href="/Download"' in html, "base.html 缺少 /Download 入口"
     count = html.count('class="side-nav-item nav-tab"')
     assert count == SIDE_NAV_TAB_COUNT, f"底部标签栏数量应保持 {SIDE_NAV_TAB_COUNT}，实际 {count}"
+    # 手机端（≤900px）头部导航与侧栏竖排项都被隐藏，底部标签栏是唯一入口
+    assert 'data-navtab="/Download"' in html, \
+        "底部标签栏缺少「下载」入口，手机端将无法进入 /Download"
+    css = _read(os.path.join(PROJECT_ROOT, "static", "css", "main.css"))
+    assert ".side-nav-item:not(.nav-tab) { display: none; }" in css, \
+        "移动端应隐藏侧栏竖排项（否则桌面入口会在窄屏溢出）"
+    assert ".header-nav .nav-link { display: none; }" in css, \
+        "移动端应隐藏头部导航链接"
 
 
 def test_download_page_renders():
