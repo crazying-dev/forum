@@ -218,6 +218,9 @@ class _FakeDownloadDialog:
     def set_progress(self, done, total) -> None:
         pass
 
+    def set_source(self, text) -> None:
+        self.source = text
+
     def close(self) -> None:
         self.closed = True
 
@@ -327,11 +330,13 @@ def test_download_and_install_pending_registers():
     _patch(upd, "DownloadDialog", _FakeDownloadDialog)
     _patch(upd, "install_choice", lambda parent, version="": "pending")
     _patch(upd, "toast", lambda *a, **k: None)
+    # 失败分支会弹模态框，测试里必须替掉，否则无事件循环会永久阻塞
+    _patch(upd, "info_box", lambda *a, **k: None)
     _patch(upd.updater, "set_pending_install",
            lambda path, version="": (registered.update(path=path, version=version)
                                      or True))
     _patch(upd.updater, "download_update",
-           lambda info, on_progress=None, on_done=None:
+           lambda info, on_progress=None, on_done=None, on_stage=None:
                on_done("C:/u/1.3.2/forum_setup.exe", ""))
     try:
         upd.download_and_install(None, _info(available=True, version="1.3.2", size=10))
@@ -351,7 +356,7 @@ def test_download_and_install_now_launches():
     _patch(upd.updater, "launch_installer",
            lambda path: (got.__setitem__("path", path) or (True, "ok")))
     _patch(upd.updater, "download_update",
-           lambda info, on_progress=None, on_done=None:
+           lambda info, on_progress=None, on_done=None, on_stage=None:
                on_done("C:/u/forum_setup.exe", ""))
     try:
         upd.download_and_install(None, _info(available=True, version="1.3.2", size=10))
@@ -366,12 +371,14 @@ def test_download_and_install_later_keeps_file():
     _patch(upd, "DownloadDialog", _FakeDownloadDialog)
     _patch(upd, "install_choice", lambda parent, version="": "later")
     _patch(upd, "toast", lambda *a, **k: None)
+    # 失败分支会弹模态框，测试里必须替掉，否则无事件循环会永久阻塞
+    _patch(upd, "info_box", lambda *a, **k: None)
     _patch(upd.updater, "set_pending_install",
            lambda path, version="": flags.__setitem__("pending", flags["pending"] + 1))
     _patch(upd.updater, "launch_installer",
            lambda path: (flags.__setitem__("launch", flags["launch"] + 1) or (True, "ok")))
     _patch(upd.updater, "download_update",
-           lambda info, on_progress=None, on_done=None:
+           lambda info, on_progress=None, on_done=None, on_stage=None:
                on_done("C:/u/forum_setup.exe", ""))
     try:
         upd.download_and_install(None, _info(available=True, version="1.3.2", size=10))

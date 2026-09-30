@@ -180,6 +180,10 @@ class DownloadDialog(QDialog):
         self.status.setWordWrap(True)
         root.addWidget(self.status)
 
+        self.source = Muted("")
+        self.source.setWordWrap(True)
+        root.addWidget(self.source)
+
         self._done = 0
         self._total = int(getattr(info, "size", 0) or 0)
         now = time.time()
@@ -197,6 +201,13 @@ class DownloadDialog(QDialog):
         self._done = int(done)
         if total:
             self._total = int(total)
+
+    def set_source(self, text: str) -> None:
+        """显示当前下载源（直连 / DoH 修复 / 公共加速 / 服务器反代）。"""
+        try:
+            self.source.setText(str(text or ""))
+        except RuntimeError:
+            pass
 
     def _tick(self) -> None:
         now = time.time()
@@ -286,8 +297,19 @@ def download_and_install(parent: QWidget | None, info, *, on_status=None) -> Non
         if not ok:
             info_box(parent, "安装更新", message)
 
+    def _on_stage(label: str) -> None:
+        """切换到下一级下载源时更新提示（直连 → DoH → 加速 → 反代）。"""
+        name = str(label or "正在连接")
+        _status("正在下载更新（%s）…" % name)
+        if dialog is not None:
+            try:
+                dialog.set_source("下载源：%s" % name)
+            except RuntimeError:
+                pass
+
     try:
-        updater.download_update(info, on_progress=_on_progress, on_done=_on_done)
+        updater.download_update(info, on_progress=_on_progress, on_done=_on_done,
+                                on_stage=_on_stage)
     except Exception as exc:  # noqa: BLE001
         _log.error("启动下载失败：%s", exc, exc_info=True)
         _on_done(None, str(exc))

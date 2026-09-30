@@ -17,7 +17,7 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.3"
+APP_VERSION = "1.3.4"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
 
 # ────────────────────────── 启动「支持作者」弹窗 ──────────────────────────
@@ -38,6 +38,23 @@ _SENT_BLOB = (b"\x32\x42\xb3\x61\xe0\x74\x27\x9d\x09\x9d\x45\xf6\x53\xb9\x4a\x6c
 BASE_URL = crypto.reveal(_BASE_BLOB).rstrip("/")
 UPDATE_EXE_URL = crypto.reveal(_UPDATE_BLOB)
 SENTENCE_BASE = crypto.reveal(_SENT_BLOB)
+
+# ────────────────────────── 更新下载回退 ──────────────────────────
+# 下载 GitHub 上的更新包时按「直连 → DoH 修复 DNS → 公共加速 → 服务器反代」逐级回退；
+# 只在“连接失败 / 超时”时升级，不因速度慢而降级。下载后一律校验 sha256，
+# 镜像即便被篡改也会被直接拒绝。
+ACCELERATOR_MIRRORS = (
+    "https://ghproxy.net/",
+    "https://gh-proxy.com/",
+    "https://ghfast.top/",
+)
+# DoH（DNS over HTTPS，JSON 接口）解析服务，按顺序尝试
+DOH_ENDPOINTS = (
+    "https://dns.alidns.com/resolve",
+    "https://doh.pub/dns-query",
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/resolve",
+)
 
 
 def api(path: str) -> str:

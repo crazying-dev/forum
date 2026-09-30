@@ -2,7 +2,9 @@
 """更新检查与下载：探测远端更新包 → 比对本地记录 → 流式下载 → 静默安装。
 
 * 主更新源是发布清单里的 GitHub Release 直链（安装包 ``forum_setup.exe``）；
-  拿不到清单时回退到 :data:`constants.UPDATE_EXE_URL` 的指纹探测
+  下载时按「直连 → DoH 修复 DNS → 公共加速 → 服务器反代」逐级回退
+  （见 :mod:`app.netfallback`）；拿不到清单时回退到
+  :data:`constants.UPDATE_EXE_URL` 的指纹探测
 * 本地记录：``~/.Cr/forum/update/manifest.json``（``etag`` / ``last_modified`` / ``size`` / ``checked_at``）
 * 每个版本的安装包单独放在 ``~/.Cr/forum/update/<版本>/`` 下，互不污染
 * 下载物按文件名区分：``forum_setup*.exe`` 走静默安装（``/SILENT``，装完自动重启），
@@ -25,12 +27,13 @@ from urllib.parse import urlparse
 import requests
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from . import api, constants, logger, paths, releases, util
+from . import api, constants, logger, netfallback, paths, releases, util
 
 _log = logger.get_logger("updater")
 
 DEFAULT_TIMEOUT = (5, 12)
-DOWNLOAD_TIMEOUT = (5, 60)
+# 下载超时（连接, 读取）；连接失败/超时即升级到下一级下载源
+DOWNLOAD_TIMEOUT = (20, 30)
 CHUNK_SIZE = 64 * 1024
 INSTALLER_NAME = "forum_setup.exe"          # 发布清单 / GitHub Release 上的安装包名
 SCRIPT_NAME = "apply_update.cmd"
@@ -292,24 +295,37 @@ def check_async(on_done, *, manifest_url=None, label="检查更新") -> None:
 
 
 class _ProgressRelay(QObject):
-    """把工作线程里的进度回调排队到主线程执行（控件不可跨线程访问）。"""
+    """把工作线程里的进度/阶段回调排队到主线程执行（控件不可跨线程访问）。"""
 
     progressed = pyqtSignal(int, int)
+    staged = pyqtSignal(str)
 
-    def __init__(self, callback=None) -> None:
+    def __init__(self, callback=None, on_stage=None) -> None:
         super().__init__()
         self._callback = callback
+        self._stage_callback = on_stage
         if callable(callback):
             self.progressed.connect(self._on_progress)
+        if callable(on_stage):
+            self.staged.connect(self._on_stage)
 
     def _on_progress(self, done: int, total: int) -> None:
         _emit(self._callback, done, total)
+
+    def _on_stage(self, label: str) -> None:
+        _emit(self._stage_callback, label)
 
     def emit_progress(self, done: int, total: int) -> None:
         try:
             self.progressed.emit(int(done), int(total))
         except Exception as exc:  # noqa: BLE001
             _log.debug("进度回调失败：%s", exc)
+
+    def emit_stage(self, label: str) -> None:
+        try:
+            self.staged.emit(str(label or ""))
+        except Exception as exc:  # noqa: BLE001
+            _log.debug("阶段回调失败：%s", exc)
 
 
 def download_to(url: str, dest, *, expected: int = 0, resume: bool = True,
@@ -402,6 +418,72 @@ def download_to(url: str, dest, *, expected: int = 0, resume: bool = True,
     return True, ""
 
 
+def _remove_part(dest) -> None:
+    """删除断点文件（换下载源时必须重下，避免混合不同来源的字节）。"""
+    part = Path(str(dest) + ".part")
+    try:
+        if part.is_file():
+            part.unlink()
+    except OSError as exc:  # noqa: PERF203
+        _log.debug("清理断点文件失败：%s", exc)
+
+
+def download_with_fallback(attempts, dest, *, expected: int = 0,
+                           on_progress=None, on_stage=None,
+                           timeout=DOWNLOAD_TIMEOUT) -> tuple[bool, str]:
+    """按顺序尝试多级下载源；全部失败返回 ``(False, 最后一次错误)``。
+
+    ``attempts`` 形如 ``[(标签, 地址, 是否用 DoH), ...]``（见
+    :func:`app.netfallback.download_attempts`）。只有第一次尝试允许断点续传；
+    换源时先删掉 ``.part``，保证不会把不同来源的字节拼在一起。
+    """
+    items = list(attempts or [])
+    if not items:
+        return False, "没有可用的下载源"
+    last_error = ""
+    for index, item in enumerate(items):
+        try:
+            label, url, use_doh = item
+        except Exception:  # noqa: BLE001
+            continue
+        if not str(url or "").strip():
+            continue
+        _emit(on_stage, str(label or "下载"))
+        if index > 0:
+            _remove_part(dest)
+        try:
+            if use_doh:
+                with netfallback.doh_dns():
+                    ok, error = download_to(url, dest, expected=expected,
+                                            resume=(index == 0),
+                                            on_progress=on_progress,
+                                            timeout=timeout)
+            else:
+                ok, error = download_to(url, dest, expected=expected,
+                                        resume=(index == 0),
+                                        on_progress=on_progress,
+                                        timeout=timeout)
+        except Exception as exc:  # noqa: BLE001
+            ok, error = False, str(exc) or "下载失败"
+        if ok:
+            return True, ""
+        last_error = error or "下载失败"
+        _log.info("下载源「%s」失败：%s", label, last_error)
+    return False, last_error or "下载失败"
+
+
+def _write_script(path: Path, text: str) -> None:
+    """写 ``.cmd``：文本已经是 CRLF，必须用 ``newline=""`` 原样写出。
+
+    若用 ``newline="\\r\\n"``，已有的 ``\\n`` 会被再翻译一次得到 ``\\r\\r\\n``。
+    实测该换行 cmd 尚能容忍，真正的致命点是 ``for /L`` 的循环变量必须
+    落成双百分号 ``%%i``（见 :func:`_script_text` 注释）；这里保持原样
+    写出，避免任何隐式二次翻译。
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="")
+
+
 def _basename_from_url(url: str) -> str:
     """取 URL 路径末段（GitHub 直链 → ``forum_setup.exe``）。"""
     try:
@@ -446,24 +528,28 @@ def _discard(path) -> None:
             _log.debug("清理损坏的更新包失败：%s", exc)
 
 
-def download_update(info, on_progress=None, on_done=None) -> None:
+def download_update(info, on_progress=None, on_done=None, on_stage=None) -> None:
     """异步下载更新包到 ``~/.Cr/forum/update/<版本>/<文件名>``。
 
     * 文件名优先用发布清单的 ``filename``，其次按 URL 末段推断
+    * 下载按「直连 → DoH 修复 DNS → 公共加速 → 服务器反代」逐级回退
     * 清单提供 ``sha256`` 时会校验，不匹配即删除并报错
     * ``on_progress(done, total)``：主线程回调，``total`` 未知时为 0
+    * ``on_stage(label)``：切换到下一级下载源时的主线程回调
     * ``on_done(exe_path, error)``：主线程回调，``error`` 为空串表示成功
     """
     url = str(getattr(info, "url", "") or constants.UPDATE_EXE_URL or "").strip()
     expected = int(getattr(info, "size", 0) or 0)
     digest = str(getattr(info, "sha256", "") or "").strip().lower()
     name = asset_name(url, str(getattr(info, "filename", "") or ""))
-    relay = _ProgressRelay(on_progress)
+    attempts = netfallback.download_attempts(url, name) or [("直连", url, False)]
+    relay = _ProgressRelay(on_progress, on_stage)
 
     def _work() -> str:
         final = download_dir(info) / name
-        ok, error = download_to(url, final, expected=expected, resume=True,
-                                on_progress=relay.emit_progress)
+        ok, error = download_with_fallback(attempts, final, expected=expected,
+                                           on_progress=relay.emit_progress,
+                                           on_stage=relay.emit_stage)
         if not ok:
             raise RuntimeError(error or "下载失败")
         if digest:
@@ -518,14 +604,18 @@ def _script_text(source: Path, target: Path) -> str:
         "setlocal enableextensions",
         'set "SRC=' + str(source) + '"',
         'set "DST=' + str(target) + '"',
-        "rem wait for the app to exit (max %d seconds), then replace it" % WAIT_SECONDS,
-        "for /L %%i in (1,1,%d) do (" % WAIT_SECONDS,
+        "rem wait for the app to exit (max {} seconds), then replace it".format(WAIT_SECONDS),
+        # 批处理文件里循环变量必须写 %%i；用 % 格式化会把 %% 折叠成单个 %，
+        # cmd 解析到 `for /L %i` 时报「此时不应有 i」并整段中断，
+        # 表现为「程序退了但安装器不启动」。
+        "for /L %%i in (1,1,{}) do (".format(WAIT_SECONDS),
         '  tasklist /fi "imagename eq ' + name + '" 2>nul | findstr /i "' + name + '" >nul',
         "  if errorlevel 1 goto copy",
-        "  timeout /t 1 /nobreak >nul",
+        "  ping -n 2 127.0.0.1 >nul",
         ")",
         ":copy",
         'move /y "%SRC%" "%DST%" >nul',
+        'start "" "%DST%"',
         'start "" "%DST%"',
         'del "%~f0" >nul 2>&1',
         "endlocal",
@@ -534,11 +624,12 @@ def _script_text(source: Path, target: Path) -> str:
     return "\r\n".join(lines)
 
 
-def _installer_script_text(setup: Path, app: Path) -> str:
+def _installer_script_text(setup: Path, app: Path, log: Path | None = None) -> str:
     """安装包脚本：等主程序退出 → 静默安装（进度条可见）→ 重新启动客户端。
 
     Inno Setup 的 ``[Run]`` 段带 ``skipifsilent``，``/SILENT`` 下安装器
     不会自己拉起程序，所以装完必须在这里手动 ``start``。
+    ``log`` 不为空时把关键节点写入日志，便于排查「安装器没启动」。
     """
     name = app.name
     args = " ".join(INSTALLER_ARGS)
@@ -547,17 +638,29 @@ def _installer_script_text(setup: Path, app: Path) -> str:
         "setlocal enableextensions",
         'set "SETUP=' + str(setup) + '"',
         'set "APP=' + str(app) + '"',
-        "rem wait for the app to exit (max %d seconds), then install silently" % WAIT_SECONDS,
-        "for /L %%i in (1,1,%d) do (" % WAIT_SECONDS,
+    ]
+    if log is not None:
+        lines += [
+            'set "LOG=' + str(log) + '"',
+            'echo [%date% %time%] apply_update start> "%LOG%"',
+        ]
+    lines += [
+        "rem wait for the app to exit (max {} seconds), then install silently".format(WAIT_SECONDS),
+        # 同 _script_text：%%i 必须原样落到 .cmd，不能被 % 格式化折叠成 %i
+        "for /L %%i in (1,1,{}) do (".format(WAIT_SECONDS),
         '  tasklist /fi "imagename eq ' + name + '" 2>nul | findstr /i "' + name + '" >nul',
         "  if errorlevel 1 goto install",
-        "  timeout /t 1 /nobreak >nul",
+        "  ping -n 2 127.0.0.1 >nul",
         ")",
         ":install",
         'start "" /wait "%SETUP%" ' + args,
         "rem give the installer a moment to finish writing files",
-        "timeout /t 2 /nobreak >nul",
+        "ping -n 3 127.0.0.1 >nul",
         'start "" "%APP%"',
+    ]
+    if log is not None:
+        lines.append('echo [%date% %time%] installer finished>> "%LOG%"')
+    lines += [
         'del "%~f0" >nul 2>&1',
         "endlocal",
         "",
@@ -566,10 +669,18 @@ def _installer_script_text(setup: Path, app: Path) -> str:
 
 
 def _spawn_script(script: Path) -> None:
-    """脱离当前进程启动 .cmd（父进程退出不影响它继续跑）。"""
+    """脱离当前进程启动 .cmd（父进程退出不影响它继续跑）。
+
+    子进程标准流接到空设备：GUI 程序没有有效控制台句柄，
+    直接继承会让 cmd 的初始化不稳定。
+    """
     flags = (getattr(subprocess, "DETACHED_PROCESS", 0)
              | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
-    subprocess.Popen(["cmd", "/c", str(script)], creationflags=flags, close_fds=True)
+    kwargs = {"creationflags": flags, "close_fds": True}
+    devnull = getattr(subprocess, "DEVNULL", None)
+    if devnull is not None:
+        kwargs.update(stdin=devnull, stdout=devnull, stderr=devnull)
+    subprocess.Popen(["cmd", "/c", str(script)], **kwargs)
 
 
 def is_installer(path) -> bool:
@@ -605,11 +716,10 @@ def launch_installer(exe_path) -> tuple[bool, str]:
             return (False, "更新包不存在，请重新下载")
 
         script = paths.update_dir() / SCRIPT_NAME
-        script.parent.mkdir(parents=True, exist_ok=True)
+        log = paths.update_dir() / "apply_update.log"
 
         if is_installer(source):
-            script.write_text(_installer_script_text(source, Path(sys.executable)),
-                              encoding="utf-8", newline="\r\n")
+            _write_script(script, _installer_script_text(source, Path(sys.executable), log))
             _spawn_script(script)
             _log.info("已启动静默安装：%s", source)
             _quit_app()
@@ -619,8 +729,7 @@ def launch_installer(exe_path) -> tuple[bool, str]:
         if source.resolve() == target.resolve():
             return (False, "更新包与当前程序路径相同，无需替换")
 
-        script.write_text(_script_text(source, target), encoding="utf-8",
-                          newline="\r\n")
+        _write_script(script, _script_text(source, target))
         _spawn_script(script)
         _log.info("已启动更新脚本：%s → %s", source, target)
         _quit_app()

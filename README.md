@@ -31,7 +31,7 @@
 | Live2D 桌宠 | 无边框、透明、置顶的桌面小窗，**原生渲染**（非网页）；可拖动、鼠标穿透、点击触发动作、视线跟随；模型只从网络下载一次并缓存 |
 | 托盘 | 显示/隐藏主窗口、世界频道、桌宠开关、主题、年制、打开数据目录、检查更新、关于、退出 |
 | 深链 | `Crforum://post/PS...`、`Crforum://user/RL...`、`Crforum://wiki?kind=live2d` 等 |
-| 自动更新 | 从官网更新端点下载新版并自动替换重启 |
+| 自动更新 | 下载安装包按「直连 → DoH 修 DNS → 公共加速 → 服务器反代」四级回退，逐级只在实际连接失败/超时时升级；校验 sha256 后静默安装并自动重启 |
 
 ---
 
@@ -67,7 +67,7 @@ python main.py "Crforum://post/PS..."   # 深链直达
   logs/forum_YYYYMMDD.log   运行日志（保留 14 天）
   update/manifest.json     更新源指纹记录（etag / 大小 / 上次检查时间）
   update/pending.json      已登记「退出程序时自动安装」的安装包
-  update/<版本>/           每个版本的安装包（forum_setup.exe[.part]）与安装脚本
+  update/<版本>/           每个版本的安装包（forum_setup.exe[.part]）、安装脚本与 apply_update.log
 ```
 
 卸载时默认**不删除**该目录（删除请用 `uninstall.cmd /purge`）。
@@ -94,7 +94,8 @@ forum-windows/
     deeplink.py            Crforum:// 解析与 HKCU 注册
     cursors.py             自定义鼠标指针（帧序列 / 动画 / 系统安装）
     tray.py               系统托盘
-    updater.py            自动更新
+    updater.py            自动更新（分级回退下载 / sha256 校验 / 拉起安装器）
+    netfallback.py        更新包下载回退：DoH 解析 + 公共加速镜像 + 服务器反代
     autostart.py          开机自启
     widgets/              可复用组件（卡片/头像/Toast/Markdown/帖子卡/评论/弹窗/世界面板）
     pages/                业务页面（home/forum/post*/search/user/profile/world/wiki/auth/settings/misc）
@@ -171,6 +172,12 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
    退出前 `wait_for_pending()` 等线程池收尾，避免解释器销毁阶段崩溃。
 10. **打包不出现 `.pyc`**：主后端用 Nuitka `--standalone`（模块编译成 `.pyd`，Qt/live2d-py/numpy
     以 `.dll` 存在）；`build.ps1` 会打印 dll/pyd 与 pyc 数量供核对。
+11. **更新安装脚本必须写成 `.cmd` 文件，而不是拼命令行**（v1.3.4 修的坑）：批处理文件里
+    `for /L` 的循环变量必须是 `%%i`；用 Python 的 `%` 格式化拼字符串时 `%%` 会被折叠成
+    单个 `%`，cmd 解析 `for /L %i` 会报「此时不应有 i」并**整段中断脚本**——现象就是
+    「点了立即更新、程序退出了，但安装器一直不启动」。脚本统一用
+    `newline=""` 原样写出（避免二次翻译出 `\r\r\n`），静默装完再手动 `start` 拉回客户端
+    （Inno Setup 的 `[Run]` 段带 `skipifsilent`，`/SILENT` 下安装器不会自己拉起程序）。
 
 ---
 
@@ -182,6 +189,8 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
 * 邮箱验证码：`/api/email/{send-register-code,send-verify-code,verify-code-email,send-code-reset-password,reset-password-by-code,send-change-password-code,send-change-email-code,send-change-email-old-code}`
 * 帖子与评论：`/api/posts*`、`/api/comments/*`、`/api/users/me/replies`
 * 其他：`/api/world/{ALL,Send}`、`/api/search`、`/api/huiguan`、`/api/report-bug`、`/Easter-Egg`、`/healthz`
+* 更新包反代（客户端四级回退的最后一级）：`/api/app/mirror/windows/<文件名>`——服务端实时拉取
+  发布清单里的 GitHub 直链并流式转发，透传 `Range` 以支持断点续传
 * 静态资源：`/static/live2d/HEI.lpk`、`/static/mouse/Liunx/*`、`/static/live2d/gif/*`
 
 缺邮件服务时注册/改密/改邮箱会提示服务端返回的原因（`503 邮件服务暂不可用…`），功能本身不会崩。
