@@ -165,7 +165,7 @@ def test_mirror_target_resolves_manifest_url():
     target = _mirror_target("windows", name)
     assert target == release.get("url"), "应解析出清单里的 GitHub 直链"
     assert target.startswith("https://github.com/")
-    # android 同样可反代（V1.0.1 已发布）；平台与文件名必须同时匹配
+    # android 同样可反代（V1.0.2 已发布）；平台与文件名必须同时匹配
     android = next(p for p in _load_manifest()["platforms"] if p.get("key") == "android")
     a_release = (android.get("releases") or [{}])[0]
     a_name = a_release.get("filename")
@@ -209,12 +209,12 @@ def test_android_release_entry():
     """Android 最新版：清单字段与 GitHub Release 直链保持一致。"""
     android = next(p for p in _load_manifest()["platforms"] if p.get("key") == "android")
     release = (android.get("releases") or [{}])[0]
-    assert release.get("version") == "1.0.1", "android 版本应为 1.0.1"
+    assert release.get("version") == "1.0.2", "android 版本应为 1.0.2"
     assert release.get("channel") == "stable"
-    assert release.get("filename") == "forum-android-1.0.1.apk"
+    assert release.get("filename") == "forum-android-1.0.2.apk"
     assert release.get("url") == (
         "https://github.com/crazying-dev/forum/releases/download/"
-        "Android-V1.0.1/forum-android-1.0.1.apk")
+        "Android-V1.0.2/forum-android-1.0.2.apk")
     assert isinstance(release.get("size"), int) and release["size"] > 0
     assert re.fullmatch(r"[0-9a-f]{64}", str(release.get("sha256"))), "sha256 应为 64 位小写十六进制"
     assert release.get("mandatory") is False
@@ -283,7 +283,7 @@ def test_download_page_links_use_site_mirror():
 
     # 两个已发布平台都要有站内入口，并带 ?v= 版本号做缓存失效
     assert "/api/app/mirror/windows/forum_setup.exe?v=1.3.6" in html
-    assert "/api/app/mirror/android/forum-android-1.0.1.apk?v=1.0.1" in html
+    assert "/api/app/mirror/android/forum-android-1.0.2.apk?v=1.0.2" in html
 
 
 def test_mirror_cache_full_flow():

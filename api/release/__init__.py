@@ -39,7 +39,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-30T23:05:00+08:00",
+    "updated_at": "2026-10-01T08:00:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -75,17 +75,18 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Android 7.0 及以上",
             "releases": [
                 {
-                    "version": "1.0.1",
+                    "version": "1.0.2",
                     "channel": "stable",
-                    "date": "2026-09-30",
-                    "size": 8004412,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.1/forum-android-1.0.1.apk",
-                    "filename": "forum-android-1.0.1.apk",
-                    "sha256": "a17dce93cd82ed43815fbe257f410f2956b5177a65b8cd0df79fa5af534053ec",
+                    "date": "2026-10-01",
+                    "size": 8037816,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.2/forum-android-1.0.2.apk",
+                    "filename": "forum-android-1.0.2.apk",
+                    "sha256": "44a945385c7f6f09af03b2b0fbdf8f1c928576c64c62feda0ec1d3fec1198d64",
                     "notes": [
-                        "「我的」页新增「支持作者」区块，常驻展示赞赏码",
-                        "赞赏码与网页端、Windows 端同源同图，由 Coil 落盘缓存，不重复下载",
-                        "网页端与 Windows 端同步上线常驻赞赏码入口",
+                        "新增应用自更新：可在「我的 › 关于」手动检查更新，冷启动也会静默检查（每 24 小时最多一次）",
+                        "下载三级回退：直连 GitHub → 公共加速 → 站内反代，完成后校验体积与 sha256 再交给系统安装器",
+                        "底部标签栏新增第 6 个「彩蛋」标签，每次随机奉上一条站内彩蛋或「每日一言」",
+                        "点过「以后再说」的版本不再自动提醒，仍可手动检查更新",
                     ],
                     "mandatory": False,
                 }
