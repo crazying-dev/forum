@@ -184,6 +184,13 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     两套色板（`constants.THEME_NATIONAL_DAY_LIGHT / _DARK`）只存在于 `theme.PALETTES`，
     **设置页与托盘菜单不提供入口**；`config.json` 里的 `theme` 始终只记录用户的基础偏好，
     假期结束自动还原。判定期函数 `theme.is_national_day()`（10-08 00:00 起失效）。
+13. **赞赏码三端常驻入口（v1.3.6）**：`app.widgets.promo.PromoDialog` 现在同时服务两种入口——
+    **启动随机弹窗**（`manual=False`：文案带本地打开次数，按钮「以后再说」）与
+    **常驻入口**（`manual=True`：固定公益文案，按钮「关闭」）。常驻入口由托盘菜单「支持作者」
+    与设置页「关于」卡片按钮经 `promo.show_support()` 触发，**不掷概率、不改启动计数**。
+    赞赏码仍是远端图 `constants.PROMO_QR_URL`，由 `widgets.images.image_cache` 落盘缓存，
+    首次下载后离线可用；与网页端（`base.html` 里的 `data-src`）、安卓端
+    （`Constants.REWARD_QR_URL`）同源同图，改图只需换图床文件、三端一起生效。
 
 ---
 

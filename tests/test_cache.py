@@ -210,6 +210,37 @@ def test_main_wires_promo():
     assert "maybe_show" in source
 
 
+# ────────────────────── 常驻「赞赏码」入口（托盘 / 设置页） ──────────────────────
+
+
+def test_promo_manual_support_entry():
+    """常驻入口：show_support() 存在，且文案为固定公益文案（无打开次数占位符）。"""
+    from app.widgets import promo
+    assert callable(promo.show_support)
+    assert "公益" in promo.MANUAL_TEXT
+    assert "%" not in promo.MANUAL_TEXT
+    assert constants.PROMO_QR_URL.startswith("https://")
+
+
+def test_promo_dialog_supports_manual_mode():
+    """PromoDialog 支持 manual 开关（常驻用「关闭」，启动随机弹窗用「以后再说」）。"""
+    from app.widgets.promo import PromoDialog
+    params = inspect.signature(PromoDialog.__init__).parameters
+    assert "manual" in params, "PromoDialog 缺少 manual 参数"
+    assert params["manual"].default is False, "manual 默认应为 False（不影响启动随机弹窗）"
+    source = inspect.getsource(PromoDialog.__init__)
+    assert "关闭" in source and "以后再说" in source
+
+
+def test_support_entry_wired_in_tray_and_settings():
+    """托盘菜单与设置页「关于」都必须挂上「支持作者」常驻入口。"""
+    root = Path(__file__).resolve().parents[1]
+    for rel in ("app/tray.py", "app/pages/settings.py"):
+        text = (root / rel).read_text(encoding="utf-8")
+        assert "支持作者" in text, "%s 缺少「支持作者」入口" % rel
+        assert "show_support" in text, "%s 未接入 promo.show_support()" % rel
+
+
 # ────────────────────── 头像强制刷新 ──────────────────────
 
 

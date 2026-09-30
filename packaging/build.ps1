@@ -104,8 +104,16 @@ if (-not $SkipTests) {
     Write-Step 'Unit tests'
     $runner = Join-Path $Root 'tests\run_tests.py'
     if (Test-Path $runner) {
+        # Test logs emit WARNING lines on stderr. With $ErrorActionPreference='Stop',
+        # PowerShell 5.1 turns a native command's stderr into a terminating error,
+        # which aborted the build before the exit code could be checked.
+        # Relax it for the test run and judge success by the exit code only.
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         & $Python $runner
-        if ($LASTEXITCODE -ne 0) { throw "tests failed (exit=$LASTEXITCODE)" }
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $prevEap
+        if ($code -ne 0) { throw "tests failed (exit=$code)" }
         Write-Ok 'tests passed'
     } else {
         Write-Warn2 'tests\run_tests.py not found - skipped'
@@ -142,8 +150,14 @@ if (-not $SkipBuild) {
         if (-not $KeepIntermediate) { $cli += '--remove-output' }
         if ($NuitkaExtra.Count -gt 0) { $cli += $NuitkaExtra }
         $cli += (Join-Path $Root 'main.py')
+        # Same reason as the test step: Nuitka logs to stderr, which Stop-mode
+        # PowerShell 5.1 treats as a terminating error. Judge by exit code only.
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         & $Python @cli
-        if ($LASTEXITCODE -ne 0) { throw "Nuitka build failed (exit=$LASTEXITCODE)" }
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $prevEap
+        if ($code -ne 0) { throw "Nuitka build failed (exit=$code)" }
         $built = Join-Path $OutputDir 'main.dist'
         if (Test-Path $built) { Move-Item $built $DistDir }
     }
@@ -156,8 +170,12 @@ if (-not $SkipBuild) {
             "--workpath=$(Join-Path $OutputDir '.pyinstaller')",
             (Join-Path $ScriptDir 'forum.spec')
         )
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
         & $Python @cli
-        if ($LASTEXITCODE -ne 0) { throw "PyInstaller build failed (exit=$LASTEXITCODE)" }
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $prevEap
+        if ($code -ne 0) { throw "PyInstaller build failed (exit=$code)" }
         $built = Join-Path $OutputDir 'forum'
         if (Test-Path $built) { Move-Item $built $DistDir }
     }

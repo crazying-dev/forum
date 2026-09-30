@@ -806,6 +806,27 @@ class SettingsPage(Page):
         row.addStretch(1)
         card.body.addLayout(row)
 
+        # 常驻赞赏码入口（与托盘菜单「支持作者」、启动随机弹窗共用同一弹窗）
+        card.body.addWidget(Divider())
+        card.body.addWidget(self._muted(
+            "如果这个客户端帮到了你，欢迎扫码赞赏支持（纯自愿，与功能无关）。"))
+        row = hbox(spacing=8)
+        row.addWidget(button("支持作者", "primary",
+                             lambda _=False: self._support()))
+        row.addStretch(1)
+        card.body.addLayout(row)
+
+    def _support(self) -> None:
+        """常驻入口：打开「支持作者」弹窗（赞赏码）。"""
+        try:
+            from ..widgets.promo import show_support
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("支持作者模块不可用：%s", exc)
+            self.toast("支持作者模块不可用")
+            return
+        if not show_support(self):
+            self.toast("支持作者暂时不可用")
+
     # ── 状态同步 ──
     def _sync_states(self) -> None:
         cfg = config_mod.current()

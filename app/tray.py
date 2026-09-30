@@ -93,6 +93,7 @@ class TrayIcon(QSystemTrayIcon):
 
         self._add_item("打开下载页", self._open_download)
         self._add_item("打开数据目录", self._open_data_dir)
+        self._add_item("支持作者", self._support)
         self._add_item("检查更新", self._check_update)
         self._add_item("反馈 Bug", self._bug_report)
 
@@ -300,6 +301,17 @@ class TrayIcon(QSystemTrayIcon):
             BugReportDialog(self._shell, page_url=constants.BASE_URL).exec()
         except Exception as exc:  # noqa: BLE001
             _log.error("打开反馈窗口失败：%s", exc, exc_info=True)
+
+    def _support(self) -> None:
+        """常驻入口：打开「支持作者」弹窗（赞赏码），与启动随机弹窗同一弹窗。"""
+        try:
+            from .widgets.promo import show_support
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("支持作者模块不可用：%s", exc)
+            self._set_status("支持作者模块不可用")
+            return
+        if not show_support(self._shell):
+            self._set_status("支持作者暂时不可用")
 
     def _about(self) -> None:
         try:
