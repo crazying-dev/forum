@@ -228,6 +228,17 @@ def test_base_nav_entries():
         "移动端应隐藏头部导航链接"
 
 
+def test_download_page_mobile_css():
+    """下载页窄屏适配：按钮大点击区 + 长串断行；≤480px 有超窄屏规则。"""
+    css = _read(os.path.join(PROJECT_ROOT, "static", "css", "main.css"))
+    assert ".dl-actions .btn { flex: 1 1 auto; min-height: 44px; justify-content: center; }" in css, \
+        "下载页缺少移动端按钮大点击区规则"
+    assert ".dl-notes li, .dl-foot, .dl-requirement { overflow-wrap: anywhere; }" in css, \
+        "下载页缺少窄屏长串断行规则（易横向溢出）"
+    assert ".dl-tab { flex: 1 1 calc(50% - 3px); justify-content: center; padding: 9px 8px; }" in css, \
+        "下载页缺少 ≤480px 平台标签两列均分规则"
+
+
 def test_download_page_renders():
     """/Download 页面纯服务端渲染成功，含 Windows 与未发布平台文案。"""
     client = _make_client()
@@ -248,6 +259,7 @@ if __name__ == "__main__":
         ("test_version_utils", test_version_utils),
         ("test_download_template_and_manifest_status", test_download_template_and_manifest_status),
         ("test_android_release_entry", test_android_release_entry),
+        ("test_download_page_mobile_css", test_download_page_mobile_css),
         ("test_base_nav_entries", test_base_nav_entries),
         ("test_download_page_renders", test_download_page_renders),
     ]
