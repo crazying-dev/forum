@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-09-29T23:30:00+08:00",
+  "updated_at": "2026-09-30T18:10:00+08:00",
   "platforms": [
     {
       "key": "windows",
@@ -10,18 +10,18 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.4",
+          "version": "1.3.5",
           "channel": "stable",
-          "date": "2026-09-29",
-          "size": 48550958,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.4/forum_setup.exe",
+          "date": "2026-09-30",
+          "size": 48552024,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.5/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "4d189743f743a0d9910d7e5ad80e95af0ea822969a317770ed1925e88a778912",
+          "sha256": "06dc997341fcc0b8ac2667ccf4d0066eae616c6f5067eecc256e3bd90d9f885c",
           "notes": [
-            "更新包下载新增四级回退：直连 → DoH 修复 DNS → 公共加速镜像 → 服务器反代，仅在连接失败/超时时逐级升级",
-            "修复「点击立即更新后程序退出、安装器却不启动」：安装脚本循环变量被错误转义导致 cmd 整段中断",
-            "下载进度窗口会显示当前下载源；切换下载源会丢弃断点文件重新下载，最终仍以 sha256 校验兜底",
-            "新增安装日志 ~/.Cr/forum/update/<版本>/apply_update.log，便于排查安装器未启动"
+            "新增国庆节限定主题：国庆浅色（暖白/米底 + 中国红 #C8102E + 五星金）与国庆深色（暗红 #3A0D12 底 + 亮金 #FFD24A）",
+            "国庆假期（10-01 00:00 ~ 10-07 24:00，本地时间）自动生效：白天→国庆浅色、夜间→国庆深色、跟随系统→恒为国庆浅色",
+            "国庆主题不支持手动切换：设置页/托盘菜单仍只有白天/夜间/跟随系统，假期结束自动还原基础偏好",
+            "网页端同步上线同款国庆主题配色（假期内强制生效）"
           ],
           "mandatory": false
         }
