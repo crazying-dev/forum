@@ -16,6 +16,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
+import time
+from collections import OrderedDict
 from urllib.parse import urlparse
 
 import requests
@@ -343,25 +346,99 @@ def download_release(platform: str, filename: str):
 
 
 # ──────────────────────────────────────────────
-# 服务器反代（客户端最后一级下载回退）
+# 服务器反代（/Download 页与客户端的统一下载入口）
 # ──────────────────────────────────────────────
 # 只允许反代 GitHub 上的安装包，避免本接口被当成任意代理（SSRF）
 MIRROR_HOSTS = ("github.com", "githubusercontent.com", "githubassets.com")
-MIRROR_TIMEOUT = (10, 60)
+MIRROR_TIMEOUT = (10, 120)
 MIRROR_CHUNK = 64 * 1024
+
+# ── 进程内内存缓存 ──
+# 24 小时 TTL；只活在当前进程内存里，不落盘、不跨 worker 共享，重启即全部丢失。
+MIRROR_TTL = 24 * 3600
+MIRROR_CACHE_MAX_BYTES = 256 * 1024 * 1024   # 总容量上限，超出按 LRU 淘汰
+MIRROR_CACHE_MAX_FILE = 128 * 1024 * 1024    # 单文件上限，超过则不缓存（仍正常转发）
+_MIRROR_CACHE: "OrderedDict[str, dict]" = OrderedDict()
+_MIRROR_LOCK = threading.Lock()
+_MIRROR_STATS = {"hit": 0, "miss": 0, "stored": 0, "evicted": 0, "skipped": 0}
+
+
+def _cache_bytes() -> int:
+    """当前缓存占用字节数（调用方需已持有 _MIRROR_LOCK）。"""
+    return sum(len(entry["data"]) for entry in _MIRROR_CACHE.values())
+
+
+def _cache_get(url: str) -> dict | None:
+    """读缓存：命中则刷新 LRU 顺序；过期条目顺手删除。"""
+    now = time.time()
+    with _MIRROR_LOCK:
+        entry = _MIRROR_CACHE.get(url)
+        if entry is None:
+            _MIRROR_STATS["miss"] += 1
+            return None
+        if now - entry["ts"] > MIRROR_TTL:
+            del _MIRROR_CACHE[url]
+            _MIRROR_STATS["miss"] += 1
+            return None
+        _MIRROR_CACHE.move_to_end(url)
+        _MIRROR_STATS["hit"] += 1
+        return entry
+
+
+def _cache_put(url: str, data: bytes, content_type: str,
+               etag: str = "", last_modified: str = "") -> None:
+    """写入缓存；超出总容量时按 LRU 淘汰到够用为止。"""
+    if not data or len(data) > MIRROR_CACHE_MAX_FILE:
+        with _MIRROR_LOCK:
+            _MIRROR_STATS["skipped"] += 1
+        return
+    with _MIRROR_LOCK:
+        _MIRROR_CACHE[url] = {
+            "data": data,
+            "ts": time.time(),
+            "content_type": content_type,
+            "etag": etag,
+            "last_modified": last_modified,
+        }
+        _MIRROR_CACHE.move_to_end(url)
+        _MIRROR_STATS["stored"] += 1
+        while _cache_bytes() > MIRROR_CACHE_MAX_BYTES and len(_MIRROR_CACHE) > 1:
+            _MIRROR_CACHE.popitem(last=False)
+            _MIRROR_STATS["evicted"] += 1
+
+
+def cache_info() -> dict:
+    """缓存现状快照（诊断 / 测试用）。"""
+    with _MIRROR_LOCK:
+        info = {
+            "entries": len(_MIRROR_CACHE),
+            "bytes": _cache_bytes(),
+            "ttl": MIRROR_TTL,
+            "max_bytes": MIRROR_CACHE_MAX_BYTES,
+            "max_file": MIRROR_CACHE_MAX_FILE,
+        }
+        info.update(_MIRROR_STATS)
+        return info
+
+
+def cache_clear() -> int:
+    """清空缓存，返回被清掉的条目数。"""
+    with _MIRROR_LOCK:
+        count = len(_MIRROR_CACHE)
+        _MIRROR_CACHE.clear()
+        return count
 
 
 def _mirror_target(platform, filename) -> str | None:
-    """按发布清单找到指定文件名的 GitHub 直链；不合法返回 None。"""
-    if (str(platform or "")).strip().lower() != "windows":
-        return None
+    """按发布清单找到指定文件名的 GitHub 直链；平台/文件名不匹配一律返回 None。"""
+    key = str(platform or "").strip().lower()
     name = str(filename or "").strip()
-    if not name or not SAFE_NAME_RE.match(name):
+    if not key or not name or not SAFE_NAME_RE.match(name):
         return None
     for item in platforms():
         if not isinstance(item, dict):
             continue
-        if str(item.get("key", "")).lower() != "windows":
+        if str(item.get("key", "")).lower() != key:
             continue
         for release in item.get("releases") or []:
             if not isinstance(release, dict):
@@ -380,22 +457,123 @@ def _mirror_target(platform, filename) -> str | None:
     return None
 
 
+def is_mirrorable(url) -> bool:
+    """该直链是否允许走本站反代（https + GitHub 域名白名单）。"""
+    text = str(url or "").strip()
+    if not text.startswith("https://"):
+        return False
+    host = (urlparse(text).hostname or "").lower()
+    return any(host == h or host.endswith("." + h) for h in MIRROR_HOSTS)
+
+
+def _parse_range(range_header, total: int):
+    """解析单段 Range（bytes=a-b / a- / -n），返回闭区间 (start, end)；不合法返回 None。"""
+    if not range_header or not isinstance(range_header, str):
+        return None
+    header = range_header.strip()
+    if not header.lower().startswith("bytes=") or "," in header:
+        return None
+    first, sep, last = header[6:].strip().partition("-")
+    if not sep:
+        return None
+    first, last = first.strip(), last.strip()
+    try:
+        if first == "":
+            size = int(last)
+            if size <= 0:
+                return None
+            start, end = max(0, total - size), total - 1
+        else:
+            start = int(first)
+            end = int(last) if last else total - 1
+    except ValueError:
+        return None
+    if start < 0 or start >= total:
+        return None
+    end = min(end, total - 1)
+    if end < start:
+        return None
+    return start, end
+
+
+def _mirror_headers(filename, content_type="", etag="", last_modified="") -> dict:
+    """反代响应的公共头。Cache-Control 与进程内缓存 TTL 对齐。"""
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": 'attachment; filename="%s"' % filename,
+        "Content-Type": content_type or "application/octet-stream",
+        "Cache-Control": "public, max-age=%d" % MIRROR_TTL,
+    }
+    if etag:
+        headers["ETag"] = etag
+    if last_modified:
+        headers["Last-Modified"] = last_modified
+    return headers
+
+
+def _serve_cached(entry, filename, range_header):
+    """命中缓存：整文件 200 / 单段 Range 206 / 越界 416，全部从内存切片。"""
+    data = entry["data"]
+    total = len(data)
+    headers = _mirror_headers(filename, entry.get("content_type", ""),
+                              entry.get("etag", ""), entry.get("last_modified", ""))
+    parsed = _parse_range(range_header, total)
+    if range_header and parsed is None:
+        return Response(status=416, headers={"Content-Range": "bytes */%d" % total,
+                                             "Accept-Ranges": "bytes"})
+    if parsed is None:
+        headers["Content-Length"] = str(total)
+        return Response(data, status=200, headers=headers)
+    start, end = parsed
+    headers["Content-Range"] = "bytes %d-%d/%d" % (start, end, total)
+    headers["Content-Length"] = str(end - start + 1)
+    return Response(data[start:end + 1], status=206, headers=headers)
+
+
+def _stream_and_cache(url, upstream, content_type, etag, last_modified):
+    """边转发边累积；只有完整收完才写入缓存（客户端中断则丢弃）。"""
+    buffer = bytearray()
+    cacheable = True
+    complete = False
+    try:
+        for chunk in upstream.iter_content(MIRROR_CHUNK):
+            if not chunk:
+                continue
+            if cacheable:
+                buffer.extend(chunk)
+                if len(buffer) > MIRROR_CACHE_MAX_FILE:
+                    cacheable = False
+                    buffer = bytearray()
+            yield chunk
+        complete = True
+    finally:
+        upstream.close()
+        if complete and cacheable and buffer:
+            _cache_put(url, bytes(buffer), content_type, etag, last_modified)
+
+
 @release_bp.route("/mirror/<platform>/<filename>", methods=["GET"])
 def mirror_release(platform: str, filename: str):
-    """服务器反代：服务端拉取 GitHub 直链并流式转发（透传 Range，支持断点续传）。
+    """站内统一下载入口：服务端反代 GitHub 直链，带进程内 24 小时内存缓存。
 
-    客户端直连 GitHub / 公共加速都失败时的最后一级回退。任何异常都返回 JSON，
-    不返回 500。
+    - 命中缓存：直接从内存切片返回（支持 Range 断点续传）
+    - 未命中：边转发边累积，完整收完后才写入缓存（客户端中断则丢弃，不留脏数据）
+    - 缓存只活在当前进程内存里，不落盘，进程重启即全部丢失
+    任何异常都返回 JSON，不返回 500。
     """
     url = _mirror_target(platform, filename)
     if not url:
         return jsonify({"success": False, "message": "暂无可反代的安装包"}), 404
 
+    range_header = request.headers.get("Range")
+    cached = _cache_get(url)
+    if cached is not None:
+        return _serve_cached(cached, filename, range_header)
+
     upstream_headers = {
         "User-Agent": request.headers.get("User-Agent") or "CrForum-Mirror",
         "Accept-Encoding": "identity",
     }
-    range_header = request.headers.get("Range")
     if range_header:
         upstream_headers["Range"] = range_header
     try:
@@ -409,21 +587,41 @@ def mirror_release(platform: str, filename: str):
         upstream.close()
         return jsonify({"success": False, "message": f"上游返回 {code}"}), 502
 
-    headers = {}
-    for key in ("Content-Length", "Content-Range", "Content-Type", "ETag", "Last-Modified"):
-        value = upstream.headers.get(key)
-        if value:
-            headers[key] = value
-    headers["Accept-Ranges"] = "bytes"
-    headers["Cache-Control"] = "no-store"
+    content_type = upstream.headers.get("Content-Type") or ""
+    etag = upstream.headers.get("ETag") or ""
+    last_modified = upstream.headers.get("Last-Modified") or ""
+    headers = _mirror_headers(filename, content_type, etag, last_modified)
 
-    def _stream():
-        try:
-            for chunk in upstream.iter_content(MIRROR_CHUNK):
-                if chunk:
-                    yield chunk
-        finally:
-            upstream.close()
+    # 带 Range 的上游响应是片段，不能当作完整文件缓存；仅透传，等整包下载时再入缓存
+    if range_header or upstream.status_code == 206:
+        for key in ("Content-Length", "Content-Range"):
+            value = upstream.headers.get(key)
+            if value:
+                headers[key] = value
+        return Response(stream_with_context(_relay(upstream)),
+                        status=upstream.status_code, headers=headers,
+                        direct_passthrough=True)
 
-    return Response(stream_with_context(_stream()), status=upstream.status_code,
-                    headers=headers, direct_passthrough=True)
+    total = upstream.headers.get("Content-Length")
+    if total:
+        headers["Content-Length"] = total
+    return Response(
+        stream_with_context(
+            _stream_and_cache(url, upstream, content_type, etag, last_modified)),
+        status=upstream.status_code, headers=headers, direct_passthrough=True)
+
+
+@release_bp.route("/cache", methods=["GET"])
+def mirror_cache_info():
+    """反代缓存诊断（只读）：条目数 / 占用字节 / TTL / 命中统计。"""
+    return jsonify({"success": True, **cache_info()}), 200
+
+
+def _relay(upstream):
+    """透传上游响应体（不缓存），结束或中断都确保关闭上游连接。"""
+    try:
+        for chunk in upstream.iter_content(MIRROR_CHUNK):
+            if chunk:
+                yield chunk
+    finally:
+        upstream.close()

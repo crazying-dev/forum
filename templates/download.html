@@ -49,9 +49,12 @@
         </ul>
         {% endif %}
         <div class="dl-actions">
-          <a class="btn btn-primary" href="{{ r.url }}"><i class="fa fa-download"></i> 下载</a>
-          <button class="btn btn-outline dl-copy" type="button" data-copy-url="{{ r.url }}"><i class="fa fa-link"></i> 复制直链</button>
+          <a class="btn btn-primary" href="{{ r.mirror_url or r.url }}"><i class="fa fa-download"></i> 下载</a>
+          <button class="btn btn-outline dl-copy" type="button" data-copy-url="{{ r.mirror_url or r.url }}"><i class="fa fa-link"></i> 复制直链</button>
         </div>
+        {% if r.mirror_url %}
+        <p class="form-hint dl-via">下载由本站服务器中转（GitHub 反代），命中缓存时无需再等待 GitHub；非本站来源请勿轻信。</p>
+        {% endif %}
       </div>
       {% endfor %}
       {% elif p.status == 'coming_soon' %}

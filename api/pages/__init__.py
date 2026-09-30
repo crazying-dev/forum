@@ -4,9 +4,25 @@ import uuid
 from flask import Blueprint, render_template, redirect, request, url_for, Response, jsonify
 
 import db
-from api.release import human_size, load_manifest
+from api.release import human_size, is_mirrorable, load_manifest
 
 pages_bp = Blueprint("pages", __name__)
+
+
+def _mirror_url(platform_key, release) -> str:
+    """站内反代下载地址（/api/app/mirror/...）。
+
+    只对 GitHub 直链生成；非 GitHub（如将来自建 CDN）返回空串，模板会回退到原始 url。
+    附带 ?v=版本号：换版本时地址变化，避免浏览器继续命中旧安装包的缓存。
+    """
+    filename = str(release.get("filename") or "").strip()
+    if not platform_key or not filename or not is_mirrorable(release.get("url")):
+        return ""
+    try:
+        return url_for("release.mirror_release", platform=platform_key,
+                       filename=filename, v=str(release.get("version") or ""))
+    except Exception:  # noqa: BLE001 — 蓝图未注册时不让下载页 500
+        return ""
 
 
 @pages_bp.route("/")
@@ -209,6 +225,8 @@ def download_page():
                 continue
             entry = dict(release)
             entry["size_text"] = human_size(release.get("size"))
+            # 下载按钮统一指向站内反代（24h 内存缓存），而不是 GitHub 直链
+            entry["mirror_url"] = _mirror_url(item.get("key"), release)
             releases.append(entry)
         item["releases"] = releases
         platform_list.append(item)

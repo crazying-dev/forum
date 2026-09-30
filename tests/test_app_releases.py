@@ -165,6 +165,14 @@ def test_mirror_target_resolves_manifest_url():
     target = _mirror_target("windows", name)
     assert target == release.get("url"), "应解析出清单里的 GitHub 直链"
     assert target.startswith("https://github.com/")
+    # android 同样可反代（V1.0.0 已发布）；平台与文件名必须同时匹配
+    android = next(p for p in _load_manifest()["platforms"] if p.get("key") == "android")
+    a_release = (android.get("releases") or [{}])[0]
+    a_name = a_release.get("filename")
+    assert _mirror_target("android", a_name) == a_release.get("url")
+    assert _mirror_target("android", a_name).startswith("https://github.com/")
+    assert _mirror_target("android", "forum-android-9.9.9.apk") is None
+    assert _mirror_target("linux", "whatever.deb") is None
     assert _mirror_target("android", name) is None
     assert _mirror_target("windows", "../../etc/passwd") is None
     assert _mirror_target("windows", "forum_setup.exe.bak") is None
@@ -239,6 +247,120 @@ def test_download_page_mobile_css():
         "下载页缺少 ≤480px 平台标签两列均分规则"
 
 
+def test_download_page_links_use_site_mirror():
+    """/Download 的下载按钮 / 复制直链必须指向站内反代路由，而不是 GitHub 直链。"""
+    client = _make_client()
+    rv = client.get("/Download")
+    assert rv.status_code == 200
+    html = rv.get_data(as_text=True)
+
+    hrefs = re.findall(r'<a class="btn btn-primary" href="([^"]+)"', html)
+    assert hrefs, "下载页没有任何下载按钮"
+    for href in hrefs:
+        assert "github.com" not in href, f"下载按钮仍指向 GitHub：{href}"
+        assert href.startswith("/api/app/mirror/"), f"下载按钮未指向站内反代：{href}"
+
+    copies = re.findall(r'data-copy-url="([^"]+)"', html)
+    assert copies, "下载页没有复制直链按钮"
+    for url in copies:
+        assert "github.com" not in url, f"复制直链仍指向 GitHub：{url}"
+        assert url.startswith("/api/app/mirror/"), f"复制直链未指向站内反代：{url}"
+
+    # 两个已发布平台都要有站内入口，并带 ?v= 版本号做缓存失效
+    assert "/api/app/mirror/windows/forum_setup.exe?v=1.3.5" in html
+    assert "/api/app/mirror/android/forum-android-1.0.0.apk?v=1.0.0" in html
+
+
+def test_mirror_cache_full_flow():
+    """反代缓存：首次填充 → 二次命中（不再回源）→ Range 走内存 → 越界 416 → TTL 过期 → 重启即丢。"""
+    import api.release as rel
+
+    payload = b"forum-android-payload-" * 500
+    calls = {"n": 0}
+
+    class _Upstream:
+        status_code = 200
+        headers = {
+            "Content-Length": str(len(payload)),
+            "Content-Type": "application/octet-stream",
+            "ETag": '"etag-1"',
+            "Last-Modified": "Wed, 30 Sep 2026 13:35:43 GMT",
+        }
+
+        def iter_content(self, size):
+            for i in range(0, len(payload), size):
+                yield payload[i:i + size]
+
+        def close(self):
+            pass
+
+    def _fake_get(url, **kwargs):
+        calls["n"] += 1
+        return _Upstream()
+
+    android = next(p for p in _load_manifest()["platforms"] if p.get("key") == "android")
+    name = (android.get("releases") or [{}])[0].get("filename")
+    path = "/api/app/mirror/android/%s" % name
+
+    original = rel.requests.get
+    rel.requests.get = _fake_get
+    rel.cache_clear()
+    try:
+        client = _make_client()
+
+        # 1) 首次：回源一次，完整收完后入缓存
+        rv = client.get(path)
+        assert rv.status_code == 200
+        assert rv.get_data() == payload
+        assert rv.headers.get("Accept-Ranges") == "bytes"
+        assert calls["n"] == 1
+        info = rel.cache_info()
+        assert info["entries"] == 1 and info["stored"] == 1
+        assert info["ttl"] == 24 * 3600, "缓存 TTL 应为 24 小时"
+
+        # 2) 二次：命中缓存，不再回源
+        rv = client.get(path)
+        assert rv.status_code == 200 and rv.get_data() == payload
+        assert calls["n"] == 1, "命中缓存时不应再请求上游"
+        assert rel.cache_info()["hit"] == 1
+
+        # 3) Range：从内存切片，206 + Content-Range
+        rv = client.get(path, headers={"Range": "bytes=0-9"})
+        assert rv.status_code == 206
+        assert rv.get_data() == payload[:10]
+        assert rv.headers["Content-Range"] == "bytes 0-9/%d" % len(payload)
+        assert calls["n"] == 1
+
+        # 4) 末尾 N 字节
+        rv = client.get(path, headers={"Range": "bytes=-8"})
+        assert rv.status_code == 206
+        assert rv.get_data() == payload[-8:]
+
+        # 5) 越界 Range → 416
+        rv = client.get(path, headers={"Range": "bytes=9999999-"})
+        assert rv.status_code == 416
+
+        # 6) TTL 过期：时间戳前拨 25 小时，下次请求重新回源
+        with rel._MIRROR_LOCK:
+            for entry in rel._MIRROR_CACHE.values():
+                entry["ts"] -= 25 * 3600
+        rv = client.get(path)
+        assert rv.status_code == 200 and rv.get_data() == payload
+        assert calls["n"] == 2, "TTL 过期后应重新回源"
+
+        # 7) 进程重启等价于模块级缓存归零（不落盘）
+        assert rel.cache_clear() == 1
+        assert rel.cache_info()["entries"] == 0
+
+        # 8) 诊断接口
+        rv = client.get("/api/app/cache")
+        assert rv.status_code == 200
+        assert rv.get_json()["ttl"] == 24 * 3600
+    finally:
+        rel.requests.get = original
+        rel.cache_clear()
+
+
 def test_download_page_renders():
     """/Download 页面纯服务端渲染成功，含 Windows 与未发布平台文案。"""
     client = _make_client()
@@ -260,6 +382,8 @@ if __name__ == "__main__":
         ("test_download_template_and_manifest_status", test_download_template_and_manifest_status),
         ("test_android_release_entry", test_android_release_entry),
         ("test_download_page_mobile_css", test_download_page_mobile_css),
+        ("test_download_page_links_use_site_mirror", test_download_page_links_use_site_mirror),
+        ("test_mirror_cache_full_flow", test_mirror_cache_full_flow),
         ("test_base_nav_entries", test_base_nav_entries),
         ("test_download_page_renders", test_download_page_renders),
     ]

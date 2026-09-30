@@ -1648,6 +1648,7 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .dl-date, .dl-size { font-size: 13px; color: var(--color-text-tertiary); }
 .dl-notes { margin: 10px 0 0 18px; font-size: 13px; line-height: 1.8; color: var(--color-text-secondary); }
 .dl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.dl-via { margin: 10px 0 0; font-size: 12px; line-height: 1.7; color: var(--color-text-tertiary); }
 .dl-foot { margin: 20px 0 8px; font-size: 12px; text-align: center; color: var(--color-text-tertiary); }
 .dl-foot a { color: var(--color-primary); }
 .dl-foot code { font-size: 12px; }
