@@ -12,7 +12,7 @@ object Constants {
     const val BASE_URL = "https://www.yjlt.top"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.0"
+    const val APP_VERSION = "1.0.1"
 
     /** 请求 UA，便于服务端日志区分端。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
@@ -31,6 +31,11 @@ object Constants {
     const val MOUSE_README_PATH = "/static/mouse/Liunx/README.md"
 
     const val HEALTHZ_PATH = "/healthz"
+
+    // ────────────────── 赞赏码（常驻入口用） ──────────────────
+    // 远端图床地址；“我的”页直接展示，Coil 会自动落盘缓存，无需每次重新下载。
+    // 与 Web（base.html 的 data-src）、Windows（app/constants.py PROMO_QR_URL）同源。
+    const val REWARD_QR_URL = "https://img.crazying-dev.top/other/help.png"
 
     // ────────────────── 国庆假期 ──────────────────
     // 本地时间 10-01 00:00 ~ 10-07 24:00（等价于 10-08 00:00 开区间，因此只判 1..7 日）

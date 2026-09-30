@@ -12,10 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
 import top.crazying.forum.core.Constants
@@ -182,6 +184,35 @@ fun MeScreen(nav: Navigator) {
             InfoRow("客户端标识", Constants.CLIENT_UA)
             HDivider()
             Muted("妖精论坛 Android 客户端。Web / Windows / Android 三端共用同一套服务端接口与主题色板。")
+        }
+
+        // ── 支持作者（常驻赞赏码入口）──
+        // 入口常驻可见；图片由 Coil 加载并落盘缓存，不需要每次重新下载。
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.bgCard)
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SectionTitle("支持作者")
+            Muted(
+                "妖精论坛是纯公益的粉丝二创项目，服务器与开发全凭热爱维持。如果它帮到了你，请我喝杯奶茶就好～",
+                maxLines = 4,
+            )
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                AsyncImage(
+                    model = Constants.REWARD_QR_URL,
+                    contentDescription = "作者赞赏码",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .width(200.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.bgInput),
+                )
+            }
+            Muted("扫码即可赞赏，金额随意，感谢每一位支持者。", maxLines = 2)
         }
 
         // ── 快捷入口 ──
