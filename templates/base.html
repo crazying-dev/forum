@@ -16,13 +16,30 @@
 <link rel="stylesheet" href="/static/css/main.css?v={{ static_version }}">
 <script src="/static/js/marked.min.js"></script>
 <script>
-// 防闪屏：按 localStorage 或时间判断主题
+// 防闪屏：按 localStorage / 时间 / 国庆假期 决定主题类
+// 国庆主题（10-01 00:00 ~ 10-07 24:00）为强制叠加层，设置中不可见、不可手动切换：
+//   显式「亮色」或「默认」→ 国庆浅色；显式「暗色」→ 国庆深色；假期内「默认」不跟随时间。
 (function () {
+  var NAT_MONTH = 10, NAT_FROM = 1, NAT_TO = 7;
+  function isNationalDay(d) {
+    d = d || new Date();
+    return (d.getMonth() + 1) === NAT_MONTH && d.getDate() >= NAT_FROM && d.getDate() <= NAT_TO;
+  }
   var t = null;
   try { t = localStorage.getItem('forum-theme'); } catch (e) {}
-  if (t === 'night' || (!t && new Date().getHours() >= 18) || (!t && new Date().getHours() < 6)) {
-    document.documentElement.classList.add('night-mode');
+  var nat = isNationalDay();
+  var night;
+  if (nat) {
+    night = (t === 'night');
+  } else {
+    var h = new Date().getHours();
+    night = (t === 'night') || (!t && (h >= 18 || h < 6));
   }
+  var root = document.documentElement;
+  if (nat) root.classList.add('national-day');
+  if (night) root.classList.add('night-mode');
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', nat ? (night ? '#3A0D12' : '#C8102E') : (night ? '#2E4659' : '#6A8C89'));
 })();
 </script>
 </head>

@@ -216,12 +216,42 @@
   // ── 当前用户状态 ──
   var currentUser = null;
 
-  // ── 主题（亮/暗/默认 + localStorage）──
-  function setTheme(v) {
+  // ── 主题（亮/暗/默认 + 国庆假期强制层 + localStorage）──
+  // 国庆假期（10-01 00:00 ~ 10-07 24:00）在渲染层强制叠加 .national-day：
+  //   显式「亮色」/「默认」→ 国庆浅色；显式「暗色」→ 国庆深色；假期内「默认」恒为国庆浅色。
+  // localStorage['forum-theme'] 始终只记录用户的「基础偏好」，假期结束自动还原。
+  var NAT_MONTH = 10, NAT_FROM = 1, NAT_TO = 7;
+  function isNationalDay(d) {
+    d = d || new Date();
+    return (d.getMonth() + 1) === NAT_MONTH && d.getDate() >= NAT_FROM && d.getDate() <= NAT_TO;
+  }
+  function themeMetaColor(nat, night) {
+    if (nat) return night ? '#3A0D12' : '#C8102E';
+    return night ? '#2E4659' : '#6A8C89';
+  }
+  // pref: 'day' | 'night' | null（null = 默认 / 跟随时间）
+  function applyTheme(pref) {
+    var nat = isNationalDay();
+    var night;
+    if (nat) {
+      night = (pref === 'night');
+    } else {
+      var h = new Date().getHours();
+      night = (pref === 'night') || (pref == null && (h >= 18 || h < 6));
+    }
     var root = document.documentElement;
-    if (v === 'day') { root.classList.remove('night-mode'); try { localStorage.setItem('forum-theme', 'day'); } catch (e) {} }
-    else if (v === 'night') { root.classList.add('night-mode'); try { localStorage.setItem('forum-theme', 'night'); } catch (e) {} }
-    else { try { localStorage.removeItem('forum-theme'); } catch (e) {} var h = new Date().getHours(); if (h < 6 || h >= 18) root.classList.add('night-mode'); else root.classList.remove('night-mode'); }
+    root.classList.toggle('national-day', nat);
+    root.classList.toggle('night-mode', night);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', themeMetaColor(nat, night));
+  }
+  function setTheme(v) {
+    if (v === 'day') { try { localStorage.setItem('forum-theme', 'day'); } catch (e) {} }
+    else if (v === 'night') { try { localStorage.setItem('forum-theme', 'night'); } catch (e) {} }
+    else { try { localStorage.removeItem('forum-theme'); } catch (e) {} }
+    var pref = null;
+    try { pref = localStorage.getItem('forum-theme'); } catch (e) {}
+    applyTheme(pref);
   }
 
   // ── 认证状态 → 侧边栏 / 顶部模式头部栏 ──
@@ -669,6 +699,7 @@
     avatarHtml: avatarHtml,
     resolveAvatarDeferred: resolveAvatarDeferred,
     setTheme: setTheme,
+    applyTheme: applyTheme,
     get currentUser() { return currentUser; },
     initAuth: initAuth,
     initMenus: initMenus,

@@ -52,6 +52,61 @@
   --color-border-divider: rgba(132, 168, 185, 0.15);
   --color-text-muted: #B4D2D8;
 }
+/* ── 国庆主题（10-01 00:00 ~ 10-07 24:00 强制生效；设置中不可见、不可手动切换）──
+   叠加在基础明暗之上：
+     · .national-day            → 国庆浅色（暖白/米底 + 中国红主色 + 五星金点缀）
+     · .night-mode.national-day → 国庆深色（暗红底 + 亮金主色）
+   假期内「亮色/默认」走浅色，「暗色」走深色；localStorage 仍只记录基础偏好。 */
+.national-day {
+  --color-text-primary: #3A1D1D;
+  --color-text-secondary: #7A3226;
+  --color-text-tertiary: #B49484;
+  --color-text-light: #FFF3E0;
+  --color-text-accent: #C8102E;
+  --color-bg-body: #FBF3E6;
+  --color-bg-header: rgba(255, 250, 240, 0.86);
+  --color-bg-card: rgba(255, 253, 249, 0.96);
+  --color-bg-input: rgba(255, 253, 248, 0.88);
+  --color-bg-hover: rgba(200, 16, 46, 0.08);
+  --color-bg-footer: #C8102E;
+  --color-border: rgba(200, 16, 46, 0.18);
+  --color-border-focus: #C8102E;
+  --color-primary: #C8102E;
+  --color-primary-hover: #A50D24;
+  --color-shadow: rgba(150, 40, 30, 0.16);
+  --color-bg-secondary: rgba(255, 253, 249, 0.96);
+  --color-bg-icon: rgba(200, 16, 46, 0.12);
+  --color-bg-icon-hover: rgba(200, 16, 46, 0.24);
+  --color-bg-item-hover: rgba(200, 16, 46, 0.08);
+  --color-bg-item-active: rgba(200, 16, 46, 0.15);
+  --color-border-divider: rgba(200, 16, 46, 0.10);
+  --color-text-muted: #FFE3B8;
+}
+.night-mode.national-day {
+  --color-text-primary: #FFE8C4;
+  --color-text-secondary: #F2CF9B;
+  --color-text-tertiary: #C79A63;
+  --color-text-light: #FFD98A;
+  --color-text-accent: #FFD24A;
+  --color-bg-body: #3A0D12;
+  --color-bg-header: rgba(74, 16, 22, 0.85);
+  --color-bg-card: rgba(48, 11, 16, 0.95);
+  --color-bg-input: rgba(58, 13, 19, 0.82);
+  --color-bg-hover: rgba(255, 210, 74, 0.15);
+  --color-bg-footer: #4A1219;
+  --color-border: rgba(255, 210, 74, 0.18);
+  --color-border-focus: #FFD24A;
+  --color-primary: #FFD24A;
+  --color-primary-hover: #FFC01E;
+  --color-shadow: rgba(0, 0, 0, 0.45);
+  --color-bg-secondary: rgba(48, 11, 16, 0.9);
+  --color-bg-icon: rgba(255, 210, 74, 0.18);
+  --color-bg-icon-hover: rgba(255, 210, 74, 0.34);
+  --color-bg-item-hover: rgba(255, 210, 74, 0.14);
+  --color-bg-item-active: rgba(255, 210, 74, 0.22);
+  --color-border-divider: rgba(255, 210, 74, 0.12);
+  --color-text-muted: #E8C795;
+}
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }

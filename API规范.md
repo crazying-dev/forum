@@ -525,6 +525,10 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 
 ### 17.3 静态资源
 
-- `static/css/main.css`：精简样式（保持原青绿风格，亮/暗双主题，约 12KB）
-- `static/js/AfterBody.js`：前端主脚本（API 封装 / 认证 / 主题 / 世界频道 / 页面渲染）
+- `static/css/main.css`：精简样式（原青绿底色 + 亮/暗双主题 + 国庆限定主题，约 63KB）
+  - 设计令牌：`:root`（亮色）/ `.night-mode`（暗色）/ `.national-day`（国庆浅色）/ `.night-mode.national-day`（国庆深色）
+  - **国庆主题为假期限定叠加层**：10-01 00:00 ~ 10-07 24:00（本地时间）强制生效，**设置中不可见、不可手动切换**；
+    假期内「亮色 / 默认」渲染为国庆浅色，「暗色」渲染为国庆深色（`localStorage['forum-theme']` 仍只记录基础偏好，假期结束自动还原）
+  - 首屏防闪屏内联脚本位于 `templates/base.html`（同时同步 `<meta name="theme-color">`）
+- `static/js/AfterBody.js`：前端主脚本（API 封装 / 认证 / 主题 `applyTheme` / 世界频道 / 页面渲染）
 - 不再依赖 CDN 的 main.css / AfterBody.js（font-awesome 图标保留 CDN 引用）
