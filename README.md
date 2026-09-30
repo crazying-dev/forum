@@ -26,15 +26,15 @@
 | 正文渲染 | `AndroidView` + `TextView` + `HtmlCompat` | 服务端正文存的是 HTML |
 | WebView | **仅用于 WIKI 页** | 其余界面全部 Compose |
 
-**版本基线**（均取 Maven 元数据的当前稳定版，见 `build.gradle.kts` 注释）：
+**版本基线**（已通过真实构建验证）：
 
 ```
-AGP 8.13.2  /  Gradle 8.14.5  /  Kotlin 2.4.20  /  Compose BOM 2026.09.00
-core-ktx 1.19.1  /  activity-compose 1.13.0  /  lifecycle 2.11.0
-coil3 3.6.3  /  okhttp 5.5.0  /  kotlinx-coroutines 1.11.0
+AGP 8.13.2  /  Gradle 8.14.5  /  Kotlin 2.2.20  /  Compose BOM 2025.08.00
+core-ktx 1.16.0  /  activity-compose 1.10.1  /  lifecycle 2.9.1
+coil3 3.2.0  /  okhttp 5.0.0  /  kotlinx-coroutines 1.10.2
 ```
 
-> **为什么不直接上 AGP 9.x？** AGP 9 已改为「内置 Kotlin」（需要删掉 `org.jetbrains.kotlin.android` 插件并改用新的 Compose 开关 DSL）。为降低首次构建失败的概率，本轮锁定在成熟的 8.x 线；升级路线见「六、后续计划」。
+> **为什么不全用最新版？** 最新依赖（core-ktx 1.19.1、Compose BOM 2026.09.00 对应的 1.12.x、okhttp 5.5.0、coil3 3.6.3）在 AAR 元数据里要求 **AGP ≥ 9.1.0 且 compileSdk ≥ 37**；而 AGP 9.x 已改为「内置 Kotlin」，需删掉 `org.jetbrains.kotlin.android` 并切换新的 Compose DSL。本项目先在成熟的 8.x 线上跑通，升级路线见「六、后续计划」。
 
 ---
 
@@ -125,7 +125,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 
 脚本做的事（全部幂等，已存在的会跳过）：
 
-1. 查找 / 安装 **JDK 17**（优先复用 `JAVA_HOME`、`Program Files` 下已有的 JDK 17；找不到则 `winget install Microsoft.OpenJDK.17`）
+1. 查找 / 安装 **JDK 17**：先复用 `JAVA_HOME`、`Program Files` 下已有的 JDK 17；找不到则 `winget install Microsoft.OpenJDK.17`（已固定 `--source winget`，避开证书有问题的 `msstore` 源）；**winget 不可用或失败时自动回退到无需管理员的便携版 zip**（解压到 `%LOCALAPPDATA%\Programs\Microsoft\jdk-17*`）
 2. 下载并解压 **Android SDK 命令行工具**（`commandlinetools-win-16111833_latest.zip`，约 155 MB）→ `<SDK>\cmdline-tools\latest`
 3. 自动接受许可证并安装 `platform-tools`、`platforms;android-36`、`build-tools;36.0.0`
 4. 写出 `local.properties`（`sdk.dir=…`，已 git-ignore）
@@ -146,6 +146,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 ```
 
 首次构建会自动下载 Gradle 8.14.5（约 138 MB）到 `%USERPROFILE%\.gradle`。
+
+> ⚠️ **国内网络注意**：`services.gradle.org` 可能超时（本机实测过），导致卡在 `Downloading https://services.gradle.org/distributions/gradle-8.14.5-bin.zip`。
+> 若遇到，任选一种：
+> 1. 已预置本地缓存（本机已完成），直接 `gradlew` 即可；
+> 2. 手动下载后放进 Wrapper 缓存：
+>    ```powershell
+>    $u = 'https://mirrors.cloud.tencent.com/gradle/gradle-8.14.5-bin.zip'   # 腾讯云镜像
+>    $d = "$env:USERPROFILE\.gradle\wrapper\dists\gradle-8.14.5-bin\690y85m0j9nfaub7xoiayko8a"
+>    New-Item -ItemType Directory -Path $d -Force | Out-Null
+>    Invoke-WebRequest $u -OutFile "$d\gradle-8.14.5-bin.zip"
+>    # 官方 sha256: 6f74b601422d6d6fc4e1f9a1ab6522f642c2fdcbc15ae33ebd30ba3d7198e854
+>    ```
+> 3. 或把 `gradle/wrapper/gradle-wrapper.properties` 的 `distributionUrl` 换成镜像地址。
 
 已安装 Android Studio 的话，直接打开本目录即可（Studio 自带的 JDK 也能满足要求，但请确认 Gradle JDK 为 17）。
 
@@ -199,4 +212,24 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **服务端不可达时**：`Api` 对 GET 请求重试 1 次（写操作绝不重试，避免重复发帖 / 评论）；返回 401 会静默清理本地会话。
 * **`local.properties` 严禁入库**（已在 `.gitignore` 中）；`gradle-wrapper.jar` 相反 **必须入库**。
 * **签名材料**（`*.jks` / `*.keystore` / `keystore.properties`）同样已 git-ignore。
-* 本工程源码是在 **无 JDK / 无 SDK 环境** 下编写的，尚未经过真实编译；若首次构建报错，请把完整日志反馈回来（预期仅需小幅修正）。
+
+---
+
+## 八、构建验证记录
+
+本工程已在本机完成**真实编译验证**（非“写而未编”）：
+
+| 项 | 结果 |
+| --- | --- |
+| JDK | Microsoft OpenJDK **17.0.20.1**（JAVA_HOME / Gradle Daemon JVM 均为它） |
+| Android SDK | `cmdline-tools 16111833`、`platform-tools r37.0.1`、`platforms;android-36`、`build-tools;36.0.0` |
+| Gradle | 8.14.5（Wrapper 自带的发行包） |
+| 命令 | `.\gradlew.bat assembleDebug` |
+| 结果 | **BUILD SUCCESSFUL**（39 个任务，39 up-to-date） |
+| 产物 | `app\build\outputs\apk\debug\app-debug.apk`，**11 623 321 字节**，sha256 `07dbf7ba7e7409f7dffe556d918c12e41eaf09753745570b94ab5725a9fdd4ac` |
+
+编译过程中定位并修正的 3 类真实问题（供后续参考）：
+
+1. **依赖代际不匹配**：直接取“最新版”会导致 `checkDebugAarMetadata` 失败（新版 AAR 要求 AGP ≥ 9.1.0 / compileSdk ≥ 37）→ 已改为与 AGP 8.13.2 同代的稳定组合。
+2. **尾随 lambda 绑定到 `Modifier`**：`Pill(text, active, onClick, modifier)` 的参数顺序使 `Pill("x", active = true) { … }` 的 lambda 绑到 `modifier` → 已把 `onClick` 调到最后一个参数。
+3. **可空接收者**：`ApiResult.rows()` 里 `val arr: JSONArray? = … ?: return` 显式声明为可空，导致后续调用报错 → 已去掉显式可空声明。

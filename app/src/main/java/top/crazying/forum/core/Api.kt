@@ -87,7 +87,7 @@ class ApiResult(
 
     /** 取 `key` 对应的数组；若自身就是数组则直接返回（`/api/world/ALL`）。 */
     fun rows(key: String? = null): List<JSONObject> {
-        val arr: JSONArray? = when {
+        val arr = when {
             key == null -> data as? JSONArray
             else -> obj()?.optJSONArray(key)
         } ?: return emptyList()

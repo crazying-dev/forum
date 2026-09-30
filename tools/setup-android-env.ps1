@@ -46,6 +46,9 @@ $CmdlineToolsBuild = '16111833'
 $CmdlineToolsUrl = 'https://dl.google.com/android/repository/commandlinetools-win-' + $CmdlineToolsBuild + '_latest.zip'
 $SdkPackages = @('platform-tools', 'platforms;android-36', 'build-tools;36.0.0')
 $JdkDownloadPage = 'https://learn.microsoft.com/java/openjdk/download'
+# Admin-free fallback: the official Microsoft OpenJDK 17 zip (no installer, no UAC).
+$JdkZipUrl = 'https://aka.ms/download-jdk/microsoft-jdk-17-windows-x64.zip'
+$JdkInstallRoot = Join-Path $env:LOCALAPPDATA 'Programs\Microsoft'
 
 function Write-Step([string]$m) { Write-Host '' ; Write-Host ('=== ' + $m + ' ===') -ForegroundColor Cyan }
 function Write-Ok([string]$m)   { Write-Host ('  [ OK ] ' + $m) -ForegroundColor Green }
@@ -53,16 +56,36 @@ function Write-Skip([string]$m) { Write-Host ('  [SKIP] ' + $m) -ForegroundColor
 function Write-Warn2([string]$m){ Write-Host ('  [WARN] ' + $m) -ForegroundColor Yellow }
 function Write-Info([string]$m) { Write-Host ('  [ .. ] ' + $m) -ForegroundColor Gray }
 
-function Test-Jdk17([string]$home) {
-    if ([string]::IsNullOrWhiteSpace($home)) { return $false }
-    $java = Join-Path $home 'bin\java.exe'
+function Test-Jdk17([string]$jdkPath) {
+    if ([string]::IsNullOrWhiteSpace($jdkPath)) { return $false }
+    $java = Join-Path $jdkPath 'bin\java.exe'
     if (-not (Test-Path $java)) { return $false }
-    try {
-        $raw = (& $java '-version' 2>&1 | Out-String)
-        return ($raw -match 'version .17\.')
-    } catch {
-        return $false
+
+    # Preferred: read "<jdk>\release". No process spawn, no stderr handling.
+    $release = Join-Path $jdkPath 'release'
+    if (Test-Path $release) {
+        $txt = ''
+        try { $txt = [IO.File]::ReadAllText($release) } catch { $txt = '' }
+        if ($txt -match 'JAVA_VERSION\s*=\s*"([^"]+)"') {
+            return $Matches[1].StartsWith('17.')
+        }
     }
+
+    # Fallback: ask java itself.
+    # NOTE: in Windows PowerShell 5.1 with $ErrorActionPreference='Stop', a native
+    # command's merged stderr (2>&1) is turned into a terminating error, so the
+    # preference has to be relaxed around the call.
+    $saved = $ErrorActionPreference
+    $raw = ''
+    try {
+        $ErrorActionPreference = 'Continue'
+        $raw = (& $java '-version' 2>&1 | Out-String)
+    } catch {
+        $raw = ''
+    } finally {
+        $ErrorActionPreference = $saved
+    }
+    return ($raw -match 'version "?17\.')
 }
 
 function Find-Jdk17 {
@@ -78,6 +101,8 @@ function Find-Jdk17 {
     if ($pf)   { $roots += (Join-Path $pf 'Zulu\zulu-17*') }
     if ($pf)   { $roots += (Join-Path $pf 'Android\Android Studio\jbr') }
     if ($pf86) { $roots += (Join-Path $pf86 'Java\jdk-17*') }
+    if ($env:LOCALAPPDATA) { $roots += (Join-Path $env:LOCALAPPDATA 'Programs\Microsoft\jdk-17*') }
+    if ($env:LOCALAPPDATA) { $roots += (Join-Path $env:LOCALAPPDATA 'Programs\Eclipse Adoptium\jdk-17*') }
     foreach ($g in $roots) {
         Get-ChildItem -Path $g -Directory -ErrorAction SilentlyContinue |
             ForEach-Object { [void]$candidates.Add($_.FullName) }
@@ -86,6 +111,15 @@ function Find-Jdk17 {
         if (Test-Jdk17 $c) { return $c }
     }
     return ''
+}
+
+# sdkmanager is a .bat, so its arguments are parsed by cmd.exe, where ";" is a
+# command separator. Package ids such as "platforms;android-36" therefore MUST be
+# quoted. Every argument is handed over through one explicit cmd command line.
+function Invoke-SdkManager([string]$sdkManagerPath, [string]$sdkRoot, [string]$yesInput, [string[]]$Extra) {
+    $parts = @(('"' + $sdkManagerPath + '"'), ('"--sdk_root=' + $sdkRoot + '"'))
+    foreach ($e in $Extra) { $parts += ('"' + $e + '"') }
+    $yesInput | & cmd.exe /c ($parts -join ' ')
 }
 
 Write-Host ''
@@ -108,21 +142,57 @@ if ($SkipJdk) {
             $JdkHome = $found
             Write-Ok ('Found JDK 17 : ' + $JdkHome)
         } else {
+            # -- 1a) try winget (skip the broken msstore source by pinning --source winget)
             $wingetCmd = (Get-Command winget -ErrorAction SilentlyContinue)
-            if (-not $wingetCmd) {
-                Write-Warn2 'winget not found. Install JDK 17 manually, then re-run with -JdkHome <path>:'
-                Write-Host ('          ' + $JdkDownloadPage) -ForegroundColor Yellow
-                exit 2
-            }
-            Write-Info 'Installing Microsoft.OpenJDK.17 via winget (this may take a few minutes)...'
-            & $wingetCmd.Source install -e --id Microsoft.OpenJDK.17 --accept-source-agreements --accept-package-agreements --disable-interactivity
-            $found = Find-Jdk17
-            if ($found) {
-                $JdkHome = $found
-                Write-Ok ('Installed JDK 17 : ' + $JdkHome)
+            if ($wingetCmd) {
+                Write-Info 'Trying winget (Microsoft.OpenJDK.17, source=winget)...'
+                try {
+                    & $wingetCmd.Source install -e --id Microsoft.OpenJDK.17 --source winget --accept-source-agreements --accept-package-agreements --disable-interactivity
+                } catch {
+                    Write-Warn2 ('winget reported: ' + $_.Exception.Message)
+                }
+                $found = Find-Jdk17
+                if ($found) {
+                    $JdkHome = $found
+                    Write-Ok ('Installed JDK 17 via winget : ' + $JdkHome)
+                }
             } else {
-                Write-Warn2 'winget finished but no JDK 17 was detected. Re-run with -JdkHome <path>.'
+                Write-Warn2 'winget not found - falling back to the portable JDK zip.'
+            }
+
+            # -- 1b) fallback: portable zip (no admin, no UAC)
+            if (-not $JdkHome) {
+                Write-Info 'Downloading Microsoft OpenJDK 17 (portable zip, no admin needed)...'
+                $jdkZip = Join-Path $env:TEMP 'microsoft-jdk-17-windows-x64.zip'
+                try {
+                    if (-not (Test-Path $jdkZip)) {
+                        Invoke-WebRequest -Uri $JdkZipUrl -OutFile $jdkZip -UseBasicParsing
+                    }
+                    $jdkTmp = Join-Path $env:TEMP 'microsoft-jdk-17-extract'
+                    if (Test-Path $jdkTmp) { Remove-Item $jdkTmp -Recurse -Force }
+                    Write-Info 'Extracting JDK...'
+                    Expand-Archive -Path $jdkZip -DestinationPath $jdkTmp -Force
+                    $innerJdk = Get-ChildItem -Path $jdkTmp -Directory | Select-Object -First 1
+                    if (-not $innerJdk) { throw 'unexpected zip layout (no top-level folder)' }
+                    New-Item -ItemType Directory -Path $JdkInstallRoot -Force | Out-Null
+                    $destJdk = Join-Path $JdkInstallRoot $innerJdk.Name
+                    if (Test-Path $destJdk) { Remove-Item $destJdk -Recurse -Force }
+                    Move-Item -Path $innerJdk.FullName -Destination $destJdk
+                    Write-Ok ('Extracted JDK to ' + $destJdk)
+                } catch {
+                    Write-Warn2 ('portable JDK step failed: ' + $_.Exception.Message)
+                }
+                $found = Find-Jdk17
+                if ($found) {
+                    $JdkHome = $found
+                    Write-Ok ('Installed JDK 17 (portable) : ' + $JdkHome)
+                }
+            }
+
+            if (-not $JdkHome) {
+                Write-Warn2 'Could not obtain a JDK 17 automatically. Install one manually:'
                 Write-Host ('          ' + $JdkDownloadPage) -ForegroundColor Yellow
+                Write-Host '          then re-run this script with -JdkHome <path>.' -ForegroundColor Yellow
                 exit 2
             }
         }
@@ -167,12 +237,12 @@ if ($SkipSdk) {
     $yes = (1..80 | ForEach-Object { 'y' }) -join $nl
     Write-Info 'Accepting SDK licenses...'
     try {
-        $yes | & $sdkManager ('--sdk_root=' + $SdkRoot) --licenses | Out-Null
+        Invoke-SdkManager $sdkManager $SdkRoot $yes @('--licenses') | Out-Null
     } catch {
         Write-Warn2 ('license step reported: ' + $_.Exception.Message)
     }
     Write-Info ('Installing: ' + ($SdkPackages -join ', '))
- $yes | & $sdkManager ('--sdk_root=' + $SdkRoot) @SdkPackages
+    Invoke-SdkManager $sdkManager $SdkRoot $yes $SdkPackages
 
     $missing = @()
     if (-not (Test-Path (Join-Path $SdkRoot 'platform-tools\adb.exe'))) { $missing += 'platform-tools' }

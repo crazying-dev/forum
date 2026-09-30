@@ -106,8 +106,10 @@ fun HDivider(modifier: Modifier = Modifier) {
 fun Pill(
     text: String,
     active: Boolean = false,
-    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    // 注意：onClick 必须是最后一个参数。否则 `Pill("x", active = true) { ... }`
+    // 的尾随 lambda 会绑定到 modifier 而编译失败。
+    onClick: (() -> Unit)? = null,
 ) {
     val colors = ForumTheme.colors
     val bg = if (active) colors.primary else colors.bgItemActive
