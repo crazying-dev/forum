@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-09-29T22:40:00+08:00",
+  "updated_at": "2026-09-29T23:30:00+08:00",
   "platforms": [
     {
       "key": "windows",
@@ -10,18 +10,18 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.3",
+          "version": "1.3.4",
           "channel": "stable",
           "date": "2026-09-29",
-          "size": 48547876,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.3/forum_setup.exe",
+          "size": 48550958,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.4/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "2301501ab7b698d569ec45519c597a55d1a9dd558ec10823ab96de77babf0938",
+          "sha256": "4d189743f743a0d9910d7e5ad80e95af0ea822969a317770ed1925e88a778912",
           "notes": [
-            "新增启动「支持作者」弹窗：本地记录累计打开次数，随机弹出并附赞赏码",
-            "帖子正文与互动数据本地缓存：进帖先秒显缓存，联网后自动刷新覆盖",
-            "进入他人个人主页时强制重新下载头像，保证头像始终最新",
-            "新增缓存目录 ~/.Cr/forum/cache/post/，与头像/图片缓存并存"
+            "更新包下载新增四级回退：直连 → DoH 修复 DNS → 公共加速镜像 → 服务器反代，仅在连接失败/超时时逐级升级",
+            "修复「点击立即更新后程序退出、安装器却不启动」：安装脚本循环变量被错误转义导致 cmd 整段中断",
+            "下载进度窗口会显示当前下载源；切换下载源会丢弃断点文件重新下载，最终仍以 sha256 校验兜底",
+            "新增安装日志 ~/.Cr/forum/update/<版本>/apply_update.log，便于排查安装器未启动"
           ],
           "mandatory": false
         }

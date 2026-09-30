@@ -6,6 +6,7 @@
     GET /api/app/check?platform=&version=        版本检查
     GET /api/app/windows/forum.exe               Windows 安装包直链（客户端 UPDATE_EXE_URL）
     GET /api/app/download/<platform>/<filename>  通用分发（目前仅 windows）
+    GET /api/app/mirror/<platform>/<filename>    服务器反代：拉 GitHub 直链并流式转发
 
 清单文件是仓库根目录的 app_releases.json（纯数据，运维直接编辑即可）；
 读取 / 解析 / 编码异常一律回退到内置 DEFAULT_MANIFEST，保证客户端拿得到清单。
@@ -15,8 +16,11 @@ from __future__ import annotations
 import json
 import os
 import re
+from urllib.parse import urlparse
 
-from flask import Blueprint, jsonify, request, send_file
+import requests
+from flask import (Blueprint, Response, jsonify, request, send_file,
+                   stream_with_context)
 
 import config
 
@@ -32,7 +36,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-09-29T22:40:00+08:00",
+    "updated_at": "2026-09-29T23:30:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -42,18 +46,18 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.3.3",
+                    "version": "1.3.4",
                     "channel": "stable",
                     "date": "2026-09-29",
-                    "size": 48547876,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.3/forum_setup.exe",
+                    "size": 48550958,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.4/forum_setup.exe",
                     "filename": "forum_setup.exe",
-                    "sha256": "2301501ab7b698d569ec45519c597a55d1a9dd558ec10823ab96de77babf0938",
+                    "sha256": "4d189743f743a0d9910d7e5ad80e95af0ea822969a317770ed1925e88a778912",
                     "notes": [
-                        "新增启动「支持作者」弹窗：本地记录累计打开次数，随机弹出并附赞赏码",
-                        "帖子正文与互动数据本地缓存：进帖先秒显缓存，联网后自动刷新覆盖",
-                        "进入他人个人主页时强制重新下载头像，保证头像始终最新",
-                        "新增缓存目录 ~/.Cr/forum/cache/post/，与头像/图片缓存并存",
+                        "更新包下载新增四级回退：直连 → DoH 修复 DNS → 公共加速镜像 → 服务器反代，仅在连接失败/超时时逐级升级",
+                        "修复「点击立即更新后程序退出、安装器却不启动」：安装脚本循环变量被错误转义导致 cmd 整段中断",
+                        "下载进度窗口会显示当前下载源；切换下载源会丢弃断点文件重新下载，最终仍以 sha256 校验兜底",
+                        "新增安装日志 ~/.Cr/forum/update/<版本>/apply_update.log，便于排查安装器未启动",
                     ],
                     "mandatory": False,
                 }
@@ -317,3 +321,90 @@ def download_release(platform: str, filename: str):
     if (platform or "").strip().lower() != "windows":
         return jsonify({"success": False, "message": "该平台暂未发布"}), 404
     return _send_release(filename)
+
+
+# ──────────────────────────────────────────────
+# 服务器反代（客户端最后一级下载回退）
+# ──────────────────────────────────────────────
+# 只允许反代 GitHub 上的安装包，避免本接口被当成任意代理（SSRF）
+MIRROR_HOSTS = ("github.com", "githubusercontent.com", "githubassets.com")
+MIRROR_TIMEOUT = (10, 60)
+MIRROR_CHUNK = 64 * 1024
+
+
+def _mirror_target(platform, filename) -> str | None:
+    """按发布清单找到指定文件名的 GitHub 直链；不合法返回 None。"""
+    if (str(platform or "")).strip().lower() != "windows":
+        return None
+    name = str(filename or "").strip()
+    if not name or not SAFE_NAME_RE.match(name):
+        return None
+    for item in platforms():
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("key", "")).lower() != "windows":
+            continue
+        for release in item.get("releases") or []:
+            if not isinstance(release, dict):
+                continue
+            url = str(release.get("url") or "").strip()
+            if not url:
+                continue
+            candidate = str(release.get("filename") or "").strip() \
+                or os.path.basename(urlparse(url).path)
+            if candidate != name:
+                continue
+            host = (urlparse(url).hostname or "").lower()
+            if url.startswith("https://") and any(
+                    host == h or host.endswith("." + h) for h in MIRROR_HOSTS):
+                return url
+    return None
+
+
+@release_bp.route("/mirror/<platform>/<filename>", methods=["GET"])
+def mirror_release(platform: str, filename: str):
+    """服务器反代：服务端拉取 GitHub 直链并流式转发（透传 Range，支持断点续传）。
+
+    客户端直连 GitHub / 公共加速都失败时的最后一级回退。任何异常都返回 JSON，
+    不返回 500。
+    """
+    url = _mirror_target(platform, filename)
+    if not url:
+        return jsonify({"success": False, "message": "暂无可反代的安装包"}), 404
+
+    upstream_headers = {
+        "User-Agent": request.headers.get("User-Agent") or "CrForum-Mirror",
+        "Accept-Encoding": "identity",
+    }
+    range_header = request.headers.get("Range")
+    if range_header:
+        upstream_headers["Range"] = range_header
+    try:
+        upstream = requests.get(url, headers=upstream_headers, stream=True,
+                                timeout=MIRROR_TIMEOUT, allow_redirects=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[release] 反代拉取失败（{url}）：{e}")
+        return jsonify({"success": False, "message": f"上游拉取失败：{e}"}), 502
+    if upstream.status_code >= 400:
+        code = upstream.status_code
+        upstream.close()
+        return jsonify({"success": False, "message": f"上游返回 {code}"}), 502
+
+    headers = {}
+    for key in ("Content-Length", "Content-Range", "Content-Type", "ETag", "Last-Modified"):
+        value = upstream.headers.get(key)
+        if value:
+            headers[key] = value
+    headers["Accept-Ranges"] = "bytes"
+    headers["Cache-Control"] = "no-store"
+
+    def _stream():
+        try:
+            for chunk in upstream.iter_content(MIRROR_CHUNK):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+
+    return Response(stream_with_context(_stream()), status=upstream.status_code,
+                    headers=headers, direct_passthrough=True)

@@ -132,6 +132,36 @@ def test_download_endpoints_never_500():
     assert rv.get_json()["success"] is False
 
 
+def test_mirror_endpoint_offline_guards():
+    """/api/app/mirror：非法平台 / 文件名 / 无匹配发布必须 404 + JSON，绝不 500。"""
+    client = _make_client()
+    for url in ("/api/app/mirror/windows/nope.exe",
+                "/api/app/mirror/android/forum_setup.exe",
+                "/api/app/mirror/windows/_",
+                "/api/app/mirror/windows/..%5C..%5Cconfig.py"):
+        rv = client.get(url)
+        assert rv.status_code == 404, f"{url} 应为 404，实际 {rv.status_code}"
+        assert rv.get_json()["success"] is False, f"{url} 应返回 JSON 错误体"
+    # 编码斜杠会被 Werkzeug 在路由层拦下（根本进不到视图），同样不能是 500
+    assert client.get("/api/app/mirror/windows/..%2F..%2Fconfig.py").status_code == 404
+
+
+def test_mirror_target_resolves_manifest_url():
+    """反代目标解析：命中清单 URL；非 GitHub 主机 / 非法名一律拒绝。"""
+    from api.release import _mirror_target
+
+    windows = next(p for p in _load_manifest()["platforms"] if p.get("key") == "windows")
+    release = (windows.get("releases") or [{}])[0]
+    name = release.get("filename") or "forum_setup.exe"
+    target = _mirror_target("windows", name)
+    assert target == release.get("url"), "应解析出清单里的 GitHub 直链"
+    assert target.startswith("https://github.com/")
+    assert _mirror_target("android", name) is None
+    assert _mirror_target("windows", "../../etc/passwd") is None
+    assert _mirror_target("windows", "forum_setup.exe.bak") is None
+    assert _mirror_target("windows", "") is None
+
+
 def test_version_utils():
     """版本号解析 / 比较 / 体积格式化。"""
     from api.release import compare_versions, human_size, parse_version
@@ -176,6 +206,8 @@ if __name__ == "__main__":
         ("test_manifest_file_valid", test_manifest_file_valid),
         ("test_release_api_endpoints", test_release_api_endpoints),
         ("test_download_endpoints_never_500", test_download_endpoints_never_500),
+        ("test_mirror_endpoint_offline_guards", test_mirror_endpoint_offline_guards),
+        ("test_mirror_target_resolves_manifest_url", test_mirror_target_resolves_manifest_url),
         ("test_version_utils", test_version_utils),
         ("test_download_template_and_manifest_status", test_download_template_and_manifest_status),
         ("test_base_nav_entries", test_base_nav_entries),
