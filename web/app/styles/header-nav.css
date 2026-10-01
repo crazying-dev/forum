@@ -1,3 +1,4 @@
+/* ===== 主样式·顶栏导航（桌面端：header / logo / 搜索 / 更多下拉）===== */
 header{
     display: flex;
     background-color: rgba(0,0,0,0);

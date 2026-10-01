@@ -4,8 +4,9 @@
 
 /* ===== 样式入口（拆分自原 globals.css，内容与顺序 1:1）=====
    分片位于 ./styles/，导入顺序 = 原区块顺序；修改样式请到对应分片
+   约定：Tailwind 指令（@theme/@apply/@source）只写本入口；分片内如确需 @apply，请加 @reference "../globals.css";
    分片：tokens base header-nav header-responsive footer elements windows-card easter-egg privacy
-         wiki video-player mouse-page user-profile home forum-common search-page post-detail
+         wiki video-player auth mouse-page user-profile home forum-common search-page post-detail
          post-comments forum-publish legacy-base-html legacy-inline toast user-comments user-popup
          loading article-cards huiguan article-detail publish-page filters huiguan-entry ui-fixes
          huiguan-members rich-editor quote-cards quote-picker night-adapt huiguan-intro ===== */
@@ -20,6 +21,7 @@
 @import "./styles/privacy.css";
 @import "./styles/wiki.css";
 @import "./styles/video-player.css";
+@import "./styles/auth.css";
 @import "./styles/mouse-page.css";
 @import "./styles/user-profile.css";
 @import "./styles/home.css";
