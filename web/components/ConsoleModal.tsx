@@ -28,7 +28,7 @@ export default function ConsoleModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} lockScroll cardStyle={{ maxWidth: 560 }}>
+    <Modal open={open} onClose={onClose} lockScroll cardStyle={{ maxWidth: 660 }}>
       <h3 className="console-title">
         <i className="fa fa-sliders"></i> 控制台
       </h3>

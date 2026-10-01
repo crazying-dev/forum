@@ -393,8 +393,8 @@ header{
 
 /* ===== 控制台弹窗（桌面端「控制台」按钮，挂载于 #header 外）===== */
 .console-title {
-    margin: 0 0 6px 0;
-    font-size: 20px;
+    margin: 0 0 8px 0;
+    font-size: 22px;
     font-weight: 400;
     color: var(--color-text-primary);
     text-align: left;
@@ -406,8 +406,8 @@ header{
 }
 
 .console-subtitle {
-    margin: 0 0 18px 0;
-    font-size: 13px;
+    margin: 0 0 20px 0;
+    font-size: 14px;
     color: var(--color-text-tertiary);
     text-align: left;
 }
@@ -415,7 +415,7 @@ header{
 .console-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: 14px;
     text-align: left;
 }
 
@@ -424,15 +424,15 @@ header{
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-height: 76px;
-    padding: 12px 6px;
+    gap: 10px;
+    min-height: 96px;
+    padding: 16px 8px;
     border: 1px solid var(--color-border-card);
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--color-bg-item);
     color: var(--color-text-secondary);
     font-family: inherit;
-    font-size: 13px;
+    font-size: 15px;
     cursor: pointer;
     transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
 }
@@ -444,16 +444,16 @@ header{
 }
 
 .console-tile i {
-    font-size: 20px;
+    font-size: 24px;
     color: var(--color-primary);
 }
 
-/* 控制台 WIKI 图标：显式重置（对抗全局 svg,img{all:inherit} 从按钮继承的 min-height/padding/背景），仅保留 24px 图标本体 */
+/* 控制台 WIKI 图标：显式重置（对抗全局 svg,img{all:inherit} 从按钮继承的 min-height/padding/背景），仅保留 28px 图标本体 */
 .console-tile img {
     all: unset;
     display: block;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     object-fit: contain;
 }
 
@@ -461,18 +461,18 @@ header{
     grid-column: span 2;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 14px 18px;
     border: 1px solid var(--color-border-card);
-    border-radius: 12px;
+    border-radius: 14px;
     background: var(--color-bg-item);
 }
 
 .console-theme-head {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
+    gap: 10px;
+    font-size: 14px;
     color: var(--color-text-secondary);
 }
 
@@ -488,13 +488,13 @@ header{
 
 .console-pill {
     flex: 1 1 auto;
-    padding: 6px 12px;
+    padding: 8px 14px;
     border: 1px solid var(--color-border-checkbox);
-    border-radius: 16px;
+    border-radius: 18px;
     background: transparent;
     color: var(--color-text-secondary);
     font-family: inherit;
-    font-size: 12px;
+    font-size: 14px;
     white-space: nowrap;
     cursor: pointer;
     transition: all 0.2s ease;
