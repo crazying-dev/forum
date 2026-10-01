@@ -1,0 +1,815 @@
+/* ======================== 会馆广场 / 会馆详情 ======================== */
+.guild-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 22px 20px 44px;
+    border-radius: 0;
+}
+
+.guild-page-header {
+    text-align: center;
+    padding: 20px 12px 18px;
+}
+
+.guild-page-title {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: 4px;
+    color: var(--color-text-secondary);
+    margin: 0 0 6px;
+}
+
+.guild-page-subtitle {
+    font-size: 14px;
+    color: var(--color-text-tertiary);
+    letter-spacing: 2px;
+    margin: 0 0 14px;
+}
+
+.guild-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: 1px solid var(--color-border-card);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guild-view-toggle:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Logo 通用（有图 / 主题色首字占位） */
+.guild-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    overflow: hidden;
+    flex-shrink: 0;
+    color: #fff !important;
+    font-weight: 600;
+    letter-spacing: 1px;
+    user-select: none;
+}
+
+.guild-logo-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.guild-carousel-thumb .guild-logo {
+    border-radius: 12px;
+}
+
+.guild-hero-logo {
+    border: 2px solid color-mix(in srgb, var(--guild-fg, #fff) 60%, transparent);
+}
+
+.guild-list-logo {
+    border-radius: 14px;
+}
+
+/* 轮播 */
+.guild-carousel {
+    padding-top: 6px;
+}
+
+.guild-carousel-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    /* 作为 popLayout 离场卡的绝对定位基准，同时建立手牌/主卡的层叠上下文 */
+    position: relative;
+}
+
+.guild-carousel-card {
+    position: relative;
+    flex: 1 1 auto;
+    max-width: 560px;
+    min-height: 290px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 28px 26px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 20px;
+    background: var(--color-bg-card);
+    box-shadow: 0 10px 28px var(--color-shadow-search);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.guild-carousel-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 32px var(--color-shadow-search-hover);
+}
+
+.guild-card-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.guild-card-body {
+    position: relative;
+    text-align: center;
+}
+
+.guild-card-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.guild-card-name {
+    font-size: 22px;
+    color: var(--color-text-primary);
+    letter-spacing: 2px;
+}
+
+.guild-card-id,
+.guild-list-id {
+    padding: 2px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.guild-card-intro {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--color-text-tertiary);
+    max-width: 420px;
+    margin: 0 auto 14px;
+    word-break: break-word;
+}
+
+.guild-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px 16px;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-enter-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 26px;
+    border-radius: 22px;
+    color: #fff !important;
+    font-size: 14px;
+    text-decoration: none;
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+    transition: transform 0.2s ease;
+}
+
+.guild-enter-btn i {
+    color: #fff !important;
+}
+
+.guild-enter-btn:hover {
+    transform: translateY(-1px);
+}
+
+.guild-carousel-arrow {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--color-border-card);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.guild-carousel-arrow:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.guild-carousel-thumb {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 8px;
+    border: none;
+    border-radius: 14px;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.6;
+    /* 扇形手牌：位于中央卡之下，位移/倾斜由 motion 承担，CSS 只管透明度 */
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.25s ease;
+}
+
+.guild-carousel-thumb:hover {
+    opacity: 1;
+}
+
+.guild-thumb-name {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.guild-carousel-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.guild-carousel-dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-border-search);
+    cursor: pointer;
+    /* scale 由 motion 过渡，CSS 只保留颜色过渡，避免两者叠乘 */
+    transition: background-color 0.2s ease;
+}
+
+.guild-carousel-dot.active {
+    transform: scale(1.3);
+}
+
+/* 紧凑列表 */
+.guild-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.guild-list-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+    text-decoration: none;
+    box-shadow: 0 2px 10px var(--color-shadow-search);
+    transition: all 0.2s ease;
+}
+
+.guild-list-item:hover {
+    border-color: var(--color-border-focus);
+}
+
+.guild-list-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.guild-list-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.guild-list-name {
+    font-size: 16px;
+    color: var(--color-text-primary);
+}
+
+.guild-list-intro {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+}
+
+.guild-list-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+/* 空态 */
+.guild-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-empty > i {
+    display: block;
+    font-size: 44px;
+    opacity: 0.5;
+    margin-bottom: 16px;
+}
+
+.guild-empty-title {
+    font-size: 17px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+}
+
+.guild-empty-desc {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    margin-bottom: 18px;
+}
+
+.guild-empty-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 22px;
+    border-radius: 20px;
+    background: var(--color-primary);
+    color: #fff !important;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.guild-empty-link i {
+    color: #fff !important;
+}
+
+/* 详情：信息卡 */
+.guild-detail-page {
+    max-width: 900px;
+}
+
+.guild-detail-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 26px 24px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px var(--color-shadow-search);
+}
+
+.guild-hero-shade {
+    position: absolute;
+    inset: 0;
+    /* 主题亮色时改用浅色遮罩（由 --guild-shade 提供） */
+    background: var(--guild-shade, linear-gradient(135deg, rgba(0, 0, 0, 0) 32%, rgba(0, 0, 0, 0.28) 100%));
+    pointer-events: none;
+}
+
+.guild-hero-body {
+    position: relative;
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.guild-hero-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.guild-hero-name {
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-hero-id {
+    padding: 1px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    background: var(--guild-fg-soft, rgba(255, 255, 255, 0.22));
+    color: var(--guild-fg, #fff) !important;
+}
+
+.guild-hero-intro {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.92;
+    margin-bottom: 10px;
+    word-break: break-word;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 12px;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.9;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+/* 详情：加入区 */
+.guild-join-area {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.guild-join-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border-radius: 22px;
+    /* 白底 + 固定深字 + 细边框 + 阴影：在任意站主题 / 会馆色系下都清晰 */
+    border: 1px solid rgba(23, 50, 58, 0.16);
+    background: #ffffff;
+    color: #2E4659 !important;
+    font-size: 14px;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    transition: all 0.2s ease;
+}
+
+.guild-join-btn i {
+    color: #2E4659 !important;
+}
+
+.guild-join-btn:hover:not(:disabled) {
+    background: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+}
+
+.guild-join-btn.pending,
+.guild-join-btn:disabled {
+    opacity: 0.88;
+    cursor: default;
+}
+
+.guild-joined-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 22px;
+    border-radius: 22px;
+    /* 深绿实底：#047857 与之上的白字对比度 ≈ 5.48，满足 WCAG ≥ 4.5 */
+    background: #047857;
+    color: #fff !important;
+    font-size: 14px;
+}
+
+.guild-joined-badge i {
+    color: #fff !important;
+}
+
+.guild-leave-btn {
+    padding: 7px 18px;
+    border-radius: 18px;
+    /* 边框/文字随 hero 前景色（--guild-fg 由页面按会馆色亮度设置） */
+    border: 1px solid currentColor;
+    background: transparent;
+    color: var(--guild-fg, #fff) !important;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guild-leave-btn:hover:not(:disabled) {
+    background: var(--guild-fg-soft, rgba(255, 255, 255, 0.18));
+}
+
+.guild-leave-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.guild-cancel-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--guild-fg, #fff) !important;
+    font-size: 12px;
+    font-family: inherit;
+    opacity: 0.9;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* 详情：馆长条 */
+.guild-leader-bar {
+    margin-top: 16px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+    overflow: hidden;
+}
+
+.guild-leader-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 14px 18px;
+    background: none;
+    border: none;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.guild-leader-avatar {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--color-bg-avatar);
+}
+
+.guild-leader-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.guild-leader-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.guild-leader-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 3px;
+    font-size: 15px;
+    color: var(--color-text-primary);
+}
+
+.guild-leader-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.guild-leader-intro {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.guild-leader-toggle {
+    flex-shrink: 0;
+    color: var(--color-text-tertiary);
+}
+
+.guild-leader-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-leader-zone {
+    padding: 14px 18px 16px 76px;
+    border-top: 1px dashed var(--color-border-divider);
+}
+
+.guild-leader-zone-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.guild-leader-bio {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 12px;
+}
+
+.guild-leader-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+/* 详情：公告轮播 */
+.guild-announce {
+    margin-top: 16px;
+    padding: 14px 18px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-item);
+}
+
+.guild-announce-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.guild-announce-title i {
+    color: var(--color-primary);
+}
+
+.guild-announce-stage {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.guild-announce-arrow {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--color-border-card);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guild-announce-arrow:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.guild-announce-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.guild-announce-text {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--color-text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.guild-announce-time {
+    display: block;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-announce-dots {
+    margin-top: 12px;
+}
+
+/* 详情：分类行（单行横向滚动 + 右侧不随滚动的发帖按钮） */
+.guild-feed-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 0 2px;
+}
+
+.guild-feed-cats {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-search) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+.guild-feed-cats::-webkit-scrollbar {
+    height: 4px;
+}
+
+.guild-feed-cats::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.guild-feed-cats::-webkit-scrollbar-thumb {
+    background: var(--color-border-search);
+    border-radius: 4px;
+}
+
+.guild-cat-chip {
+    flex: 0 0 auto;
+    padding: 7px 16px;
+    border: none;
+    border-radius: 18px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.guild-cat-chip:hover {
+    background: var(--color-bg-icon-hover);
+}
+
+/* 选中态背景为主题色，字色由内联按 WCAG 对比度给出（不再强制白字） */
+.guild-cat-chip.active {
+    background: var(--color-primary);
+}
+
+.guild-feed-post-btn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 18px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 3px 10px var(--color-shadow-search);
+    transition: all 0.2s ease;
+}
+
+.guild-feed-post-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px var(--color-shadow-search-hover);
+}
+
+.guild-feed-post-btn i {
+    color: inherit !important;
+}
+
+.guild-feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+}
+

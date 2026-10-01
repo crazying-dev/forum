@@ -1,0 +1,123 @@
+/* ======================== 引用选择弹窗 ======================== */
+
+.quote-picker-container {
+    max-width: 520px;
+}
+
+.quote-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--color-border-divider);
+    background: var(--color-bg-item);
+}
+
+.quote-picker-search i {
+    color: var(--color-text-tertiary);
+}
+
+.quote-picker-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-search);
+    border-radius: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+}
+
+.quote-picker-input:focus {
+    border-color: var(--color-border-focus);
+}
+
+.quote-picker-insert {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 16px;
+    background: var(--color-primary);
+    color: #fff !important;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.quote-picker-insert:hover {
+    opacity: 0.88;
+}
+
+.quote-picker-id {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+    word-break: break-all;
+}
+
+.quote-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    transition: background-color 0.2s ease;
+}
+
+.quote-picker-item:hover {
+    background: var(--color-bg-item-hover);
+}
+
+.quote-picker-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.quote-picker-item-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+    color: var(--color-text-primary);
+}
+
+.quote-picker-item-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.quote-picker-item-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+}
+
+.quote-picker-item-meta i {
+    color: inherit !important;
+}
+
+.quote-picker-more {
+    display: block;
+    width: calc(100% - 40px);
+    margin: 8px 20px 12px;
+    padding: 8px 0;
+    border: 1px dashed var(--color-border-card);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.quote-picker-more:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+

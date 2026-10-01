@@ -1,0 +1,430 @@
+/* ===== 用户资料弹窗（详情/编辑，对照 legacy ShowUserProfileDetail/Edit 还原） ===== */
+.profile-modal-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.profile-modal-body {
+    padding: 8px 4px 4px;
+}
+
+.profile-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 11px 4px;
+    border-bottom: 1px solid var(--color-border-divider);
+    font-size: 14px;
+}
+
+.profile-detail-row:last-child {
+    border-bottom: none;
+}
+
+.profile-detail-row .label {
+    color: var(--color-text-secondary);
+    flex-shrink: 0;
+}
+
+.profile-detail-row .value {
+    color: var(--color-text-primary);
+    font-weight: 500;
+    text-align: right;
+    word-break: break-all;
+}
+
+.profile-detail-edit-btn {
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 5px 14px;
+    font-size: 13px;
+    background: var(--color-primary);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.profile-detail-edit-btn:hover {
+    opacity: 0.85;
+}
+
+.profile-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 4px;
+}
+
+.profile-edit-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+}
+
+.profile-edit-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-divider);
+    border-radius: 6px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    resize: vertical;
+}
+
+.profile-edit-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.profile-edit-textarea {
+    min-height: 76px;
+}
+
+.profile-avatar-edit {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.profile-avatar-preview {
+    flex-shrink: 0;
+}
+
+.profile-avatar-preview img {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-bg-icon);
+    border: 1px solid var(--color-border-divider);
+}
+
+.profile-avatar-fields {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.profile-avatar-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.profile-avatar-switch-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    background: transparent;
+    border: 1px solid var(--color-border-divider);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.profile-avatar-switch-btn:hover {
+    color: var(--color-text-secondary);
+    border-color: var(--color-text-tertiary);
+    background: var(--color-bg-item-hover);
+}
+
+.profile-avatar-upload-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px 12px;
+    border: 1px dashed var(--color-border-divider);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--color-bg-card);
+    margin-top: 10px;
+}
+
+.profile-avatar-upload-area:hover {
+    border-color: var(--color-text-tertiary);
+}
+
+.profile-avatar-upload-area i {
+    font-size: 22px;
+    color: var(--color-text-tertiary);
+}
+
+.profile-avatar-upload-area span {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.profile-avatar-upload-hint {
+    font-size: 11px !important;
+    color: var(--color-text-tertiary) !important;
+}
+
+.profile-gender-options {
+    display: flex;
+    gap: 8px;
+}
+
+.profile-gender-opt {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-divider);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.profile-gender-opt i {
+    margin-right: 4px;
+}
+
+.profile-gender-opt:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.profile-gender-opt.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+}
+
+.profile-birthday-picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.profile-birthday-picker .bp-arrow {
+    width: 32px;
+    height: 36px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-divider);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.profile-birthday-picker .bp-arrow:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-bg-item-hover);
+}
+
+.profile-birthday-picker .bp-arrow:active {
+    transform: scale(0.92);
+}
+
+.profile-birthday-picker .bp-year {
+    width: 88px;
+    height: 36px;
+    text-align: center;
+    border: 1px solid var(--color-border-divider);
+    border-radius: 6px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    outline: none;
+    appearance: textfield;
+}
+
+.profile-birthday-picker .bp-month,
+.profile-birthday-picker .bp-day {
+    width: 56px;
+    height: 36px;
+    text-align: center;
+    border: 1px solid var(--color-border-divider);
+    border-radius: 6px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    outline: none;
+    appearance: textfield;
+}
+
+.profile-birthday-picker .bp-year::-webkit-inner-spin-button,
+.profile-birthday-picker .bp-year::-webkit-outer-spin-button,
+.profile-birthday-picker .bp-month::-webkit-inner-spin-button,
+.profile-birthday-picker .bp-month::-webkit-outer-spin-button,
+.profile-birthday-picker .bp-day::-webkit-inner-spin-button,
+.profile-birthday-picker .bp-day::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.profile-birthday-picker .bp-sep {
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.profile-birthday-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.profile-cal-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-divider);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.profile-cal-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.profile-calendar {
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+
+.profile-calendar-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.profile-cal-nav {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border-divider);
+    background: transparent;
+    border-radius: 6px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.profile-cal-nav:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.profile-cal-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-bottom: 10px;
+}
+
+.profile-cal-title i {
+    margin-right: 6px;
+    color: var(--color-primary);
+}
+
+.profile-cal-month-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.profile-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.profile-cal-week {
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    padding: 4px 0;
+}
+
+.profile-cal-day {
+    height: 30px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.profile-cal-day:hover {
+    background: var(--color-bg-item-hover);
+}
+
+.profile-cal-day.selected {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.profile-cal-empty {
+    height: 30px;
+}
+
+.profile-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.profile-action-btn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    border: none;
+    transition: opacity 0.2s;
+}
+
+.profile-action-cancel {
+    background: var(--color-bg-item-hover);
+    color: var(--color-text-secondary);
+}
+
+.profile-action-save {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.profile-action-cancel:hover,
+.profile-action-save:hover {
+    opacity: 0.85;
+}
+
+.profile-action-save:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+

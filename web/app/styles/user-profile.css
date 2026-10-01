@@ -1,0 +1,502 @@
+/* ===== 用户主页样式 ===== */
+.user-profile-page {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.user-profile-card {
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: center;
+    border: 1px solid var(--color-border-card);
+    box-shadow: 0 4px 16px var(--color-shadow-card);
+    position: relative;
+}
+
+.user-profile-avatar-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    width: 120px;
+    height: 120px;
+}
+
+.user-profile-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--color-bg-avatar);
+}
+
+.user-profile-avatar img {
+    width: 120px;
+    height: 120px;
+    object-fit: cover;
+    border: 4px solid var(--color-bg-icon);
+    box-sizing: border-box;
+}
+
+.user-profile-info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.user-profile-info h2 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    color: var(--color-text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.user-profile-info h2 #user-profile-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.user-profile-info h2 .user-vip-icon,
+.user-profile-info h2 .email-verified-badge {
+    flex-shrink: 0;
+}
+
+.user-profile-info h2 button#user-profile-name,
+.user-profile-info h2 div#user-profile-name {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-profile-info h2 button#user-profile-name *,
+.user-profile-info h2 div#user-profile-name * {
+    display: inline !important;
+    white-space: nowrap !important;
+}
+
+.user-meta-clickable {
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
+    border-radius: 6px;
+    padding: 2px 6px;
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.user-meta-clickable:hover {
+    color: var(--color-primary, #3b82f6);
+    background-color: var(--color-bg-item-hover, rgba(59, 130, 246, 0.08));
+}
+
+.user-name-clickable {
+    cursor: pointer;
+    transition: color 0.2s ease;
+    border-radius: 6px;
+    font: inherit;
+    font-weight: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    text-align: left;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-name-clickable:hover {
+    color: var(--color-primary, #3b82f6);
+}
+
+.user-vip-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background-size: 20px auto;
+    background-repeat: no-repeat;
+    background-position: center center;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.user-profile-intro {
+    margin: 0 0 12px 0;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.user-profile-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.user-meta-item {
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.user-profile-stats {
+    display: flex;
+    gap: 32px;
+    flex-shrink: 0;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--color-primary);
+}
+
+.stat-label {
+    display: block;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    margin-top: 4px;
+}
+
+.user-profile-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--color-border-divider);
+    padding-bottom: 0;
+}
+
+.profile-tab {
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 15px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.profile-tab:hover {
+    color: var(--color-text-primary);
+}
+
+.profile-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.profile-tab-create {
+    text-decoration: none;
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 20px;
+    padding: 8px 18px;
+    margin-left: auto;
+    border-bottom: none;
+    box-shadow: 0 2px 8px rgba(106, 140, 137, 0.3);
+}
+
+.profile-tab-create:hover {
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(106, 140, 137, 0.4);
+}
+
+.user-profile-content {
+    min-height: 200px;
+}
+
+.user-posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.post-item {
+    background: var(--color-bg-card);
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid var(--color-border-card);
+    transition: all 0.2s ease;
+}
+
+.post-item:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px var(--color-shadow-card);
+}
+
+.post-item-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--color-text-primary);
+    margin: 0 0 10px 0;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}
+
+.post-item-summary {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 12px 0;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.post-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.post-item-stats {
+    display: flex;
+    gap: 16px;
+}
+
+.post-item-category {
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.post-item-author {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin-right: 8px;
+}
+
+.post-item-author i {
+    margin-right: 3px;
+}
+
+/* 我的收藏卡片：头像 + 标题 + 作者/分类行 */
+.post-item-header {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.post-item-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-bg-icon);
+    flex-shrink: 0;
+}
+
+.post-item-header-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.post-item-header .post-item-title {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.post-item-sub-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+/* 个人中心帖子列表：分类 ↔ 空间标签固定小间距（与主卡片头部一致） */
+.post-item-tags {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.post-item-footer-right {
+    justify-content: flex-end;
+}
+
+/* 个人中心帖子列表内部切换（帖子 / 我的收藏） */
+.profile-sub-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.profile-sub-tab {
+    padding: 6px 16px;
+    border-radius: 16px;
+    border: 1px solid var(--color-border-primary);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.profile-sub-tab:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.profile-sub-tab.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+}
+
+.post-item-stats span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.post-item-category {
+    background: var(--color-bg-item-hover);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.loading-text, .empty-text {
+    text-align: center;
+    color: var(--color-text-tertiary);
+    padding: 40px 0;
+    font-size: 14px;
+}
+
+@media (max-width: 768px) {
+    .user-profile-page {
+        margin: 20px auto;
+        padding: 0 12px;
+    }
+
+    .user-profile-card {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .user-profile-info {
+        text-align: center;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .user-profile-info h2 {
+        justify-content: center;
+        font-size: 20px;
+    }
+
+    .user-profile-info h2 button#user-profile-name,
+    .user-profile-info h2 div#user-profile-name {
+        max-width: 240px;
+    }
+
+    .user-profile-meta {
+        justify-content: center;
+    }
+
+    .user-profile-stats {
+        width: 100%;
+        justify-content: center;
+        gap: 20px;
+    }
+
+    .post-item {
+        padding: 16px;
+    }
+
+    .post-item-title {
+        font-size: 16px;
+    }
+}
+
+
+
+.gender-selector-wrapper .gender-selector-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.gender-selector-wrapper .gender-selector-item {
+    margin: 8px 0;
+}
+
+/* 隐藏原生单选框 */
+.gender-selector-wrapper .gender-selector-real-radio {
+    display: none;
+}
+
+/* 自定义圆形单选框 */
+.gender-selector-wrapper .gender-selector-radio-box {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 1px solid #aaa;
+    border-radius: 50%;
+    vertical-align: middle;
+    position: relative;
+    margin-right: 6px;
+}
+
+.gender-selector-wrapper .gender-selector-radio-box::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background: #1677ff;
+    border-radius: 50%;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+}
+
+.gender-selector-wrapper .gender-selector-real-radio:checked + .gender-selector-radio-box {
+    border-color: #1677ff;
+}
+
+.gender-selector-wrapper .gender-selector-real-radio:checked + .gender-selector-radio-box::after {
+    display: block;
+}
+
+.gender-selector-wrapper .gender-selector-text {
+    display: inline-block;
+    vertical-align: middle;
+}
+

@@ -1,0 +1,103 @@
+/* ===== 主样式（源自 legacy main.css，保持视觉 1:1）===== */
+:root{
+    --color-text-primary: #1A2423;
+    --color-text-secondary: #2E4659;
+    --color-text-tertiary: #96A9A7;
+    --color-text-light: #E8EEED;
+    --color-text-muted: #D8E6E4;
+    --color-text-accent: #579491;
+    --color-text-accent-light: #B4D2D8;
+    --color-text-accent-muted: #84A8B9;
+
+    --color-bg-body: #D8E6E4;
+    --color-bg-header: rgba(232, 238, 237, 0.75);
+    --color-bg-footer: #6A8C89;
+    --color-bg-search: rgba(255, 255, 255, 0.6);
+    --color-bg-search-hover: rgba(255, 255, 255, 0.85);
+    --color-bg-search-focus: rgba(255, 255, 255, 0.95);
+    --color-bg-dropdown: rgba(255, 255, 255, 0.95);
+    --color-bg-icon: rgba(106, 140, 137, 0.15);
+    --color-bg-icon-hover: rgba(106, 140, 137, 0.3);
+    --color-bg-item-hover: rgba(106, 140, 137, 0.1);
+    --color-bg-item-active: rgba(106, 140, 137, 0.15);
+    --color-bg-avatar: linear-gradient(135deg, #84A8B9 0%, #6A8C89 100%);
+    --color-bg-checkbox-active: linear-gradient(135deg, #6A8C89 0%, #579491 100%);
+    --color-bg-card: rgba(255, 255, 255, 0.95);
+    --color-bg-mask: rgba(0, 0, 0, 0.4);
+    --color-bg-autofill: #fff;
+    --color-bg-item: rgba(255, 255, 255, 0.6);
+    --color-bg-input: rgba(255, 255, 255, 0.85);
+    --color-bg-secondary: rgba(255, 255, 255, 0.95);
+
+    --color-border-primary: rgba(106, 140, 137, 0.2);
+    --color-border: rgba(106, 140, 137, 0.2);
+    --color-border-search: rgba(106, 140, 137, 0.25);
+    --color-border-search-hover: rgba(106, 140, 137, 0.5);
+    --color-border-focus: #6A8C89;
+    --color-border-divider: rgba(106, 140, 137, 0.1);
+    --color-border-checkbox: rgba(106, 140, 137, 0.4);
+    --color-border-card: rgba(106, 140, 137, 0.2);
+
+    --color-shadow-header: rgba(58, 95, 107, 0.08);
+    --color-shadow-search: rgba(58, 95, 107, 0.06);
+    --color-shadow-search-hover: rgba(58, 95, 107, 0.1);
+    --color-shadow-search-focus: rgba(106, 140, 137, 0.2);
+    --color-shadow-avatar: rgba(106, 140, 137, 0.3);
+    --color-shadow-dropdown: rgba(58, 95, 107, 0.15);
+    --color-shadow-card: rgba(58, 95, 107, 0.2);
+    --color-shadow-qr: rgba(0,0,0,0.2);
+
+    --color-primary: #6A8C89;
+    --color-secondary: #579491;
+}
+
+.night-mode {
+    --color-text-primary: #E8EEED;
+    --color-text-secondary: #D8E6E4;
+    --color-text-tertiary: #84A8B9;
+    --color-text-light: #B4D2D8;
+    --color-text-muted: #B4D2D8;
+    --color-text-accent: #B4D2D8;
+    --color-text-accent-light: #B4D2D8;
+    --color-text-accent-muted: #84A8B9;
+
+    --color-bg-body: #325a64;
+    --color-bg-header: rgba(46, 70, 89, 0.75);
+    --color-bg-footer: #2E4659;
+    --color-bg-search: rgba(26, 36, 35, 0.6);
+    --color-bg-search-hover: rgba(26, 36, 35, 0.8);
+    --color-bg-search-focus: rgba(26, 36, 35, 0.9);
+    --color-bg-dropdown: rgba(26, 36, 35, 0.95);
+    --color-bg-icon: rgba(132, 168, 185, 0.2);
+    --color-bg-icon-hover: rgba(132, 168, 185, 0.4);
+    --color-bg-item-hover: rgba(132, 168, 185, 0.15);
+    --color-bg-item-active: rgba(132, 168, 185, 0.2);
+    --color-bg-checkbox-active: linear-gradient(135deg, #84A8B9 0%, #6A8C89 100%);
+    --color-bg-card: rgba(26, 36, 35, 0.95);
+    --color-bg-item: rgba(26, 36, 35, 0.5);
+    --color-bg-input: rgba(26, 36, 35, 0.8);
+    --color-bg-secondary: rgba(26, 36, 35, 0.9);
+
+    --color-border-primary: rgba(132, 168, 185, 0.15);
+    --color-border: rgba(132, 168, 185, 0.15);
+    --color-border-search: rgba(132, 168, 185, 0.25);
+    --color-border-search-hover: rgba(132, 168, 185, 0.5);
+    --color-border-focus: #84A8B9;
+    --color-border-divider: rgba(132, 168, 185, 0.15);
+    --color-border-checkbox: rgba(132, 168, 185, 0.4);
+    --color-border-card: rgba(132, 168, 185, 0.2);
+
+    --color-shadow-header: rgba(0, 0, 0, 0.1);
+    --color-shadow-dropdown: rgba(0, 0, 0, 0.3);
+    --color-shadow-card: rgba(0, 0, 0, 0.4);
+}
+
+
+@font-face {
+    font-family: 'OriginalHandWrite';
+    src: url('https://assets.crazying-dev.top/font/CEFFontsCJK.woff2') format('woff2'),url('https://ciallovo.top/assets/fonts/CEFFontsCJK.woff2') format('woff2'), url('https://cdn.bootcdn.net/ajax/libs/webfont/1.6.28/fonts/ma-shan-zheng.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+

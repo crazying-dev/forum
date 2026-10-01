@@ -1,0 +1,75 @@
+/* ===== 胶囊状态提醒 Toast ===== */
+.toast-container {
+    position: fixed;
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    pointer-events: none;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+}
+
+.toast-pill {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    padding: 9px 18px;
+    border-radius: 999px; /* 胶囊 */
+    font-size: 14px;
+    line-height: 1.4;
+    color: #fff;
+    background: rgba(26, 36, 35, 0.92);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    user-select: none;
+    animation: toastIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast-pill i {
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
+.toast-pill span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.toast-success { background: rgba(16, 185, 129, 0.95); }
+.toast-error   { background: rgba(239, 68, 68, 0.95); }
+.toast-warning { background: rgba(245, 158, 11, 0.95); }
+.toast-info    { background: rgba(106, 140, 137, 0.95); }
+
+.toast-leaving {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(-12px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 480px) {
+    .toast-container { top: 64px; }
+    .toast-pill { padding: 8px 14px; font-size: 13px; }
+}
+

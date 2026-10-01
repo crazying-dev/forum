@@ -1,0 +1,425 @@
+/* ===== 以下样式源自 legacy 模板内联 <style>（对齐视觉 1:1）===== */
+
+/* --- 邮件验证页 (verify_success/failed) --- */
+.verify-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.verify-card {
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+}
+
+.verify-card.success .verify-icon { color: #10b981; }
+.verify-card.failed .verify-icon { color: #ef4444; }
+
+.verify-icon {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+.verify-card h2 {
+    font-size: 24px;
+    margin: 0 0 8px 0;
+    color: var(--color-text-primary);
+}
+
+.verify-card p {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0 0 24px 0;
+}
+
+.verify-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 24px;
+    background: var(--color-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    font: inherit;
+    transition: opacity 0.2s ease;
+}
+
+.verify-btn:hover { opacity: 0.9; }
+
+/* --- 外链过渡页 (goto) --- */
+.goto-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    padding: 20px;
+}
+
+.goto-card {
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 520px;
+    width: 100%;
+}
+
+.goto-icon {
+    font-size: 56px;
+    color: #f0ad4e;
+    margin-bottom: 16px;
+}
+
+.goto-card h2 {
+    font-size: 22px;
+    margin: 0 0 8px 0;
+    color: var(--color-text-primary);
+}
+
+.goto-tip {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin: 0 0 16px 0;
+}
+
+.goto-url {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-divider);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--color-text-primary);
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    margin-bottom: 24px;
+    font-family: monospace;
+}
+
+.goto-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.goto-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+    border: none;
+}
+
+.goto-btn-cancel {
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+}
+.goto-btn-cancel:hover { background: var(--color-bg-icon-hover); }
+
+.goto-btn-confirm {
+    background: var(--color-primary);
+    color: #fff;
+}
+.goto-btn-confirm:hover { opacity: 0.9; }
+
+.goto-warn {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin: 20px 0 0 0;
+}
+
+/* --- 关注列表弹窗 (UserPersonalinfo) --- */
+.stat-item-clickable {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+.stat-item-clickable:hover { opacity: 0.8; }
+
+.follow-list-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.follow-list-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.follow-list-container {
+    position: relative;
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: followListScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+@keyframes followListScaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.follow-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.08));
+}
+.follow-list-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: var(--color-text-primary);
+}
+.follow-list-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--color-text-tertiary);
+    cursor: pointer;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+.follow-list-close:hover { color: var(--color-text-primary); }
+
+.follow-list-tabs {
+    display: flex;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--color-border, rgba(0,0,0,0.08));
+}
+.follow-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 12px 0;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease;
+    font: inherit;
+}
+.follow-tab.active { color: var(--color-primary); }
+.follow-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 2px;
+    background: var(--color-primary);
+    border-radius: 2px;
+}
+
+.follow-list-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.follow-user-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    gap: 12px;
+    transition: background-color 0.2s ease;
+}
+.follow-user-item:hover { background: var(--color-bg-item-hover, rgba(0,0,0,0.04)); }
+
+.follow-user-avatar {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+.follow-user-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+.follow-user-vip {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    border: 2px solid var(--color-bg-card);
+}
+
+.follow-user-info {
+    flex: 1;
+    min-width: 0;
+}
+.follow-user-name {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.follow-user-intro {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin: 2px 0 0 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 昵称行：昵称 + 「共同关注」小胶囊 */
+.follow-user-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.follow-user-name-row .follow-user-name {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+/* 「共同关注」小胶囊（规格参考 .user-guild-chip；底色/字色用设计令牌，夜间可读） */
+.follow-user-tag {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-accent);
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+}
+
+.follow-btn {
+    flex-shrink: 0;
+    padding: 6px 16px;
+    border: none;
+    border-radius: 20px;
+    background: var(--color-primary);
+    color: white;
+    font-size: 13px;
+    cursor: pointer;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+    font: inherit;
+}
+.follow-btn:hover { opacity: 0.9; }
+.follow-btn.followed {
+    background: var(--color-bg-item-hover, rgba(0,0,0,0.08));
+    color: var(--color-text-secondary);
+}
+.follow-btn.followed:hover { background: var(--color-bg-item-active, rgba(0,0,0,0.12)); }
+
+/* 列表「加载更多」（复用 ListState.LoadMoreButton 结构） */
+.follow-list-more {
+    display: flex;
+    justify-content: center;
+    padding: 12px 0 16px;
+}
+.follow-list-more button {
+    padding: 8px 26px;
+    border: none;
+    border-radius: 20px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+.follow-list-more button:hover:not(:disabled) { background: var(--color-bg-icon-hover); }
+.follow-list-more button:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 640px) {
+    .follow-list-container {
+        width: 100%;
+        max-width: none;
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+
+/* --- auth 验证码输入组 (auth.html 内联) --- */
+.auth-code-group { display: flex; gap: 8px; }
+.auth-code-group input { flex: 1; min-width: 0; width: auto; }
+.code-btn {
+    flex-shrink: 0; width: auto; height: 48px; padding: 0 14px; border: none;
+    border-radius: 12px; background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: all 0.3s ease;
+}
+.code-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px var(--color-primary); opacity: 0.9; }
+.code-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+@media (max-width: 480px) { .code-btn { height: 44px; font-size: 13px; padding: 0 10px; } }
+
+/* --- 邮箱已认证徽章 / 验证按钮 (UserPersonalinfo 内联) --- */
+.email-verified-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #10b981;
+    font-weight: 500;
+    margin-left: 8px;
+}
+.email-verified-badge i { font-size: 14px; }
+.email-verify-btn { color: #3b82f6; }
+.email-verify-btn:hover { color: #2563eb; }
+
+/* live2d 动作卡片选中态（移植版增强，不改动 legacy 基础样式） */
+.live2d-action-card.active {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+.live2d-action-card.active .live2d-action-name {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+

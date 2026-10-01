@@ -1,0 +1,41 @@
+/* ======================== 空间标签 / 文章卡 ======================== */
+.space-badge,
+.article-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--color-bg-icon);
+    color: var(--color-text-tertiary);
+    white-space: nowrap;
+}
+
+.space-badge i {
+    font-size: 11px;
+}
+
+.article-badge {
+    /* 实底 + 白字（#7c3aed 对比度 ≈ 5.7），不再透出下层背景 */
+    background: #7c3aed;
+    color: #fff;
+}
+
+.article-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+.article-card-icon i {
+    color: #fff !important;
+    font-size: 18px;
+}
+
+.article-card-author {
+    color: var(--color-text-tertiary);
+}
+

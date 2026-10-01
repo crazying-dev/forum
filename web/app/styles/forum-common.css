@@ -1,0 +1,90 @@
+/* ======================== 论坛帖子 ======================== */
+.forum-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.forum-header {
+    text-align: center;
+    padding: 28px 16px 20px;
+    position: relative;
+}
+
+.forum-title {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: 4px;
+    color: var(--color-text-secondary);
+    margin: 0 0 6px;
+}
+
+.forum-subtitle {
+    font-size: 14px;
+    color: var(--color-text-tertiary);
+    letter-spacing: 2px;
+    margin: 0 0 16px;
+}
+
+.forum-create-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: var(--color-primary);
+    color: #fff;
+    border-radius: 24px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(106, 140, 137, 0.3);
+}
+
+.forum-create-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(106, 140, 137, 0.4);
+}
+
+.forum-category-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 12px 0;
+    margin-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.forum-tab {
+    padding: 8px 18px;
+    background: var(--color-bg-icon);
+    border: none;
+    border-radius: 20px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.forum-tab:hover {
+    background: var(--color-bg-icon-hover);
+}
+
+.forum-tab.active {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.forum-post-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.forum-user-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+

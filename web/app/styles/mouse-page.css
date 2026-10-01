@@ -1,0 +1,214 @@
+/* ===== 罗小黑战记鼠标 Linux版 页面样式 ===== */
+.mouse-linux-page {
+    overflow: visible;
+    overflow-x: visible;
+    overflow-y: visible;
+}
+
+.mouse-linux-page .wiki-container {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    overflow: visible;
+    overflow-x: visible;
+    overflow-y: visible;
+}
+
+.mouse-linux-download {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.mouse-linux-download .wiki-card {
+    flex: 1;
+    min-width: 200px;
+    text-decoration: none;
+}
+
+.mouse-linux-download .wiki-card-content {
+    text-align: center;
+}
+
+.mouse-linux-download .wiki-card-content i {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.mouse-linux-markdown {
+    padding: 24px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    background: var(--color-bg-card);
+    min-height: 100px;
+    max-width: 100%;
+    word-break: break-word;
+    overflow: visible;
+    overflow-x: visible;
+    overflow-y: visible;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mouse-linux-markdown.markdown-body {
+    color: var(--color-text-primary) !important;
+    background: var(--color-bg-card) !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.mouse-linux-markdown.markdown-body h1,
+.mouse-linux-markdown.markdown-body h2,
+.mouse-linux-markdown.markdown-body h3,
+.mouse-linux-markdown.markdown-body h4,
+.mouse-linux-markdown.markdown-body h5,
+.mouse-linux-markdown.markdown-body h6 {
+    color: var(--color-text-secondary);
+    border-bottom-color: var(--color-border-divider);
+    word-break: break-word;
+}
+
+.mouse-linux-markdown.markdown-body p,
+.mouse-linux-markdown.markdown-body li,
+.mouse-linux-markdown.markdown-body ul,
+.mouse-linux-markdown.markdown-body ol {
+    word-break: break-all;
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: 100%;
+}
+
+.mouse-linux-markdown.markdown-body p {
+    word-break: break-all !important;
+    overflow-wrap: anywhere !important;
+    white-space: normal !important;
+    max-width: 100% !important;
+    width: 100%;
+}
+
+.mouse-linux-markdown.markdown-body a {
+    color: var(--color-primary);
+    word-break: break-all;
+}
+
+.mouse-linux-markdown.markdown-body code {
+    background: var(--color-bg-item-hover);
+    color: var(--color-text-primary);
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.mouse-linux-markdown.markdown-body pre {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    position: relative;
+    overflow: visible;
+    overflow-x: visible;
+    word-break: break-all;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-width: 100%;
+    border: 1px solid var(--color-border-divider);
+    border-radius: 8px;
+    padding: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.mouse-linux-markdown.markdown-body pre code {
+    background: transparent;
+    padding: 0;
+    word-break: break-all;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+.md-copy-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    z-index: 10;
+}
+
+.mouse-linux-markdown.markdown-body pre:hover .md-copy-btn {
+    opacity: 1;
+}
+
+.md-copy-btn:hover {
+    background: var(--color-primary) !important;
+    color: #fff !important;
+}
+
+.md-copy-btn.copied {
+    background: var(--color-primary) !important;
+    color: #fff !important;
+    opacity: 1;
+}
+
+.mouse-linux-markdown.markdown-body blockquote {
+    color: var(--color-text-tertiary);
+    border-left-color: var(--color-border-divider);
+}
+
+.mouse-linux-markdown.markdown-body img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+.mouse-linux-markdown.markdown-body table {
+    border-color: var(--color-border-divider);
+}
+
+.mouse-linux-markdown.markdown-body table th,
+.mouse-linux-markdown.markdown-body table td {
+    border-color: var(--color-border-divider);
+}
+
+.mouse-linux-markdown.markdown-body table tr {
+    background: var(--color-bg-card);
+    border-color: var(--color-border-divider);
+}
+
+.mouse-linux-license {
+    margin-bottom: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--color-border-divider);
+    overflow: hidden;
+}
+
+.mouse-linux-license summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.mouse-linux-license pre {
+    padding: 16px;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 13px;
+    line-height: 1.6;
+    max-height: 400px;
+    overflow-y: auto;
+}
+

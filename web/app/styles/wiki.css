@@ -1,0 +1,456 @@
+/* ===== WIKI页面样式 ===== */
+.wiki-page {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.wiki-header {
+    text-align: center;
+    margin-bottom: 40px;
+    padding-bottom: 30px;
+    border-bottom: 2px solid var(--color-border-divider);
+}
+
+.wiki-header h2 {
+    font-size: 32px;
+    color: var(--color-text-secondary);
+    letter-spacing: 6px;
+    margin-bottom: 16px;
+    transition: color 0.5s ease;
+}
+
+.wiki-intro {
+    font-size: 15px;
+    color: var(--color-text-tertiary);
+    line-height: 1.8;
+    white-space: normal;
+}
+
+.wiki-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 40px;
+}
+
+.wiki-card {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    border: 1px solid var(--color-border-card);
+    box-shadow: 0 4px 16px var(--color-shadow-card);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.wiki-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px var(--color-shadow-card);
+}
+
+.wiki-card-image {
+    width: 100%;
+    height: 180px;
+    overflow: hidden;
+    position: relative;
+}
+
+.wiki-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.wiki-card:hover .wiki-card-image img {
+    transform: scale(1.05);
+}
+
+.wiki-card-content {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.wiki-card-content h3 {
+    font-size: 20px;
+    color: var(--color-text-secondary);
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    transition: color 0.5s ease;
+}
+
+.wiki-card-content p {
+    font-size: 14px;
+    color: var(--color-text-tertiary);
+    line-height: 1.7;
+    white-space: normal;
+    margin-bottom: 16px;
+    transition: color 0.5s ease;
+}
+
+.wiki-card-link {
+    font-size: 13px;
+    color: var(--color-text-accent);
+    letter-spacing: 1px;
+    transition: color 0.3s ease;
+}
+
+.wiki-card:hover .wiki-card-link {
+    color: var(--color-primary);
+}
+
+.wiki-footer {
+    text-align: center;
+    padding-top: 24px;
+    border-top: 1px solid var(--color-border-divider);
+}
+
+.wiki-footer p {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    white-space: normal;
+    letter-spacing: 1px;
+}
+
+/* Live2D 原作者信息卡片 */
+.live2d-author-card {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto 24px;
+    padding: 18px 24px;
+    background: var(--color-bg-card);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px var(--color-shadow-search);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.live2d-author-label {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    letter-spacing: 1px;
+}
+
+.live2d-author-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.live2d-author-icon {
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.live2d-author-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.live2d-author-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.live2d-author-desc {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.live2d-author-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--color-primary);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--color-bg-item-hover);
+    transition: all 0.2s ease;
+    align-self: flex-start;
+}
+
+.live2d-author-link:hover {
+    background: var(--color-bg-item-active);
+    transform: translateX(2px);
+}
+
+.live2d-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.live2d-canvas-wrapper {
+    position: relative;
+    width: 400px;
+    height: 500px;
+    background: var(--color-bg-card);
+    border-radius: 16px;
+    box-shadow: 0 4px 20px var(--color-shadow-card);
+    overflow: hidden;
+}
+
+.live2d-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.live2d-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--color-text-tertiary);
+}
+
+/* error 默认不显示（显式独立定义，避免和 loading 共享导致自动出现）；
+   只有调用 showLive2DError() 将 display 设为 flex 时才显示，加载成功时要立即清除 */
+.live2d-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--color-text-tertiary);
+    z-index: 2;
+}
+/* z-index：加载进度和失败提示永远盖在画布上方；加载成功后它们被 display:none 隐藏，画布仍正常显示 */
+.live2d-loading {
+    z-index: 2;
+}
+
+.live2d-progress-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 80%;
+}
+
+.live2d-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-bg-icon);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.live2d-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.live2d-progress-text {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+}
+
+.live2d-progress-percent {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.live2d-error i {
+    font-size: 32px;
+    animation: none;
+    color: #ef4444;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.live2d-controls {
+    background: var(--color-bg-card);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px var(--color-shadow-search);
+}
+
+.live2d-control-title {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.live2d-control-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.live2d-btn {
+    background: var(--color-bg-icon);
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.live2d-btn:hover {
+    background: var(--color-bg-item-hover);
+    color: var(--color-primary);
+}
+
+.live2d-btn:active {
+    transform: scale(0.96);
+}
+
+/* Live2D 动作示例展示区 */
+.live2d-actions-section {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px;
+    background: var(--color-bg-card);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px var(--color-shadow-search);
+}
+
+.live2d-actions-title {
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.live2d-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 16px;
+}
+
+.live2d-action-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: var(--color-bg-icon);
+    border-radius: 10px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: default;
+}
+
+.live2d-action-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px var(--color-shadow-search);
+}
+
+.live2d-action-gif {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--color-bg-item-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.live2d-action-gif img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.live2d-action-name {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    letter-spacing: 1px;
+}
+
+@media (max-width: 600px) {
+    .live2d-actions-section {
+        padding: 14px;
+    }
+    .live2d-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    .live2d-action-card {
+        padding: 8px;
+    }
+    .live2d-action-name {
+        font-size: 12px;
+    }
+}
+
+@media (max-width: 600px) {
+    .live2d-canvas-wrapper {
+        width: 100%;
+        max-width: 320px;
+        height: 400px;
+    }
+    .live2d-control-buttons {
+        gap: 8px;
+    }
+    .live2d-btn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+}
+
+/* 小屏幕WIKI适配 */
+@media (max-width: 600px) {
+    .wiki-container {
+        grid-template-columns: 1fr;
+    }
+    .wiki-card-image {
+        height: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .wiki-header {
+        margin-bottom: 24px;
+        padding-bottom: 20px;
+    }
+    .wiki-header h2 {
+        font-size: 24px;
+        letter-spacing: 3px;
+    }
+    .wiki-card-image {
+        height: 120px;
+    }
+    .wiki-card-content {
+        padding: 16px;
+    }
+    .wiki-card-content h3 {
+        font-size: 18px;
+    }
+}
+

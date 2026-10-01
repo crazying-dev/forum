@@ -1,0 +1,88 @@
+#footer {
+    width: 100%;
+    background: var(--color-bg-footer);
+    padding: 36px 24px 28px;
+    color: var(--color-text-light);
+    font-size: 14px;
+    margin-top: 40px;
+    transition: background 0.5s ease, color 0.5s ease;
+}
+
+.footer-container {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap: 36px;
+    text-align: left;
+}
+
+.footer-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-light);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.footer-logo {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+}
+
+.footer-desc {
+    font-size: 13px;
+    opacity: 0.75;
+    margin: 0;
+}
+
+/* 品牌列：免责声明与隐私政策依次排在简介下方 */
+.footer-brand .footer-disclaimer {
+    display: block;
+    margin: 12px 0 0;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.footer-brand a {
+    display: block;
+    margin-top: 8px;
+}
+
+.footer-links {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.footer-links i {
+    width: 16px;
+    margin-right: 6px;
+    opacity: 0.8;
+}
+
+#footer a {
+    color: var(--color-text-light);
+    text-decoration: none;
+    opacity: 0.9;
+    transition: opacity 0.2s ease;
+}
+
+#footer a:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .footer-container {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+}
+

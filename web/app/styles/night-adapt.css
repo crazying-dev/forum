@@ -1,0 +1,20 @@
+/* ======================== 夜间模式适配（编辑器 / 引用卡片） ======================== */
+
+.night-mode .quote-card {
+    background: rgba(26, 36, 35, 0.55);
+}
+
+.night-mode .quote-skeleton-block {
+    background: linear-gradient(90deg, rgba(132, 168, 185, 0.12) 25%, rgba(132, 168, 185, 0.28) 37%, rgba(132, 168, 185, 0.12) 63%);
+    background-size: 400% 100%;
+}
+
+.night-mode .rich-editor-option-btn,
+.night-mode .rich-editor-number {
+    background: var(--color-bg-input);
+}
+
+.night-mode .embed-node-selected {
+    border-color: var(--color-border-focus);
+}
+

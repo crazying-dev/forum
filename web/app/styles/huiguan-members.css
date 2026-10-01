@@ -1,0 +1,461 @@
+/* ======================== 会馆成员名单 / 馆长介绍页 ======================== */
+
+/* --- 成员数入口链接 --- */
+/* 会馆 hero 成员数：链接继承 hero 前景色（与其余 meta 文案一致） */
+.guild-hero-meta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+}
+
+.guild-hero-meta-link,
+.guild-hero-meta-link i {
+    color: var(--guild-fg, #fff) !important;
+}
+
+.guild-hero-meta-link:hover {
+    text-decoration: underline;
+    opacity: 1;
+}
+
+/* 轮播主卡成员数（阻止冒泡，避免同时触发整卡跳转） */
+.guild-card-meta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.guild-card-meta-link i {
+    color: inherit !important;
+}
+
+.guild-card-meta-link:hover {
+    color: var(--color-primary);
+}
+
+/* 列表卡成员数：span 模拟链接（外层是整卡 Link） */
+.guild-list-meta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: var(--color-text-tertiary);
+    transition: color 0.2s ease;
+}
+
+.guild-list-meta-link i {
+    color: inherit !important;
+}
+
+.guild-list-meta-link:hover {
+    color: var(--color-primary);
+}
+
+/* 馆长称号（小号，跟在馆长名旁；颜色由 .theme-ink 提供，夜间自动提亮） */
+.guild-leader-title {
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    opacity: 0.95;
+}
+
+/* --- 成员名单页 --- */
+.guild-members-page {
+    max-width: 900px;
+}
+
+.guild-members-header {
+    margin: 10px 0 4px;
+}
+
+.guild-members-title {
+    font-size: 20px;
+    font-weight: 400;
+    letter-spacing: 1px;
+    color: var(--color-text-secondary);
+}
+
+.guild-members-title i {
+    margin-right: 4px;
+    color: var(--color-primary);
+}
+
+/* 馆长特写卡（居中，整卡跳转个人主页） */
+.guild-members-leader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 16px auto 0;
+    padding: 22px 24px;
+    max-width: 420px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 18px;
+    background: var(--color-bg-card);
+    box-shadow: 0 6px 18px var(--color-shadow-search);
+    text-align: center;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.guild-members-leader:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px var(--color-shadow-search-hover);
+}
+
+.guild-members-leader-avatar {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: visible;
+    background: var(--color-bg-avatar);
+}
+
+.guild-members-leader-avatar img,
+.guild-members-leader-avatar .avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.guild-members-leader-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.guild-members-leader-name {
+    font-size: 18px;
+    color: var(--color-text-primary);
+}
+
+.guild-members-leader-intro {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--color-text-tertiary);
+    word-break: break-word;
+}
+
+.guild-members-list {
+    margin-top: 18px;
+}
+
+/* 成员网格：桌面 4 列 / 移动 2 列 */
+.guild-members-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.guild-member-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 12px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+    text-align: center;
+    text-decoration: none;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guild-member-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-border-focus);
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+}
+
+.guild-member-avatar {
+    position: relative;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: visible;
+    background: var(--color-bg-avatar);
+}
+
+.guild-member-avatar img,
+.guild-member-avatar .avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.guild-member-name {
+    max-width: 100%;
+    font-size: 14px;
+    color: var(--color-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.guild-member-intro {
+    width: 100%;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-tertiary);
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+@media (max-width: 640px) {
+    .guild-members-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .guild-members-leader {
+        padding: 18px 16px;
+    }
+}
+
+/* --- 馆长介绍页 --- */
+.guild-leader-page {
+    max-width: 900px;
+}
+
+.guild-leader-hero {
+    position: relative;
+    padding: 30px 24px 28px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px var(--color-shadow-search);
+}
+
+.guild-leader-hero-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.guild-leader-hero-guild {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.9;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-leader-hero-guild i {
+    color: inherit !important;
+}
+
+.guild-leader-hero-avatar {
+    position: relative;
+    width: 104px;
+    height: 104px;
+    margin-top: 4px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: visible;
+    background: var(--color-bg-avatar);
+    box-shadow: 0 0 0 3px var(--guild-fg-soft, rgba(255, 255, 255, 0.18));
+}
+
+.guild-leader-hero-avatar img,
+.guild-leader-hero-avatar .avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.guild-leader-hero-name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.guild-leader-hero-name {
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+/* 称号 chip / 「馆长」标签（hero 上：半透明底 + hero 前景色） */
+.guild-leader-hero-title,
+.guild-leader-hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 10px;
+    background: var(--guild-fg-soft, rgba(255, 255, 255, 0.18));
+    color: var(--guild-fg, #fff) !important;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+}
+
+.guild-leader-hero-title i,
+.guild-leader-hero-tag i {
+    color: inherit !important;
+}
+
+.guild-leader-hero-intro {
+    max-width: 560px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.92;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+    word-break: break-word;
+}
+
+.guild-leader-panel {
+    margin-top: 16px;
+    padding: 18px 20px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+}
+
+.guild-leader-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.guild-leader-panel-title i {
+    color: inherit !important;
+}
+
+/* 寄语：短引用样式 */
+.guild-leader-quote {
+    margin: 0;
+    padding: 10px 14px;
+    border-left: 3px solid var(--color-primary);
+    border-radius: 0 10px 10px 0;
+    background: var(--color-bg-item);
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.guild-leader-placeholder {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+/* 正文（管理端 HTML，RichContent 渲染）排版 */
+.guild-leader-content {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.guild-leader-content p {
+    margin: 0 0 10px;
+}
+
+.guild-leader-content h1,
+.guild-leader-content h2,
+.guild-leader-content h3,
+.guild-leader-content h4,
+.guild-leader-content h5,
+.guild-leader-content h6 {
+    margin: 14px 0 8px;
+    font-weight: 600;
+}
+
+.guild-leader-content ul,
+.guild-leader-content ol {
+    margin: 0 0 10px;
+    padding-left: 22px;
+}
+
+.guild-leader-content li {
+    list-style: disc;
+}
+
+.guild-leader-content ol li {
+    list-style: decimal;
+}
+
+.guild-leader-content img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+
+.guild-leader-content a {
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+.guild-leader-content blockquote {
+    margin: 0 0 10px;
+    padding: 8px 12px;
+    border-left: 3px solid var(--color-border-card);
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+}
+
+.guild-leader-content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.guild-leader-content th,
+.guild-leader-content td {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-card);
+}
+
+.guild-leader-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+}
+
+.guild-leader-profile-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 26px;
+    border-radius: 22px;
+    font-size: 14px;
+    text-decoration: none;
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+    transition: transform 0.2s ease;
+}
+
+.guild-leader-profile-btn i {
+    color: inherit !important;
+}
+
+.guild-leader-profile-btn:hover {
+    transform: translateY(-1px);
+}
+

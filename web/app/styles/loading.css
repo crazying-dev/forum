@@ -1,0 +1,91 @@
+/* ======================== 全局加载动图 ======================== */
+.global-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 36px 16px;
+}
+
+.global-loading-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    box-shadow: 0 6px 18px var(--color-shadow-avatar);
+    animation: globalLoadingBreath 1.9s ease-in-out infinite;
+}
+
+.global-loading-logo img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.global-loading-dots {
+    display: flex;
+    gap: 7px;
+}
+
+.global-loading-dots span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    animation: globalLoadingDot 1.2s ease-in-out infinite;
+}
+
+.global-loading-dots span:nth-child(2) {
+    animation-delay: 0.18s;
+}
+
+.global-loading-dots span:nth-child(3) {
+    animation-delay: 0.36s;
+}
+
+.global-loading-text {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    letter-spacing: 2px;
+}
+
+@keyframes globalLoadingBreath {
+    0%, 100% {
+        transform: scale(0.9);
+        box-shadow: 0 0 0 0 var(--color-shadow-avatar);
+    }
+    50% {
+        transform: scale(1.06);
+        box-shadow: 0 0 0 12px rgba(106, 140, 137, 0);
+    }
+}
+
+@keyframes globalLoadingDot {
+    0%, 100% {
+        transform: scale(0.7);
+        opacity: 0.45;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+.route-loading {
+    min-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 16px;
+}
+
+/* 列表内嵌动图：去掉外层额外留白 */
+.forum-loading .global-loading,
+.global-loading.inline {
+    padding: 0;
+}
+

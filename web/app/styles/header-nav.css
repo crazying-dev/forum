@@ -1,0 +1,420 @@
+header{
+    display: flex;
+    background-color: rgba(0,0,0,0);
+    height: 70px;
+}
+#logo{
+    height: 50px;
+    width: 50px;
+}
+
+#header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 70px;
+    padding: 0 40px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background: var(--color-bg-header);
+    border-bottom: 1px solid var(--color-border-primary);
+    box-shadow: 0 2px 20px var(--color-shadow-header);
+    transition: background 0.5s ease, border-color 0.5s ease, color 0.5s ease;
+}
+
+#header .header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+#header h1 {
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+    letter-spacing: 4px;
+    transition: color 0.5s ease;
+}
+
+/* 品牌角标：ov2 上标小字（弱化色、随各断点字号等比缩放） */
+#header h1 .header-brand-badge {
+    /* 移动端最小 9px，避免 16px 字号下缩到不可读 */
+    font-size: max(0.45em, 9px);
+    font-weight: 400;
+    letter-spacing: 0;
+    vertical-align: super;
+    margin-left: 2px;
+    color: inherit;
+    opacity: 0.55;
+    white-space: nowrap;
+}
+
+#header .header-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    padding: 0 40px;
+}
+
+#header #search {
+    display: flex;
+    align-items: center;
+    background: var(--color-bg-search);
+    border: 1px solid var(--color-border-search);
+    border-radius: 30px;
+    padding: 6px 18px;
+    width: 100%;
+    max-width: 420px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px var(--color-shadow-search);
+}
+
+#header #search:hover {
+    border-color: var(--color-border-search-hover);
+    box-shadow: 0 4px 16px var(--color-shadow-search-hover);
+    background: var(--color-bg-search-hover);
+}
+
+#header #search:focus-within {
+    border-color: var(--color-border-focus);
+    box-shadow: 0 4px 20px var(--color-shadow-search-focus);
+    background: var(--color-bg-search-focus);
+}
+
+#header #search label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+#header #search_input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 15px;
+    color: var(--color-text-primary);
+    padding: 6px 0;
+    transition: color 0.5s ease;
+}
+
+#header #search_input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+#header #search_button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+#header #search_Button_ICON {
+    width: 20px;
+    height: 20px;
+}
+
+.night-mode #header #search_Button_ICON {
+    filter: brightness(0) invert(1);
+}
+
+#header .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+    position: relative;
+}
+
+#header .header-right ul {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0;
+    padding: 0;
+}
+
+#header .header-right li {
+    list-style: none;
+}
+
+#header .header-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 15px;
+    cursor: pointer;
+    transition: color 0.5s ease;
+}
+
+#header .header-btn:hover {
+    color: var(--color-text-accent);
+}
+
+#header .header-btn i {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-bg-icon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    color: var(--color-text-accent);
+    transition: all 0.3s ease;
+    font-style: normal;
+}
+
+#header .header-btn:hover i {
+    background: var(--color-bg-icon-hover);
+    transform: scale(1.08);
+}
+
+#header #UserInfo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 15px;
+    cursor: pointer;
+    transition: color 0.5s ease;
+    text-decoration: none;
+}
+
+#header #UserInfo:hover {
+    color: var(--color-primary);
+}
+
+#header .user-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-bg-avatar);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-light);
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+#header #UserInfo:hover .user-avatar {
+    transform: scale(1.08);
+    box-shadow: 0 4px 12px var(--color-shadow-avatar);
+}
+
+#header .header-setting {
+    position: relative;
+}
+
+#header .setting-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 180px;
+    background: var(--color-bg-dropdown);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border-primary);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px var(--color-shadow-dropdown);
+    padding: 12px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: all 0.25s ease;
+    z-index: 200;
+}
+
+#header .header-setting.active .setting-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+#header .setting-dropdown-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#header .setting-dropdown-menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#header .setting-dropdown-title {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    padding: 4px 10px 8px;
+    border-bottom: 1px solid var(--color-border-divider);
+    margin-bottom: 4px;
+    letter-spacing: 2px;
+    list-style: none;
+}
+
+#header .setting-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 15px;
+    color: var(--color-text-secondary);
+}
+
+#header .setting-dropdown-item:hover {
+    background: var(--color-bg-item-hover);
+}
+
+#header .setting-dropdown-item > i.fa {
+    width: 20px;
+    text-align: center;
+    color: var(--color-text-secondary);
+}
+
+#header .setting-dropdown-item > i.fa:hover {
+    color: var(--color-text-accent);
+}
+
+/* 更多下拉：WIKI 小图标带圆形背景 */
+#header .setting-dropdown-item > img {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--color-bg-icon);
+    padding: 2px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* 更多下拉：更宽且居中于父按钮 */
+#header .setting-dropdown.dropdown-center {
+    left: 50%;
+    right: auto;
+    min-width: 220px;
+    transform: translate(-50%, -8px);
+}
+
+#header .header-setting.active .setting-dropdown.dropdown-center {
+    transform: translate(-50%, 0);
+}
+
+#header .setting-dropdown-item.active {
+    background: var(--color-bg-item-active);
+}
+
+#header .setting-item-icon {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--color-border-checkbox);
+    border-radius: 4px;
+    background: transparent;
+    position: relative;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+#header .setting-dropdown-item.active .setting-item-icon {
+    background: var(--color-bg-checkbox-active);
+    border-color: var(--color-border-focus);
+}
+
+#header .setting-dropdown-item.active .setting-item-icon::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 5px;
+    width: 4px;
+    height: 8px;
+    border: solid var(--color-text-light);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+#header .setting-item-text {
+    flex: 1;
+}
+
+#header .setting-dropdown-item:hover .setting-item-icon {
+    border-color: var(--color-border-focus);
+}
+
+#header .setting-dropdown-divider {
+    height: 1px;
+    background: var(--color-border-divider);
+    margin: 6px 0;
+    list-style: none;
+}
+
+#logoutBtn {
+    color: #ef4444;
+}
+
+#logoutBtn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+@media (max-width: 900px) {
+    #header {
+        padding: 0 20px;
+    }
+    #header .header-center {
+        flex: 0 0 auto;
+    }
+    #header #search {
+        max-width: 280px;
+        padding: 5px 14px;
+    }
+    #header h1 {
+        font-size: 22px;
+        letter-spacing: 2px;
+    }
+}
+
+#header #user-name {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.Username {
+    white-space: nowrap;
+}
+
+.Username * {
+    display: inline !important;
+    white-space: nowrap !important;
+}
+
+#header #user-name * {
+    display: inline !important;
+    white-space: nowrap !important;
+}
+
+#header .header-menu-toggle {
+    display: none;
+}
+

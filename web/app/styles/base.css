@@ -1,0 +1,74 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    color: var(--color-text-primary);
+    -webkit-tap-highlight-color: transparent;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-text-tertiary) transparent;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-text-tertiary);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
+
+html {
+    scroll-behavior: smooth;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: var(--color-bg-body);
+    min-width: 320px;
+    transition: background 0.5s ease, color 0.5s ease;
+}
+
+/* 页面主体：占满剩余高度，确保内容不足时页脚贴底 */
+.app-main {
+    flex: 1;
+    width: 100%;
+}
+html,body{
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    line-height: 1;
+    color: var(--color-text-primary);
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: none;
+    -moz-text-size-adjust: none;
+    -ms-text-size-adjust: none;
+    text-size-adjust: none;
+    overscroll-behavior: none;
+    overflow-anchor: none;
+    margin: 0;
+    padding: 0;
+    font-family: 'OriginalHandWrite', "楷体", KaiTi, "华文行楷", STXingkai, 'Ma Shan Zheng', cursive, sans-serif, PingFang SC, HarmonyOS_Regular, Helvetica Neue, Microsoft YaHei, serif, -apple-system,BlinkMacSystemFont,Helvetica Neue,Helvetica,Arial,PingFang SC,Hiragino Sans GB,Microsoft YaHei,sans-serif !important;
+}
+@media(max-resolution: 1dppx),(-webkit-max-device-pixel-ratio:1) {
+    html,body {
+        font-family: 'OriginalHandWrite', 'Ma Shan Zheng', cursive, -apple-system,BlinkMacSystemFont,Helvetica Neue,Helvetica,Arial,PingFang SC,Hiragino Sans GB,Microsoft YaHei,sans-serif !important;
+    }
+}
+
+
+

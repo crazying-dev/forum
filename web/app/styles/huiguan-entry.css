@@ -1,0 +1,101 @@
+/* ======================== 首页会馆入口 / 个人中心会馆标签 ======================== */
+.quick-top-icon-guild {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+}
+
+.user-guild-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+/* 「会馆行」内会馆标签与馆长 chip 统一规格：同高 / 同内距 / 同圆角 / 同字号 */
+.user-guild-row .user-guild-tag,
+.user-guild-row .user-guild-chip {
+    box-sizing: border-box;
+    height: 22px;
+    padding: 0 11px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1;
+}
+
+.user-guild-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 11px;
+    border-radius: 10px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.user-guild-tag.user-guild-none {
+    background: var(--color-bg-icon);
+    color: var(--color-text-tertiary);
+}
+
+.user-guild-leader-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+/* 窄屏：轮播两侧缩略图收起为隐藏，保证主卡宽度 */
+@media (max-width: 700px) {
+    .guild-carousel-stage {
+        gap: 8px;
+    }
+    .guild-carousel-thumb {
+        display: none;
+    }
+    .guild-carousel-card {
+        padding: 22px 18px;
+        min-height: 260px;
+    }
+    /* 移动端：信息卡纵向排布并整体居中（桌面端布局不变） */
+    .guild-detail-hero {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .guild-hero-body {
+        flex: 0 0 auto;
+        width: 100%;
+    }
+    .guild-hero-name-row {
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+    .guild-hero-intro {
+        text-align: center;
+    }
+    .guild-hero-meta {
+        justify-content: center;
+    }
+    .guild-join-area {
+        width: 100%;
+        align-items: center;
+    }
+    .guild-leader-zone {
+        padding: 14px 16px 16px;
+    }
+    .guild-list-meta {
+        display: none;
+    }
+    .article-content {
+        padding: 16px;
+    }
+}
+

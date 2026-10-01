@@ -1,0 +1,146 @@
+/* ======================== 发帖页：发布到 / 左右排版 / 须知折叠 ======================== */
+.post-target-segmented {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.post-target-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 20px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 20px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.post-target-btn:hover {
+    background: var(--color-bg-icon-hover);
+}
+
+.post-target-btn.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: #fff !important;
+}
+
+.post-target-btn.active i {
+    color: #fff !important;
+}
+
+.post-target-hint {
+    margin-top: 10px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.post-editor-split {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+}
+
+.post-editor-split .form-editor,
+.post-editor-split .post-editor-preview {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 320px;
+}
+
+.post-editor-split .form-editor {
+    border: 1px solid var(--color-border-search);
+    border-radius: 10px;
+}
+
+.post-editor-split .post-editor-preview {
+    max-height: 640px;
+    overflow: auto;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+}
+
+.post-compliance-collapse {
+    margin-top: 22px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 12px;
+    background: var(--color-bg-item);
+    overflow: hidden;
+}
+
+.post-compliance-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.post-compliance-toggle > i:first-child {
+    color: var(--color-primary);
+}
+
+.post-compliance-arrow {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.post-compliance-collapse.open .post-compliance-toggle {
+    border-bottom: 1px dashed var(--color-border-divider);
+}
+
+.post-compliance-collapse .post-compliance-list {
+    padding: 12px 16px 14px 36px;
+}
+
+/* 桌面端：编辑区 + 实时预览左右排版，隐藏 编辑/预览 Tab */
+@media (min-width: 992px) {
+    .post-create-form .form-editor-tabs {
+        display: none;
+    }
+    .post-editor-split .form-editor,
+    .post-editor-split .post-editor-preview {
+        display: block;
+    }
+}
+
+/* 窄屏：编辑 / 预览 Tab 切换 */
+@media (max-width: 991px) {
+    .post-editor-split {
+        flex-direction: column;
+    }
+    .post-editor-split .form-editor,
+    .post-editor-split .post-editor-preview {
+        display: none;
+    }
+    .post-editor-split.show-edit .form-editor {
+        display: block;
+    }
+    .post-editor-split.show-preview .post-editor-preview {
+        display: block;
+    }
+    .article-toc {
+        display: none;
+    }
+    .article-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .article-main {
+        grid-column: 1;
+    }
+}
+

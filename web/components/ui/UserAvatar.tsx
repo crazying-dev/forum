@@ -7,7 +7,7 @@ import { CornerPrefixBadge, CornerVipBadge } from "./CornerBadge";
  * 用户头像(含 fa-user fallback)。
  * 传入 userId / vip 时会在头像右下角展示角标(VIP 优先靠角，前缀徽标向左并排)；
  * 无角标时仍只渲染 img / fallback 本体，外层容器(wrapper/Link)由调用方决定。
- * 注意：角标需要容器不裁剪溢出(见 globals.css 头像容器 overflow: visible 规则)。
+ * 注意：角标需要容器不裁剪溢出(见 app/styles/ui-fixes.css 头像容器 overflow: visible 规则)。
  */
 export function UserAvatar({
   src,

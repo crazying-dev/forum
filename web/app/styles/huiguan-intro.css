@@ -1,0 +1,243 @@
+/* ======================== 会馆介绍页 ======================== */
+.guild-intro-page {
+    max-width: 900px;
+}
+
+.guild-intro-hero {
+    position: relative;
+    padding: 30px 24px 28px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px var(--color-shadow-search);
+}
+
+.guild-intro-hero-body {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+}
+
+.guild-intro-hero-guild {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.9;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-intro-hero-guild i {
+    color: inherit !important;
+}
+
+/* 徽标（无 logo 字段，用主题色块 + 图标占位） */
+.guild-intro-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 84px;
+    height: 84px;
+    margin-top: 4px;
+    border-radius: 24px;
+    box-shadow: 0 0 0 3px var(--guild-fg-soft, rgba(255, 255, 255, 0.18));
+}
+
+.guild-intro-badge i {
+    font-size: 34px;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-intro-hero-name {
+    font-size: 24px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    color: var(--guild-fg, #fff) !important;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+}
+
+.guild-intro-hero-intro {
+    max-width: 560px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--guild-fg, #fff) !important;
+    opacity: 0.92;
+    text-shadow: var(--guild-ts, 0 1px 2px rgba(0, 0, 0, 0.28));
+    word-break: break-word;
+}
+
+/* 信息卡：成立时间 / 成员数 / 分类数 */
+.guild-intro-meta-card {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.guild-intro-meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 12px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+    text-align: center;
+    text-decoration: none;
+}
+
+.guild-intro-meta-item > i {
+    color: var(--color-primary);
+    font-size: 16px;
+}
+
+.guild-intro-meta-label {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-intro-meta-value {
+    font-size: 14px;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.guild-intro-meta-value i {
+    font-size: 11px;
+    color: inherit !important;
+}
+
+.guild-intro-meta-link {
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guild-intro-meta-link:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-border-focus);
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+}
+
+/* 正文面板 */
+.guild-intro-panel {
+    margin-top: 16px;
+    padding: 18px 20px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+}
+
+.guild-intro-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.guild-intro-panel-title i {
+    color: inherit !important;
+}
+
+.guild-intro-content {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.guild-intro-content p {
+    margin: 0 0 10px;
+}
+
+.guild-intro-content h1,
+.guild-intro-content h2,
+.guild-intro-content h3,
+.guild-intro-content h4,
+.guild-intro-content h5,
+.guild-intro-content h6 {
+    margin: 14px 0 8px;
+    color: var(--color-text-primary);
+}
+
+.guild-intro-content ul,
+.guild-intro-content ol {
+    margin: 6px 0 10px;
+    padding-left: 22px;
+}
+
+.guild-intro-content li {
+    margin: 3px 0;
+}
+
+.guild-intro-content img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+.guild-intro-content a {
+    color: var(--color-primary);
+    word-break: break-all;
+}
+
+.guild-intro-content blockquote {
+    margin: 8px 0;
+    padding: 8px 14px;
+    border-left: 3px solid var(--color-primary);
+    border-radius: 0 10px 10px 0;
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+}
+
+.guild-intro-content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.guild-intro-content th,
+.guild-intro-content td {
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-card);
+}
+
+.guild-intro-placeholder {
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.guild-intro-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+}
+
+.guild-intro-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 26px;
+    border-radius: 22px;
+    font-size: 14px;
+    text-decoration: none;
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+    transition: transform 0.2s ease;
+}
+
+.guild-intro-back-btn i {
+    color: inherit !important;
+}
+
+.guild-intro-back-btn:hover {
+    transform: translateY(-1px);
+}
+
+/* 会馆介绍页：窄屏信息卡改两列（第三项换行居中） */
+@media (max-width: 640px) {
+    .guild-intro-meta-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+

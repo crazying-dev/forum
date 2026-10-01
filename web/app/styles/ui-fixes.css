@@ -1,0 +1,220 @@
+/* ======================== UI 细节修复（角标 / 身份 chip / 主题色可读性） ======================== */
+
+/* 文章正文列居中：<1400 隐藏章节导航，正文仍然居中 */
+@media (max-width: 1399px) {
+    .article-toc {
+        display: none;
+    }
+}
+
+/* 头像右下角角标：包裹容器 + 角标（VIP 优先靠角，前缀徽标向左并排） */
+.avatar-corner-wrap {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.avatar-corner-badges {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    /* 高度取头像尺寸的 36%（绝对定位百分比基于外层头像容器）；角标等宽 */
+    height: 36%;
+    max-height: 26px;
+    pointer-events: none;
+}
+
+.avatar-corner-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    background: var(--color-bg-card);
+    box-shadow: 0 0 0 1px var(--color-border-card);
+    overflow: hidden;
+}
+
+.avatar-corner-badge svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.avatar-corner-badge img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+/* VIP 图标为深色六边形 + 金色 V，固定用浅底保证日/夜模式都可辨识 */
+.avatar-corner-badge-vip {
+    background: #ffffff;
+    box-shadow: 0 0 0 1px rgba(23, 50, 58, 0.18);
+}
+
+/* 角标需要溢出容器，否则会被圆形头像的 overflow:hidden 裁掉（图片本身已是圆形） */
+.post-card-avatar,
+.post-author-avatar,
+.comment-avatar,
+.user-profile-avatar,
+.search-user-avatar-wrapper,
+.guild-leader-avatar,
+.post-item-avatar {
+    position: relative;
+    overflow: visible !important;
+}
+
+/* 用户身份 chip：会馆名（主题色实底 + 对比字）/ 馆长（低饱和墨绿实底 + 白字）
+   规格与通用标签（.space-badge / 分类徽章）对齐：18px 高全圆胶囊（12px 字 + 3px 上下内距） */
+.user-guild-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 12px;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.user-guild-chip i {
+    font-size: 11px;
+    color: inherit !important;
+}
+
+/* 馆长 chip：低饱和墨绿 #5b736e 实底 + 白字（对比度 ≈ 5.1），图标随字色 */
+.user-leader-chip {
+    background: #5b736e;
+    color: #fff;
+}
+
+.user-leader-chip i {
+    color: inherit !important;
+}
+
+/* 主题色作为卡片底上的文字/图标色：--guild-ink 由内联提供，夜间自动提亮 */
+.theme-ink {
+    color: var(--guild-ink, var(--color-primary));
+}
+
+.night-mode .theme-ink {
+    color: color-mix(in srgb, var(--guild-ink, var(--color-primary)) 45%, #ffffff);
+}
+
+.article-toc-item.theme-ink {
+    color: var(--guild-ink, var(--color-primary));
+}
+
+.night-mode .article-toc-item.theme-ink {
+    color: color-mix(in srgb, var(--guild-ink, var(--color-primary)) 45%, #ffffff);
+}
+
+/* 发帖页：会馆目标按钮/发布按钮的对比字（默认仍为白字，旧行为不变） */
+.post-target-btn.active {
+    color: var(--guild-btn-fg, #fff) !important;
+}
+
+.post-target-btn.active i {
+    color: var(--guild-btn-fg, #fff) !important;
+}
+
+/* 会馆退出二次确认文案 */
+.guild-confirm-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+}
+
+/* 帖子详情：作者行姓名 + 身份 chip 并排；顶部徽章行（分类 + 空间） */
+.post-author-name-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.post-author-name-row .post-author-name {
+    margin-bottom: 0;
+}
+
+.post-meta-top {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+/* 卡片头部：加入身份 chip 后允许换行，作者名过长省略 */
+.post-card-header {
+    flex-wrap: wrap;
+    row-gap: 6px;
+}
+
+.post-card-author {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 文章卡作者名后的身份小图标：PrefixBadge SVG（16px），夜间加浅色描边保证可辨 */
+.post-card-prefix-badge {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-radius: 50%;
+}
+
+.post-card-prefix-badge svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+.night-mode .post-card-prefix-badge {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
+}
+
+/* 个人中心收藏列表：头像改为容器 + UserAvatar */
+.post-item-avatar img,
+.post-item-avatar .avatar-fallback {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.post-item-sub-meta {
+    flex-wrap: wrap;
+}
+
+/* 会馆广场：轮播主卡外层（承载 motion 动效，内层保留 CSS hover）与列表项外层 */
+.guild-carousel-card-wrap {
+    flex: 1 1 auto;
+    max-width: 560px;
+    min-width: 0;
+    display: flex;
+    /* 位于两侧扇形手牌之上 */
+    position: relative;
+    z-index: 2;
+}
+
+.guild-carousel-card-wrap .guild-carousel-card {
+    width: 100%;
+}
+
+.guild-list-cell {
+    display: block;
+}
+

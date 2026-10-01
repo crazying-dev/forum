@@ -1,0 +1,9 @@
+/* ===== 彩蛋卡片自动换行样式 ===== */
+#WindowsCardWithCenterSreen #Easter-Egg_Text,
+#WindowsCardWithCenterSreen #Easter-Egg-Name {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    max-width: 100%;
+}
+
