@@ -8,19 +8,21 @@ import { miscApi } from "@/lib/api";
 import { useCenterCard } from "./CenterCard";
 import { useToast } from "./Toast";
 import Modal from "./ui/Modal";
+import ConsoleModal from "./ConsoleModal";
 
 export default function Header() {
-  const { theme, setTheme, user, userId, logout } = useStore();
+  const { setTheme, user, userId, logout } = useStore();
   const { show } = useCenterCard();
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
   const [search, setSearch] = useState("");
-  // 顶部栏下拉菜单："" = 收起，"more"/"theme"/"user" 对应 更多 / 主题 / 用户
-  const [openMenu, setOpenMenu] = useState<"" | "more" | "theme" | "user">("");
+  // 顶部栏下拉菜单："" = 收起，"user" 对应用户菜单（控制台改为弹窗）
+  const [openMenu, setOpenMenu] = useState<"" | "user">("");
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showSearchLayer, setShowSearchLayer] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
   const menuRef = useRef<HTMLUListElement>(null);
   const searchLayerInputRef = useRef<HTMLInputElement>(null);
   const deferredPromptRef = useRef<Event | null>(null);
@@ -76,6 +78,9 @@ export default function Header() {
 
   // OAuth 授权等页不显示全局导航栏（Header 保持挂载，仅不渲染内容，避免导航时品牌图重载）
   if (pathname.startsWith("/oauth")) return null;
+
+  // /search 页隐藏桌面搜索框（页内已有搜索入口）
+  const isSearchPage = pathname.startsWith("/search");
 
   const doSearch = () => {
     const k = search.trim();
@@ -145,22 +150,24 @@ export default function Header() {
             </h1>
           </Link>
         </div>
-        <div className="header-center">
-          <div id="search">
-            <label htmlFor="search_input">
-              <input
-                id="search_input"
-                placeholder="搜索帖子、用户、文章..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && doSearch()}
-              />
-            </label>
-            <button id="search_button" onClick={doSearch}>
-              <img alt="search_Button_ICON" src="/assets/img/search.svg" id="search_Button_ICON" />
-            </button>
+        {!isSearchPage && (
+          <div className="header-center">
+            <div id="search">
+              <label htmlFor="search_input">
+                <input
+                  id="search_input"
+                  placeholder="搜索帖子、用户、文章..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && doSearch()}
+                />
+              </label>
+              <button id="search_button" onClick={doSearch}>
+                <img alt="search_Button_ICON" src="/assets/img/search.svg" id="search_Button_ICON" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         <div className="header-right">
           {/* 移动端发帖按钮（仅 ≤700px 显示，样式见 header-responsive.css） */}
           <Link className="header-btn header-post-toggle" href="/post/create" aria-label="发帖">
@@ -183,78 +190,21 @@ export default function Header() {
                 <span>会馆</span>
               </Link>
             </li>
+            {/* 控制台：次级功能与偏好设置收纳（弹窗） */}
             <li className="header-collapsible">
-              <button className="header-btn" id="Easter-Egg" onClick={showEasterEgg}>
-                <i className="fa fa-gift"></i>
-                <span>彩蛋</span>
+              <button
+                className="header-btn"
+                aria-haspopup="dialog"
+                aria-expanded={showConsole}
+                onClick={() => setShowConsole(true)}
+              >
+                <i className="fa fa-sliders"></i>
+                <span>控制台</span>
               </button>
-            </li>
-            {/* 更多：次级功能收纳 */}
-            <li className={`header-collapsible header-setting ${openMenu === "more" ? "active" : ""}`}>
-              <button className="header-btn" onClick={() => setOpenMenu(openMenu === "more" ? "" : "more")}>
-                <i className="fa fa-ellipsis-h"></i>
-                <span>更多</span>
-              </button>
-              {openMenu === "more" && (
-                <div className="setting-dropdown dropdown-center">
-                  <ul className="setting-dropdown-menu">
-                    <li className="setting-dropdown-title">更多功能</li>
-                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/WIKI"); }}>
-                      <img src="/assets/img/wiki_avatar_l.png" alt="" />
-                      <span className="setting-item-text">WIKI</span>
-                    </li>
-                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); setShowDonate(true); }}>
-                      <i className="fa fa-heart"></i>
-                      <span className="setting-item-text">赞赏</span>
-                    </li>
-                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/feedback/submit"); }}>
-                      <i className="fa fa-bug"></i>
-                      <span className="setting-item-text">提交反馈</span>
-                    </li>
-                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/feedback"); }}>
-                      <i className="fa fa-comments-o"></i>
-                      <span className="setting-item-text">反馈中心</span>
-                    </li>
-                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/guide"); }}>
-                      <i className="fa fa-map-o"></i>
-                      <span className="setting-item-text">论坛指南</span>
-                    </li>
-                    <li className="setting-dropdown-item" id="pwa-install-li" onClick={() => { setOpenMenu(""); installPWA(); }}>
-                      <i className="fa fa-download"></i>
-                      <span className="setting-item-text">安装论坛客户端</span>
-                    </li>
-                  </ul>
-                </div>
-              )}
-            </li>
-            <li className={`header-collapsible header-setting ${openMenu === "theme" ? "active" : ""}`}>
-              <button className="header-btn" onClick={() => setOpenMenu(openMenu === "theme" ? "" : "theme")}>
-                <i className="fa fa-paint-brush"></i>
-                <span>主题</span>
-              </button>
-              {openMenu === "theme" && (
-                <div className="setting-dropdown" id="settingDropdown">
-                  <ul className="setting-dropdown-menu">
-                    <li className="setting-dropdown-title">选择主题</li>
-                    <li className={`setting-dropdown-item ${theme === "day" ? "active" : ""}`} onClick={() => setTheme("day")}>
-                      <span className="setting-item-icon"></span>
-                      <span className="setting-item-text">亮色</span>
-                    </li>
-                    <li className={`setting-dropdown-item ${theme === "night" ? "active" : ""}`} onClick={() => setTheme("night")}>
-                      <span className="setting-item-icon"></span>
-                      <span className="setting-item-text">暗色</span>
-                    </li>
-                    <li className={`setting-dropdown-item ${theme === "default" ? "active" : ""}`} onClick={() => setTheme("default")}>
-                      <span className="setting-item-icon"></span>
-                      <span className="setting-item-text">默认（跟随时间）</span>
-                    </li>
-                  </ul>
-                </div>
-              )}
             </li>
             <li className="header-collapsible">
-              <Link className="header-post-btn" href="/post/create">
-                <span className="header-post-icon" aria-hidden="true">✏️</span>
+              <Link className="header-btn" href="/post/create">
+                <i className="fa fa-pencil"></i>
                 <span>发帖</span>
               </Link>
             </li>
@@ -377,6 +327,15 @@ export default function Header() {
           </div>
         </div>
       )}
+
+      {/* 控制台弹窗（桌面端「控制台」按钮） */}
+      <ConsoleModal
+        open={showConsole}
+        onClose={() => setShowConsole(false)}
+        onDonate={() => setShowDonate(true)}
+        onInstall={installPWA}
+        onEasterEgg={showEasterEgg}
+      />
 
       {/* 赞赏弹窗 */}
       <Modal open={showDonate} onClose={() => setShowDonate(false)}>

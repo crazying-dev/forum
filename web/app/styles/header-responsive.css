@@ -3,7 +3,7 @@
     display: none;
 }
 
-/* 移动端发帖按钮：仅 ≤700px 显示（桌面使用 .header-post-btn 胶囊按钮） */
+/* 移动端发帖按钮：仅 ≤700px 显示（桌面使用 .header-btn 统一样式） */
 #header .header-post-toggle {
     display: none;
 }

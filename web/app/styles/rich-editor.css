@@ -269,3 +269,12 @@
     color: inherit !important;
 }
 
+/* 吸附触发：容器与工具条顶部圆角改直角（覆盖默认 10px 10px 0 0） */
+.rich-editor-sticky.stuck {
+    border-radius: 0;
+}
+
+.rich-editor-sticky.stuck .rich-editor-toolbar {
+    border-radius: 0;
+}
+

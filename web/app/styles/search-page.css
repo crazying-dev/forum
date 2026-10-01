@@ -1,16 +1,16 @@
-/* 搜索页搜索框 */
+/* 搜索页搜索框：输入框内右侧圆形图标按钮 */
 .search-page-form {
     padding: 0 0 16px;
 }
 .search-page-input-wrapper {
-    display: flex;
-    gap: 8px;
+    position: relative;
     max-width: 600px;
     margin: 0 auto;
 }
 .search-page-input {
-    flex: 1;
-    padding: 10px 16px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 52px 10px 16px;
     border: 2px solid var(--color-border-card);
     border-radius: 24px;
     background: var(--color-bg-card);
@@ -24,22 +24,28 @@
     border-color: var(--color-primary);
 }
 .search-page-btn {
-    padding: 10px 20px;
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
     background: var(--color-primary);
     color: #fff;
     border: none;
-    border-radius: 24px;
+    border-radius: 50%;
     font-size: 14px;
+    line-height: 1;
     cursor: pointer;
     font-family: inherit;
-    white-space: nowrap;
-    transition: background 0.2s ease;
+    transition: opacity 0.2s ease;
 }
 .search-page-btn:hover {
     opacity: 0.85;
-}
-.search-page-btn i {
-    margin-right: 4px;
 }
 
 .search-tabs {
@@ -68,6 +74,18 @@
 .search-tab.active {
     background: var(--color-primary);
     color: #fff;
+}
+
+/* 「全部」模式分区标题（仅全部 Tab 显示） */
+.search-section-title {
+    margin: 18px 0 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.search-tabs + .search-section-title {
+    margin-top: 0;
 }
 
 .search-user-item {

@@ -11,70 +11,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import Placeholder from "@tiptap/extension-placeholder";
-import Image from "@tiptap/extension-image";
 import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { Plugin } from "@tiptap/pm/state";
-import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/ui/Modal";
 import { ApiException, EmbedKind, mediaApi } from "@/lib/api";
 import { USER_EMBED_FIELDS } from "@/lib/embed";
 import EmbedNode from "./Embed";
 import QuotePickerModal from "./QuotePickerModal";
-
-/**
- * 图片宽度视图层同步（Decoration）：遍历文档为带 width 的图片节点挂内联 style。
- * - 仅编辑视图装饰，不写入 getHTML()/序列化，存储仍为 width 属性
- * - 装饰随每次 transaction 由节点属性重算，更新/还原即时生效
- */
-function imageWidthPlugin(): Plugin {
-  return new Plugin({
-    props: {
-      decorations(state) {
-        const decos: Decoration[] = [];
-        state.doc.descendants((node, pos) => {
-          if (node.type.name !== "image") return;
-          const width = node.attrs.width;
-          if (typeof width === "number" && width > 0) {
-            decos.push(Decoration.node(pos, pos + node.nodeSize, { style: `width: ${width}px;` }));
-          }
-        });
-        return DecorationSet.create(state.doc, decos);
-      },
-    },
-  });
-}
-
-/** 图片宽度属性归一：仅接受纯正整数（与 RichContent 渲染端一致） */
-const ResizableImage = Image.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      width: {
-        default: null,
-        parseHTML: (element) => {
-          const raw = (element.getAttribute("width") ?? "").trim();
-          if (!/^\d+$/.test(raw)) return null;
-          const n = Number.parseInt(raw, 10);
-          return n > 0 ? n : null;
-        },
-        renderHTML: (attributes) => (attributes.width ? { width: attributes.width } : {}),
-      },
-    };
-  },
-  addProseMirrorPlugins() {
-    return [...(this.parent?.() ?? []), imageWidthPlugin()];
-  },
-});
+import { MAX_IMAGE_WIDTH, MIN_IMAGE_WIDTH, ResizableImage } from "./resizableImage";
 
 /** 图片约束（与服务端一致） */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-/** 自定义宽度范围（px） */
-const MIN_IMAGE_WIDTH = 40;
-const MAX_IMAGE_WIDTH = 2400;
 
 const EMPTY_TOOLBAR_STATE = {
   bold: false,
@@ -244,8 +194,9 @@ export default function RichTextEditor({
   const currentImageWidth = (): number | null =>
     (editor?.getAttributes("image").width as number | null | undefined) ?? null;
 
+  // 不调用 .focus()：宽度输入框连续输入（≥3 位）时避免焦点被夺回正文
   const setImageWidth = (width: number | null) => {
-    editor?.chain().focus().updateAttributes("image", { width }).run();
+    editor?.chain().updateAttributes("image", { width }).run();
   };
 
   /** 解析并提交宽度（40-2400 整数；非法或与当前一致时不提交） */

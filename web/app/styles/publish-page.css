@@ -44,11 +44,218 @@
     cursor: pointer;
 }
 
-.post-schedule-input {
-    display: block;
+/* 定时发布：日期胶囊条 + 时/分下拉 + 「更多日期」自研日历浮层 */
+.post-schedule-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
     margin-top: 10px;
-    width: 100%;
-    max-width: 320px;
+}
+
+.post-schedule-days {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 6px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+}
+
+.post-schedule-day {
+    flex-shrink: 0;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    min-width: 54px;
+    padding: 6px 10px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.2;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.post-schedule-day:hover {
+    background: var(--color-bg-icon-hover);
+}
+
+.post-schedule-day.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.post-schedule-day-sub {
+    font-size: 11px;
+    color: var(--color-text-tertiary);
+}
+
+.post-schedule-day.active .post-schedule-day-sub {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.post-schedule-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.post-schedule-select-wrap {
+    position: relative;
+    display: inline-flex;
+}
+
+.post-schedule-select {
+    padding: 7px 26px 7px 10px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: var(--color-bg-search);
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.post-schedule-select:focus {
+    border-color: var(--color-border-focus);
+}
+
+.post-schedule-select-caret {
+    position: absolute;
+    top: 50%;
+    right: 9px;
+    transform: translateY(-50%);
+    color: var(--color-text-tertiary);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.post-schedule-time-sep {
+    font-size: 14px;
+    color: var(--color-text-tertiary);
+}
+
+.post-schedule-more {
+    position: relative;
+}
+
+.post-schedule-more-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.post-schedule-more-btn:hover {
+    background: var(--color-bg-icon-hover);
+}
+
+.post-schedule-more-btn.open {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* 日历浮层：按钮下方 absolute；层级高于页面内容、低于固定顶栏（100，见 header-nav） */
+.post-schedule-cal {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 95;
+    width: 264px;
+    padding: 12px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 12px;
+    background: var(--color-bg-dropdown);
+    box-shadow: 0 10px 26px var(--color-shadow-dropdown);
+}
+
+.post-schedule-cal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.post-schedule-cal-nav {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border-divider);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.post-schedule-cal-nav:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.post-schedule-cal-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text-primary);
+}
+
+.post-schedule-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.post-schedule-cal-week {
+    padding: 4px 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+}
+
+.post-schedule-cal-day {
+    height: 30px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.post-schedule-cal-day:hover:not(:disabled) {
+    background: var(--color-bg-item-hover);
+}
+
+.post-schedule-cal-day.selected {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.post-schedule-cal-day:disabled {
+    color: var(--color-text-tertiary);
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.post-schedule-cal-empty {
+    height: 30px;
 }
 
 .post-schedule-hint {
@@ -152,10 +359,6 @@
         display: none;
     }
 
-    /* 定时发布（开关 + datetime-local + 提示）：移动端占满整行 */
-    .post-schedule-input {
-        max-width: 100%;
-    }
     .post-editor-split.show-edit .form-editor {
         display: block;
     }
@@ -170,6 +373,20 @@
     }
     .article-main {
         grid-column: 1;
+    }
+}
+
+/* 窄屏：定时选择器换行 + 胶囊条占满整行横向滚动（≤480px） */
+@media (max-width: 480px) {
+    .post-schedule-days {
+        flex: 1 1 100%;
+    }
+    .post-schedule-day {
+        min-width: 50px;
+        padding: 5px 8px;
+    }
+    .post-schedule-more {
+        margin-left: auto;
     }
 }
 

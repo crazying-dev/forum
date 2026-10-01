@@ -199,31 +199,6 @@ header{
     transform: scale(1.08);
 }
 
-/* 桌面「发帖」胶囊按钮：渐变主色底 + ✏️ 图标（随 .header-collapsible 在 ≤700px 隐藏） */
-#header .header-post-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    border-radius: 20px;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
-    color: #fff;
-    font-size: 14px;
-    text-decoration: none;
-    white-space: nowrap;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-#header .header-post-btn:hover {
-    opacity: 0.88;
-    transform: translateY(-1px);
-}
-
-#header .header-post-btn .header-post-icon {
-    font-size: 13px;
-    line-height: 1;
-}
-
 #header #UserInfo {
     display: flex;
     align-items: center;
@@ -351,56 +326,12 @@ header{
     flex-shrink: 0;
 }
 
-/* 更多下拉：更宽且居中于父按钮 */
-#header .setting-dropdown.dropdown-center {
-    left: 50%;
-    right: auto;
-    min-width: 220px;
-    transform: translate(-50%, -8px);
-}
-
-#header .header-setting.active .setting-dropdown.dropdown-center {
-    transform: translate(-50%, 0);
-}
-
 #header .setting-dropdown-item.active {
     background: var(--color-bg-item-active);
 }
 
-#header .setting-item-icon {
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--color-border-checkbox);
-    border-radius: 4px;
-    background: transparent;
-    position: relative;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
-}
-
-#header .setting-dropdown-item.active .setting-item-icon {
-    background: var(--color-bg-checkbox-active);
-    border-color: var(--color-border-focus);
-}
-
-#header .setting-dropdown-item.active .setting-item-icon::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 5px;
-    width: 4px;
-    height: 8px;
-    border: solid var(--color-text-light);
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-}
-
 #header .setting-item-text {
     flex: 1;
-}
-
-#header .setting-dropdown-item:hover .setting-item-icon {
-    border-color: var(--color-border-focus);
 }
 
 #header .setting-dropdown-divider {
@@ -458,5 +389,123 @@ header{
 
 #header .header-menu-toggle {
     display: none;
+}
+
+/* ===== 控制台弹窗（桌面端「控制台」按钮，挂载于 #header 外）===== */
+.console-title {
+    margin: 0 0 6px 0;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--color-text-primary);
+    text-align: left;
+}
+
+.console-title i {
+    color: var(--color-primary);
+    margin-right: 8px;
+}
+
+.console-subtitle {
+    margin: 0 0 18px 0;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    text-align: left;
+}
+
+.console-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    text-align: left;
+}
+
+.console-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 76px;
+    padding: 12px 6px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 12px;
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.console-tile:hover {
+    border-color: var(--color-border-focus);
+    background: var(--color-bg-item-hover);
+    transform: translateY(-2px);
+}
+
+.console-tile i {
+    font-size: 20px;
+    color: var(--color-primary);
+}
+
+.console-tile img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.console-theme {
+    grid-column: span 2;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 12px;
+    background: var(--color-bg-item);
+}
+
+.console-theme-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.console-theme-head i {
+    color: var(--color-primary);
+}
+
+.console-theme-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.console-pill {
+    flex: 1 1 auto;
+    padding: 6px 12px;
+    border: 1px solid var(--color-border-checkbox);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-family: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.console-pill:hover {
+    border-color: var(--color-border-focus);
+    color: var(--color-primary);
+}
+
+.console-pill.active {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: #fff;
 }
 

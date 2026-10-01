@@ -428,6 +428,8 @@
     }
 
     .user-profile-info {
+        display: flex;
+        flex-direction: column;
         text-align: center;
         width: 100%;
         min-width: 0;
@@ -444,7 +446,24 @@
     }
 
     .user-profile-meta {
+        order: 2;
         justify-content: center;
+    }
+
+    /* 简介之后先展示会馆/馆长标签，性别年龄等 meta 置于其后 */
+    .user-guild-row {
+        order: 1;
+        justify-content: center;
+    }
+
+    .profile-tab {
+        font-size: 13px;
+        padding: 10px 12px;
+    }
+
+    .profile-tab-create {
+        font-size: 13px;
+        padding: 7px 14px;
     }
 
     .user-profile-stats {

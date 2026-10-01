@@ -1,12 +1,12 @@
 "use client";
 
 // 评论富文本编辑器（TipTap 3.31.3）：
-// - 工具条：加粗/斜体/删除线、链接、图片上传（scene=comment_image）、emoji 面板、引用用户/帖子/文章
+// - 工具条：加粗/斜体/删除线、链接、图片上传（scene=comment_image）、emoji 面板、插入引用（@，弹窗内三 Tab）
+// - 选中图片：紧凑宽度条（25/50/75/100% + 自定义 40-2400px + 还原；宽度存 width 属性）
 // - Ctrl/Cmd+Enter 提交；纯文本 1-500 字（纯图片 / 纯引用卡片视为有效）
 // - 紧凑尺寸（.comment-editor-*），评论以 HTML 存储（服务端统一净化）
 
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
-import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -15,38 +15,96 @@ import Modal from "@/components/ui/Modal";
 import { ApiException, EmbedKind, mediaApi } from "@/lib/api";
 import EmbedNode from "./Embed";
 import QuotePickerModal from "./QuotePickerModal";
+import { MAX_IMAGE_WIDTH, MIN_IMAGE_WIDTH, ResizableImage } from "./resizableImage";
 
-// emoji 面板（由原评论输入框迁入编辑器，分类与内容保持 1:1）
+// emoji 面板（由原评论输入框迁入编辑器；Unicode 分类，10 类 / 252 个）
 const EMOJI_CATEGORIES: { name: string; icon: string; emojis: string[] }[] = [
   {
     name: "表情",
     icon: "😀",
-    emojis: ["😀", "😁", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤔", "😅", "😉", "🙃", "😭", "😢", "😡", "🤬", "😤", "😳", "🥺", "😴", "🤯", "😇", "🙄"],
+    emojis: [
+      "😀", "😁", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤔",
+      "😅", "😉", "🙃", "😭", "😢", "😡", "🤬", "😤", "😳", "🥺",
+      "😴", "🤯", "😇", "🙄", "😋", "🤗", "🤩", "😱", "😜", "😏",
+      "😐", "😬", "🤫", "😷", "🥳", "😌", "😔", "🤤", "🙁", "😆"
+    ],
   },
   {
     name: "手势",
     icon: "👍",
-    emojis: ["👍", "👎", "👏", "🙏", "💪", "🤝", "✌️", "🤞", "👌", "👊", "🖐️", "🙌", "🤙", "👋", "💅", "🫶"],
+    emojis: [
+      "👍", "👎", "👏", "🙏", "💪", "🤝", "✌️", "🤞", "👌", "👊",
+      "🖐️", "🙌", "🤙", "👋", "💅", "🫶", "👆", "👇", "👈", "👉",
+      "✊", "🫰", "🤟", "🖖", "☝️", "🤲"
+    ],
   },
   {
     name: "爱心",
     icon: "❤️",
-    emojis: ["❤️", "💔", "💕", "💖", "💘", "💝", "💯", "✨", "🔥", "⭐", "🌟", "💫", "⚡", "💥", "💤", "💦"],
+    emojis: [
+      "❤️", "💔", "💕", "💖", "💘", "💝", "💯", "✨", "🔥", "⭐",
+      "🌟", "💫", "⚡", "💥", "💤", "💦", "❣️", "💞", "💓", "💗",
+      "💟", "💜", "🤍", "🖤", "💙", "💚"
+    ],
   },
   {
     name: "食物",
     icon: "🍕",
-    emojis: ["🍎", "🍌", "🍉", "🍇", "🍓", "🍔", "🍕", "🍟", "🌭", "🍜", "🍣", "🍰", "🍦", "☕", "🍺", "🥤"],
+    emojis: [
+      "🍎", "🍌", "🍉", "🍇", "🍓", "🍔", "🍕", "🍟", "🌭", "🍜",
+      "🍣", "🍰", "🍦", "☕", "🍺", "🥤", "🍊", "🍑", "🍍", "🥝",
+      "🍋", "🍒", "🧁", "🍩", "🍭", "🍪"
+    ],
   },
   {
     name: "动物",
     icon: "🐱",
-    emojis: ["🐱", "🐶", "🐼", "🐰", "🦊", "🐸", "🐷", "🐵", "🐯", "🦁", "🐦", "🐧", "🌹", "🌸", "🌵", "🌈"],
+    emojis: [
+      "🐱", "🐶", "🐼", "🐰", "🦊", "🐸", "🐷", "🐵", "🐯", "🦁",
+      "🐦", "🐧", "🌹", "🌸", "🌵", "🌈", "🐨", "🐻", "🐮", "🐔",
+      "🦄", "🐝", "🦋", "🐢", "🦉", "🐺"
+    ],
   },
   {
     name: "活动",
     icon: "🎉",
-    emojis: ["🎉", "🎊", "🎈", "🎁", "🏆", "🚀", "🎮", "🎯", "🎨", "🎤", "🎧", "⚽", "🏀", "🏸", "🎳", "🎲"],
+    emojis: [
+      "🎉", "🎊", "🎈", "🎁", "🏆", "🚀", "🎮", "🎯", "🎨", "🎤",
+      "🎧", "⚽", "🏀", "🏸", "🎳", "🎲", "🎸", "🎭", "🏅", "🎿",
+      "🏓", "🎪", "🎬", "🎵", "🎻", "🥇"
+    ],
+  },
+  {
+    name: "符号",
+    icon: "✅",
+    emojis: [
+      "✅", "❌", "⭕", "❗", "❓", "💢", "💬", "💭", "🔔", "🔕",
+      "♻️", "🔱", "📢", "📣", "🉑", "🆗", "🆒", "🆕", "🔴", "🔵", "➕", "💠"
+    ],
+  },
+  {
+    name: "自然",
+    icon: "🌿",
+    emojis: [
+      "🌙", "☀️", "⛅", "☁️", "🌧️", "⛈️", "❄️", "⛄", "🌊", "🌪️",
+      "🌱", "🌲", "🌴", "🌻", "🌞", "🌤️", "🌎", "🌋", "🌠", "🌾"
+    ],
+  },
+  {
+    name: "交通",
+    icon: "🚗",
+    emojis: [
+      "🚗", "🚕", "🚌", "🚎", "🏎️", "🚓", "🚑", "🚒", "🚐", "🚚",
+      "🚜", "🛵", "🏍️", "🚲", "✈️", "🚁", "⛵", "🚢", "🚂", "🚆"
+    ],
+  },
+  {
+    name: "物品",
+    icon: "📦",
+    emojis: [
+      "💻", "📱", "⌚", "📷", "🎥", "💡", "🔦", "🔋", "🔌", "💰",
+      "💎", "🔑", "🔒", "📚", "✏️", "📝", "📦", "🎓", "🧸", "🛒"
+    ],
   },
 ];
 
@@ -65,8 +123,15 @@ function hasRichMedia(html: string): boolean {
   return /<img\b/i.test(html) || /data-embed=/i.test(html);
 }
 
-/** 行内格式 active 态初始值（useEditorState 首帧） */
-const EMPTY_TOOLBAR_STATE = { bold: false, italic: false, strike: false, link: false };
+/** 行内格式 / 图片选中 active 态初始值（useEditorState 首帧） */
+const EMPTY_TOOLBAR_STATE = {
+  bold: false,
+  italic: false,
+  strike: false,
+  link: false,
+  isImage: false,
+  imageWidth: null as number | null,
+};
 
 /** 暴露给父级的句柄：聚焦编辑器（「评论数」按钮跳转输入框用） */
 export interface CommentEditorHandle {
@@ -97,6 +162,8 @@ export default function CommentEditor({
   const [linkUrl, setLinkUrl] = useState("");
   const [pickerKind, setPickerKind] = useState<EmbedKind | null>(null);
   const [uploading, setUploading] = useState(false);
+  // 自定义宽度输入缓冲（null = 直接显示编辑器实际宽度，避免用 effect 同步 state）
+  const [widthDraft, setWidthDraft] = useState<string | null>(null);
   const [plainLen, setPlainLen] = useState(() => plainTextOf(value).length);
   const fileRef = useRef<HTMLInputElement>(null);
   const emojiWrapRef = useRef<HTMLDivElement>(null);
@@ -125,7 +192,7 @@ export default function CommentEditor({
         horizontalRule: false,
         link: { openOnClick: false, HTMLAttributes: {} },
       }),
-      Image,
+      ResizableImage,
       EmbedNode,
       Placeholder.configure({ placeholder }),
     ],
@@ -159,7 +226,7 @@ export default function CommentEditor({
     setPlainLen(plainTextOf(value || "").length);
   }, [editor, value]);
 
-  // 行内格式 active 态（useEditorState 保证选区变化时重渲染）
+  // 行内格式与图片选中态（useEditorState 保证选区/属性变化时重渲染）
   const st =
     useEditorState({
       editor,
@@ -170,6 +237,8 @@ export default function CommentEditor({
               italic: ed.isActive("italic"),
               strike: ed.isActive("strike"),
               link: ed.isActive("link"),
+              isImage: ed.isActive("image"),
+              imageWidth: (ed.getAttributes("image").width as number | null | undefined) ?? null,
             }
           : EMPTY_TOOLBAR_STATE,
     }) ?? EMPTY_TOOLBAR_STATE;
@@ -204,6 +273,32 @@ export default function CommentEditor({
     else editor.chain().focus().extendMarkRange("link").unsetLink().run();
     setLinkOpen(false);
   };
+
+  /** 图片当前实时宽度（读编辑器实时值，避免 state 时序问题） */
+  const currentImageWidth = (): number | null =>
+    (editor?.getAttributes("image").width as number | null | undefined) ?? null;
+
+  // 不调用 .focus()：宽度输入框连续输入（≥3 位）时避免焦点被夺回正文
+  const setImageWidth = (width: number | null) => {
+    editor?.chain().updateAttributes("image", { width }).run();
+  };
+
+  /** 解析并提交宽度（40-2400 整数；非法或与当前一致时不提交） */
+  const commitImageWidth = (raw: string | number) => {
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n) || n < MIN_IMAGE_WIDTH) return;
+    const clamped = Math.min(n, MAX_IMAGE_WIDTH);
+    if (clamped !== currentImageWidth()) setImageWidth(clamped);
+  };
+
+  /** 百分比按编辑区宽度换算为 px */
+  const applyImagePercent = (pct: number) => {
+    const base = editor?.view.dom.clientWidth || 720;
+    setImageWidth(Math.max(MIN_IMAGE_WIDTH, Math.round((base * pct) / 100)));
+  };
+
+  // 自定义宽度输入框显示值：输入中显示缓冲值，否则显示编辑器实际宽度
+  const widthInputValue = widthDraft ?? (st.imageWidth !== null ? String(st.imageWidth) : "");
 
   const pickFile = () => fileRef.current?.click();
 
@@ -323,21 +418,70 @@ export default function CommentEditor({
             )}
           </div>
           <span className="editor-sep"></span>
-          <button type="button" className="editor-tool comment-editor-quote" title="引用用户" onClick={() => setPickerKind("user")}>
-            <i className="fa fa-user-o"></i>
-            <span className="editor-tool-text">引用</span>
-          </button>
-          <button type="button" className="editor-tool comment-editor-quote" title="引用帖子" onClick={() => setPickerKind("post")}>
-            <i className="fa fa-file-text-o"></i>
-            <span className="editor-tool-text">引用</span>
-          </button>
-          <button type="button" className="editor-tool comment-editor-quote" title="引用文章" onClick={() => setPickerKind("article")}>
-            <i className="fa fa-book"></i>
-            <span className="editor-tool-text">引用</span>
+          <button
+            type="button"
+            className="editor-tool"
+            title="插入引用"
+            aria-label="插入引用"
+            onClick={() => setPickerKind("user")}
+          >
+            <i className="fa fa-at"></i>
           </button>
           <span className="comment-editor-count">
             <span className={plainLen > MAX_COMMENT_CHARS ? "over" : ""}>{plainLen}</span>/{MAX_COMMENT_CHARS}
           </span>
+        </div>
+      )}
+
+      {/* 图片宽度条（选中图片时）：与发帖端一致的 25/50/75/100% + 自定义 40-2400px + 还原 */}
+      {st.isImage && (
+        <div className="rich-editor-option-bar comment-editor-option-bar">
+          <span className="rich-editor-option-label">图片宽度</span>
+          {[25, 50, 75, 100].map((pct) => (
+            <button
+              key={pct}
+              type="button"
+              className="rich-editor-option-btn"
+              onClick={() => {
+                setWidthDraft(null);
+                applyImagePercent(pct);
+              }}
+            >
+              {pct}%
+            </button>
+          ))}
+          <span className="rich-editor-option-label">自定义</span>
+          <input
+            type="number"
+            className="rich-editor-number"
+            min={MIN_IMAGE_WIDTH}
+            max={MAX_IMAGE_WIDTH}
+            step={20}
+            placeholder="原始"
+            value={widthInputValue}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setWidthDraft(raw);
+              // 输入即提交：>=40 的合法值直接生效（“3/36” 等中间态自然被跳过，失焦亦会兜底提交）
+              if (raw !== "") commitImageWidth(raw);
+            }}
+            onBlur={(e) => {
+              const raw = e.target.value.trim();
+              if (raw !== "") commitImageWidth(raw);
+              setWidthDraft(null);
+            }}
+          />
+          <span className="rich-editor-option-label">px</span>
+          <button
+            type="button"
+            className="rich-editor-option-btn"
+            onClick={() => {
+              setWidthDraft(null);
+              setImageWidth(null);
+            }}
+          >
+            还原
+          </button>
         </div>
       )}
 

@@ -46,7 +46,7 @@ export default function Modal({
   return (
     <div className={className} style={{ display: "flex" }}>
       <div className={overlayClassName} onClick={onClose}></div>
-      <div className={cardClassName} style={cardStyle}>
+      <div className={cardClassName} style={cardStyle} role="dialog" aria-modal="true">
         {closeable && (
           <button className={closeClassName} onClick={onClose} aria-label="关闭">
             &times;

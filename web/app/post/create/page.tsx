@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GlobalLoading from "@/components/GlobalLoading";
 import RichTextEditor from "@/components/editor/RichTextEditor";
+import SchedulePicker from "@/components/post/SchedulePicker";
 import { useToast } from "@/components/Toast";
 import BackButton from "@/components/ui/BackButton";
 import { postApi, userApi, guildApi, ApiException, GuildMembership } from "@/lib/api";
@@ -26,7 +27,7 @@ function hasRichContent(html: string): boolean {
   return !!text || /<img\b/i.test(html) || /data-embed=/i.test(html);
 }
 
-/** datetime-local 控件值（本地时区 YYYY-MM-DDTHH:mm） */
+/** 本地时区 YYYY-MM-DDTHH:mm 时间串（定时选择器与 min/max 共用口径） */
 function toLocalInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -68,10 +69,10 @@ function PostCreateForm() {
   const [target, setTarget] = useState<"public" | "guild">("public");
   const [guild, setGuild] = useState<GuildMembership | null>(null);
   const [noticeOpen, setNoticeOpen] = useState(false);
-  // 定时发布（可选）：开关 + datetime-local（本地时间；提交转 UTC ISO）
+  // 定时发布（可选）：开关 + 日期/时间选择器（本地时间；提交转 UTC ISO）
   const [scheduled, setScheduled] = useState(false);
   const [publishAt, setPublishAt] = useState("");
-  // datetime-local 的 min/max 在开关事件里计算（避免渲染期调用 Date.now）
+  // 时间范围 min/max 在开关事件里计算（避免渲染期调用 Date.now）
   const [publishBounds, setPublishBounds] = useState<{ min: string; max: string } | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -96,16 +97,27 @@ function PostCreateForm() {
     })();
   }, [guildSlug]);
 
+  /** 向上取整到下一整分钟（含秒/毫秒时进位）：分钟粒度下保证 min 提交时依旧有效 */
+  const ceilToMinute = (t: number): Date => {
+    const d = new Date(t);
+    if (d.getSeconds() > 0 || d.getMilliseconds() > 0) d.setMinutes(d.getMinutes() + 1);
+    d.setSeconds(0, 0);
+    return d;
+  };
+
+  /** 计算定时范围（最早 +5 分钟〔向上取整到分〕/ 最晚 +1 年）；可反复调用获取「实时」边界 */
+  const computeBounds = () => {
+    const now = Date.now();
+    return {
+      min: toLocalInput(ceilToMinute(now + SCHEDULE_MIN_AHEAD_MS)),
+      max: toLocalInput(new Date(now + SCHEDULE_MAX_AHEAD_MS)),
+    };
+  };
+
   /** 切换定时发布：开启时计算时间范围（最早 +5 分钟 / 最晚 +1 年） */
   const toggleScheduled = (on: boolean) => {
     setScheduled(on);
-    if (on) {
-      const now = Date.now();
-      setPublishBounds({
-        min: toLocalInput(new Date(now + SCHEDULE_MIN_AHEAD_MS)),
-        max: toLocalInput(new Date(now + SCHEDULE_MAX_AHEAD_MS)),
-      });
-    }
+    if (on) setPublishBounds(computeBounds());
   };
 
   const category = target === "guild" ? guildCat : pubCat;
@@ -128,9 +140,14 @@ function PostCreateForm() {
     let publishedAt: string | undefined;
     if (scheduled) {
       if (!publishAt) return setErr("请选择定时发布时间");
-      const t = new Date(publishAt).getTime();
+      // 最早时间随「当前时间」实时前移：刷新边界，并把已选值收敛到最新的最早可选时间，
+      // 避免「选择时合法、提交时已过期」的边界死区（选今天 → 立即提交被拒）。
+      const live = computeBounds();
+      setPublishBounds(live);
+      const value = publishAt < live.min ? live.min : publishAt;
+      if (value !== publishAt) setPublishAt(value);
+      const t = new Date(value).getTime();
       if (!Number.isFinite(t)) return setErr("定时发布时间无效");
-      if (t < Date.now() + SCHEDULE_MIN_AHEAD_MS) return setErr("定时发布时间需晚于当前时间 5 分钟");
       if (t > Date.now() + SCHEDULE_MAX_AHEAD_MS) return setErr("定时发布时间不能超过 1 年");
       publishedAt = new Date(t).toISOString();
     }
@@ -242,15 +259,13 @@ function PostCreateForm() {
               <input type="checkbox" checked={scheduled} onChange={(e) => toggleScheduled(e.target.checked)} />
               <i className="fa fa-clock-o"></i> 定时发布
             </label>
-            {scheduled && (
+            {scheduled && publishBounds && (
               <>
-                <input
-                  type="datetime-local"
-                  className="form-input post-schedule-input"
+                <SchedulePicker
                   value={publishAt}
-                  min={publishBounds?.min}
-                  max={publishBounds?.max}
-                  onChange={(e) => setPublishAt(e.target.value)}
+                  min={publishBounds.min}
+                  max={publishBounds.max}
+                  onChange={setPublishAt}
                 />
                 <p className="post-schedule-hint">
                   <i className="fa fa-info-circle"></i> 到点后自动发布：最早为当前时间 5 分钟后，最晚 1 年内；未到时间前仅自己可见。

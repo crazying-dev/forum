@@ -132,14 +132,6 @@
     color: var(--color-text-secondary);
 }
 
-/* 退出按钮不需要主题勾选框的外框 */
-#header #logoutBtn .setting-item-icon {
-    border: none;
-    width: auto;
-    height: auto;
-    background: none;
-}
-
 /* 举报/反馈 弹窗通用表单样式（Bug举报、帖子举报 共用） */
 .report-label {
     display: block;

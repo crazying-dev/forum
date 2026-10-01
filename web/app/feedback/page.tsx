@@ -153,18 +153,23 @@ export default function FeedbackPage() {
         </div>
       </div>
 
-      {/* 状态筛选 chips */}
-      <div className="feedback-chips">
-        {chips.map((c) => (
-          <button
-            key={c.key === null ? "all" : c.key}
-            type="button"
-            className={`feedback-chip ${statusFilter === c.key ? "active" : ""}`}
-            onClick={() => setStatusFilter(c.key)}
-          >
-            {c.label} <span className="feedback-chip-count">{c.count}</span>
-          </button>
-        ))}
+      {/* 状态筛选 chips + 提交反馈入口（同一行，滚动吸顶） */}
+      <div className="feedback-toolbar">
+        <div className="feedback-chips">
+          {chips.map((c) => (
+            <button
+              key={c.key === null ? "all" : c.key}
+              type="button"
+              className={`feedback-chip ${statusFilter === c.key ? "active" : ""}`}
+              onClick={() => setStatusFilter(c.key)}
+            >
+              {c.label} <span className="feedback-chip-count">{c.count}</span>
+            </button>
+          ))}
+        </div>
+        <Link className="forum-create-btn" href="/feedback/submit">
+          <i className="fa fa-bug"></i> 提交反馈
+        </Link>
       </div>
 
       {loading ? (
@@ -188,13 +193,6 @@ export default function FeedbackPage() {
       )}
 
       {hasMore && !loading && <LoadMoreButton loading={loadingMore} onClick={loadMore} id="feedback-load-more" />}
-
-      <div className="feedback-submit-entry">
-        <span>没找到你遇到的问题？</span>
-        <Link className="forum-create-btn" href="/feedback/submit">
-          <i className="fa fa-bug"></i> 提交反馈
-        </Link>
-      </div>
 
       {/* 详情弹窗 */}
       <Modal open={detailOpen} onClose={() => setDetailOpen(false)} cardStyle={{ maxWidth: 560 }}>
