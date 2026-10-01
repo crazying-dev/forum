@@ -36,6 +36,8 @@ import top.crazying.forum.ui.components.*
 /**
  * 楼中楼扁平化后的一行：评论 + 层级深度 + 被回复人昵称。
  *
+ * 只保留两层（0 = 根评论，1 = 其下所有回复）：对第 2 层的回复（孙级及更深）
+ * 压平到第 2 层，并用 [replyToName]（直接父评论作者）显示「回复 @某人」；
  * 用「扁平列表 + depth 缩进」交给 [LazyColumn] 渲染，性能优于递归 Composable；
  * `key` 唯一稳定（优先取评论 id，极端空 id 才退化为位置键）。
  */
@@ -49,6 +51,9 @@ private data class CommentNode(
 
 /**
  * 把扁平的评论列表按 `parentId` 组装成「父在前、子紧随其后」的扁平序列。
+ *
+ * 渲染只保留两层：根评论 + 其下所有回复（孙级及更深压平到第 2 层，
+ * 由 [CommentNode.replyToName] 以「回复 @某人」标明实际回复对象）。
  *
  * - 根节点保持服务端返回顺序（时间序），子节点保持其在原列表中的相对顺序；
  * - `parentId` 在列表中找不到（孤儿）、或指向自身时按根节点处理，绝不丢评论；
@@ -72,13 +77,15 @@ private fun buildCommentThread(comments: List<CommentItem>): List<CommentNode> {
 
     val out = ArrayList<CommentNode>(comments.size)
     val visited = HashSet<String>()
+    // depth 为真实层级；渲染只保留两层（0 = 根，1 = 其下所有回复）。
     fun emit(c: CommentItem, depth: Int, parent: CommentItem?) {
         if (c.id.isNotBlank() && !visited.add(c.id)) return
         out.add(
             CommentNode(
                 comment = c,
-                depth = depth,
-                replyToName = parent?.userName,
+                depth = if (depth == 0) 0 else 1,
+                // 仅压平上来的回复（真实层级 >= 2）显示 @ 直接父评论作者
+                replyToName = if (depth > 1) parent?.userName else null,
                 parent = parent,
                 key = c.id.ifBlank { "idx-${out.size}" },
             )
@@ -434,8 +441,8 @@ private fun CommentRow(
 ) {
     val colors = ForumTheme.colors
     val comment = node.comment
-    // 层级缩进：根 12dp，每深一层 +22dp（最多 4 层，避免窄屏过挤）。
-    val indent = (12 + node.depth.coerceAtMost(4) * 22).dp
+    // 层级缩进：只保留两层（根 12dp / 回复 34dp）。
+    val indent = (12 + node.depth.coerceAtMost(1) * 22).dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
