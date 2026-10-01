@@ -7,7 +7,8 @@ import android.content.SharedPreferences
  * 本地持久化（SharedPreferences）。
  *
  * 只存四类东西：主题偏好、年制、用户缓存、Cookie 串；
- * 另加两个更新检查相关的标记（上次检查时间 / 已忽略的版本）。
+ * 另加两个更新检查相关的标记（上次检查时间 / 已忽略的版本），
+ * 以及隐私政策同意标记（`privacyAgreedVersion`，与 `Constants.PRIVACY_POLICY_VERSION` 比对）。
  * 注意：`themePref` **只允许** day / night / auto 三个基础值，
  * 国庆限定主题是假期内的运行时叠加层，绝不能写进来。
  */
@@ -49,7 +50,15 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_UPDATE_SKIP, "") ?: ""
         set(value) = sp.edit().putString(KEY_UPDATE_SKIP, value).apply()
 
-    /** 退出登录 / 掉线时清理会话（保留主题与年制）。 */
+    /**
+     * 用户已同意的隐私政策版本号（空串表示从未同意）。
+     * 与 `Constants.PRIVACY_POLICY_VERSION` 不一致时，启动需重新弹窗征得同意。
+     */
+    var privacyAgreedVersion: String
+        get() = sp.getString(KEY_PRIVACY_AGREED, "") ?: ""
+        set(value) = sp.edit().putString(KEY_PRIVACY_AGREED, value).apply()
+
+    /** 退出登录 / 掉线时清理会话（保留主题、年制与隐私政策同意标记）。 */
     fun clearSession() {
         sp.edit().remove(KEY_USER).remove(KEY_COOKIES).apply()
     }
@@ -63,5 +72,6 @@ class Prefs(context: Context) {
         const val KEY_LAST_NAME = "last_name"
         const val KEY_UPDATE_CHECK_AT = "update_check_at"
         const val KEY_UPDATE_SKIP = "update_skip_version"
+        const val KEY_PRIVACY_AGREED = "privacy_agreed_version"
     }
 }

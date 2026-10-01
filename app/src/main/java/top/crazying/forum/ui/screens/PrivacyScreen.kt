@@ -31,9 +31,18 @@ private sealed interface PBlock {
  * Markdown 表格已改写为「· 名称 — 说明」的纯文本逐行排版。
  */
 @Composable
-fun PrivacyScreen(nav: Navigator) {
+fun PrivacyScreen(nav: Navigator) = PrivacyPolicyPage(onBack = { nav.pop() })
+
+/**
+ * 隐私政策正文页（返回行为由调用方决定）。
+ *
+ * * 从「我的」页进入：`PrivacyScreen(nav)` → 返回即 `nav.pop()`；
+ * * 首启隐私同意门内「查看全文」：`PrivacyPolicyPage(onBack = { … })` → 返回即关闭全文。
+ */
+@Composable
+fun PrivacyPolicyPage(onBack: () -> Unit) {
     val colors = ForumTheme.colors
-    PageScaffold(title = "隐私政策", onBack = { nav.pop() }) { padding ->
+    PageScaffold(title = "隐私政策", onBack = onBack) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),

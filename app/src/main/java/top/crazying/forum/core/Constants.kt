@@ -12,7 +12,7 @@ object Constants {
     const val BASE_URL = "https://www.yjlt.top"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.3"
+    const val APP_VERSION = "1.0.4"
 
     /** 请求 UA，便于服务端日志区分端。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
@@ -72,6 +72,15 @@ object Constants {
     // 远端图床地址；“我的”页直接展示，Coil 会自动落盘缓存，无需每次重新下载。
     // 与 Web（base.html 的 data-src）、Windows（app/constants.py PROMO_QR_URL）同源。
     const val REWARD_QR_URL = "https://img.crazying-dev.top/other/help.png"
+
+    // ────────────────── 隐私政策 ──────────────────
+    /**
+     * 当前隐私政策版本，与 `PrivacyScreen` 正文标题里的「版本」一致。
+     *
+     * 用户同意后把该值写入 `Prefs.privacyAgreedVersion`；政策版本升号时
+     * 会在下次启动重新弹窗征得同意（合规要求）。
+     */
+    const val PRIVACY_POLICY_VERSION = "2.0"
 
     // ────────────────── 国庆假期 ──────────────────
     // 本地时间 10-01 00:00 ~ 10-07 24:00（等价于 10-08 00:00 开区间，因此只判 1..7 日）

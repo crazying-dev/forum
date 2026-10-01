@@ -20,10 +20,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import top.crazying.forum.core.App
+import top.crazying.forum.core.Constants
 import top.crazying.forum.core.Updater
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.screens.AuthScreen
@@ -50,8 +54,24 @@ import top.crazying.forum.ui.screens.WorldScreen
 @Composable
 fun ForumRoot() {
     ForumTheme {
-        val nav = remember { Navigator() }
         val colors = ForumTheme.colors
+
+        // 首次启动（或隐私政策版本升级后）必须先手动同意隐私政策。
+        // 未同意时既不渲染主界面，也不发起任何网络请求（合规：同意前不收集、不上传）。
+        var agreed by remember {
+            mutableStateOf(App.prefs.privacyAgreedVersion == Constants.PRIVACY_POLICY_VERSION)
+        }
+        if (!agreed) {
+            PrivacyConsentGate(
+                onAgree = {
+                    App.prefs.privacyAgreedVersion = Constants.PRIVACY_POLICY_VERSION
+                    agreed = true
+                },
+            )
+            return@ForumTheme
+        }
+
+        val nav = remember { Navigator() }
 
         // 启动时若本地存有会话（cookie + 用户缓存），静默刷新一次当前用户。
         // 失败（如 cookie 失效）由 Api 内部触发 onUnauthorized 清理，不打扰用户。
