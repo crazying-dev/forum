@@ -47,11 +47,15 @@ def test_comment_list_renders_children():
     assert root is not None
     kids = [item.comment_id for item in root.children()]
     assert "C2" in kids, kids                      # 子回复必须挂到父条目
+    # 第 3 层（孙级）压平到第 2 层：成为根评论的直接子块，与 C2 同级
+    assert "C3" in kids, kids
     child = listing.item_for("C2")
     assert child is not None
-    grand = [item.comment_id for item in child.children()]
-    assert "C3" in grand, grand                     # 楼中楼（孙级）也要渲染
-    assert listing.item_for("C3") is not None       # items() 递归可达
+    assert child.children() == [], "第 2 层不应再嵌套孙级"
+    assert child.data.get("reply_to_name") == ""   # 直接回复根评论：不显示 @
+    grand = listing.item_for("C3")
+    assert grand is not None                       # items() 递归可达
+    assert grand.data.get("reply_to_name") == "甲"  # 压平项显示「回复 @甲」
 
 
 # ────────────────────── 隐私政策 v2.0（Task D 回归） ──────────────────────

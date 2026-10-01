@@ -118,6 +118,24 @@ def test_comment_tree_handles_cycles():
     assert roots, "环状依赖不应导致评论丢失"
 
 
+def test_comment_tree_flattens_deep_replies():
+    comments = [
+        {"id": "C1", "parent_id": None, "user_name": "楼主", "created_at": "2026-01-01 00:00:00"},
+        {"id": "C2", "parent_id": "C1", "user_name": "甲", "created_at": "2026-01-01 00:01:00"},
+        {"id": "C3", "parent_id": "C2", "user_name": "乙", "created_at": "2026-01-01 00:02:00"},
+        {"id": "C4", "parent_id": "C3", "user_name": "丙", "created_at": "2026-01-01 00:03:00"},
+    ]
+    roots = comment_mod._build_tree(comments)
+    c1 = [node for node in roots if node["id"] == "C1"][0]
+    # 孙级及更深全部压平：C3 / C4 与 C2 同级挂在根评论下
+    assert [child["id"] for child in c1["children"]] == ["C2", "C3", "C4"]
+    kids = {node["id"]: node for node in c1["children"]}
+    assert kids["C2"]["reply_to_name"] == ""      # 直接回复根评论：不显示 @
+    assert kids["C3"]["reply_to_name"] == "甲"     # @ 直接父评论作者
+    assert kids["C4"]["reply_to_name"] == "乙"
+    assert kids["C2"]["children"] == [] and kids["C3"]["children"] == []
+
+
 def test_comment_list_folding():
     _app_instance()
     from app.widgets import CommentList

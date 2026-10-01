@@ -48,8 +48,10 @@ class CommentItem(QFrame):
         self.user = UserLink()
         self.user.activated.connect(self._on_user_link)
         head.addWidget(self.user)
-        if self._comment.get("parent_id"):
-            reply_tag = QLabel("回复")
+        reply_to = str(self._comment.get("reply_to_name") or "")
+        if reply_to:
+            # 第 3 层及更深压平到第 2 层后，用「回复 @某人」标明实际回复对象
+            reply_tag = QLabel("回复 @" + reply_to)
             reply_tag.setProperty("muted", "true")
             head.addWidget(reply_tag)
         self.meta = Muted("")
@@ -366,7 +368,32 @@ def _build_tree(comments: list) -> list[dict]:
             roots.append(node)
             reachable.add(id(node))
     _flatten_orphans(roots, nodes)
+    _flatten_two_levels(roots)
     return roots
+
+
+def _flatten_two_levels(roots: list) -> None:
+    """只保留两层：第 3 层及更深一律提升到所属根评论下（与第 2 层同级）。
+
+    被压平的节点写入 ``reply_to_name``（其直接父评论作者），供渲染层显示
+    「回复 @某人」；直接回复根评论的第 2 层不写该字段，保持不显示 @。
+    """
+    for root in roots:
+        level2: list[dict] = []
+        root_name = str(root.get("user_name") or "")
+
+        def take(node: dict, parent_name: str, level: int) -> None:
+            node["reply_to_name"] = "" if level == 1 else parent_name
+            kids = list(node.get("children") or [])
+            node["children"] = []
+            level2.append(node)
+            name = str(node.get("user_name") or "")
+            for child in kids:
+                take(child, name, level + 1)
+
+        for child in list(root.get("children") or []):
+            take(child, root_name, 1)
+        root["children"] = level2
 
 
 def _flatten_orphans(roots: list, nodes: dict) -> None:
