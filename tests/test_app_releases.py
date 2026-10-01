@@ -224,12 +224,12 @@ def test_windows_release_entry():
     """Windows 最新版：清单字段与 GitHub Release 直链保持一致。"""
     windows = next(p for p in _load_manifest()["platforms"] if p.get("key") == "windows")
     release = (windows.get("releases") or [{}])[0]
-    assert release.get("version") == "1.3.6", "windows 版本应为 1.3.6"
+    assert release.get("version") == "1.3.7", "windows 版本应为 1.3.7"
     assert release.get("channel") == "stable"
     assert release.get("filename") == "forum_setup.exe"
     assert release.get("url") == (
         "https://github.com/crazying-dev/forum/releases/download/"
-        "Windows-V1.3.6/forum_setup.exe")
+        "Windows-V1.3.7/forum_setup.exe")
     assert isinstance(release.get("size"), int) and release["size"] > 0
     assert re.fullmatch(r"[0-9a-f]{64}", str(release.get("sha256"))), "sha256 应为 64 位小写十六进制"
     assert release.get("mandatory") is False
@@ -282,7 +282,7 @@ def test_download_page_links_use_site_mirror():
         assert url.startswith("/api/app/mirror/"), f"复制直链未指向站内反代：{url}"
 
     # 两个已发布平台都要有站内入口，并带 ?v= 版本号做缓存失效
-    assert "/api/app/mirror/windows/forum_setup.exe?v=1.3.6" in html
+    assert "/api/app/mirror/windows/forum_setup.exe?v=1.3.7" in html
     assert "/api/app/mirror/android/forum-android-1.0.2.apk?v=1.0.2" in html
 
 

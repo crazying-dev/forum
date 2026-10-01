@@ -39,7 +39,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-01T08:00:00+08:00",
+    "updated_at": "2026-10-01T10:15:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -49,19 +49,18 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.3.6",
+                    "version": "1.3.7",
                     "channel": "stable",
-                    "date": "2026-09-30",
-                    "size": 48561636,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.6/forum_setup.exe",
+                    "date": "2026-10-01",
+                    "size": 48564337,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.7/forum_setup.exe",
                     "filename": "forum_setup.exe",
-                    "sha256": "6dc208f6b296f0512c357979ea399d3f0fc01feec9dcea07575ac06f64a5e67e",
+                    "sha256": "cba06397bdfb3bf78d343efadc4087775114a23e0ee513dcb524049fd24e4813",
                     "notes": [
-                        "新增常驻赞赏码入口：托盘菜单「支持作者」+ 设置页「关于」按钮，随时可打开赞赏码弹窗",
-                        "常驻入口弹窗为固定公益文案 + 「关闭」按钮，不掷概率、不影响启动计数",
-                        "启动时按概率（30%）随机弹出的「支持一下妖精论坛」弹窗行为完全不变",
-                        "赞赏码与网页端、安卓端同源同图，客户端首次打开后落盘缓存，之后离线也能显示",
-                        "网页端与安卓端同步上线常驻赞赏码入口",
+                        "修复点「立即更新」时闪黑框、控制台卡住不响应：不再经 apply_update.cmd 批处理中转",
+                        "安装动作改由进程退出钩子用 CREATE_NO_WINDOW 直接唤起安装包，不再出现任何控制台窗口",
+                        "「立即安装」= 登记后立刻退出程序；「退出时自动安装」= 关闭客户端后再安装",
+                        "静默安装完成后由安装器自己把客户端重新拉起来（不再依赖 .cmd 里的 start）",
                     ],
                     "mandatory": False,
                 }
