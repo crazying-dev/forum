@@ -23,7 +23,7 @@ function cardClass(kind: "user" | "post" | "article", variant: QuoteVariant, siz
   return cls.join(" ");
 }
 
-/** 用户引用卡片：头像（含前缀/VIP 角标）+ 昵称 + VIP/会馆 chip + 简介 */
+/** 用户引用卡片：头像（含前缀角标）+ 昵称 + 会馆 chip + 简介 */
 export function UserQuoteCard({
   user,
   variant = "card",
@@ -38,23 +38,17 @@ export function UserQuoteCard({
   align?: QuoteAlign;
 }) {
   const guild = user.guild;
-  const showVip = hasEmbedField(fields, "vip") && !!user.vip && user.vip !== "0";
   const showGuild = hasEmbedField(fields, "guild") && !!guild;
-  // 紧凑版式不展示简介（字段开关仍作用于 VIP / 会馆）
+  // 紧凑版式不展示简介（字段开关仍作用于会馆）
   const showIntro = variant === "card" && hasEmbedField(fields, "intro");
   return (
     <Link href={`/users/${encodeURIComponent(user.id)}`} className={cardClass("user", variant, size, align)}>
       <span className="quote-card-avatar">
-        <UserAvatar src={user.avatar} alt={user.name} userId={user.id} vip={showVip} />
+        <UserAvatar src={user.avatar} alt={user.name} userId={user.id} />
       </span>
       <span className="quote-card-body">
         <span className="quote-card-name-row">
           <span className="quote-card-name">{user.name}</span>
-          {showVip && (
-            <span className="quote-card-vip" title="VIP">
-              <i className="fa fa-diamond"></i> VIP
-            </span>
-          )}
           {showGuild && guild && <UserGuildChip name={guild.name} color={guild.theme_color} />}
         </span>
         {showIntro && <span className="quote-card-intro">{user.intro || "这个人很懒，什么都没留下～"}</span>}

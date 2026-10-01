@@ -77,14 +77,10 @@ export default function FollowListModal({
         ) : (
           users.map((u) => {
             const isItemSelf = currentUserId === u.id;
-            const vipBadge = u.vip && u.vip !== "0" ? (
-              <span className="follow-user-vip"><i className="fa fa-diamond"></i></span>
-            ) : null;
             return (
               <div className="follow-user-item" key={u.id}>
                 <Link href={`/users/${u.id}`} className="follow-user-avatar">
                   <UserAvatar src={u.avatar} alt={u.name} />
-                  {vipBadge}
                 </Link>
                 <div className="follow-user-info">
                   <div className="follow-user-name-row">

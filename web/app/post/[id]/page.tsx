@@ -8,6 +8,7 @@ import Modal from "@/components/ui/Modal";
 import Markdown from "@/components/Markdown";
 import RichContent from "@/components/ui/RichContent";
 import CommentSection from "@/components/CommentSection";
+import type { CommentEditorHandle } from "@/components/editor/CommentEditor";
 import { UserAvatar, UserName } from "@/components/ui/UserAvatar";
 import { UserGuildChip } from "@/components/ui/UserGuildChip";
 import CategoryBadge from "@/components/ui/CategoryBadge";
@@ -27,11 +28,12 @@ export default function PostDetailPage() {
   const [liked, setLiked] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [replyTo, setReplyTo] = useState<{ id: string; name: string; path: string[] } | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [showReport, setShowReport] = useState(false);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const commentEditorRef = useRef<CommentEditorHandle>(null);
 
   const load = useCallback(async () => {
     try {
@@ -100,19 +102,24 @@ export default function PostDetailPage() {
 
   const submitComment = async () => {
     if (!userId) return router.push("/auth");
+    if (submittingComment) return; // 提交中：忽略重复点击/快捷键，防重复发送
     const content = commentText.trim();
     if (!content) {
       toast("请先输入内容", "warning");
       return;
     }
+    setSubmittingComment(true);
     try {
-      const r = await postApi.createComment(id, content, replyTo?.id);
+      // 评论存 HTML（content_format=html）；回复仅与直接对象建立 parent_id 关联
+      const r = await postApi.createComment(id, content, replyTo?.id, "html");
       setComments((prev) => [...prev, r.comment]);
       setCommentText("");
       setReplyTo(null);
       toast(replyTo ? "回复发送成功" : "评论发送成功", "success");
     } catch (e: any) {
       toast(e instanceof ApiException ? e.message : "发送失败，请稍后再试", "error");
+    } finally {
+      setSubmittingComment(false);
     }
   };
 
@@ -120,7 +127,8 @@ export default function PostDetailPage() {
     if (!window.confirm("确定删除这条评论吗？")) return;
     try {
       await postApi.deleteComment(cid);
-      setComments((prev) => prev.filter((c) => c.id !== cid));
+      // 删除后重拉：服务端归并/提升口径（父级缺失等）以最新数据为准
+      await load();
     } catch (e: any) {
       toast(e.message, "error");
     }
@@ -205,7 +213,7 @@ export default function PostDetailPage() {
               <i className="fa fa-bookmark"></i>
               <span className="post-action-label">收藏</span>
             </button>
-            <button className="post-action-btn" onClick={() => inputRef.current?.focus()}>
+            <button className="post-action-btn" onClick={() => commentEditorRef.current?.focus()}>
               <i className="fa fa-comment"></i>
               <span>{mainCount}</span>
             </button>
@@ -232,11 +240,13 @@ export default function PostDetailPage() {
           <CommentSection
             comments={comments}
             userId={userId}
-            inputRef={inputRef}
+            editorRef={commentEditorRef}
+            replyText={commentText}
             replyTo={replyTo}
             setReplyTo={setReplyTo}
             onChangeReplyText={setCommentText}
             onSubmit={submitComment}
+            submitting={submittingComment}
             onDelete={deleteComment}
             onLike={doLikeComment}
           />

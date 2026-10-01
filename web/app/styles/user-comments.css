@@ -29,13 +29,22 @@
     color: var(--color-primary);
 }
 
-/* 个人中心评论卡片整体可点击 */
-.user-comments-list a.comment-item {
+/* 个人中心评论卡片整体可点击（div/链接两种形态通用） */
+.user-comments-list .comment-item {
     color: inherit;
     text-decoration: none;
 }
 
-.user-comments-list a.comment-item:hover .comment-post-link {
+.comment-item-clickable {
+    cursor: pointer;
+    outline: none;
+}
+
+.comment-item-clickable:focus-visible {
+    border-color: var(--color-border-focus);
+}
+
+.user-comments-list .comment-item:hover .comment-post-link {
     color: var(--color-primary);
 }
 

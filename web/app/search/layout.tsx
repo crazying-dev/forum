@@ -4,7 +4,7 @@ import { pageMetadata } from "@/lib/seo";
 // 搜索页（功能页：noindex；关键词联动标签页标题在页面内客户端更新）
 export const metadata: Metadata = pageMetadata({
   title: "搜索",
-  description: "在妖精论坛搜索帖子与用户。",
+  description: "搜索帖子、用户与文章",
   path: "/search",
   index: false,
 });

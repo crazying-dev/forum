@@ -7,7 +7,7 @@ import BackButton from "@/components/ui/BackButton";
 import { ListEmpty, ListLoading, LoadMoreButton } from "@/components/ui/ListState";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { guildApi, GuildDetail, GuildMember } from "@/lib/api";
-import { contrastText, isVip, themeColor, themeInk, themeTint } from "@/lib/constants";
+import { contrastText, themeColor, themeInk, themeTint } from "@/lib/constants";
 
 /** 会馆成员名单：馆长特写卡 + 成员网格（分页加载） */
 export default function GuildMembersPage() {
@@ -136,7 +136,7 @@ export default function GuildMembersPage() {
             {gridMembers.map((m) => (
               <Link key={m.id} className="guild-member-card" href={`/users/${m.id}`}>
                 <div className="guild-member-avatar">
-                  <UserAvatar src={m.avatar} alt={m.name} userId={m.id} vip={isVip(m.vip)} />
+                  <UserAvatar src={m.avatar} alt={m.name} userId={m.id} />
                 </div>
                 <div className="guild-member-name Username">{m.name}</div>
                 <p className="guild-member-intro">{m.intro || "这个人很懒，什么都没留下~"}</p>

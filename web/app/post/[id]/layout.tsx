@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/ui/JsonLd";
 import { absoluteUrl, fetchApi, pageMetadata, stripHtml, truncate } from "@/lib/seo";
@@ -24,7 +25,14 @@ interface PostDetailResp {
 }
 
 const getPost = cache(async (id: string) => {
-  const r = await fetchApi<PostDetailResp>(`/api/v1/posts/${encodeURIComponent(id)}?track=0`);
+  // 转发浏览器 Cookie：服务端对「作者本人」开放未发布帖
+  // 无 Cookie（匿名/爬虫）：保持 revalidate 共享缓存；带 Cookie（作者本人视角）：no-store，
+  // 避免 404/个性化数据被后续请求按 URL 复用
+  const cookie = (await cookies()).toString();
+  const r = await fetchApi<PostDetailResp>(`/api/v1/posts/${encodeURIComponent(id)}?track=0`, 300, {
+    headers: cookie ? { Cookie: cookie } : {},
+    noStore: !!cookie,
+  });
   return { ok: r.ok, status: r.status, post: r.data?.post ?? null };
 });
 

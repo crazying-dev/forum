@@ -5,6 +5,32 @@
     flex-direction: column;
 }
 
+/* 吸附容器：工具条 + 选项条（图片宽度条/引用样式条）整体吸附在顶栏（70px）下方；
+   z-index 必须低于顶栏（100）；≤480px 顶栏降为 60px。背景不透明，悬浮时补阴影 */
+.rich-editor-sticky {
+    position: sticky;
+    top: 70px;
+    z-index: 90;
+    background: var(--color-bg-card);
+    border-radius: 10px 10px 0 0;
+}
+
+.rich-editor-sticky.stuck {
+    box-shadow: 0 6px 16px var(--color-shadow-dropdown);
+}
+
+/* 哨兵：位于吸附容器上方，用于探测是否已吸附（1px 高 + 负 margin 避免布局位移） */
+.rich-editor-sticky-sentinel {
+    height: 1px;
+    margin: 0 0 -1px;
+}
+
+@media (max-width: 480px) {
+    .rich-editor-sticky {
+        top: 60px;
+    }
+}
+
 /* 带文字的按钮（H2/H3/引用）自动放宽：图标 + 文字并排 */
 .rich-editor-toolbar {
     align-items: center;
@@ -107,6 +133,12 @@
     margin: 0 0 8px;
 }
 
+.rich-editor-body h1 {
+    margin: 16px 0 8px;
+    font-size: 24px;
+    font-weight: 600;
+}
+
 .rich-editor-body h2 {
     margin: 14px 0 8px;
     font-size: 20px;
@@ -117,6 +149,42 @@
     margin: 12px 0 6px;
     font-size: 17px;
     font-weight: 600;
+}
+
+.rich-editor-body h4 {
+    margin: 10px 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* 行内代码 / 代码块 / 分割线 */
+.rich-editor-body code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--color-bg-item-hover);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+}
+
+.rich-editor-body pre {
+    margin: 8px 0;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--color-bg-item-hover);
+    overflow-x: auto;
+}
+
+.rich-editor-body pre code {
+    padding: 0;
+    background: transparent;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.rich-editor-body hr {
+    margin: 14px 0;
+    border: none;
+    border-top: 1px solid var(--color-border-divider);
 }
 
 .rich-editor-body ul,

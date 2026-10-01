@@ -8,10 +8,13 @@ import FollowListModal, { FollowTab } from "@/components/FollowListModal";
 import UserProfileModal from "@/components/UserProfileModal";
 import CategoryBadge from "@/components/ui/CategoryBadge";
 import SpaceBadge from "@/components/ui/SpaceBadge";
+import Markdown from "@/components/Markdown";
+import RichContent from "@/components/ui/RichContent";
+import HoverTip from "@/components/ui/HoverTip";
 import { useToast } from "@/components/Toast";
 import { UserAvatar } from "@/components/ui/UserAvatar";
 import { userApi, postApi, User, Post, UserBrief, ReplyItem, ApiException, GuildMembership } from "@/lib/api";
-import { ageDisplay, contrastText, isVip, themeColor } from "@/lib/constants";
+import { ageDisplay, contrastText, themeColor } from "@/lib/constants";
 import { useStore } from "@/lib/store";
 
 function fmtDate(v?: string) {
@@ -19,6 +22,32 @@ function fmtDate(v?: string) {
   const d = new Date(v);
   if (isNaN(d.getTime())) return "-";
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Asia/Shanghai 日期 YYYY-MM-DD（签到初始态与 last_sign_in 比对，与服务端签到日界一致） */
+function shanghaiDateStr() {
+  // 用 formatToParts 手动拼接，避免部分环境 en-CA 输出格式差异
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+
+/** 定时发布时间展示（YYYY-MM-DD HH:mm，本地时区） */
+function fmtDateTime(v?: string) {
+  if (!v) return "";
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return "";
+  return `${fmtDate(v)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** published_at 在未来即定时未发布（本人可见） */
+function isScheduled(v?: string) {
+  return !!v && new Date(v).getTime() > Date.now();
+}
+
+/** 馆长提示中的会馆名（名称已以「会馆」结尾则不重复追加） */
+function guildTitle(name: string) {
+  return name.endsWith("会馆") ? name : `${name}会馆`;
 }
 
 export default function UserPage() {
@@ -45,11 +74,15 @@ export default function UserPage() {
   const [postView, setPostView] = useState<"posts" | "favorites">("posts");
   const [comments, setComments] = useState<ReplyItem[] | null>(null);
   const [favorites, setFavorites] = useState<Post[] | null>(null);
+  // 签到：初始态用 last_sign_in 与 Asia/Shanghai 日期比对；409 视为今日已签
+  const [signedToday, setSignedToday] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const r = await userApi.profile(id);
       setProfile(r.user);
+      setSignedToday(!!r.user.last_sign_in && r.user.last_sign_in === shanghaiDateStr());
       setStats(r.stats);
       setFollowStats(r.follow_stats);
       setIsFollowing(!!r.is_following);
@@ -92,6 +125,27 @@ export default function UserPage() {
   useEffect(() => {
     if (postView === "favorites" && favorites === null) loadFavorites();
   }, [postView, favorites, loadFavorites]);
+
+  /** 每日签到：成功更新灵力值；409 置为已签 */
+  const doSignIn = async () => {
+    if (signingIn || signedToday) return;
+    setSigningIn(true);
+    try {
+      const r = await userApi.signIn();
+      setSignedToday(true);
+      setProfile((p) => (p ? { ...p, spirit: r.data.spirit, last_sign_in: r.data.last_sign_in } : p));
+      toast("签到成功，灵力值 +10", "success");
+    } catch (e: unknown) {
+      if (e instanceof ApiException && e.status === 409) {
+        setSignedToday(true);
+        toast("今日已签到", "info");
+      } else {
+        toast(e instanceof ApiException ? e.message : "签到失败，请稍后再试", "error");
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
 
   const toggleFollow = async () => {
     if (!me) return router.push("/auth");
@@ -185,9 +239,6 @@ export default function UserPage() {
   if (loading) return <div className="loading-text" style={{ padding: 40 }}>加载中...</div>;
   if (!profile) return <div className="loading-text" style={{ padding: 40 }}>用户不存在</div>;
 
-  // VIP 徽章统一展示在头像右下角（与前缀徽标同一角落体系）
-  const vip = isVip(profile.vip);
-
   return (
     <>
       <div className="user-profile-page">
@@ -200,7 +251,6 @@ export default function UserPage() {
                 imgId="user-profile-avatar-img"
                 fallbackClassName="avatar-fallback avatar-fallback-lg"
                 userId={profile.id}
-                vip={vip}
               />
             </div>
           </div>
@@ -233,18 +283,21 @@ export default function UserPage() {
             <div className="user-guild-row" id="user-profile-guild">
               {guild ? (
                 <>
-                  <Link
-                    className="user-guild-tag"
-                    href={`/huiguan/${guild.slug}`}
-                    title={`进入会馆「${guild.name}」`}
-                    style={{ background: themeColor(guild.theme_color), color: contrastText(themeColor(guild.theme_color)) }}
-                  >
-                    <i className="fa fa-home"></i> {guild.name}
-                  </Link>
+                  <HoverTip text={`进入会馆「${guild.name}」`}>
+                    <Link
+                      className="user-guild-tag"
+                      href={`/huiguan/${guild.slug}`}
+                      style={{ background: themeColor(guild.theme_color), color: contrastText(themeColor(guild.theme_color)) }}
+                    >
+                      <i className="fa fa-home"></i> {guild.name}
+                    </Link>
+                  </HoverTip>
                   {isLeader && (
-                    <span className="user-guild-chip user-leader-chip">
-                      <i className="fa fa-crown"></i> 馆长
-                    </span>
+                    <HoverTip text={`TA 是「${guildTitle(guild.name)}」的馆长`}>
+                      <span className="user-guild-chip user-leader-chip">
+                        <i className="fa fa-crown"></i> 馆长
+                      </span>
+                    </HoverTip>
                   )}
                 </>
               ) : (
@@ -267,6 +320,10 @@ export default function UserPage() {
               <span className="stat-number" id="user-total-views">{stats?.total_views || 0}</span>
               <span className="stat-label">浏览</span>
             </div>
+            <div className="stat-item">
+              <span className="stat-number" id="user-spirit">{profile.spirit ?? 0}</span>
+              <span className="stat-label">灵力值</span>
+            </div>
             <div className="stat-item stat-item-clickable" onClick={() => openFollowList("following")}>
               <span className="stat-number" id="user-following-count">{followStats?.following_count || 0}</span>
               <span className="stat-label">关注</span>
@@ -279,6 +336,16 @@ export default function UserPage() {
           {!isSelf && (
             <button className={`user-follow-btn ${isFollowing ? "following" : ""}`} id="user-follow-btn" onClick={toggleFollow}>
               {isFollowing ? "已关注" : "+ 关注"}
+            </button>
+          )}
+          {isSelf && (
+            <button
+              className={`user-follow-btn user-signin-btn ${signedToday ? "signed" : ""}`}
+              id="user-signin-btn"
+              disabled={signingIn || signedToday}
+              onClick={doSignIn}
+            >
+              <i className="fa fa-calendar-check-o"></i> {signedToday ? "今日已签到" : "今日签到 +10"}
             </button>
           )}
         </div>
@@ -329,6 +396,11 @@ export default function UserPage() {
                       <div className="post-item-tags">
                         <CategoryBadge category={p.category} className="post-item-category" />
                         <SpaceBadge name={p.guild_name} color={p.guild_theme_color} />
+                        {isSelf && isScheduled(p.published_at) && (
+                          <span className="post-scheduled-tag" title="尚未到达发布时间，仅自己可见">
+                            <i className="fa fa-clock-o"></i> 定时发布 {fmtDateTime(p.published_at)}
+                          </span>
+                        )}
                       </div>
                       <div className="post-item-stats">
                         <span><i className="fa fa-eye"></i> {p.views || 0}</span>
@@ -385,30 +457,44 @@ export default function UserPage() {
             ) : comments.length === 0 ? (
               <p className="loading-text">还没有发表评论</p>
             ) : (
-              comments.map((c) => (
-                <Link
-                  className="comment-item"
-                  key={c.id}
-                  href={`/post/${c.post_id}#comment-${c.id}`}
-                  title="点击跳转到该评论"
-                >
-                  <div className="comment-avatar">
-                    <UserAvatar src={c.user_avatar} userId={c.user_id} />
-                  </div>
-                  <div className="comment-body">
-                    <div className="comment-header">
-                      <span className="comment-author">{c.user_name}</span>
-                      <span className="comment-time">{fmtDate(c.created_at)}</span>
+              comments.map((c) => {
+                const href = `/post/${c.post_id}#comment-${c.id}`;
+                return (
+                  <div
+                    className="comment-item comment-item-clickable"
+                    key={c.id}
+                    role="link"
+                    tabIndex={0}
+                    title="点击跳转到该评论"
+                    onClick={(e) => {
+                      // 正文内的链接（超链接/引用卡）自行处理跳转，不触发整卡跳转
+                      if ((e.target as HTMLElement).closest("a")) return;
+                      router.push(href);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") router.push(href);
+                    }}
+                  >
+                    <div className="comment-avatar">
+                      <UserAvatar src={c.user_avatar} userId={c.user_id} />
                     </div>
-                    <div className="comment-text">{c.content}</div>
-                    <div className="comment-footer">
-                      <span className="comment-post-link">
-                        <i className="fa fa-commenting-o"></i> 评论于「{c.post_title}」
-                      </span>
+                    <div className="comment-body">
+                      <div className="comment-header">
+                        <span className="comment-author">{c.user_name}</span>
+                        <span className="comment-time">{fmtDate(c.created_at)}</span>
+                      </div>
+                      <div className="comment-text">
+                        {c.content_format === "html" ? <RichContent content={c.content} /> : <Markdown content={c.content} />}
+                      </div>
+                      <div className="comment-footer">
+                        <Link className="comment-post-link" href={href} onClick={(e) => e.stopPropagation()}>
+                          <i className="fa fa-commenting-o"></i> 评论于「{c.post_title}」
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                </Link>
-              ))
+                );
+              })
             )}
           </div>
         )}

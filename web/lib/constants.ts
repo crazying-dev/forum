@@ -103,11 +103,6 @@ export function themeInk(color?: string | null): string {
   return `rgb(${mix(rgb[0])}, ${mix(rgb[1])}, ${mix(rgb[2])})`;
 }
 
-// VIP 字段（"0" 表示非会员；空值不渲染）
-export function isVip(vip?: string | null): boolean {
-  return !!vip && vip !== "0";
-}
-
 // 相对时间（刚刚 / N分钟前 / N小时前 / N天前 / 日期）
 export function timeAgo(ts?: string): string {
   if (!ts) return "";

@@ -21,7 +21,6 @@ export default function Header() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showSearchLayer, setShowSearchLayer] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
-  const [showBug, setShowBug] = useState(false);
   const menuRef = useRef<HTMLUListElement>(null);
   const searchLayerInputRef = useRef<HTMLInputElement>(null);
   const deferredPromptRef = useRef<Event | null>(null);
@@ -151,7 +150,7 @@ export default function Header() {
             <label htmlFor="search_input">
               <input
                 id="search_input"
-                placeholder="搜索帖子、用户..."
+                placeholder="搜索帖子、用户、文章..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && doSearch()}
@@ -163,6 +162,11 @@ export default function Header() {
           </div>
         </div>
         <div className="header-right">
+          {/* 移动端发帖按钮（仅 ≤700px 显示，样式见 header-responsive.css） */}
+          <Link className="header-btn header-post-toggle" href="/post/create" aria-label="发帖">
+            <i className="fa fa-pencil"></i>
+            <span>发帖</span>
+          </Link>
           {/* 移动端搜索按钮（仅 ≤700px 显示），点击打开全屏搜索弹层 */}
           <button
             className="header-btn header-search-toggle"
@@ -203,9 +207,17 @@ export default function Header() {
                       <i className="fa fa-heart"></i>
                       <span className="setting-item-text">赞赏</span>
                     </li>
-                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); setShowBug(true); }}>
+                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/feedback/submit"); }}>
                       <i className="fa fa-bug"></i>
-                      <span className="setting-item-text">Bug提交</span>
+                      <span className="setting-item-text">提交反馈</span>
+                    </li>
+                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/feedback"); }}>
+                      <i className="fa fa-comments-o"></i>
+                      <span className="setting-item-text">反馈中心</span>
+                    </li>
+                    <li className="setting-dropdown-item" onClick={() => { setOpenMenu(""); router.push("/guide"); }}>
+                      <i className="fa fa-map-o"></i>
+                      <span className="setting-item-text">论坛指南</span>
                     </li>
                     <li className="setting-dropdown-item" id="pwa-install-li" onClick={() => { setOpenMenu(""); installPWA(); }}>
                       <i className="fa fa-download"></i>
@@ -239,6 +251,12 @@ export default function Header() {
                   </ul>
                 </div>
               )}
+            </li>
+            <li className="header-collapsible">
+              <Link className="header-post-btn" href="/post/create">
+                <span className="header-post-icon" aria-hidden="true">✏️</span>
+                <span>发帖</span>
+              </Link>
             </li>
             <li className={`header-setting ${openMenu === "user" ? "active" : ""}`}>
               {user ? (
@@ -312,7 +330,9 @@ export default function Header() {
             <Link className="mobile-menu-item" href="/WIKI" onClick={() => setShowMobileMenu(false)}><i className="fa fa-book"></i> WIKI</Link>
             <Link className="mobile-menu-item" href="/huiguan" onClick={() => setShowMobileMenu(false)}><i className="fa fa-home"></i> 会馆</Link>
             <button className="mobile-menu-item" onClick={() => { setShowDonate(true); setShowMobileMenu(false); }}><i className="fa fa-heart"></i> 赞赏</button>
-            <button className="mobile-menu-item" onClick={() => { setShowBug(true); setShowMobileMenu(false); }}><i className="fa fa-bug"></i> Bug举报</button>
+            <button className="mobile-menu-item" onClick={() => { setShowMobileMenu(false); router.push("/feedback/submit"); }}><i className="fa fa-bug"></i> 提交反馈</button>
+            <Link className="mobile-menu-item" href="/feedback" onClick={() => setShowMobileMenu(false)}><i className="fa fa-comments-o"></i> 反馈中心</Link>
+            <Link className="mobile-menu-item" href="/guide" onClick={() => setShowMobileMenu(false)}><i className="fa fa-map-o"></i> 论坛指南</Link>
             <button className="mobile-menu-item" id="pwa-install-mobile" onClick={installPWA}><i className="fa fa-download"></i> 安装论坛客户端</button>
             <button className="mobile-menu-item" onClick={showEasterEgg}><i className="fa fa-gift"></i> 彩蛋</button>
             <div className="mobile-menu-divider"></div>
@@ -345,7 +365,7 @@ export default function Header() {
               <input
                 ref={searchLayerInputRef}
                 className="search-layer-input"
-                placeholder="搜索帖子、用户..."
+                placeholder="搜索帖子、用户、文章..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && doSearch()}
@@ -367,47 +387,6 @@ export default function Header() {
         </div>
         <p className="donate-tip">你的支持是我持续创作的动力 ❤️</p>
       </Modal>
-
-      {/* Bug 举报弹窗 */}
-      {showBug && <BugReportDialog onClose={() => setShowBug(false)} />}
     </>
-  );
-}
-
-function BugReportDialog({ onClose }: { onClose: () => void }) {
-  const { toast } = useToast();
-  const [title, setTitle] = useState("");
-  const [detail, setDetail] = useState("");
-  const [steps, setSteps] = useState("");
-  const [contact, setContact] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = async () => {
-    if (!title.trim() || !detail.trim()) return;
-    setSubmitting(true);
-    try {
-      await miscApi.reportBug({ title, detail, steps, contact, page_url: window.location.href });
-      toast("Bug 提交成功，感谢反馈！", "success");
-      onClose();
-    } catch (e: any) {
-      toast(e.message, "error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal open onClose={onClose} cardStyle={{ maxWidth: 520 }}>
-      <h3 className="donate-title"><i className="fa fa-bug"></i> Bug 报告</h3>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-        <input className="report-detail-input" placeholder="标题（必填）" maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
-        <textarea className="report-detail-input textarea" placeholder="问题详情（必填）" rows={4} maxLength={5000} value={detail} onChange={(e) => setDetail(e.target.value)} />
-        <textarea className="report-detail-input textarea" placeholder="复现步骤（可选）" rows={3} maxLength={3000} value={steps} onChange={(e) => setSteps(e.target.value)} />
-        <input className="report-detail-input" placeholder="联系方式（可选）" maxLength={200} value={contact} onChange={(e) => setContact(e.target.value)} />
-        <button className="report-submit" disabled={submitting} onClick={submit}>
-          {submitting ? "提交中..." : "提交"}
-        </button>
-      </div>
-    </Modal>
   );
 }

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { FeedItem } from "@/lib/api";
-import { prefixBadgeColor, timeAgo } from "@/lib/constants";
-import { PrefixBadgeSvg } from "./PrefixBadge";
+import { timeAgo } from "@/lib/constants";
 import SpaceBadge from "./ui/SpaceBadge";
 import { UserName } from "./ui/UserAvatar";
 
@@ -9,8 +8,6 @@ import { UserName } from "./ui/UserAvatar";
 export default function ArticleCard({ item, showSpace = true }: { item: FeedItem; showSpace?: boolean }) {
   const summary = (item.summary || "").replace(/<[^>]+>/g, "").substring(0, 100);
   const authorName = item.author?.name || item.user_name;
-  // 身份小图标：按作者 user_id 前缀取色（HG/YJ），无徽章时不渲染，避免占位空隙
-  const badgeColor = prefixBadgeColor(item.user_id);
 
   return (
     <Link className="post-card article-card" href={`/article/${item.id}`}>
@@ -26,11 +23,6 @@ export default function ArticleCard({ item, showSpace = true }: { item: FeedItem
           <span className="post-card-author Username">
             <UserName name={authorName} />
           </span>
-          {badgeColor && (
-            <span className="post-card-prefix-badge" title="身份徽标">
-              <PrefixBadgeSvg color={badgeColor} />
-            </span>
-          )}
           <span className="post-card-time">{timeAgo(item.updated_at || item.created_at)}</span>
         </div>
         <h3 className="post-card-title">{item.title}</h3>

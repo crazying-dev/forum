@@ -32,6 +32,9 @@ header{
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
+    /* 搜索框绝对居中后，左右两侧需要压在搜索层之上，避免被遮挡 */
+    position: relative;
+    z-index: 2;
 }
 
 #header h1 {
@@ -56,10 +59,19 @@ header{
 }
 
 #header .header-center {
-    flex: 1;
+    /* 桌面端搜索框绝对居中：脱离两侧 flex 布局，以视口中线为基准 */
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 560px;
+    /* 视口不足时为两侧 logo / 按钮组预留空间：搜索框收缩而不是压住两侧 */
+    max-width: calc(100% - 720px);
+    min-width: 180px;
     display: flex;
     justify-content: center;
-    padding: 0 40px;
+    padding: 0;
+    z-index: 1;
 }
 
 #header #search {
@@ -70,7 +82,7 @@ header{
     border-radius: 30px;
     padding: 6px 18px;
     width: 100%;
-    max-width: 420px;
+    max-width: 560px;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px var(--color-shadow-search);
 }
@@ -135,6 +147,8 @@ header{
     gap: 8px;
     flex-shrink: 0;
     position: relative;
+    /* 压在绝对居中的搜索层之上，保证按钮可点不被遮挡 */
+    z-index: 2;
 }
 
 #header .header-right ul {
@@ -183,6 +197,31 @@ header{
 #header .header-btn:hover i {
     background: var(--color-bg-icon-hover);
     transform: scale(1.08);
+}
+
+/* 桌面「发帖」胶囊按钮：渐变主色底 + ✏️ 图标（随 .header-collapsible 在 ≤700px 隐藏） */
+#header .header-post-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    color: #fff;
+    font-size: 14px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#header .header-post-btn:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+}
+
+#header .header-post-btn .header-post-icon {
+    font-size: 13px;
+    line-height: 1;
 }
 
 #header #UserInfo {
@@ -384,10 +423,12 @@ header{
         padding: 0 20px;
     }
     #header .header-center {
-        flex: 0 0 auto;
+        /* 900 以下：进一步让位两侧按钮，搜索框按可用宽度缩小 */
+        max-width: calc(100% - 560px);
+        min-width: 160px;
     }
     #header #search {
-        max-width: 280px;
+        max-width: 100%;
         padding: 5px 14px;
     }
     #header h1 {

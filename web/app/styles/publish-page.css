@@ -34,6 +34,30 @@
     color: #fff !important;
 }
 
+/* 定时发布：开关 / 时间输入 / 提示文案 */
+.post-schedule-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.post-schedule-input {
+    display: block;
+    margin-top: 10px;
+    width: 100%;
+    max-width: 320px;
+}
+
+.post-schedule-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--color-text-tertiary);
+}
+
 .post-target-hint {
     margin-top: 10px;
     font-size: 12px;
@@ -126,6 +150,11 @@
     .post-editor-split .form-editor,
     .post-editor-split .post-editor-preview {
         display: none;
+    }
+
+    /* 定时发布（开关 + datetime-local + 提示）：移动端占满整行 */
+    .post-schedule-input {
+        max-width: 100%;
     }
     .post-editor-split.show-edit .form-editor {
         display: block;

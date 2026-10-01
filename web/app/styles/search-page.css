@@ -119,6 +119,73 @@
     color: var(--color-text-tertiary);
 }
 
+/* 搜索页文章结果行：标题 + 会馆名 + 时间 */
+.search-article-list {
+    flex-direction: column;
+    gap: 10px;
+}
+
+.search-article-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: 12px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.search-article-item:hover {
+    background: var(--color-bg-item-hover);
+    transform: translateX(4px);
+}
+
+.search-article-icon {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--color-bg-icon);
+    color: var(--color-text-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.search-article-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.search-article-title {
+    font-size: 16px;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-article-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+}
+
+.search-article-guild i {
+    margin-right: 4px;
+}
+
+.search-article-time {
+    margin-left: auto;
+}
+
 .forum-loading, .forum-empty {
     text-align: center;
     padding: 40px 0;

@@ -94,7 +94,6 @@ export function hasEmbedField(fields: string | null, name: string): boolean {
 /** 用户字段开关（契约子集） */
 export const USER_EMBED_FIELDS = [
   { key: "intro", label: "简介" },
-  { key: "vip", label: "VIP" },
   { key: "guild", label: "会馆" },
 ] as const;
 

@@ -31,6 +31,11 @@ const nextConfig: NextConfig = {
         source: "/guild-img/:path*",
         destination: `${ADMIN_TARGET}/api/:path*`,
       },
+      {
+        // 论坛指南正文图片代理：/guide-img/* → 管理端 /api/*（与 /guild-img 同模式）
+        source: "/guide-img/:path*",
+        destination: `${ADMIN_TARGET}/api/:path*`,
+      },
     ];
   },
 };

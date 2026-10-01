@@ -1,22 +1,51 @@
 "use client";
 
 // 富文本编辑器（TipTap）：发帖正文用
-// - 工具条：加粗/斜体/删除线/H2/H3/无序/有序/引用/链接/图片上传/撤销/重做 + 三种引用卡片
-// - 图片选中：宽度条（25/50/75/100% 按编辑区换算 + 自定义 40-2400px + 还原）
+// - 工具条：加粗/斜体/删除线/下划线/H1-H4/行内代码/代码块/引用段落/分割线/无序/有序/
+//   链接/图片上传/清除格式/撤销/重做 + 三种引用卡片
+// - 工具条与选项条（图片宽度条/引用样式条）整体吸附（顶栏下，≤480px 适配）
+// - 图片选中：宽度条（25/50/75/100% 按编辑区换算 + 自定义 40-2400px + 还原），
+//   宽度即时生效（Decoration 视图层内联 style，不污染序列化）
 // - 引用节点选中：版式/尺寸/字段开关（用户）/对齐；序列化严格按契约（lib/embed.ts）
 // - 图片上传：mediaApi.upload → 插入站内相对路径 /api/v1/media/{id}
 
 import { useEffect, useRef, useState } from "react";
 import Placeholder from "@tiptap/extension-placeholder";
 import Image from "@tiptap/extension-image";
+import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { Plugin } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/ui/Modal";
 import { ApiException, EmbedKind, mediaApi } from "@/lib/api";
 import { USER_EMBED_FIELDS } from "@/lib/embed";
 import EmbedNode from "./Embed";
 import QuotePickerModal from "./QuotePickerModal";
+
+/**
+ * 图片宽度视图层同步（Decoration）：遍历文档为带 width 的图片节点挂内联 style。
+ * - 仅编辑视图装饰，不写入 getHTML()/序列化，存储仍为 width 属性
+ * - 装饰随每次 transaction 由节点属性重算，更新/还原即时生效
+ */
+function imageWidthPlugin(): Plugin {
+  return new Plugin({
+    props: {
+      decorations(state) {
+        const decos: Decoration[] = [];
+        state.doc.descendants((node, pos) => {
+          if (node.type.name !== "image") return;
+          const width = node.attrs.width;
+          if (typeof width === "number" && width > 0) {
+            decos.push(Decoration.node(pos, pos + node.nodeSize, { style: `width: ${width}px;` }));
+          }
+        });
+        return DecorationSet.create(state.doc, decos);
+      },
+    },
+  });
+}
 
 /** 图片宽度属性归一：仅接受纯正整数（与 RichContent 渲染端一致） */
 const ResizableImage = Image.extend({
@@ -35,6 +64,9 @@ const ResizableImage = Image.extend({
       },
     };
   },
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() ?? []), imageWidthPlugin()];
+  },
 });
 
 /** 图片约束（与服务端一致） */
@@ -48,8 +80,13 @@ const EMPTY_TOOLBAR_STATE = {
   bold: false,
   italic: false,
   strike: false,
+  underline: false,
+  h1: false,
   h2: false,
   h3: false,
+  h4: false,
+  code: false,
+  codeBlock: false,
   bulletList: false,
   orderedList: false,
   blockquote: false,
@@ -111,6 +148,9 @@ export default function RichTextEditor({
   const [uploading, setUploading] = useState(false);
   // 自定义宽度输入缓冲（null = 直接显示编辑器实际宽度，避免用 effect 同步 state）
   const [widthDraft, setWidthDraft] = useState<string | null>(null);
+  // 吸附状态：哨兵滚过顶栏（70px）后为吸附容器补阴影
+  const [stuck, setStuck] = useState(false);
+  const stickySentinelRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // 记录编辑器最近一次的产出：外部 value 与之相同则不回灌（避免光标跳动）
   const lastValueRef = useRef(value);
@@ -125,12 +165,12 @@ export default function RichTextEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        // 与后端白名单对齐：禁用代码/代码块，标题仅 2-3 级
+        // 与后端白名单对齐：标题 1-4 级，启用行内代码/代码块；下划线用独立扩展（禁用 StarterKit 内置项避免重复）
         link: { openOnClick: false, HTMLAttributes: {} },
-        code: false,
-        codeBlock: false,
-        heading: { levels: [2, 3] },
+        heading: { levels: [1, 2, 3, 4] },
+        underline: false,
       }),
+      Underline,
       ResizableImage,
       EmbedNode,
       Placeholder.configure({ placeholder }),
@@ -152,6 +192,17 @@ export default function RichTextEditor({
     editor.commands.setContent(value || "", { emitUpdate: false });
   }, [editor, value]);
 
+  // 吸附监测：哨兵进入顶栏区域（rootMargin 上边距 = 顶栏高度）即 "stuck"
+  useEffect(() => {
+    const sentinel = stickySentinelRef.current;
+    if (!sentinel || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([entry]) => setStuck(!entry.isIntersecting), {
+      rootMargin: "-70px 0px 0px 0px",
+    });
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [editor]);
+
   const st =
     useEditorState({
       editor,
@@ -161,8 +212,13 @@ export default function RichTextEditor({
               bold: ed.isActive("bold"),
               italic: ed.isActive("italic"),
               strike: ed.isActive("strike"),
+              underline: ed.isActive("underline"),
+              h1: ed.isActive("heading", { level: 1 }),
               h2: ed.isActive("heading", { level: 2 }),
               h3: ed.isActive("heading", { level: 3 }),
+              h4: ed.isActive("heading", { level: 4 }),
+              code: ed.isActive("code"),
+              codeBlock: ed.isActive("codeBlock"),
               bulletList: ed.isActive("bulletList"),
               orderedList: ed.isActive("orderedList"),
               blockquote: ed.isActive("blockquote"),
@@ -265,7 +321,11 @@ export default function RichTextEditor({
   return (
     <div className="rich-editor">
       {editor && (
-        <div className="form-editor-toolbar rich-editor-toolbar">
+        <>
+          {/* 吸附哨兵：滚过顶栏后为吸附容器加阴影 */}
+          <div ref={stickySentinelRef} className="rich-editor-sticky-sentinel" aria-hidden="true" />
+          <div className={`rich-editor-sticky ${stuck ? "stuck" : ""}`}>
+            <div className="form-editor-toolbar rich-editor-toolbar">
           <ToolbarButton title="加粗" active={st.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
             <i className="fa fa-bold"></i>
           </ToolbarButton>
@@ -275,13 +335,35 @@ export default function RichTextEditor({
           <ToolbarButton title="删除线" active={st.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
             <i className="fa fa-strikethrough"></i>
           </ToolbarButton>
+          <ToolbarButton title="下划线" active={st.underline} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+            <i className="fa fa-underline"></i>
+          </ToolbarButton>
           <span className="editor-sep"></span>
+          <ToolbarButton title="一级标题" active={st.h1} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+            <span className="editor-tool-text">H1</span>
+          </ToolbarButton>
           <ToolbarButton title="二级标题" active={st.h2} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
             <span className="editor-tool-text">H2</span>
           </ToolbarButton>
           <ToolbarButton title="三级标题" active={st.h3} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
             <span className="editor-tool-text">H3</span>
           </ToolbarButton>
+          <ToolbarButton title="四级标题" active={st.h4} onClick={() => editor.chain().focus().toggleHeading({ level: 4 }).run()}>
+            <span className="editor-tool-text">H4</span>
+          </ToolbarButton>
+          <ToolbarButton title="行内代码" active={st.code} onClick={() => editor.chain().focus().toggleCode().run()}>
+            <i className="fa fa-code"></i>
+          </ToolbarButton>
+          <ToolbarButton title="代码块" active={st.codeBlock} onClick={() => editor.chain().focus().toggleCodeBlock().run()}>
+            <i className="fa fa-file-code-o"></i>
+          </ToolbarButton>
+          <ToolbarButton title="分割线" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+            <i className="fa fa-minus"></i>
+          </ToolbarButton>
+          <ToolbarButton title="清除格式" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}>
+            <i className="fa fa-eraser"></i>
+          </ToolbarButton>
+          <span className="editor-sep"></span>
           <ToolbarButton title="无序列表" active={st.bulletList} onClick={() => editor.chain().focus().toggleBulletList().run()}>
             <i className="fa fa-list-ul"></i>
           </ToolbarButton>
@@ -318,12 +400,11 @@ export default function RichTextEditor({
             <i className="fa fa-book"></i>
             <span className="editor-tool-text">引用</span>
           </ToolbarButton>
-        </div>
-      )}
+            </div>
 
-      {/* 图片宽度条（选中图片时） */}
-      {editor && st.isImage && (
-        <div className="rich-editor-option-bar">
+            {/* 图片宽度条（选中图片时） */}
+            {st.isImage && (
+              <div className="rich-editor-option-bar">
           <span className="rich-editor-option-label">图片宽度</span>
           {[25, 50, 75, 100].map((pct) => (
             <button
@@ -370,12 +451,12 @@ export default function RichTextEditor({
           >
             还原
           </button>
-        </div>
-      )}
+              </div>
+            )}
 
-      {/* 引用样式条（选中引用节点时） */}
-      {editor && st.isEmbed && (
-        <div className="rich-editor-option-bar">
+            {/* 引用样式条（选中引用节点时） */}
+            {st.isEmbed && (
+              <div className="rich-editor-option-bar">
           <span className="rich-editor-option-label">版式</span>
           <button
             type="button"
@@ -441,12 +522,15 @@ export default function RichTextEditor({
           >
             中
           </button>
-        </div>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       <EditorContent editor={editor} className="rich-editor-content" />
       <p className="form-editor-tips rich-editor-tips">
-        支持标题、列表、引用、链接、图片与引用卡片；点击图片可调整宽度，图片与引用会随正文一并保存。
+        支持标题（H1-H4）、列表、引用、行内代码/代码块、分割线、链接、图片与引用卡片；点击图片可调整宽度，图片与引用会随正文一并保存。
       </p>
 
       <input

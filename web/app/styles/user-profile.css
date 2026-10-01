@@ -66,7 +66,6 @@
     flex-shrink: 1;
 }
 
-.user-profile-info h2 .user-vip-icon,
 .user-profile-info h2 .email-verified-badge {
     flex-shrink: 0;
 }
@@ -119,17 +118,6 @@
 
 .user-name-clickable:hover {
     color: var(--color-primary, #3b82f6);
-}
-
-.user-vip-icon {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    background-size: 20px auto;
-    background-repeat: no-repeat;
-    background-position: center center;
-    flex-shrink: 0;
-    vertical-align: middle;
 }
 
 .user-profile-intro {
@@ -343,6 +331,35 @@
     display: flex;
     align-items: center;
     gap: 6px;
+}
+
+/* 定时发布标识（本人帖子列表） */
+.post-scheduled-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 10px;
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* 本人「今日签到 +10」按钮（复用 .user-follow-btn 的定位/主色） */
+.user-signin-btn:disabled {
+    cursor: default;
+}
+
+.user-signin-btn:disabled:hover {
+    transform: none;
+}
+
+.user-signin-btn.signed {
+    background: transparent;
+    border-color: var(--color-border);
+    color: var(--color-text-tertiary);
 }
 
 .post-item-footer-right {

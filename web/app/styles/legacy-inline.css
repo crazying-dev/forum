@@ -271,22 +271,6 @@
     border-radius: 50%;
     object-fit: cover;
 }
-.follow-user-vip {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    width: 18px;
-    height: 18px;
-    background: linear-gradient(135deg, #f59e0b, #d97706);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 10px;
-    border: 2px solid var(--color-bg-card);
-}
-
 .follow-user-info {
     flex: 1;
     min-width: 0;

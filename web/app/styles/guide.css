@@ -1,0 +1,223 @@
+/* ===== 论坛指南（/guide：左侧多层目录树 + 右侧 RichContent 正文）===== */
+
+.guide-page {
+    max-width: 1040px;
+}
+
+.guide-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.guide-sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 90px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+}
+
+.guide-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.guide-tree-item {
+    list-style: none;
+}
+
+/* 目录项（folder / doc） */
+.guide-tree-folder,
+.guide-tree-doc {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.guide-tree-folder:hover,
+.guide-tree-doc:hover {
+    background: var(--color-bg-item-hover);
+}
+
+.guide-tree-doc.active {
+    background: var(--color-bg-item-active);
+    color: var(--color-primary);
+    font-weight: 500;
+}
+
+.guide-tree-caret {
+    width: 12px;
+    flex-shrink: 0;
+    color: var(--color-text-tertiary);
+}
+
+.guide-tree-icon {
+    width: 16px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.guide-tree-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 右侧正文卡片 */
+.guide-content {
+    flex: 1;
+    min-width: 0;
+    min-height: 320px;
+    padding: 22px 24px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 14px;
+    background: var(--color-bg-card);
+}
+
+.guide-doc-title {
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: var(--color-text-primary);
+    margin: 0 0 6px;
+    word-break: break-word;
+}
+
+.guide-doc-meta {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin-bottom: 16px;
+}
+
+.guide-doc-body {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--color-text-primary);
+    word-break: break-word;
+}
+
+.guide-doc-body p {
+    margin: 0 0 10px;
+}
+
+.guide-doc-body h1,
+.guide-doc-body h2,
+.guide-doc-body h3,
+.guide-doc-body h4,
+.guide-doc-body h5,
+.guide-doc-body h6 {
+    font-weight: 600;
+    margin: 14px 0 8px;
+    color: var(--color-text-primary);
+}
+
+.guide-doc-body ul,
+.guide-doc-body ol {
+    margin: 6px 0 10px;
+    padding-left: 22px;
+}
+
+.guide-doc-body li {
+    margin: 3px 0;
+}
+
+.guide-doc-body img {
+    max-width: 100%;
+    border-radius: 8px;
+}
+
+.guide-doc-body a {
+    color: var(--color-primary);
+    word-break: break-all;
+}
+
+.guide-doc-body blockquote {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+    border-radius: 0 10px 10px 0;
+    margin: 8px 0;
+    padding: 8px 14px;
+}
+
+.guide-doc-body table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.guide-doc-body th,
+.guide-doc-body td {
+    border: 1px solid var(--color-border-card);
+    padding: 6px 10px;
+}
+
+.guide-doc-body pre {
+    overflow-x: auto;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--color-bg-item);
+}
+
+.guide-doc-body code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+}
+
+/* 窄屏目录折叠开关（桌面隐藏） */
+.guide-tree-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 12px;
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+@media (max-width: 760px) {
+    /* 窄屏：目录在上（默认折叠，可展开），正文在下 */
+    .guide-layout {
+        flex-direction: column;
+    }
+    .guide-tree-toggle {
+        display: flex;
+    }
+    .guide-sidebar {
+        display: none;
+        position: static;
+        width: 100%;
+        max-height: none;
+    }
+    .guide-sidebar.open {
+        display: block;
+    }
+    .guide-content {
+        padding: 18px 16px;
+    }
+}

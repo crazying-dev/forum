@@ -7,7 +7,7 @@
     }
 }
 
-/* 头像右下角角标：包裹容器 + 角标（VIP 优先靠角，前缀徽标向左并排） */
+/* 头像右下角角标：包裹容器 + 角标（前缀徽标 HG/YJ） */
 .avatar-corner-wrap {
     position: relative;
     display: block;
@@ -52,12 +52,6 @@
     height: 100%;
     display: block;
     object-fit: contain;
-}
-
-/* VIP 图标为深色六边形 + 金色 V，固定用浅底保证日/夜模式都可辨识 */
-.avatar-corner-badge-vip {
-    background: #ffffff;
-    box-shadow: 0 0 0 1px rgba(23, 50, 58, 0.18);
 }
 
 /* 角标需要溢出容器，否则会被圆形头像的 overflow:hidden 裁掉（图片本身已是圆形） */
@@ -168,24 +162,6 @@
     white-space: nowrap;
 }
 
-/* 文章卡作者名后的身份小图标：PrefixBadge SVG（16px），夜间加浅色描边保证可辨 */
-.post-card-prefix-badge {
-    display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    border-radius: 50%;
-}
-
-.post-card-prefix-badge svg {
-    width: 16px;
-    height: 16px;
-    display: block;
-}
-
-.night-mode .post-card-prefix-badge {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
-}
-
 /* 个人中心收藏列表：头像改为容器 + UserAvatar */
 .post-item-avatar img,
 .post-item-avatar .avatar-fallback {
@@ -216,5 +192,31 @@
 
 .guild-list-cell {
     display: block;
+}
+
+/* ===== 悬浮气泡提示（HoverTip 组件，替代原生 title）===== */
+.hover-tip-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.hover-tip-bubble {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+    max-width: 260px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-primary);
+    background: var(--color-bg-dropdown);
+    box-shadow: 0 6px 18px var(--color-shadow-dropdown);
+    color: var(--color-text-primary);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: nowrap;
+    pointer-events: none;
 }
 

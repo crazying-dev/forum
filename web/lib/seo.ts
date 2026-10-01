@@ -38,15 +38,30 @@ export interface ApiFetchResult<T> {
   data: T | null;
 }
 
+export interface FetchApiOptions {
+  /** 透传请求头（如转发浏览器 Cookie：服务端才能识别作者本人视角） */
+  headers?: Record<string, string>;
+  /** true = no-store（依赖 viewer 的请求，不得按 URL 共享缓存） */
+  noStore?: boolean;
+}
+
 /**
  * 服务端拉取论坛 API（永不抛错，失败返回 ok:false）。
  * 用于 generateMetadata / layout 内 JSON-LD / sitemap；revalidate 默认 300s。
+ * options.noStore=true 时强制 no-store；headers 带 Cookie 时同样强制 no-store
+ * （个性化响应不得按 URL 共享缓存，即使调用方遗漏 noStore）。
  */
-export async function fetchApi<T = unknown>(path: string, revalidate = 300): Promise<ApiFetchResult<T>> {
+export async function fetchApi<T = unknown>(
+  path: string,
+  revalidate = 300,
+  options: FetchApiOptions = {}
+): Promise<ApiFetchResult<T>> {
   try {
+    // 仅带 Cookie 的个性化请求降级 no-store；无 Cookie（匿名/爬虫）保持 revalidate 共享缓存
+    const personalized = options.noStore === true || !!options.headers?.Cookie;
     const res = await fetch(apiBase() + path, {
-      next: { revalidate },
-      headers: { Accept: "application/json" },
+      ...(personalized ? { cache: "no-store" as const } : { next: { revalidate } }),
+      headers: { Accept: "application/json", ...(options.headers || {}) },
       // 超时保护：上游挂起时不拖住页面渲染 / sitemap 生成（Node fetch 默认超时为分钟级）
       signal: AbortSignal.timeout(4000),
     });

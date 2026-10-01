@@ -26,6 +26,16 @@ function hasRichContent(html: string): boolean {
   return !!text || /<img\b/i.test(html) || /data-embed=/i.test(html);
 }
 
+/** datetime-local 控件值（本地时区 YYYY-MM-DDTHH:mm） */
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** 定时发布时间约束：最早当前时间 +5 分钟，最晚 +1 年 */
+const SCHEDULE_MIN_AHEAD_MS = 5 * 60 * 1000;
+const SCHEDULE_MAX_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
+
 /**
  * 发帖页（useSearchParams 需在 Suspense 内，遵循 Next.js App Router 规范）：
  * 发布到（公共空间 / 我的会馆）+ 分类联动 + 富文本编辑器（TipTap，提交 HTML）；支持 ?guild=slug 预选会馆。
@@ -58,6 +68,11 @@ function PostCreateForm() {
   const [target, setTarget] = useState<"public" | "guild">("public");
   const [guild, setGuild] = useState<GuildMembership | null>(null);
   const [noticeOpen, setNoticeOpen] = useState(false);
+  // 定时发布（可选）：开关 + datetime-local（本地时间；提交转 UTC ISO）
+  const [scheduled, setScheduled] = useState(false);
+  const [publishAt, setPublishAt] = useState("");
+  // datetime-local 的 min/max 在开关事件里计算（避免渲染期调用 Date.now）
+  const [publishBounds, setPublishBounds] = useState<{ min: string; max: string } | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -81,6 +96,18 @@ function PostCreateForm() {
     })();
   }, [guildSlug]);
 
+  /** 切换定时发布：开启时计算时间范围（最早 +5 分钟 / 最晚 +1 年） */
+  const toggleScheduled = (on: boolean) => {
+    setScheduled(on);
+    if (on) {
+      const now = Date.now();
+      setPublishBounds({
+        min: toLocalInput(new Date(now + SCHEDULE_MIN_AHEAD_MS)),
+        max: toLocalInput(new Date(now + SCHEDULE_MAX_AHEAD_MS)),
+      });
+    }
+  };
+
   const category = target === "guild" ? guildCat : pubCat;
   const chips = target === "guild" ? guildCats : POST_CATEGORIES.map((c) => c.key);
   const theme = themeColor(guild?.theme_color);
@@ -97,10 +124,26 @@ function PostCreateForm() {
       toast("会馆标识缺失，请刷新重试", "error");
       return;
     }
+    // 定时发布：校验范围（客户端本地时间 → UTC ISO，与服务端 RFC3339 口径一致）
+    let publishedAt: string | undefined;
+    if (scheduled) {
+      if (!publishAt) return setErr("请选择定时发布时间");
+      const t = new Date(publishAt).getTime();
+      if (!Number.isFinite(t)) return setErr("定时发布时间无效");
+      if (t < Date.now() + SCHEDULE_MIN_AHEAD_MS) return setErr("定时发布时间需晚于当前时间 5 分钟");
+      if (t > Date.now() + SCHEDULE_MAX_AHEAD_MS) return setErr("定时发布时间不能超过 1 年");
+      publishedAt = new Date(t).toISOString();
+    }
     setBusy(true);
     setErr("");
     try {
-      const r = await postApi.create(title.trim(), content, category, target === "guild" && guild ? guild.uuid : undefined);
+      const r = await postApi.create(
+        title.trim(),
+        content,
+        category,
+        target === "guild" && guild ? guild.uuid : undefined,
+        publishedAt
+      );
       router.push(`/post/${r.id}`);
     } catch (e) {
       setErr(e instanceof ApiException ? e.message : "发布失败");
@@ -193,6 +236,29 @@ function PostCreateForm() {
             <RichTextEditor value={content} onChange={setContent} placeholder="在此输入正文…" />
           </div>
 
+          {/* 定时发布（可选） */}
+          <div className="form-group">
+            <label className="post-schedule-toggle">
+              <input type="checkbox" checked={scheduled} onChange={(e) => toggleScheduled(e.target.checked)} />
+              <i className="fa fa-clock-o"></i> 定时发布
+            </label>
+            {scheduled && (
+              <>
+                <input
+                  type="datetime-local"
+                  className="form-input post-schedule-input"
+                  value={publishAt}
+                  min={publishBounds?.min}
+                  max={publishBounds?.max}
+                  onChange={(e) => setPublishAt(e.target.value)}
+                />
+                <p className="post-schedule-hint">
+                  <i className="fa fa-info-circle"></i> 到点后自动发布：最早为当前时间 5 分钟后，最晚 1 年内；未到时间前仅自己可见。
+                </p>
+              </>
+            )}
+          </div>
+
           {err && <p style={{ color: "#ef4444", margin: "12px 0 0" }}>{err}</p>}
 
           <div className="form-actions">
@@ -204,7 +270,7 @@ function PostCreateForm() {
               onClick={submit}
               style={target === "guild" ? { background: theme, color: themeFg } : undefined}
             >
-              <i className="fa fa-paper-plane"></i> {busy ? "发布中..." : "发布"}
+              <i className="fa fa-paper-plane"></i> {busy ? "发布中..." : scheduled ? "定时发布" : "发布"}
             </button>
           </div>
 

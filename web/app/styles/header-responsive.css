@@ -3,6 +3,11 @@
     display: none;
 }
 
+/* 移动端发帖按钮：仅 ≤700px 显示（桌面使用 .header-post-btn 胶囊按钮） */
+#header .header-post-toggle {
+    display: none;
+}
+
 #header .header-left-link {
     display: flex;
     align-items: center;
@@ -48,6 +53,9 @@
         display: flex;
     }
     #header .header-search-toggle {
+        display: flex;
+    }
+    #header .header-post-toggle {
         display: flex;
     }
     /* 隐藏顶部居中搜索框（改用右侧按钮 + 全屏弹层） */
