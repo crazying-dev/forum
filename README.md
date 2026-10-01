@@ -200,6 +200,13 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     仍占用 `forum.exe` 的客户端）+ `RestartApplications=no`，并去掉 `[Run]` 的
     `skipifsilent`——`/SILENT` 静默安装装完后由安装器自己拉起客户端
     （替代被移除的 `.cmd` 里那句 `start "" "%APP%"`）。
+15. **V1.3.8：楼中楼评论渲染 + 自助注销账号 + 隐私政策 v2.0**：修复评论列表
+    `CommentList._rebuild()` 从不调用 `set_children()`、导致楼中楼子回复完全不显示的问题
+    （并对孙级回复递归渲染）；`PostDetailPage.refresh_auth()` 现在会在登录态变化后
+    重算帖子 / 评论的「本人可删除」按钮可见性；设置页「关于」卡片与「我的」页新增
+    「注销账号」入口（密码或邮箱验证码二选一 + 输入「注销账号」确认 + 「此操作不可恢复」
+    二次确认），对接服务端 `POST /api/user/delete`；隐私政策页同步为三端唯一真源 v2.0
+    （仅取 [通用] + [WIN] 段）。版本号升至 1.3.8。
 
 ---
 

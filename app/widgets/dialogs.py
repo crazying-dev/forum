@@ -5,14 +5,16 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QGuiApplication
-from PyQt6.QtWidgets import (QComboBox, QDialog, QLabel, QPlainTextEdit, QLineEdit,
+from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDialog, QLabel, QLineEdit,
+                             QMessageBox, QPlainTextEdit, QRadioButton,
                              QScrollArea, QVBoxLayout, QWidget)
 
 from .. import api as api_mod
 from .. import constants, logger, theme, util, yearmode
-from .common import Card, Muted, TitleLabel, button, clear_layout, hbox, vbox
+from .common import (Card, Divider, Muted, TitleLabel, button, clear_layout, hbox,
+                     vbox)
 from .images import Avatar
 from .toast import toast
 
@@ -400,3 +402,191 @@ class UserListDialog(BaseDialog):
     def _open(self, user_id: str) -> None:
         if user_id:
             self.open_user.emit(user_id)
+
+
+# ────────────────────────── 注销账号 ──────────────────────────
+
+
+_DELETE_CONFIRM = constants.DELETE_ACCOUNT_CONFIRM_TEXT
+_CODE_MAX = 6
+
+
+class _CodeCooldown:
+    """「获取验证码」按钮的 60 秒倒计时（随按钮一起销毁）。"""
+
+    def __init__(self, button_widget, seconds: int = 60) -> None:
+        self._button = button_widget
+        self._seconds = int(seconds)
+        self._left = 0
+        self._timer = QTimer(button_widget)
+        self._timer.setInterval(1000)
+        self._timer.timeout.connect(self._tick)
+
+    def ready(self) -> bool:
+        return self._left <= 0
+
+    def start(self) -> None:
+        self._left = self._seconds
+        self._button.setEnabled(False)
+        self._button.setText("%ds" % self._left)
+        self._timer.start()
+
+    def _tick(self) -> None:
+        self._left -= 1
+        if self._left <= 0:
+            self._left = 0
+            self._timer.stop()
+            self._button.setText("获取验证码")
+            self._button.setEnabled(True)
+        else:
+            self._button.setText("%ds" % self._left)
+
+
+class DeleteAccountDialog(BaseDialog):
+    """自助注销账号（密码或邮箱验证码二选一 + 输入「注销账号」确认）。\n    文本对照三端真源「八、你的权利 → 4. 注销账号」；成功后就地清空登录态、
+    回到登录页。
+    """
+
+    def __init__(self, page, parent: QWidget | None = None) -> None:
+        super().__init__(parent, title="注销账号", width=520)
+        self._page = page
+        self.deleted = False
+
+        self.body.addWidget(Muted(
+            "注销后你的账号将不可用。请选择注销方式并完成身份验证。"))
+
+        self.mode_group = QButtonGroup(self)
+        self.mode_purge = QRadioButton("彻底删除")
+        self.mode_anon = QRadioButton("匿名化保留")
+        self.mode_purge.setChecked(True)
+        self.mode_group.addButton(self.mode_purge)
+        self.mode_group.addButton(self.mode_anon)
+        self.body.addWidget(self.mode_purge)
+        self.body.addWidget(Muted(
+            "删除账号及你发布的全部帖子、评论、点赞、收藏、关注、举报记录，"
+            "该操作不可恢复。"))
+        self.body.addWidget(self.mode_anon)
+        self.body.addWidget(Muted(
+            "删除邮箱、密码等身份信息，用户名统一显示为「已注销用户」，"
+            "历史帖子与评论正文保留但无法再关联到你。"))
+
+        self.body.addWidget(Divider())
+
+        self.verify_group = QButtonGroup(self)
+        self.verify_password = QRadioButton("使用账号密码验证")
+        self.verify_code = QRadioButton("使用邮箱验证码验证")
+        self.verify_password.setChecked(True)
+        self.verify_group.addButton(self.verify_password)
+        self.verify_group.addButton(self.verify_code)
+
+        self.body.addWidget(self.verify_password)
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password_input.setMaxLength(constants.PASSWORD_MAX)
+        self.password_input.setPlaceholderText("账号密码")
+        self.field("密码", self.password_input)
+
+        self.body.addWidget(self.verify_code)
+        code_wrap = QWidget()
+        code_row = hbox(code_wrap, spacing=8)
+        self.code_input = QLineEdit()
+        self.code_input.setMaxLength(_CODE_MAX)
+        self.code_input.setPlaceholderText("6 位数字验证码")
+        code_row.addWidget(self.code_input, 1)
+        self.send_btn = button("获取验证码", None, self._send_code)
+        code_row.addWidget(self.send_btn)
+        self.field("邮箱验证码", code_wrap)
+        self._cool = _CodeCooldown(self.send_btn)
+
+        self.verify_password.toggled.connect(self._apply_verify)
+        self.verify_code.toggled.connect(self._apply_verify)
+
+        self.confirm_input = QLineEdit()
+        self.confirm_input.setMaxLength(len(_DELETE_CONFIRM) + 2)
+        self.confirm_input.setPlaceholderText(
+            "请输入「%s」以确认" % _DELETE_CONFIRM)
+        self.field("确认文字", self.confirm_input)
+
+        self._apply_verify()
+
+        self.add_action("取消", None, self.reject)
+        self.submit_btn = self.add_action("确认注销", "danger", self._submit)
+
+    def _apply_verify(self) -> None:
+        use_password = self.verify_password.isChecked()
+        self.password_input.setEnabled(use_password)
+        self.code_input.setEnabled(not use_password)
+        self.send_btn.setEnabled(not use_password)
+
+    def _send_code(self) -> None:
+        if not self._cool.ready():
+            return
+        self.clear_error()
+        self.send_btn.setEnabled(False)
+        self._page.run(lambda: self._page.api.send_delete_account_code(),
+                       self._on_code_sent, self._on_code_failed, label="验证码")
+
+    def _on_code_sent(self, result) -> None:
+        if not result.ok:
+            self.send_btn.setEnabled(True)
+            self.show_error(result.message)
+            return
+        toast(result.message or "验证码已发送至绑定邮箱")
+        self._cool.start()
+
+    def _on_code_failed(self, message: str) -> None:
+        self.send_btn.setEnabled(True)
+        self.show_error(message)
+
+    def _mode(self) -> str:
+        return "purge" if self.mode_purge.isChecked() else "anonymize"
+
+    def _submit(self) -> None:
+        self.clear_error()
+        password = ""
+        code = ""
+        if self.verify_password.isChecked():
+            password = self.password_input.text()
+        else:
+            code = self.code_input.text().strip()
+        if not password and not code:
+            self.show_error("请输入账号密码或邮箱验证码")
+            return
+        if self.confirm_input.text().strip() != _DELETE_CONFIRM:
+            self.show_error("请输入「%s」以确认操作" % _DELETE_CONFIRM)
+            return
+        answer = QMessageBox.warning(
+            self, "再次确认",
+            "确定要注销账号吗？此操作不可恢复。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        mode = self._mode()
+        self.submit_btn.setEnabled(False)
+        self._page.run(
+            lambda: self._page.api.delete_account(
+                mode, password=password, code=code),
+            self._on_submitted, self._on_submit_failed, label="注销账号")
+
+    def _on_submitted(self, result) -> None:
+        self.submit_btn.setEnabled(True)
+        if not result.ok:
+            self.show_error(result.message)
+            return
+        self.deleted = True
+        toast(result.message or "账号已注销")
+        page = self._page
+        if page is not None:
+            # api.delete_account 成功后已 clear_login()，这里刷新外壳并回登录页
+            if getattr(page, "shell", None) is not None:
+                try:
+                    page.shell.refresh_user()
+                except Exception:
+                    pass
+            page.go("auth", mode="login")
+        self.accept()
+
+    def _on_submit_failed(self, message: str) -> None:
+        self.submit_btn.setEnabled(True)
+        self.show_error(message)

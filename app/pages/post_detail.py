@@ -34,6 +34,7 @@ class PostDetailPage(Page):
         super().__init__(shell, parent)
         self._post_id = ""
         self._post: dict = {}
+        self._comments: list = []
         self._liked = False
         self._favorited = False
         self._likes = 0
@@ -166,6 +167,7 @@ class PostDetailPage(Page):
             self._views = 0
             self.title.setText("")
             self.content.set_markdown("")
+            self._comments = []
             self.comment_list.set_comments([])
             self.comment_count.setText("")
             self._cancel_reply()
@@ -173,12 +175,20 @@ class PostDetailPage(Page):
         self.reload()
 
     def refresh_auth(self) -> None:
-        """登录态变化后刷新输入框（Shell.refresh_user 会回调）。"""
+        """登录态变化后刷新输入框（Shell.refresh_user 会回调）。
+
+        登录 / 退出后「本人可删除」的可见性会变（帖子与评论的删除按钮），
+        因此这里必须就地重算一次，而不是只改输入框。
+        """
         logged = bool(self.me)
         self.input.setEnabled(logged)
         self.input.setPlaceholderText("写下你的评论…（最多 500 字）" if logged
                                       else "请先登录后发表评论")
         self._on_input_changed()
+        if self._post:
+            self._render_post()
+        if self._comments:
+            self._render_comments(self._comments)
 
     def reload(self) -> None:
         if not self._post_id:
@@ -273,6 +283,7 @@ class PostDetailPage(Page):
 
     def _render_comments(self, comments: list) -> None:
         rows = [c for c in (comments or []) if isinstance(c, dict)]
+        self._comments = rows
         me_id = str((self.me or {}).get("id") or "")
         self.comment_list.set_comments(rows, me_id=me_id, post_link=self._post_id,
                                        total=len(rows))

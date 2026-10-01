@@ -17,7 +17,7 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.7"
+APP_VERSION = "1.3.8"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
 
 # ────────────────────────── 启动「支持作者」弹窗 ──────────────────────────
@@ -127,6 +127,8 @@ PROFILE_NAME_MAX = 20
 EMAIL_MAX = 255
 PASSWORD_MIN = 8
 PASSWORD_MAX = 64
+# 「注销账号」二次确认文案（必须与服务端 config.DELETE_ACCOUNT_CONFIRM_TEXT 一致）
+DELETE_ACCOUNT_CONFIRM_TEXT = "注销账号"
 
 # ────────────────────────── 年制 ──────────────────────────
 

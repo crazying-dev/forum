@@ -441,6 +441,31 @@ class ForumApi:
                 self.set_user(user)
         return result
 
+    def send_delete_account_code(self) -> Result:
+        """发送「注销账号」邮箱验证码（需登录，发往当前绑定邮箱）。"""
+        return self.post("/api/email/send-delete-account-code", {})
+
+    def delete_account(self, mode: str, password: str | None = None,
+                       code: str | None = None) -> Result:
+        """自助注销账号。
+
+        ``mode`` ∈ ``{"purge", "anonymize"}``（彻底删除 / 匿名化保留）；
+        ``password`` 与 ``code`` 二选一（账号密码或邮箱验证码）。
+        成功后服务端会清除登录 Cookie，这里同步清空本地登录态。
+        """
+        payload: dict[str, Any] = {
+            "mode": mode,
+            "confirm": constants.DELETE_ACCOUNT_CONFIRM_TEXT,
+        }
+        if password:
+            payload["password"] = password
+        if code:
+            payload["code"] = code
+        result = self.post("/api/user/delete", payload)
+        if result.ok:
+            self.clear_login()
+        return result
+
     # ─────────────── 用户 ───────────────
     def me(self) -> Result:
         result = self.get("/api/user/info")

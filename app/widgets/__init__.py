@@ -14,8 +14,8 @@ from .common import (Card, CardTitle, Chip, Divider, ElidedLabel, EmptyHint, Flo
                      button, chip, clear_layout, divider, ghost_button, hbox,
                      set_active, set_variant, vbox)
 from .dialogs import (REPORT_REASONS, BaseDialog, BugReportDialog,
-                      ExternalLinkDialog, ReportDialog, UserListDialog, confirm,
-                      info_box)
+                      DeleteAccountDialog, ExternalLinkDialog, ReportDialog,
+                      UserListDialog, confirm, info_box)
 from .images import AsyncImage, Avatar, avatar_cache, image_cache
 from .markdown import MarkdownView, markdown_to_html
 from .post_card import PostCard, with_author
@@ -30,8 +30,8 @@ __all__ = [
     "LoadingHint", "Muted", "ScrollPage", "TitleLabel", "UserLink",
     "button", "chip", "clear_layout", "divider", "ghost_button", "hbox",
     "set_active", "set_variant", "vbox",
-    "REPORT_REASONS", "BaseDialog", "BugReportDialog", "ExternalLinkDialog",
-    "ReportDialog", "UserListDialog", "confirm", "info_box",
+    "REPORT_REASONS", "BaseDialog", "BugReportDialog", "DeleteAccountDialog",
+    "ExternalLinkDialog", "ReportDialog", "UserListDialog", "confirm", "info_box",
     "AsyncImage", "Avatar", "avatar_cache", "image_cache",
     "MarkdownView", "markdown_to_html",
     "PostCard", "with_author",

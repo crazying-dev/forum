@@ -138,6 +138,8 @@ class CommentItem(QFrame):
         for child in children:
             item = CommentItem(child, me_id=self._me_id,
                                post_link=self._post_link, depth=self._depth + 1)
+            # 递归构建孙级回复：否则楼中楼只显示到第二层
+            item.set_children((child or {}).get("children") or [])
             self._wire_child(item)
             self._children_box.addWidget(item)
             self._children.append(item)
@@ -269,6 +271,8 @@ class CommentList(QWidget):
 
         for node in shown:
             item = CommentItem(node, me_id=self._me_id, post_link=self._post_link)
+            # 关键：把组装好的子回复塞回条目，否则楼中楼永远不渲染
+            item.set_children(node.get("children") or [])
             self._wire(item)
             self._box.addWidget(item)
             self._items.append(item)

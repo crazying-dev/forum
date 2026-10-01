@@ -22,9 +22,9 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDateEdit, QFileDialog,
                              QWidget)
 
 from .. import constants, yearmode
-from ..widgets import (BaseDialog, Card, Chip, EmptyHint, Muted, PostCard,
-                       ScrollPage, UserLink, UserListDialog, button, hbox,
-                       toast, vbox, with_author)
+from ..widgets import (BaseDialog, Card, Chip, DeleteAccountDialog, EmptyHint,
+                       Muted, PostCard, ScrollPage, UserLink, UserListDialog,
+                       button, hbox, toast, vbox, with_author)
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -261,6 +261,8 @@ class ProfilePage(Page):
         row.addWidget(self.edit_btn)
         row.addWidget(button("修改密码", None, self._open_password))
         row.addWidget(button("更换邮箱", None, self._open_email))
+        self.delete_btn = button("注销账号", "danger", self._open_delete_account)
+        row.addWidget(self.delete_btn)
         row.addStretch(1)
         return row
 
@@ -539,6 +541,12 @@ class ProfilePage(Page):
         dialog.exec()
         if dialog.changed:
             self.reload()
+
+    def _open_delete_account(self) -> None:
+        """自助注销账号（仅登录态可见；对照隐私政策「你的权利 → 注销账号」）。"""
+        if not self.need_login("请先登录"):
+            return
+        DeleteAccountDialog(self, self.window()).exec()
 
     # ────────────────────── 页签 ──────────────────────
     def _on_tab_changed(self, index: int) -> None:

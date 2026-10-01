@@ -19,8 +19,8 @@ from PyQt6.QtWidgets import (QCheckBox, QLabel, QLineEdit, QPlainTextEdit, QSlid
 
 from .. import config as config_mod
 from .. import constants, logger, paths, util, yearmode
-from ..widgets import (Card, CardTitle, Divider, Muted, ScrollPage, button, hbox,
-                       set_active, vbox)
+from ..widgets import (Card, CardTitle, DeleteAccountDialog, Divider, Muted,
+                       ScrollPage, button, hbox, set_active, vbox)
 from .base import Page
 
 _log = logger.get_logger("settings_page")
@@ -66,6 +66,13 @@ class SettingsPage(Page):
     def on_show(self, **kwargs) -> None:
         super().on_show(**kwargs)
         self._sync_states()
+        self.refresh_auth()
+
+    def refresh_auth(self) -> None:
+        """登录态变化后刷新「注销账号」入口的可见性（Shell.refresh_user 会回调）。"""
+        btn = getattr(self, "_delete_account_btn", None)
+        if btn is not None:
+            btn.setVisible(bool(self.me))
 
     # ── 小工具 ──
     def _card(self, title: str) -> Card:
@@ -815,6 +822,24 @@ class SettingsPage(Page):
                              lambda _=False: self._support()))
         row.addStretch(1)
         card.body.addLayout(row)
+
+        # 自助注销账号（仅登录时可见；对照隐私政策「你的权利 → 注销账号」）
+        card.body.addWidget(Divider())
+        card.body.addWidget(self._muted(
+            "注销账号会删除或匿名化你的账号资料，操作不可恢复，请谨慎操作。"))
+        row = hbox(spacing=8)
+        self._delete_account_btn = button("注销账号", "danger",
+                                          lambda _=False: self._open_delete_account())
+        self._delete_account_btn.setVisible(bool(self.me))
+        row.addWidget(self._delete_account_btn)
+        row.addStretch(1)
+        card.body.addLayout(row)
+
+    def _open_delete_account(self) -> None:
+        """自助注销账号（需登录）。"""
+        if not self.need_login("请先登录"):
+            return
+        DeleteAccountDialog(self, self.window()).exec()
 
     def _support(self) -> None:
         """常驻入口：打开「支持作者」弹窗（赞赏码）。"""
