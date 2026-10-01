@@ -231,6 +231,8 @@ ALL_TABLE_SQL = [
     CREATE_COMMENT_REPORTS_TABLE_SQL,
     # 兼容既有库：新增 users.title 头衔列（幂等）
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS title VARCHAR(64) DEFAULT '';",
+    # 兼容既有库：新增 users.deleted_at 注销时间列（幂等；匿名化注销时写入，NULL = 正常账号）
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP DEFAULT NULL;",
     *CREATE_INDEX_SQLS
 ]
 
@@ -269,7 +271,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "34"
+STATIC_VERSION = "35"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -347,6 +349,16 @@ SITE_ANNOUNCEMENT_TEXT = os.getenv(
 )
 SITE_ANNOUNCEMENT_LINK = os.getenv("SITE_ANNOUNCEMENT_LINK", "")
 SITE_ANNOUNCEMENT_LINK_TEXT = os.getenv("SITE_ANNOUNCEMENT_LINK_TEXT", "查看详情")
+
+# ── 自助注销账号（隐私政策「你的权利 → 注销账号」）──
+# 两种模式：purge = 彻底删除账号与全部内容；anonymize = 匿名化保留内容。
+# 匿名化后用户名改为 DELETED_USER_NAME（重名时追加 _<6位随机>），
+# 邮箱改为占位地址 deleted+<uid>@DELETED_USER_EMAIL_DOMAIN（不可投递、天然唯一），
+# 密码改为随机串（任何人都无法再登录），并写入 deleted_at 时间戳。
+DELETED_USER_NAME = "已注销用户"
+DELETED_USER_EMAIL_DOMAIN = "deleted.invalid"
+# 注销确认口令：调用方必须原样提交该字符串，防止误触
+DELETE_ACCOUNT_CONFIRM_TEXT = "注销账号"
 
 # ── 头像上传限制 ──
 AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5MB

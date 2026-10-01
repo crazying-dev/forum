@@ -37,6 +37,7 @@ def _row_to_user(row: Optional[dict]) -> Optional[dict]:
         "title": row.get("title") or "",
         "is_banned": row.get("is_banned", 0),
         "email_verified": row.get("email_verified", 0),
+        "deleted_at": str(row["deleted_at"]) if row.get("deleted_at") else None,
         "created_at": str(row["created_at"]) if row.get("created_at") else None,
         "last_login": str(row["last_login"]) if row.get("last_login") else None,
     }
@@ -152,6 +153,9 @@ def LoginINFOTrueorFlase(username_or_email: str, raw_password: str, client_ip: O
         return False
     if user.get("is_banned"):
         return False
+    # 已注销账号（匿名化保留）不可再登录
+    if user.get("deleted_at"):
+        return False
     if not verify_password(raw_password, user.get("password") or ""):
         return False
     # 更新最后登录时间
@@ -247,6 +251,115 @@ def change_email(user_id: str, new_email: str) -> tuple[bool, str]:
         return False, "该邮箱已被其他账号绑定"
     except Exception as e:
         return False, f"数据库错误: {e}"
+
+
+def purge_user(user_id: str) -> dict:
+    """彻底删除账号及其全部内容（不可恢复）。
+
+    对应隐私政策「注销账号 → 彻底删除」：账号、帖子、评论、点赞、收藏、
+    关注关系、举报记录、Bug 反馈、验证 token / 验证码全部清除。
+
+    Returns:
+        {"success": True, "mode": "purge"} 或 {"success": False, "message": ...}
+    """
+    if not user_id:
+        return {"success": False, "message": "缺少用户ID"}
+    user = get_user_by_id(user_id)
+    if not user:
+        return {"success": False, "message": "用户不存在"}
+    email = (user.get("email") or "").strip()
+    try:
+        # 顺序：先清子表（含间接子表），再清评论/帖子，最后清用户
+        execute_query("DELETE FROM comment_reports WHERE reporter_id = %s", (user_id,))
+        execute_query(
+            "DELETE FROM comment_reports WHERE comment_id IN "
+            "(SELECT id FROM comments WHERE user_id = %s "
+            " OR post_id IN (SELECT id FROM posts WHERE user_id = %s))",
+            (user_id, user_id),
+        )
+        execute_query(
+            "DELETE FROM comment_likes WHERE user_id = %s OR comment_id IN "
+            "(SELECT id FROM comments WHERE user_id = %s "
+            " OR post_id IN (SELECT id FROM posts WHERE user_id = %s))",
+            (user_id, user_id, user_id),
+        )
+        execute_query("DELETE FROM post_reports WHERE reporter_id = %s", (user_id,))
+        execute_query(
+            "DELETE FROM post_reports WHERE post_id IN "
+            "(SELECT id FROM posts WHERE user_id = %s)",
+            (user_id,),
+        )
+        execute_query(
+            "DELETE FROM post_likes WHERE user_id = %s OR post_id IN "
+            "(SELECT id FROM posts WHERE user_id = %s)",
+            (user_id, user_id),
+        )
+        execute_query(
+            "DELETE FROM post_favorites WHERE user_id = %s OR post_id IN "
+            "(SELECT id FROM posts WHERE user_id = %s)",
+            (user_id, user_id),
+        )
+        execute_query(
+            "DELETE FROM user_follows WHERE follower_id = %s OR following_id = %s",
+            (user_id, user_id),
+        )
+        execute_query("DELETE FROM verify_tokens WHERE user_id = %s", (user_id,))
+        # 本人发表的评论（其对他人评论的回复随 parent_id 级联移除）
+        execute_query("DELETE FROM comments WHERE user_id = %s", (user_id,))
+        # 本人帖子下的全部评论
+        execute_query(
+            "DELETE FROM comments WHERE post_id IN "
+            "(SELECT id FROM posts WHERE user_id = %s)",
+            (user_id,),
+        )
+        execute_query("DELETE FROM world WHERE sender_id = %s", (user_id,))
+        # Bug 反馈里含 user_agent / page_url，属个人信息，一并删除
+        execute_query("DELETE FROM bug_reports WHERE reporter_id = %s", (user_id,))
+        if email:
+            execute_query("DELETE FROM verify_codes WHERE email = %s", (email,))
+        execute_query("DELETE FROM posts WHERE user_id = %s", (user_id,))
+        execute_query("DELETE FROM users WHERE id = %s", (user_id,))
+        return {"success": True, "mode": "purge"}
+    except Exception as e:
+        return {"success": False, "message": f"数据库错误: {e}"}
+
+
+def anonymize_user(user_id: str) -> dict:
+    """匿名化注销：清空个人标识，保留历史内容（作者显示为「已注销用户」）。
+
+    用户名改为 config.DELETED_USER_NAME（重名则追加 _<6 位随机>），
+    邮箱改为不可投递的唯一占位地址，密码改为随机串（无法再登录），
+    头像回落默认头像，性别/年龄/简介/头衔一并清空，并写入 deleted_at。
+
+    Returns:
+        {"success": True, "mode": "anonymize", "name": ...} 或 {"success": False, ...}
+    """
+    if not user_id:
+        return {"success": False, "message": "缺少用户ID"}
+    user = get_user_by_id(user_id)
+    if not user:
+        return {"success": False, "message": "用户不存在"}
+    base = getattr(config, "DELETED_USER_NAME", "已注销用户")
+    name = base
+    if get_user_by_name(name):
+        name = f"{base}_{uuid.uuid4().hex[:6].upper()}"
+    domain = getattr(config, "DELETED_USER_EMAIL_DOMAIN", "deleted.invalid")
+    placeholder_email = f"deleted+{user_id.lower()}@{domain}"
+    old_email = (user.get("email") or "").strip()
+    try:
+        execute_query(
+            "UPDATE users SET name = %s, email = %s, password = %s, avatar = %s,"
+            " gender = 0, age = NULL, intro = '', title = '', email_verified = 0,"
+            " deleted_at = CURRENT_TIMESTAMP WHERE id = %s",
+            (name, placeholder_email, hash_password(uuid.uuid4().hex),
+             random.choice(config.DEFAULT_AVATARS), user_id),
+        )
+        execute_query("DELETE FROM verify_tokens WHERE user_id = %s", (user_id,))
+        if old_email:
+            execute_query("DELETE FROM verify_codes WHERE email = %s", (old_email,))
+        return {"success": True, "mode": "anonymize", "name": name}
+    except Exception as e:
+        return {"success": False, "message": f"数据库错误: {e}"}
 
 
 def reset_password(user_id: str, new_raw: str) -> tuple[bool, str]:

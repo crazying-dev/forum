@@ -1004,6 +1004,114 @@
         }
       }
     },
+    "/api/user/delete": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "自助注销账号",
+        "description": "隐私政策「你的权利 → 注销 / 删除」的落地实现。mode=purge 彻底删除账号与全部内容（不可恢复）；mode=anonymize 匿名化保留：邮箱/密码清空、用户名改为「已注销用户」，历史内容保留。身份验证需「账号密码」或「邮箱验证码」二选一。成功后清除登录 Cookie。",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "purge",
+                      "anonymize"
+                    ],
+                    "description": "purge=彻底删除（不可恢复）；anonymize=匿名化保留"
+                  },
+                  "confirm": {
+                    "type": "string",
+                    "const": "注销账号",
+                    "description": "防误触确认词，必须逐字相等"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "账号密码（与 code 二选一）"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "邮箱验证码（与 password 二选一，先调 /api/email/send-delete-account-code）"
+                  }
+                },
+                "required": [
+                  "mode",
+                  "confirm"
+                ]
+              },
+              "example": {
+                "mode": "anonymize",
+                "confirm": "注销账号",
+                "password": "Hello123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注销成功，Cookie 已清除",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "账号已注销，历史内容已匿名保留"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "purge",
+                        "anonymize"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "mode 非法 / confirm 不匹配 / 身份验证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求过于频繁（5 次 / 300 秒）"
+          }
+        }
+      }
+    },
     "/api/user/{user_id}": {
       "get": {
         "tags": [
@@ -1983,6 +2091,68 @@
           },
           "400": {
             "description": "token 无效 / 密码强度不足"
+          }
+        }
+      }
+    },
+    "/api/email/send-delete-account-code": {
+      "post": {
+        "tags": [
+          "Email"
+        ],
+        "summary": "发送注销账号验证码",
+        "description": "向当前绑定邮箱发送 6 位验证码（purpose=delete_account，有效期 5 分钟），用于 POST /api/user/delete 的身份验证（与密码二选一）。",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "验证码已发送",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "验证码已发送至绑定邮箱"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "当前账号未绑定有效邮箱，请改用密码验证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResp"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求过于频繁（3 次 / 300 ）"
+          },
+          "503": {
+            "description": "邮件服务暂不可用"
           }
         }
       }

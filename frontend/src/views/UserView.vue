@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import PostList from '../components/PostList.vue'
-import { apiFetch, avatarHtml, esc, fmtTime, getCurrentUser, resolveAvatars, toast } from '../utils.js'
+import { apiFetch, avatarHtml, esc, fmtTime, getCurrentUser, initAuth, resolveAvatars, toast } from '../utils.js'
 
 const userId = computed(() => {
   const m = location.pathname.match(/^\/users\/([^/]+)/)
@@ -43,8 +43,9 @@ const listTitle = ref('')
 const listUsers = ref([])
 const listLoading = ref(false)
 
-const me = getCurrentUser()
-const isSelf = computed(() => user.value && me && me.id === user.value.id)
+// me 必须是响应式：登录态可能在 setup 之后才就绪，非响应式会让「编辑资料 / 删除」入口永远消失
+const me = ref(getCurrentUser())
+const isSelf = computed(() => !!user.value && !!me.value && me.value.id === user.value.id)
 const followText = ref('关注')
 
 // 生日/年龄展示（沿用 V1 __profileAgeDisplay 逻辑）：
@@ -207,6 +208,14 @@ function openEdit() {
   emMsgColor.value = ''
   editError.value = ''
   editErrorColor.value = ''
+  // 注销面板同样清空（密码 / 验证码一次性，不回填）
+  delMode.value = 'anonymize'
+  delVerify.value = 'password'
+  delPassword.value = ''
+  delCode.value = ''
+  delConfirmText.value = ''
+  delMsg.value = ''
+  delMsgColor.value = ''
   editOpen.value = true
 }
 function closeEdit() { editOpen.value = false }
@@ -433,7 +442,102 @@ function changeEmail() {
   }).catch(() => { emMsg.value = '网络错误' })
 }
 
-onMounted(load)
+// ── 注销账号（自助，需登录）────────────────────────────────
+// 真源：POST /api/user/delete { mode, confirm, password | code }
+//   mode=purge     彻底删除账号与全部内容（不可恢复）
+//   mode=anonymize 匿名化保留：用户名变为「已注销用户」，清空邮箱/密码，内容保留
+const DEL_CONFIRM_TEXT = '注销账号'
+const delMode = ref('anonymize')
+const delVerify = ref('password')   // 'password' | 'code'
+const delPassword = ref('')
+const delCode = ref('')
+const delCooldown = ref(0)
+const delConfirmText = ref('')
+const delMsg = ref('')
+const delMsgColor = ref('')
+const delSubmitting = ref(false)
+let delTimer = null
+function openDeletePanel() {
+  delMode.value = 'anonymize'
+  delVerify.value = 'password'
+  delPassword.value = ''
+  delCode.value = ''
+  delConfirmText.value = ''
+  delMsg.value = ''
+  delMsgColor.value = ''
+  editPanel.value = 'delete'
+}
+function startDelCooldown() {
+  delCooldown.value = 60
+  clearInterval(delTimer)
+  delTimer = setInterval(() => {
+    delCooldown.value -= 1
+    if (delCooldown.value <= 0) { clearInterval(delTimer); delTimer = null }
+  }, 1000)
+}
+function sendDelCode() {
+  if (delCooldown.value > 0) return
+  delMsg.value = ''
+  delMsgColor.value = ''
+  apiFetch('/api/email/send-delete-account-code', { method: 'POST', body: {} })
+    .then((d) => {
+      if (!d) return
+      if (d.success) {
+        delMsgColor.value = '#2ecc71'
+        delMsg.value = d.message || '验证码已发送至绑定邮箱'
+        startDelCooldown()
+      } else {
+        delMsgColor.value = ''
+        delMsg.value = d.message || '发送失败'
+      }
+    })
+    .catch(() => { delMsg.value = '网络错误' })
+}
+function submitDelete() {
+  if (delSubmitting.value) return
+  delMsg.value = ''
+  delMsgColor.value = ''
+  if (delConfirmText.value.trim() !== DEL_CONFIRM_TEXT) {
+    delMsg.value = '请输入「' + DEL_CONFIRM_TEXT + '」以确认操作'
+    return
+  }
+  const body = { mode: delMode.value, confirm: DEL_CONFIRM_TEXT }
+  if (delVerify.value === 'password') {
+    if (!delPassword.value) { delMsg.value = '请输入当前账号密码'; return }
+    body.password = delPassword.value
+  } else {
+    if (!delCode.value.trim()) { delMsg.value = '请填写邮箱验证码'; return }
+    body.code = delCode.value.trim()
+  }
+  // 二次确认：彻底删除不可恢复，务必让用户再次确认
+  const tip = delMode.value === 'purge'
+    ? '将彻底删除你的账号及全部帖子、评论、点赞、收藏、关注、举报记录。\n\n此操作不可恢复，确定继续吗？'
+    : '将删除你的邮箱、密码等身份信息，用户名变为「已注销用户」，历史内容保留。\n\n确定继续吗？'
+  if (!confirm(tip)) return
+  delSubmitting.value = true
+  apiFetch('/api/user/delete', { method: 'POST', body, noAuthRedirect: true })
+    .then((d) => {
+      delSubmitting.value = false
+      if (!d) return
+      if (d.success) {
+        delMsgColor.value = '#2ecc71'
+        delMsg.value = d.message || '账号已注销'
+        toast('账号已注销')
+        setTimeout(() => { location.href = '/' }, 1500)
+      } else {
+        delMsgColor.value = ''
+        delMsg.value = d.message || '注销失败'
+      }
+    })
+    .catch(() => { delSubmitting.value = false; delMsg.value = '网络错误' })
+}
+
+onMounted(async () => {
+  // 登录态就绪后再拉取：isSelf / 收藏 / 编辑与注销入口都依赖 currentUser
+  try { await initAuth() } catch (e) { /* 未登录也照常渲染 */ }
+  me.value = getCurrentUser()
+  load()
+})
 </script>
 
 <template>
@@ -529,7 +633,7 @@ onMounted(load)
     <div v-if="editOpen" class="modal-mask" @click.self="closeEdit">
       <div class="modal">
         <div class="modal-header">
-          <h3><i class="fa fa-user"></i> {{ editPanel === 'password' ? '修改密码' : editPanel === 'email' ? '更换绑定邮箱' : '编辑资料' }}</h3>
+          <h3><i class="fa fa-user"></i> {{ editPanel === 'password' ? '修改密码' : editPanel === 'email' ? '更换绑定邮箱' : editPanel === 'delete' ? '注销账号' : '编辑资料' }}</h3>
           <button class="modal-close" @click="closeEdit">&times;</button>
         </div>
         <!-- 面板：修改密码（不显示邮箱） -->
@@ -600,6 +704,60 @@ onMounted(load)
           </template>
         </template>
 
+        <!-- 面板：注销账号（方式二选一 + 身份验证二选一 + 输入「注销账号」确认） -->
+        <template v-else-if="editPanel === 'delete'">
+          <div class="form-hint" style="margin-top:0;">
+            注销后账号将立即失效且无法再登录。请选择注销方式与身份验证方式，详见
+            <a href="/privacy" target="_blank" rel="noopener">隐私政策</a>。
+          </div>
+          <div class="form-group">
+            <label>注销方式</label>
+            <div class="mode-pick">
+              <label class="mode-opt" :class="{ active: delMode === 'anonymize' }">
+                <input v-model="delMode" type="radio" value="anonymize">
+                <span>
+                  <span class="mode-opt-label">匿名化保留（推荐）</span>
+                  <span class="mode-opt-desc">删除邮箱、密码等身份信息，用户名统一显示为「已注销用户」，历史帖子与评论正文保留但无法再关联到你。</span>
+                </span>
+              </label>
+              <label class="mode-opt" :class="{ active: delMode === 'purge' }">
+                <input v-model="delMode" type="radio" value="purge">
+                <span>
+                  <span class="mode-opt-label">彻底删除</span>
+                  <span class="mode-opt-desc">删除账号及你发布的全部帖子、评论、点赞、收藏、关注、举报记录。该操作不可恢复。</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>身份验证（二选一）</label>
+            <div class="auth-methods">
+              <button type="button" class="btn btn-sm btn-outline" :class="{ active: delVerify === 'password' }" @click="delVerify = 'password'">使用密码</button>
+              <button type="button" class="btn btn-sm btn-outline" :class="{ active: delVerify === 'code' }" @click="delVerify = 'code'">使用邮箱验证码</button>
+            </div>
+            <template v-if="delVerify === 'password'">
+              <input v-model="delPassword" type="password" maxlength="64" placeholder="请输入当前账号密码">
+            </template>
+            <template v-else>
+              <div class="code-row">
+                <input v-model="delCode" type="text" maxlength="6" placeholder="6 位数字验证码">
+                <button type="button" class="btn btn-outline btn-sm" :disabled="delCooldown > 0" @click="sendDelCode">
+                  {{ delCooldown > 0 ? delCooldown + 's' : '获取验证码' }}
+                </button>
+              </div>
+            </template>
+          </div>
+          <div class="form-group">
+            <label>请输入「注销账号」以确认</label>
+            <input v-model="delConfirmText" type="text" maxlength="8" placeholder="注销账号">
+          </div>
+          <p class="auth-error" :style="delMsgColor ? { color: delMsgColor } : {}">{{ delMsg }}</p>
+          <div class="modal-actions">
+            <button class="btn btn-outline" @click="editPanel = ''">返回</button>
+            <button class="btn btn-danger" :disabled="delSubmitting" @click="submitDelete"><i class="fa fa-user-times"></i> 确认注销</button>
+          </div>
+        </template>
+
         <!-- 面板：编辑资料 -->
         <template v-else>
         <div class="form-group">
@@ -647,6 +805,17 @@ onMounted(load)
         <div class="modal-actions" style="justify-content:flex-start; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
           <button type="button" class="btn btn-outline" @click="editPanel = 'password'"><i class="fa fa-key"></i> 修改密码</button>
           <button type="button" class="btn btn-outline" @click="openEmailPanel"><i class="fa fa-envelope-o"></i> 修改邮箱</button>
+        </div>
+        <!-- 注销账号（自助，隐私政策「你的权利」落地入口） -->
+        <div v-if="isSelf" class="danger-zone">
+          <div class="danger-title"><i class="fa fa-exclamation-triangle"></i> 注销账号</div>
+          <div class="form-hint" style="margin-top:0;">
+            注销后账号将无法登录。你可以选择「彻底删除」或「匿名化保留」历史内容，详见
+            <a href="/privacy" target="_blank" rel="noopener">隐私政策</a>。
+          </div>
+          <button type="button" class="btn btn-danger btn-sm" @click="openDeletePanel">
+            <i class="fa fa-user-times"></i> 注销账号
+          </button>
         </div>
         <div class="modal-actions">
           <button class="btn btn-outline" @click="closeEdit">取消</button>

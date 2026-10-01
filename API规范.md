@@ -199,6 +199,29 @@ OpenAPI 机器可读文档见同目录 [API.json](./API.json)，版本号同步�
 - **成功 200**：返回字段比「本人资料」**少一个 email**，其他相同。
 - **失败 404**：ID 不存在或用户被封禁。
 
+### 4.8 自助注销账号 —— POST /api/user/delete
+
+隐私政策「你的权利 → 注销 / 删除」的落地实现。
+
+- **鉴权**：需要
+- **限流**：`delete_account`，5 次 / 300 秒
+- **Body**：
+  ```jsonc
+  {
+    "mode": "purge",          // 或 "anonymize"（必填）
+    "confirm": "注销账号",       // 必填，必须逐字相等（防误触）
+    "password": "Hello123",   // 与 code 二选一
+    "code": "123456"          // 与 password 二选一（先调 13.5 发码）
+  }
+  ```
+- **mode 语义**：
+  - `purge`：彻底删除账号 + 全量级联（帖子/评论/点赞/收藏/关注/举报/验证码/世界消息/反馈），**不可恢复**；
+  - `anonymize`：邮箱改为 `deleted+<uid>@deleted.invalid`、密码重置为随机值、用户名改为「已注销用户」（重名时追加 `_xxxxxx`）、头像换为默认头像、清空性别/生日/简介/称号、`deleted_at` 置为当前时间；历史内容保留。
+- **身份验证**：账号密码（`verify_password`）或邮箱验证码，**二选一**；两者都失败返回 400。
+- **成功 200**：`{success: true, message, mode}`，并清除 `token` / `ID` Cookie（强制退出）。
+- **失败 400**：`mode` 非法 / `confirm` 不匹配 / 身份验证失败；429：请求过于频繁。
+- 已注销（`deleted_at` 非空）的账号无法再登录（`LoginINFOTrueorFlase` 返回 False）。
+
 ---
 
 ## 5. 系统接口
@@ -393,6 +416,17 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 - Body：`token` + `password`（≥8 位，字母+数字）
 - 成功 200：密码重置成功
 
+### 13.5 注销账号验证码 —— POST /api/email/send-delete-account-code
+
+- **鉴权**：需要
+- **限流**：`delete_account_code`，3 次 / 300 秒
+- **Body**：无
+- **作用**：向「当前绑定邮箱」发送 6 位验证码（purpose = `delete_account`，有效期 5 分钟，邮件主题「【妖精论坛】注销账号验证码」），用于 `POST /api/user/delete` 的身份验证。
+- **成功 200**：`{success: true, message: "验证码已发送至绑定邮箱"}`
+- **失败 400**：当前账号未绑定有效邮箱（提示改用密码验证）；503：邮件服务不可用；429：请求过于频繁。
+
+> 注销账号支持「密码」与「邮箱验证码」**二选一**；邮箱不可用时直接改用密码即可。
+
 ---
 
 ## 14. 用户社交（并入 /api/user/*）
@@ -458,6 +492,7 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 | 用户 | GET | /api/user/info | 需登录 |
 | 用户 | PUT/POST | /api/user/info | 需登录 |
 | 用户 | POST | /api/user/password | 需登录 |
+| 用户 | POST | /api/user/delete | 需登录 |
 | 用户 | POST | /api/user/avatar/upload | 需登录 |
 | 用户 | GET | /api/user/{user_id} | 无 |
 | 用户 | POST | /api/user/{user_id}/follow | 需登录 |
@@ -481,6 +516,7 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 | 邮箱 | POST | /api/email/verify-email | 无 |
 | 邮箱 | POST | /api/email/send-reset-password | 无 |
 | 邮箱 | POST | /api/email/reset-password | 无 |
+| 邮箱 | POST | /api/email/send-delete-account-code | 需登录 |
 | 反馈 | POST | /api/report-bug | 无（登录可选） |
 | 杂项 | GET | /api/huiguan | 无 |
 | 杂项 | GET | /Easter-Egg | 无 |

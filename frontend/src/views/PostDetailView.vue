@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import CommentItem from '../components/CommentItem.vue'
 import {
   apiFetch, avatarHtml, categoryLabel, enhanceContent, fmtTime,
-  getCurrentUser, needLogin, openReportModal, renderMarkdown, resolveAvatars, toast,
+  getCurrentUser, initAuth, needLogin, openReportModal, renderMarkdown, resolveAvatars, toast,
 } from '../utils.js'
 
 const postId = computed(() => {
@@ -21,17 +21,24 @@ const showFollow = ref(false)
 const replyTarget = ref(null)
 const commentText = ref('')
 
-const me = getCurrentUser()
+const me = ref(getCurrentUser())
 const postLink = computed(() => location.pathname + location.search)
 const commentCount = computed(() => comments.value.length)
-// 评论楼中楼：按 parent_id 构建树
+// 评论楼中楼：按 parent_id 构建树（并标注被回复人，理清子父关系）
 const commentTree = computed(() => {
   const map = {}
   comments.value.forEach((c) => { map[c.id] = c; c.children = [] })
   const roots = []
   comments.value.forEach((c) => {
-    if (c.parent_id && map[c.parent_id]) map[c.parent_id].children.push(c)
-    else roots.push(c)
+    const parent = c.parent_id ? map[c.parent_id] : null
+    if (parent) {
+      // 标注被回复人：子评论显示「回复 @某人」
+      c.reply_to_name = parent.user_name || ''
+      c.reply_to_uid = parent.user_id || ''
+      parent.children.push(c)
+    } else {
+      roots.push(c)
+    }
   })
   return roots
 })
@@ -40,12 +47,14 @@ async function load() {
   if (!postId.value) { loading.value = false; notFound.value = true; return }
   const d = await apiFetch('/api/posts/' + encodeURIComponent(postId.value))
   loading.value = false
+  // 登录态可能在上一次渲染后才就绪：每次加载都重新同步，避免作者按钮（删除）不出现
+  me.value = getCurrentUser()
   if (!d || !d.success) { notFound.value = true; return }
   post.value = d.post
   liked.value = !!d.liked
   favorited.value = !!d.favorited
   comments.value = d.comments || []
-  if (me && me.id !== post.value.user_id) {
+  if (me.value && me.value.id !== post.value.user_id) {
     showFollow.value = true
     apiFetch('/api/user/' + encodeURIComponent(post.value.user_id)).then((r) => {
       if (r && r.success) followText.value = (r.user && r.user.is_following) ? '已关注' : '关注'
@@ -129,7 +138,12 @@ function deleteComment(cid) {
   })
 }
 
-onMounted(load)
+onMounted(async () => {
+  // 登录态就绪后再拉数据：作者操作（删除帖/评论）依赖 me
+  try { await initAuth() } catch (e) { /* 未登录也照常渲染 */ }
+  me.value = getCurrentUser()
+  load()
+})
 </script>
 
 <template>

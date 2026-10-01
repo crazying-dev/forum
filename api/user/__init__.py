@@ -8,6 +8,7 @@
     PUT  /api/user/info       更新当前用户基础资料
     POST /api/user/password   修改密码（邮箱验证码 code + new_password；也兼容旧密码校验）
     POST /api/user/email      更换绑定邮箱（需旧邮箱验证码 old_code + 新邮箱验证码 code）
+    POST /api/user/delete     自助注销账号（mode=purge 彻底删除 / mode=anonymize 匿名化保留）
     GET  /api/user/<id>       公开查询某个用户资料
 """
 from __future__ import annotations
@@ -32,6 +33,7 @@ from api.encrypt import (
     validate_password,
     validate_username,
     is_valid_email,
+    verify_password,
 )
 from Email import send_email, build_email_html
 
@@ -92,7 +94,7 @@ def _authenticate_from_cookies():
         g.user = None
         return
     user = db.user.get_user_by_id(uid)
-    if not user or user.get("is_banned"):
+    if not user or user.get("is_banned") or user.get("deleted_at"):
         g.user = None
         return
     ok = verify_login_token(
@@ -492,7 +494,80 @@ def api_user_change_email():
 
 
 # ──────────────────────────────────────────────
-# 8. 按 ID 查询任意用户公开资料（无需登录）
+# 8. 自助注销账号（需登录）
+#    隐私政策「你的权利 → 注销 / 删除」落地实现：
+#      mode=purge     彻底删除账号与全部内容（不可恢复）
+#      mode=anonymize 匿名化保留：用户名→「已注销用户」，清空邮箱/密码，内容保留
+#    身份验证：账号密码 或 邮箱验证码（二选一）
+# ──────────────────────────────────────────────
+@user_bp.route("/delete", methods=["POST"])
+@login_required
+def api_user_delete():
+    """自助注销账号。
+
+    Body(JSON):
+        mode:      str "purge" | "anonymize"（必填）
+        confirm:   str 必须为 config.DELETE_ACCOUNT_CONFIRM_TEXT（防误触）
+        password:  str 账号密码（与 code 二选一）
+        code:      str 邮箱验证码（与 password 二选一，需先调
+                        POST /api/email/send-delete-account-code）
+    """
+    if rate_limit("delete_account", 5, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请稍后再试"}), 429
+
+    data = request.get_json(silent=True) or {}
+    mode = (data.get("mode") or "").strip().lower()
+    password = data.get("password") or ""
+    code = (data.get("code") or "").strip()
+    confirm = (data.get("confirm") or "").strip()
+
+    if mode not in ("purge", "anonymize"):
+        return jsonify({"success": False, "message": "请选择注销方式"}), 400
+    if confirm != config.DELETE_ACCOUNT_CONFIRM_TEXT:
+        return jsonify(
+            {"success": False,
+             "message": f"请输入「{config.DELETE_ACCOUNT_CONFIRM_TEXT}」以确认操作"}
+        ), 400
+
+    user = db.user.get_user_by_id(g.user["id"])
+    if not user:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+
+    # —— 身份验证：密码 或 邮箱验证码，二选一 ——
+    verified = False
+    if password and verify_password(password, user.get("password") or ""):
+        verified = True
+    if not verified and code:
+        # 局部导入：api.email 又依赖本模块的 login_required，顶层互导会形成循环
+        from api.email import verify_delete_account_code, consume_delete_account_code
+
+        email = (user.get("email") or "").strip().lower()
+        if is_valid_email(email):
+            ok, _msg = verify_delete_account_code(email, code)
+            if ok:
+                verified = True
+                consume_delete_account_code(email, code)
+    if not verified:
+        return jsonify(
+            {"success": False, "message": "身份验证失败：请输入正确的密码或邮箱验证码"}
+        ), 400
+
+    if mode == "purge":
+        result = db.user.purge_user(g.user["id"])
+    else:
+        result = db.user.anonymize_user(g.user["id"])
+    if not result.get("success"):
+        return jsonify(result), 400
+
+    message = ("账号已注销，全部内容已彻底删除" if mode == "purge"
+               else "账号已注销，历史内容已匿名保留")
+    resp = make_response(jsonify({"success": True, "message": message, "mode": mode}))
+    _clear_auth_cookies(resp)
+    return resp
+
+
+# ──────────────────────────────────────────────
+# 9. 按 ID 查询任意用户公开资料（无需登录）
 # ──────────────────────────────────────────────
 @user_bp.route("/<user_id>", methods=["GET"])
 def api_user_public(user_id: str):

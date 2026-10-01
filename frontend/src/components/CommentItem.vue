@@ -25,17 +25,19 @@ function onDelete() {
     :data-cuid="comment.user_id"
     :data-post-link="postLink"
   >
-    <span v-html="avatarHtml(comment.user_avatar)"></span>
-    <div class="comment-body">
-      <div class="comment-head">
-        <a :href="'/users/' + comment.user_id">{{ comment.user_name }}</a>
-        <span v-if="comment.parent_id" class="comment-reply-to">回复</span>
-        <span> · {{ fmtTime(comment.created_at) }}</span>
-      </div>
-      <div class="comment-content">{{ comment.content }}</div>
-      <div class="comment-actions">
-        <button class="comment-reply" @click="emit('reply', { id: comment.id, name: comment.user_name })">回复</button>
-        <button v-if="me && me.id === comment.user_id" class="comment-reply" @click="onDelete">删除</button>
+    <div class="comment-main">
+      <span v-html="avatarHtml(comment.user_avatar)"></span>
+      <div class="comment-body">
+        <div class="comment-head">
+          <a :href="'/users/' + comment.user_id">{{ comment.user_name }}</a>
+          <span v-if="comment.parent_id" class="comment-reply-to">回复<span v-if="comment.reply_to_name"> <a :href="'/users/' + (comment.reply_to_uid || '') + '#comment-' + comment.parent_id">@{{ comment.reply_to_name }}</a></span></span>
+          <span> · {{ fmtTime(comment.created_at) }}</span>
+        </div>
+        <div class="comment-content">{{ comment.content }}</div>
+        <div class="comment-actions">
+          <button class="comment-reply" @click="emit('reply', { id: comment.id, name: comment.user_name })">回复</button>
+          <button v-if="me && me.id === comment.user_id" class="comment-reply" @click="onDelete">删除</button>
+        </div>
       </div>
     </div>
     <template v-if="kids.length">
