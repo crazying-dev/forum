@@ -39,7 +39,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-01T11:30:00+08:00",
+    "updated_at": "2026-10-01T12:45:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -74,19 +74,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Android 7.0 及以上",
             "releases": [
                 {
-                    "version": "1.0.3",
+                    "version": "1.0.4",
                     "channel": "stable",
                     "date": "2026-10-01",
-                    "size": 8070588,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.3/forum-android-1.0.3.apk",
-                    "filename": "forum-android-1.0.3.apk",
-                    "sha256": "3fdf704b3c7509961d92a82fe1885ca23d868d55a31c3b87b5dac6ea2e3dae1f",
+                    "size": 8086972,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.4/forum-android-1.0.4.apk",
+                    "filename": "forum-android-1.0.4.apk",
+                    "sha256": "2756a6b2c48ff085270776db12d7aeebcd13f1bdc7a8b92f26544882d3eae557",
                     "notes": [
-                        "新增完整版隐私政策：「我的 → 隐私政策」查看，逐项列出第三方域名与本地存储",
-                        "新增自助注销账号：可选「匿名化保留」或「彻底删除」，需密码或邮箱验证码验证身份",
-                        "修复评论没有子父层级：现按回复关系逐层缩进，并显示「回复 @某人」",
-                        "修复无法删除帖子/评论：作者本人现在可见删除按钮",
-                        "修复点赞/收藏导致帖子浏览量虚增：不再重新拉取帖子详情",
+                        "新增首启隐私政策同意弹窗：首次打开须手动勾选同意后才能进入应用",
+                        "同意前不发起任何网络请求：登录态刷新与自动检查更新均延后到同意之后",
+                        "同意状态按政策版本号记录，政策升级后会重新征得同意；「不同意」直接退出应用",
                     ],
                     "mandatory": False,
                 }
