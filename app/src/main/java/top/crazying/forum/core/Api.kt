@@ -4,6 +4,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
@@ -298,6 +300,66 @@ class Api(private val prefs: Prefs) {
         return result
     }
 
+    /**
+     * 上传头像（multipart，字段名 `avatar`，与 Web 端一致）。
+     *
+     * 服务端会裁剪压缩为 400×400 WebP 并直接落库，成功后调用方应再调一次 [me] 刷新本地用户。
+     */
+    suspend fun uploadAvatar(bytes: ByteArray, filename: String, mimeType: String): ApiResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart(
+                        "avatar",
+                        filename.ifBlank { "avatar.jpg" },
+                        bytes.toRequestBody(mimeType.toMediaTypeOrNull()),
+                    )
+                    .build()
+                val request = Request.Builder()
+                    .url(Constants.BASE_URL + "/api/user/avatar/upload")
+                    .header("User-Agent", Constants.CLIENT_UA)
+                    .header("Accept", "application/json, text/plain, */*")
+                    .post(body)
+                    .build()
+                val result = callOnce(request)
+                if (result.status == 401) runCatching { App.onUnauthorized() }
+                result
+            } catch (e: Exception) {
+                ApiResult(0, null, "网络错误，请检查网络连接后重试")
+            }
+        }
+
+    // ────────────────── 账号安全（修改密码 / 更换邮箱） ──────────────────
+
+    /** 修改密码第 1 步：发送 6 位验证码到当前绑定邮箱。 */
+    suspend fun sendChangePasswordCode(): ApiResult = post("/api/email/send-change-password-code")
+
+    /** 修改密码第 2 步：凭邮箱验证码设置新密码（成功后服务端会清 cookie，需重新登录）。 */
+    suspend fun changePassword(code: String, newPassword: String): ApiResult =
+        post(
+            "/api/user/password",
+            JSONObject().put("code", code.trim()).put("new_password", newPassword),
+        )
+
+    /** 更换邮箱第 1 步：发送验证码到「当前绑定邮箱」（身份确认）。 */
+    suspend fun sendChangeEmailOldCode(): ApiResult = post("/api/email/send-change-email-old-code")
+
+    /** 更换邮箱第 2 步：发送验证码到「新邮箱」（可达性验证）。 */
+    suspend fun sendChangeEmailCode(email: String): ApiResult =
+        post("/api/email/send-change-email-code", JSONObject().put("email", email.trim()))
+
+    /** 更换邮箱第 3 步：凭两枚验证码完成换绑。 */
+    suspend fun changeEmail(email: String, oldCode: String, code: String): ApiResult {
+        val body = JSONObject()
+            .put("email", email.trim())
+            .put("old_code", oldCode.trim())
+            .put("code", code.trim())
+        val result = post("/api/user/email", body)
+        if (result.ok) adoptUser(result)
+        return result
+    }
+
     // ────────────────── 帖子 ──────────────────
 
     suspend fun posts(
@@ -341,6 +403,9 @@ class Api(private val prefs: Prefs) {
     }
 
     suspend fun deleteComment(commentId: String): ApiResult = post("/api/comments/$commentId/delete")
+
+    /** 点赞 / 取消点赞评论；返回 `{success, liked, likes}`。 */
+    suspend fun likeComment(commentId: String): ApiResult = post("/api/comments/$commentId/like")
 
     // ────────────────── 搜索 ──────────────────
 

@@ -83,6 +83,10 @@ data class CommentItem(
     val likes: Int,
     val liked: Boolean,
     val parentId: String,
+    /** 所属帖子 id（仅「用户的评论列表」接口返回，用于跳转帖子）。 */
+    val postId: String,
+    /** 所属帖子标题（仅「用户的评论列表」接口返回）。 */
+    val postTitle: String,
 ) {
     val isReply: Boolean get() = parentId.isNotBlank()
 
@@ -97,6 +101,8 @@ data class CommentItem(
             likes = o.i("likes"),
             liked = o.b("liked"),
             parentId = o.s("parent_id"),
+            postId = o.s("post_id"),
+            postTitle = o.s("post_title"),
         )
 
         fun list(arr: List<JSONObject>): List<CommentItem> = arr.map { from(it) }

@@ -12,7 +12,7 @@ object Constants {
     const val BASE_URL = "https://www.yjlt.top"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.4"
+    const val APP_VERSION = "1.0.5"
 
     /** 请求 UA，便于服务端日志区分端。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION

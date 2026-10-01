@@ -20,6 +20,7 @@ sealed interface Screen {
     // 从「我的」页二级进入的普通页面（不占底部标签栏）。
     data object Privacy : Screen
     data object DeleteAccount : Screen
+    data object ProfileEdit : Screen
 
     data class PostDetail(val postId: String) : Screen
     data class PostCreate(val category: String = "general") : Screen

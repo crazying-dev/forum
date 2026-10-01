@@ -203,6 +203,23 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
         }
     }
 
+    fun toggleCommentLike(target: CommentItem) {
+        if (!requireLogin()) return
+        scope.launch {
+            val r = App.api.likeComment(target.id)
+            if (r.ok) {
+                // 用接口返回的 liked/likes 就地更新，绝不重新 getPost（否则浏览量 +1）。
+                val newLiked = r.bool("liked", !target.liked)
+                val newLikes = r.int("likes", target.likes)
+                comments = comments.map {
+                    if (it.id == target.id) it.copy(liked = newLiked, likes = newLikes) else it
+                }
+            } else {
+                toast(context, r.message)
+            }
+        }
+    }
+
     PageScaffold(
         title = "帖子详情",
         onBack = { nav.pop() },
@@ -360,6 +377,7 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                             }
                         },
                         onDelete = { pendingDeleteComment = c },
+                        onLike = { toggleCommentLike(c) },
                     )
                 }
             }
@@ -412,6 +430,7 @@ private fun CommentRow(
     onReply: () -> Unit,
     onReplyToParent: () -> Unit,
     onDelete: () -> Unit,
+    onLike: () -> Unit,
 ) {
     val colors = ForumTheme.colors
     val comment = node.comment
@@ -462,7 +481,12 @@ private fun CommentRow(
             )
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("赞 ${comment.likes}", color = colors.textMuted, fontSize = 11.sp)
+                Text(
+                    text = if (comment.liked) "已赞 ${comment.likes}" else "赞 ${comment.likes}",
+                    color = if (comment.liked) colors.primary else colors.textMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.clickable { onLike() },
+                )
                 Spacer(Modifier.width(14.dp))
                 Text(
                     text = "回复",

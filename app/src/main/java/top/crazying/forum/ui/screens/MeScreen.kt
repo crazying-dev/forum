@@ -95,6 +95,11 @@ fun MeScreen(nav: Navigator) {
                 if (intro.isNotBlank()) {
                     Text(intro, color = colors.textSecondary, fontSize = 13.sp)
                 }
+                GhostButton(
+                    text = "编辑资料",
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { nav.push(Screen.ProfileEdit) },
+                )
                 HDivider()
                 GhostButton(
                     text = if (busy) "正在退出…" else "退出登录",
@@ -256,6 +261,7 @@ fun MeScreen(nav: Navigator) {
                 .background(colors.bgCard)
                 .padding(4.dp),
         ) {
+            SettingEntry("编辑资料") { nav.push(Screen.ProfileEdit) }
             SettingEntry("搜索帖子与用户") { nav.push(Screen.Search()) }
             SettingEntry("发布新帖子") { nav.push(Screen.PostCreate()) }
             SettingEntry("访问 WIKI") { nav.switchTab(Screen.Wiki) }
