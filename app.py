@@ -11,6 +11,7 @@ import config
 import db
 import api
 from api.user import _authenticate_from_cookies
+from api.status import record as record_status_code
 
 
 def create_app() -> Flask:
@@ -64,6 +65,20 @@ def create_app() -> Flask:
             print(f"[access] ip={real_ip} peer={peer} {request.method} {target} {resp.status_code} {cost_ms}ms", flush=True)
         except Exception:
             pass
+        return resp
+
+    # ── 状态码日志：记录 2xx / 4xx / 5xx 的发生时间（落盘保留最近 N 条）──
+    # 只写时间 + 状态码（不记 IP / 路径）；查询接口 GET /api/status-log。
+    # 可用环境变量 STATUS_LOG=0 关闭；文件与上限见 config.STATUS_LOG_PATH / STATUS_LOG_MAX。
+    _status_log = os.getenv("STATUS_LOG", "1") != "0"
+
+    @app.after_request
+    def _status_log_write(resp):
+        if _status_log:
+            try:
+                record_status_code(resp.status_code)
+            except Exception:
+                pass
         return resp
 
     # ── CORS（简化实现，生产建议装 flask-cors 包） ──

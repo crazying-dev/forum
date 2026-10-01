@@ -339,6 +339,21 @@ except OSError:
 # general=综合 talk=闲聊 question=求助 share=分享 creative=创作
 ALLOWED_CATEGORIES = ["general", "talk", "question", "share", "creative"]
 
+# ── 状态码日志（2xx / 4xx / 5xx 的发生时间）──
+# 追加式文本日志，每行一个 JSON（{"time": ..., "status": ..., "class": ...}）。
+# 仅保留最近 STATUS_LOG_MAX 条（超出即裁剪最旧的）；查询接口 GET /api/status-log。
+# 环境变量 STATUS_LOG=0 可整体关闭记录（见 app.py）。
+STATUS_LOG_PATH = os.getenv(
+    "STATUS_LOG_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "status.log"),
+)
+STATUS_LOG_MAX = int(os.getenv("STATUS_LOG_MAX", "1000") or "1000")
+try:
+    # 目录不存在时自动创建；权限不足等异常不阻塞启动
+    os.makedirs(os.path.dirname(STATUS_LOG_PATH), exist_ok=True)
+except OSError:
+    pass
+
 # ── 全站公告横幅（公告组件②）──
 # 文案留空或 SITE_ANNOUNCEMENT_ENABLED=0 时整个横幅不渲染；
 # 用户点关闭后按「标签+文案」记入 localStorage，改文案即视为新公告重新展示。
