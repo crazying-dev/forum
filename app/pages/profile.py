@@ -15,9 +15,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PyQt6.QtCore import QDate, Qt, QTimer
+from PyQt6.QtCore import QDate, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QDateEdit, QFileDialog,
+from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
                              QLabel, QLineEdit, QPlainTextEdit, QTabWidget,
                              QWidget)
 
@@ -598,6 +598,72 @@ class _Cooldown:
             self._button.setText("%ds" % self._left)
 
 
+class BirthPicker(QWidget):
+    """年 / 月 / 日三个下拉组成的生日选择器。
+
+    默认展示 2000-01-01；任一档被用户改动时发出 :attr:`changed`（初始化
+    赋默认值不会触发，因此不会误标「已改动」）。日数随年月联动，闰年正确。
+    """
+
+    changed = pyqtSignal()
+
+    def __init__(self, initial: str = "", parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        current_year = QDate.currentDate().year()
+        self.year_box = QComboBox()
+        for year in range(1900, current_year + 1):
+            self.year_box.addItem(str(year), year)
+        self.month_box = QComboBox()
+        for month in range(1, 13):
+            self.month_box.addItem("%02d" % month, month)
+        self.day_box = QComboBox()
+
+        row = hbox(self, spacing=6)
+        row.addWidget(self.year_box)
+        row.addWidget(self.month_box)
+        row.addWidget(self.day_box)
+
+        date = QDate.fromString(str(initial or ""), "yyyy-MM-dd")
+        if not date.isValid():
+            date = QDate(2000, 1, 1)
+        year = min(max(date.year(), 1900), current_year)
+        self.year_box.setCurrentIndex(self.year_box.findData(year))
+        self.month_box.setCurrentIndex(self.month_box.findData(date.month()))
+        self._refresh_days(date.day())
+        # 初始化完成后再接信号，避免默认值被当成用户改动。
+        self.year_box.currentIndexChanged.connect(self._on_year_month_changed)
+        self.month_box.currentIndexChanged.connect(self._on_year_month_changed)
+        self.day_box.currentIndexChanged.connect(self._emit_changed)
+
+    # ── 内部 ──
+    def _refresh_days(self, select) -> None:
+        """按当前年月重建「日」下拉，尽量保留原选择（越界则取当月最后一天）。"""
+        year = int(self.year_box.currentData() or 2000)
+        month = int(self.month_box.currentData() or 1)
+        days = QDate(year, month, 1).daysInMonth()
+        self.day_box.blockSignals(True)
+        self.day_box.clear()
+        for day in range(1, days + 1):
+            self.day_box.addItem("%02d" % day, day)
+        index = self.day_box.findData(min(int(select or 1), days))
+        self.day_box.setCurrentIndex(index if index >= 0 else 0)
+        self.day_box.blockSignals(False)
+
+    def _on_year_month_changed(self, _index: int) -> None:
+        self._refresh_days(self.day_box.currentData())
+        self._emit_changed()
+
+    def _emit_changed(self, *_args) -> None:
+        self.changed.emit()
+
+    # ── 对外 ──
+    def date(self) -> QDate:
+        """当前选择（与 ``QDateEdit.date()`` 对齐）。"""
+        return QDate(int(self.year_box.currentData() or 2000),
+                     int(self.month_box.currentData() or 1),
+                     int(self.day_box.currentData() or 1))
+
+
 class EditProfileDialog(BaseDialog):
     """编辑资料（对照 Web 端「编辑资料」面板）。
 
@@ -630,14 +696,9 @@ class EditProfileDialog(BaseDialog):
 
         birth_wrap = QWidget()
         birth_row = hbox(birth_wrap, spacing=10)
-        self.birth_input = QDateEdit()
-        self.birth_input.setCalendarPopup(True)
-        self.birth_input.setDisplayFormat("yyyy-MM-dd")
-        self.birth_input.setDateRange(QDate(1900, 1, 1), QDate.currentDate())
         initial = yearmode.to_date_value(user.get("age"))
-        start = QDate.fromString(initial, "yyyy-MM-dd") if initial else QDate(2000, 1, 1)
-        self.birth_input.setDate(start if start.isValid() else QDate(2000, 1, 1))
-        self.birth_input.dateChanged.connect(self._mark_birth_dirty)
+        self.birth_input = BirthPicker(initial)
+        self.birth_input.changed.connect(self._mark_birth_dirty)
         birth_row.addWidget(self.birth_input)
         self.no_birth_box = QCheckBox("不展示出生日期")
         self.no_birth_box.toggled.connect(self._toggle_birth)
