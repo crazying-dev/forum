@@ -167,6 +167,14 @@ def test_comment_tree_labels_reply_target():
     assert "parent.children.push(c)" in POST_DETAIL, "commentTree 未构建父子关系"
 
 
+def test_comment_tree_flattens_deep_replies_to_two_levels():
+    """第 3 层及更深压平到第 2 层；仅压平项显示「回复 @某人」。"""
+    assert "depthOf" in POST_DETAIL, "commentTree 未计算原始层级"
+    assert "depthOf[parent.id] > 0" in POST_DETAIL, "深层回复未向上提升到所属根评论"
+    assert "c.reply_to_name = ''" in POST_DETAIL, "直接回复根评论应清空 @ 昵称（不显示 @）"
+    assert 'v-if="comment.reply_to_name"' in COMMENT_ITEM, "CommentItem 应仅在压平项显示 @"
+
+
 if __name__ == "__main__":
     tests = [
         ("test_privacy_has_all_sections", test_privacy_has_all_sections),
@@ -182,6 +190,7 @@ if __name__ == "__main__":
         ("test_comment_item_wraps_main_block", test_comment_item_wraps_main_block),
         ("test_css_comment_item_not_flex_container", test_css_comment_item_not_flex_container),
         ("test_comment_tree_labels_reply_target", test_comment_tree_labels_reply_target),
+        ("test_comment_tree_flattens_deep_replies_to_two_levels", test_comment_tree_flattens_deep_replies_to_two_levels),
     ]
     passed = failed = 0
     for name, fn in tests:

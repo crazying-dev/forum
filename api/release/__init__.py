@@ -39,7 +39,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-01T13:25:00+08:00",
+    "updated_at": "2026-10-01T14:20:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -49,17 +49,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.3.9",
+                    "version": "1.3.10",
                     "channel": "stable",
                     "date": "2026-10-01",
-                    "size": 48571834,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.9/forum_setup.exe",
+                    "size": 48576674,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.10/forum_setup.exe",
                     "filename": "forum_setup.exe",
-                    "sha256": "0858361eac8b11165069a5e868a0e8d51f61fc61ab5faf728baa10dee50ef8d0",
+                    "sha256": "1a5ba1cba820f3defd9576fec059fd60b5d7b0f4d02d3a1eeab77a9bb71e3663",
                     "notes": [
-                        "出生日期选择器重做：「编辑资料」改用年 / 月 / 日三个下拉框，日月联动、闰年正确",
-                        "复用应用主题样式，修复原系统默认日历弹窗与主题不搭的问题",
-                        "未改动生日时不提交，「不展示出生日期」勾选后提交空值",
+                        "评论楼中楼压平为两层：「回复的回复」（第 3 层及更深）不再逐级缩进，压平到第 2 层",
+                        "用「回复 @某人」标明实际回复对象（仅压平项显示 @，直接回复根评论不显示）",
+                        "窄屏下评论层级更清爽，读取从属关系更直观",
                     ],
                     "mandatory": False,
                 }
@@ -73,17 +73,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Android 7.0 及以上",
             "releases": [
                 {
-                    "version": "1.0.5",
+                    "version": "1.0.6",
                     "channel": "stable",
                     "date": "2026-10-01",
-                    "size": 8119740,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.5/forum-android-1.0.5.apk",
-                    "filename": "forum-android-1.0.5.apk",
-                    "sha256": "fcd114c85f2ffe97809b2a1ef70b3e7f6468a1ff465fdd911b51a57a16b98c38",
+                    "size": 8103356,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.6/forum-android-1.0.6.apk",
+                    "filename": "forum-android-1.0.6.apk",
+                    "sha256": "a7c676e0cd278ef4e48b564c507df6c42c9d465001b8263db10baf6ff556a512",
                     "notes": [
-                        "新增「编辑资料」页：头像上传、昵称 / 性别 / 出生日期 / 简介，并支持修改密码与更换绑定邮箱",
-                        "帖子详情支持点赞 / 取消点赞评论（就地更新，不重新拉帖）",
-                        "用户主页评论可点击进入对应的帖子详情",
+                        "评论楼中楼压平为两层：对回复的回复不再逐级缩进，深层压平到第 2 层",
+                        "用「回复 @某人」标明实际回复对象（仅压平项显示 @，直接回复根评论不显示）",
+                        "窄屏下评论层级更清爽，读取从属关系更直观",
                     ],
                     "mandatory": False,
                 }

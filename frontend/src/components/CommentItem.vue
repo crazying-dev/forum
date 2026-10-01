@@ -30,7 +30,7 @@ function onDelete() {
       <div class="comment-body">
         <div class="comment-head">
           <a :href="'/users/' + comment.user_id">{{ comment.user_name }}</a>
-          <span v-if="comment.parent_id" class="comment-reply-to">回复<span v-if="comment.reply_to_name"> <a :href="'/users/' + (comment.reply_to_uid || '') + '#comment-' + comment.parent_id">@{{ comment.reply_to_name }}</a></span></span>
+          <span v-if="comment.reply_to_name" class="comment-reply-to">回复 <a :href="'/users/' + (comment.reply_to_uid || '') + '#comment-' + comment.parent_id">@{{ comment.reply_to_name }}</a></span>
           <span> · {{ fmtTime(comment.created_at) }}</span>
         </div>
         <div class="comment-content">{{ comment.content }}</div>

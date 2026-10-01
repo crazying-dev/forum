@@ -24,21 +24,57 @@ const commentText = ref('')
 const me = ref(getCurrentUser())
 const postLink = computed(() => location.pathname + location.search)
 const commentCount = computed(() => comments.value.length)
-// 评论楼中楼：按 parent_id 构建树（并标注被回复人，理清子父关系）
+// 评论楼中楼：只保留两层——根评论 + 其下所有回复。
+// 对第 2 层的回复（孙级及更深）不再逐层缩进，而是压平到第 2 层，
+// 并用「回复 @被回复者」标出它实际回复的是哪一条（仅压平项显示 @）。
 const commentTree = computed(() => {
   const map = {}
   comments.value.forEach((c) => { map[c.id] = c; c.children = [] })
+  // 1) 计算原始层级：parent_id 自环/环状时安全退化为根，避免死循环
+  const depthOf = {}
+  for (const c of comments.value) {
+    if (depthOf[c.id] !== undefined) continue
+    const chain = []
+    const seen = new Set()
+    let cur = c
+    while (depthOf[cur.id] === undefined && !seen.has(cur.id)) {
+      seen.add(cur.id)
+      const p = cur.parent_id ? map[cur.parent_id] : null
+      if (!p || p === cur) break
+      chain.push(cur)
+      cur = p
+    }
+    if (depthOf[cur.id] === undefined) depthOf[cur.id] = 0
+    let d = depthOf[cur.id]
+    for (let i = chain.length - 1; i >= 0; i -= 1) {
+      if (depthOf[chain[i].id] !== undefined) continue
+      d += 1
+      depthOf[chain[i].id] = d
+    }
+  }
+  // 2) 组装成两层：第 3 层及更深一律挂到所属根评论下
   const roots = []
   comments.value.forEach((c) => {
-    const parent = c.parent_id ? map[c.parent_id] : null
-    if (parent) {
-      // 标注被回复人：子评论显示「回复 @某人」
-      c.reply_to_name = parent.user_name || ''
-      c.reply_to_uid = parent.user_id || ''
-      parent.children.push(c)
-    } else {
-      roots.push(c)
+    const d = depthOf[c.id] || 0
+    if (d === 0) { roots.push(c); return }
+    const direct = c.parent_id ? map[c.parent_id] : null
+    if (d === 1) {
+      // 直接回复根评论：保持第 2 层，不显示 @
+      c.reply_to_name = ''
+      c.reply_to_uid = ''
+    } else if (direct) {
+      // 第 3 层及更深：用 @ 标注直接回复的那条评论的作者
+      c.reply_to_name = direct.user_name || ''
+      c.reply_to_uid = direct.user_id || ''
     }
+    let parent = direct
+    let hops = 0
+    while (parent && depthOf[parent.id] > 0 && hops <= comments.value.length) {
+      parent = map[parent.parent_id]
+      hops += 1
+    }
+    if (parent && parent !== c) parent.children.push(c)
+    else roots.push(c)
   })
   return roots
 })
