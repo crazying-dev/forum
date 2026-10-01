@@ -1062,6 +1062,15 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
   border: none;
 }
 .comment-reply:hover { color: var(--color-primary-hover); }
+.comment-like {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.comment-like:hover { color: var(--color-primary-hover); }
+.comment-like.on { color: var(--color-primary); }
 .comment-reply-to { font-size: 12px; color: var(--color-text-tertiary); }
 .comment-reply-to a { color: var(--color-text-accent); }
 .comment-children {

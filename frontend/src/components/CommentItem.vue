@@ -7,7 +7,7 @@ const props = defineProps({
   me: { type: Object, default: null },
   postLink: { type: String, default: '' },
 })
-const emit = defineEmits(['reply', 'delete'])
+const emit = defineEmits(['reply', 'delete', 'like'])
 
 const folded = ref(false)
 const kids = computed(() => props.comment.children || [])
@@ -35,6 +35,7 @@ function onDelete() {
         </div>
         <div class="comment-content">{{ comment.content }}</div>
         <div class="comment-actions">
+          <button class="comment-like" :class="{ on: comment.liked }" @click="emit('like', { id: comment.id })">{{ comment.liked ? '已赞' : '赞' }} {{ comment.likes || 0 }}</button>
           <button class="comment-reply" @click="emit('reply', { id: comment.id, name: comment.user_name })">回复</button>
           <button v-if="me && me.id === comment.user_id" class="comment-reply" @click="onDelete">删除</button>
         </div>
@@ -50,6 +51,7 @@ function onDelete() {
           :post-link="postLink"
           @reply="emit('reply', $event)"
           @delete="emit('delete', $event)"
+          @like="emit('like', $event)"
         />
       </div>
       <button class="comment-fold" @click="folded = !folded">

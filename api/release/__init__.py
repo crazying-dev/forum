@@ -39,7 +39,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-01T12:45:00+08:00",
+    "updated_at": "2026-10-01T13:25:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -49,18 +49,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.3.8",
+                    "version": "1.3.9",
                     "channel": "stable",
                     "date": "2026-10-01",
-                    "size": 48568637,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.8/forum_setup.exe",
+                    "size": 48571834,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.9/forum_setup.exe",
                     "filename": "forum_setup.exe",
-                    "sha256": "880b0eca4e3104bbe9dc0c82de252d86efcb1ee70bfbdf50f158a9212aaabebb",
+                    "sha256": "0858361eac8b11165069a5e868a0e8d51f61fc61ab5faf728baa10dee50ef8d0",
                     "notes": [
-                        "新增完整版隐私政策：「设置 → 关于」或「个人中心 → 隐私政策」查看，逐项列出第三方域名与本地存储",
-                        "新增自助注销账号：可选「彻底删除」或「匿名化保留」，需密码或邮箱验证码验证身份",
-                        "修复评论楼中楼（子回复）从未渲染：评论列表重建时漏挂载子评论",
-                        "修复登录/退出后「本人可删除」按钮不更新：帖子与评论均就地重算作者可见性",
+                        "出生日期选择器重做：「编辑资料」改用年 / 月 / 日三个下拉框，日月联动、闰年正确",
+                        "复用应用主题样式，修复原系统默认日历弹窗与主题不搭的问题",
+                        "未改动生日时不提交，「不展示出生日期」勾选后提交空值",
                     ],
                     "mandatory": False,
                 }
@@ -74,17 +73,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Android 7.0 及以上",
             "releases": [
                 {
-                    "version": "1.0.4",
+                    "version": "1.0.5",
                     "channel": "stable",
                     "date": "2026-10-01",
-                    "size": 8086972,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.4/forum-android-1.0.4.apk",
-                    "filename": "forum-android-1.0.4.apk",
-                    "sha256": "2756a6b2c48ff085270776db12d7aeebcd13f1bdc7a8b92f26544882d3eae557",
+                    "size": 8119740,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.5/forum-android-1.0.5.apk",
+                    "filename": "forum-android-1.0.5.apk",
+                    "sha256": "fcd114c85f2ffe97809b2a1ef70b3e7f6468a1ff465fdd911b51a57a16b98c38",
                     "notes": [
-                        "新增首启隐私政策同意弹窗：首次打开须手动勾选同意后才能进入应用",
-                        "同意前不发起任何网络请求：登录态刷新与自动检查更新均延后到同意之后",
-                        "同意状态按政策版本号记录，政策升级后会重新征得同意；「不同意」直接退出应用",
+                        "新增「编辑资料」页：头像上传、昵称 / 性别 / 出生日期 / 简介，并支持修改密码与更换绑定邮箱",
+                        "帖子详情支持点赞 / 取消点赞评论（就地更新，不重新拉帖）",
+                        "用户主页评论可点击进入对应的帖子详情",
                     ],
                     "mandatory": False,
                 }

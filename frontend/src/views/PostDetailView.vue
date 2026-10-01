@@ -137,6 +137,26 @@ function deleteComment(cid) {
     if (d && d.success) location.reload()
   })
 }
+// 评论点赞：就地更新目标评论（递归查找，兼容任意层级），绝不重拉帖（否则浏览量虚增）
+function findComment(list, id) {
+  for (const c of list) {
+    if (c.id === id) return c
+    if (c.children && c.children.length) {
+      const hit = findComment(c.children, id)
+      if (hit) return hit
+    }
+  }
+  return null
+}
+function likeComment({ id }) {
+  if (!getCurrentUser()) { toast('请先登录'); return }
+  apiFetch('/api/comments/' + id + '/like', { method: 'POST' }).then((d) => {
+    if (!d) return
+    if (!d.success) { toast(d.message || '操作失败'); return }
+    const c = findComment(comments.value, id)
+    if (c) { c.liked = !!d.liked; c.likes = d.likes }
+  }).catch(() => toast('操作失败'))
+}
 
 onMounted(async () => {
   // 登录态就绪后再拉数据：作者操作（删除帖/评论）依赖 me
@@ -191,6 +211,7 @@ onMounted(async () => {
             :post-link="postLink"
             @reply="startReply"
             @delete="deleteComment"
+            @like="likeComment"
           />
         </div>
         <div class="comment-input">
