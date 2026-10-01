@@ -28,6 +28,11 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 	poolCfg.MaxConns = 10
 	poolCfg.MinConns = 1
 	poolCfg.MaxConnLifetime = 30 * time.Minute
+	// 每新建连接固定 UTC：保证 NOW()/CURRENT_DATE 恒为 UTC 墙钟，与库内 TIMESTAMP 列（无时区）惯例一致
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET TIME ZONE 'UTC'")
+		return err
+	}
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, fmt.Errorf("创建连接池失败: %w", err)
@@ -94,49 +99,6 @@ func GenID(prefix string) string {
 		idCounter = 0
 	}
 	return fmt.Sprintf("%s%d", prefix, now)
-}
-
-// ---- HTML 净化（对齐 legacy safe_html）----
-
-var ( // 常见危险标签黑名单（对齐 legacy DANGEROUS_TAGS）
-	dangerousTags = map[string]bool{
-		"script": true, "iframe": true, "embed": true, "object": true,
-		"applet": true, "base": true, "form": true, "input": true,
-		"textarea": true, "select": true, "option": true, "button": true,
-		"link": true, "meta": true, "svg": true, "math": true, "style": true,
-	}
-)
-
-var (
-	reComment     = regexp.MustCompile(`(?is)<!--[\s\S]*?-->`)
-	reDangerOpen  = regexp.MustCompile(`(?is)<(?:SCRIPT|IFRAME|EMBED|OBJECT|APPLET|BASE|FORM|INPUT|TEXTAREA|SELECT|OPTION|BUTTON|LINK|META|SVG|MATH|STYLE)\b[^>]*>`)
-	reDangerClose = regexp.MustCompile(`(?is)</(?:SCRIPT|IFRAME|EMBED|OBJECT|APPLET|BASE|FORM|INPUT|TEXTAREA|SELECT|OPTION|BUTTON|LINK|META|SVG|MATH|STYLE)\s*>`)
-	reOnEvent     = regexp.MustCompile(`(?is)\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)`)
-	reJSProto     = regexp.MustCompile(`(?is)(href|src|action|formaction)\s*=\s*("javascript:[^"]*"|'javascript:[^']*'|javascript:[^\s>]+)`)
-	reDataProto   = regexp.MustCompile(`(?is)(href|src|action)\s*=\s*("data:text/html[^"]*"|'data:text/html[^']*')`)
-)
-
-// SafeHTML 净化用户提交内容。
-func SafeHTML(content string) string {
-	if content == "" {
-		return ""
-	}
-	content = htmlUnescape(content)
-	content = reComment.ReplaceAllString(content, "")
-	content = reDangerOpen.ReplaceAllString(content, "")
-	content = reDangerClose.ReplaceAllString(content, "")
-	content = reOnEvent.ReplaceAllString(content, "")
-	content = reJSProto.ReplaceAllString(content, "")
-	content = reDataProto.ReplaceAllString(content, "")
-	return content
-}
-
-func htmlUnescape(s string) string {
-	repl := strings.NewReplacer(
-		"&amp;", "&", "&lt;", "<", "&gt;", ">", "&quot;", `"`, "&#39;", "'",
-		"&nbsp;", "\u00a0", "&lt;", "<",
-	)
-	return repl.Replace(s)
 }
 
 // StripEasterEgg 去除用户名彩蛋标记（|[TIME] 与 <p...> 旧格式）。

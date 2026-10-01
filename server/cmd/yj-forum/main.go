@@ -49,17 +49,19 @@ func main() {
 	sessions := &auth.SessionManager{DB: db}
 	mailer := email.New(cfg.SMTPEnabled, cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPassword, cfg.SMTPFromName, cfg.ReceiverAll)
 
-	// 4. 路由
+	// 4. 路由（返回帖子处理器，供定时发布任务复用 DB/缓存）
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
-	handler.Register(r, cfg, db, sessions, mailer)
+	postsH := handler.Register(r, cfg, db, sessions, mailer)
 
-	// 5. 后台清理任务（10 分钟：会话/验证码；1 小时：过期媒体文件）
+	// 5. 后台任务（10 分钟：会话/验证码；1 小时：过期媒体文件；1 分钟：定时帖到点补发通知）
 	go func() {
 		cleanTicker := time.NewTicker(10 * time.Minute)
 		defer cleanTicker.Stop()
 		mediaTicker := time.NewTicker(1 * time.Hour)
 		defer mediaTicker.Stop()
+		publishTicker := time.NewTicker(1 * time.Minute)
+		defer publishTicker.Stop()
 		for {
 			select {
 			case <-cleanTicker.C:
@@ -67,6 +69,8 @@ func main() {
 				_ = db.CleanExpiredVerifyCodes(ctx)
 			case <-mediaTicker.C:
 				cleanDeletedMediaFiles(ctx, db, cfg.MediaDir)
+			case <-publishTicker.C:
+				postsH.ProcessScheduledPublishes(ctx)
 			}
 		}
 	}()

@@ -256,7 +256,7 @@ func (d *DB) ListGuildMembers(ctx context.Context, guildID int64, page, pageSize
 		pageSize = 24
 	}
 	offset := (page - 1) * pageSize
-	rows, err := d.Query(ctx, `SELECT m.user_id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.vip, '0'),
+	rows, err := d.Query(ctx, `SELECT m.user_id, COALESCE(u.name, ''), COALESCE(u.avatar, ''),
 		COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
 		COALESCE(g.leader_user_id = m.user_id, false) AS is_leader, m.joined_at
 		FROM guild_members m JOIN guilds g ON g.id = m.guild_id
@@ -271,7 +271,7 @@ func (d *DB) ListGuildMembers(ctx context.Context, guildID int64, page, pageSize
 	members := []models.GuildMember{}
 	for rows.Next() {
 		var m models.GuildMember
-		if err := rows.Scan(&m.ID, &m.Name, &m.Avatar, &m.VIP, &m.Prefix, &m.Intro, &m.IsLeader, &m.JoinedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.Avatar, &m.Prefix, &m.Intro, &m.IsLeader, &m.JoinedAt); err != nil {
 			return nil, false, err
 		}
 		members = append(members, m)
@@ -357,7 +357,7 @@ func (d *DB) GetArticle(ctx context.Context, articleID string) (*models.GuildArt
 		FROM guild_articles a
 		LEFT JOIN users author ON author.id = a.author_user_id
 		LEFT JOIN guilds g ON g.id = a.guild_id
-		WHERE a.id = $1`, articleID).
+		WHERE a.id = $1 AND a.published_at <= NOW()`, articleID).
 		Scan(&a.ID, &a.GuildID, &a.Title, &a.Summary, &a.Content, &a.ContentFormat, &a.AuthorUserID, &a.Views,
 			&createdAt, &updatedAt, &authorID, &authorName, &authorAvatar, &guildSlug, &guildName, &guildTheme)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -406,12 +406,12 @@ func (d *DB) SearchArticles(ctx context.Context, keyword string, page, pageSize 
 	like := "%" + keyword + "%"
 	var total int
 	if err := d.QueryRow(ctx, `SELECT COUNT(*) FROM guild_articles
-		WHERE title ILIKE $1 OR summary ILIKE $1`, like).Scan(&total); err != nil {
+		WHERE (title ILIKE $1 OR summary ILIKE $1) AND published_at <= NOW()`, like).Scan(&total); err != nil {
 		return nil, 0, false, err
 	}
 	rows, err := d.Query(ctx, `SELECT a.id, a.title, COALESCE(g.name, ''), a.created_at
 		FROM guild_articles a LEFT JOIN guilds g ON g.id = a.guild_id
-		WHERE a.title ILIKE $1 OR a.summary ILIKE $1
+		WHERE (a.title ILIKE $1 OR a.summary ILIKE $1) AND a.published_at <= NOW()
 		ORDER BY a.created_at DESC, a.id DESC LIMIT $2 OFFSET $3`,
 		like, pageSize+1, offset)
 	if err != nil {
@@ -524,9 +524,9 @@ func (d *DB) queryFeed(ctx context.Context, postWhere string, args []any, articl
 
 // ListGuildFeed 会馆信息流：帖子 + 文章按时间倒序；category 非空时仅帖子。
 func (d *DB) ListGuildFeed(ctx context.Context, guildID int64, page, pageSize int, category string) ([]models.FeedItem, bool, error) {
-	postWhere := "p.status = 1 AND p.guild_id = $1"
+	postWhere := "p.status = 1 AND p.published_at <= NOW() AND p.guild_id = $1"
 	args := []any{guildID}
-	articleWhere := "a.guild_id = $1"
+	articleWhere := "a.published_at <= NOW() AND a.guild_id = $1"
 	if category != "" {
 		args = append(args, category)
 		postWhere += " AND p.category = $" + itoa(len(args))
@@ -537,7 +537,7 @@ func (d *DB) ListGuildFeed(ctx context.Context, guildID int64, page, pageSize in
 
 // ListGlobalFeed 全站信息流：space=all/public/guild；文章只在 all 或指定会馆时出现。
 func (d *DB) ListGlobalFeed(ctx context.Context, space string, guildID int64, category string, page, pageSize int) ([]models.FeedItem, bool, error) {
-	postWhere := "p.status = 1"
+	postWhere := "p.status = 1 AND p.published_at <= NOW()"
 	articleWhere := ""
 	args := []any{}
 	switch space {
@@ -547,13 +547,13 @@ func (d *DB) ListGlobalFeed(ctx context.Context, space string, guildID int64, ca
 		if guildID > 0 {
 			args = append(args, guildID)
 			postWhere += " AND p.guild_id = $1"
-			articleWhere = "a.guild_id = $1"
+			articleWhere = "a.published_at <= NOW() AND a.guild_id = $1"
 		} else {
 			// 未指定会馆：列出全部会馆帖子，不含文章
 			postWhere += " AND p.guild_id IS NOT NULL"
 		}
 	default: // all：公共 + 会馆帖子 + 文章
-		articleWhere = "TRUE"
+		articleWhere = "a.published_at <= NOW()"
 	}
 	if category != "" {
 		args = append(args, category)

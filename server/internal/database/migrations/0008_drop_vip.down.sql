@@ -1,0 +1,2 @@
+-- 回滚 0008：恢复 vip 列（历史值不保留，默认 '0'）
+ALTER TABLE users ADD COLUMN IF NOT EXISTS vip VARCHAR(32) NOT NULL DEFAULT '0';

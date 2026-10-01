@@ -12,7 +12,8 @@ type User struct {
 	Gender        int        `json:"gender"`
 	Age           string     `json:"age"`
 	Intro         string     `json:"intro"`
-	VIP           string     `json:"vip"`
+	Spirit        int        `json:"spirit"`       // 灵力值（签到累计）
+	LastSignIn    string     `json:"last_sign_in"` // 最近签到日期（YYYY-MM-DD，未签到为空）
 	Prefix        string     `json:"prefix"`
 	IsBanned      int        `json:"is_banned"`
 	EmailVerified int        `json:"email_verified"`
@@ -25,7 +26,6 @@ type UserBrief struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Avatar      string `json:"avatar"`
-	VIP         string `json:"vip"`
 	Prefix      string `json:"prefix"`
 	Intro       string `json:"intro"`
 	IsSelf      bool   `json:"is_self"`
@@ -47,8 +47,10 @@ type Post struct {
 	Status        int        `json:"status"`
 	CreatedAt     *time.Time `json:"created_at"`
 	UpdatedAt     *time.Time `json:"updated_at"`
-	UserName      string     `json:"user_name"`
-	UserAvatar    string     `json:"user_avatar"`
+	// PublishedAt 定时发布时间（未来=未发布；存量/立即帖为发布时刻，DB 恒非空）
+	PublishedAt *time.Time `json:"published_at,omitempty"`
+	UserName    string     `json:"user_name"`
+	UserAvatar  string     `json:"user_avatar"`
 	// 作者所属会馆（无会馆时为 "" / "" / false）
 	UserGuildName       string `json:"user_guild_name"`
 	UserGuildThemeColor string `json:"user_guild_theme_color"`
@@ -61,17 +63,18 @@ type Post struct {
 
 // Comment 评论。
 type Comment struct {
-	ID         string     `json:"id"`
-	PostID     string     `json:"post_id"`
-	UserID     string     `json:"user_id"`
-	Content    string     `json:"content"`
-	ParentID   *string    `json:"parent_id"`
-	Likes      int        `json:"likes"`
-	Status     int        `json:"status"`
-	LikedByMe  bool       `json:"liked_by_me"`
-	CreatedAt  *time.Time `json:"created_at"`
-	UserName   string     `json:"user_name"`
-	UserAvatar string     `json:"user_avatar"`
+	ID            string     `json:"id"`
+	PostID        string     `json:"post_id"`
+	UserID        string     `json:"user_id"`
+	Content       string     `json:"content"`
+	ContentFormat string     `json:"content_format"` // 正文存储形态：markdown（历史数据）/ html（新富文本）
+	ParentID      *string    `json:"parent_id"`
+	Likes         int        `json:"likes"`
+	Status        int        `json:"status"`
+	LikedByMe     bool       `json:"liked_by_me"`
+	CreatedAt     *time.Time `json:"created_at"`
+	UserName      string     `json:"user_name"`
+	UserAvatar    string     `json:"user_avatar"`
 	// 作者所属会馆（无会馆时为 "" / "" / false）
 	UserGuildName       string `json:"user_guild_name"`
 	UserGuildThemeColor string `json:"user_guild_theme_color"`
@@ -89,8 +92,10 @@ type PostListItem struct {
 	Views        int        `json:"views"`
 	CommentCount int        `json:"comment_count"`
 	CreatedAt    *time.Time `json:"created_at"`
-	UserName     string     `json:"user_name"`
-	UserAvatar   string     `json:"user_avatar"`
+	// PublishedAt 发布时间（RFC3339；本人视角下的定时帖为未来时间）
+	PublishedAt string `json:"published_at"`
+	UserName    string `json:"user_name"`
+	UserAvatar  string `json:"user_avatar"`
 	// 作者所属会馆（无会馆时为 "" / "" / false）
 	UserGuildName       string `json:"user_guild_name"`
 	UserGuildThemeColor string `json:"user_guild_theme_color"`
@@ -229,7 +234,6 @@ type GuildMember struct {
 	ID       string     `json:"id"`
 	Name     string     `json:"name"`
 	Avatar   string     `json:"avatar"`
-	VIP      string     `json:"vip"`
 	Prefix   string     `json:"prefix"`
 	Intro    string     `json:"intro"`
 	IsLeader bool       `json:"is_leader"`
@@ -303,7 +307,6 @@ type EmbedUser struct {
 	ID     string      `json:"id"`
 	Name   string      `json:"name"`
 	Avatar string      `json:"avatar"`
-	VIP    string      `json:"vip"`
 	Prefix string      `json:"prefix"`
 	Intro  string      `json:"intro"`
 	Guild  *EmbedGuild `json:"guild"`
@@ -392,4 +395,63 @@ type UserProfile struct {
 type VersionVoteStats struct {
 	V1 int `json:"v1"`
 	V2 int `json:"v2"`
+}
+
+// ---- Bug 反馈（公开读取，均不含提交人信息）----
+
+// BugReportListItem 反馈列表项（不含 steps）。
+type BugReportListItem struct {
+	ID        int64      `json:"id"`
+	Title     string     `json:"title"`
+	Detail    string     `json:"detail"`
+	Status    int        `json:"status"`
+	CreatedAt *time.Time `json:"created_at"`
+}
+
+// BugReport 反馈详情（不含提交人信息）。
+type BugReport struct {
+	ID        int64      `json:"id"`
+	Title     string     `json:"title"`
+	Detail    string     `json:"detail"`
+	Steps     string     `json:"steps"`
+	Status    int        `json:"status"`
+	CreatedAt *time.Time `json:"created_at"`
+}
+
+// BugReportLog 反馈状态流转日志（from_status 可为空）。
+type BugReportLog struct {
+	FromStatus *int       `json:"from_status"`
+	ToStatus   int        `json:"to_status"`
+	Note       string     `json:"note"`
+	CreatedAt  *time.Time `json:"created_at"`
+}
+
+// ---- 指南（guides）----
+
+// GuideNodeListItem 指南节点列表项（不含正文）。
+type GuideNodeListItem struct {
+	ID        string     `json:"id"`
+	ParentID  *string    `json:"parent_id"`
+	Title     string     `json:"title"`
+	Kind      string     `json:"kind"`
+	Sort      int        `json:"sort"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+
+// GuideNode 指南节点详情（含正文）。
+type GuideNode struct {
+	ID            string     `json:"id"`
+	ParentID      *string    `json:"parent_id"`
+	Title         string     `json:"title"`
+	Kind          string     `json:"kind"`
+	Sort          int        `json:"sort"`
+	Content       string     `json:"content"`
+	ContentFormat string     `json:"content_format"`
+	UpdatedAt     *time.Time `json:"updated_at"`
+}
+
+// BugReportStat 反馈状态统计项（status: 0 未处理 / 1 处理中 / 2 已处理 / 3 关闭）。
+type BugReportStat struct {
+	Status int `json:"status"`
+	Count  int `json:"count"`
 }

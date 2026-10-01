@@ -8,7 +8,7 @@ import (
 // 合法引用节点与格式标签应完整保留。
 func TestSanitizeRichContentKeepsValidEmbed(t *testing.T) {
 	in := `<p>看这里</p>` +
-		`<div data-embed="post" data-id="PS123_abc-XYZ" data-variant="card" data-size="md" data-fields="intro,vip" data-align="center"></div>`
+		`<div data-embed="post" data-id="PS123_abc-XYZ" data-variant="card" data-size="md" data-fields="intro,guild" data-align="center"></div>`
 	out := SanitizeRichContent(in)
 	for _, want := range []string{
 		"<p>看这里</p>",
@@ -16,7 +16,7 @@ func TestSanitizeRichContentKeepsValidEmbed(t *testing.T) {
 		`data-id="PS123_abc-XYZ"`,
 		`data-variant="card"`,
 		`data-size="md"`,
-		`data-fields="intro,vip"`,
+		`data-fields="intro,guild"`,
 		`data-align="center"`,
 	} {
 		if !strings.Contains(out, want) {
@@ -78,6 +78,17 @@ func TestSanitizeRichContentKeepsFormatting(t *testing.T) {
 		`href="https://yjlt.top/post/PS1"`, `href="/post/PS1"`, `<img src="/api/v1/media/MD1" alt="图" width="600" height="400">`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("合法标签/属性应保留 %q，实际输出：%s", want, out)
+		}
+	}
+}
+
+// pre/code 代码块标签应保留（代码展示）。
+func TestSanitizeRichContentKeepsPreCode(t *testing.T) {
+	in := `<pre><code>func main() { println("hi") }</code></pre>`
+	out := SanitizeRichContent(in)
+	for _, want := range []string{"<pre>", "<code>", "func main()"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("代码块内容应保留 %q，实际输出：%s", want, out)
 		}
 	}
 }

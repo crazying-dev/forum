@@ -14,8 +14,8 @@ import (
 // Search 搜索帖子/用户（缓存 120s）。
 func (h *PostsHandler) Search(c *gin.Context) {
 	k := strings.TrimSpace(c.Query("k"))
-	if len([]rune(k)) < 2 {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "关键词至少2个字符"})
+	if len([]rune(k)) < 1 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "关键词至少1个字符"})
 		return
 	}
 	typ := c.DefaultQuery("type", "both")

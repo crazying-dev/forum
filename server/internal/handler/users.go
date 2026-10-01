@@ -80,7 +80,8 @@ func (h *AuthHandler) UserProfile(c *gin.Context) {
 func (h *AuthHandler) UserPosts(c *gin.Context) {
 	id := c.Param("id")
 	page, pageSize := parsePage(c)
-	posts, err := h.DB.GetUserPosts(c.Request.Context(), id, page, pageSize)
+	viewer := h.CurrentUserFromCookie(c)
+	posts, err := h.DB.GetUserPosts(c.Request.Context(), id, viewer, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
 		return
@@ -99,7 +100,7 @@ type updateProfileReq struct {
 	Password *string `json:"password"`
 }
 
-// UpdateMe 修改资料。
+// UpdateMe 修改资料（白名单字段，灵力值 spirit / 签到日期 last_sign_in 不可由客户端修改）。
 func (h *AuthHandler) UpdateMe(c *gin.Context) {
 	uid := CurrentUser(c)
 	if uid == "" {
@@ -145,6 +146,27 @@ func (h *AuthHandler) UpdateMe(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ---- POST /api/v1/users/me/sign-in ----
+
+// SignIn 每日签到（当日未签到则灵力 +10；重复签到 409）。
+func (h *AuthHandler) SignIn(c *gin.Context) {
+	uid := CurrentUser(c)
+	if uid == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "请先登录"})
+		return
+	}
+	spirit, lastSignIn, signed, err := h.DB.SignInToday(c.Request.Context(), uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "签到失败"})
+		return
+	}
+	if !signed {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "message": "今日已签到"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"spirit": spirit, "last_sign_in": lastSignIn}})
 }
 
 // ---- POST /api/v1/users/:id/follow ----

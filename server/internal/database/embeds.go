@@ -15,7 +15,7 @@ func (d *DB) GetEmbedUsers(ctx context.Context, ids []string) ([]models.EmbedUse
 	if len(ids) == 0 {
 		return users, nil
 	}
-	rows, err := d.Query(ctx, `SELECT u.id, u.name, COALESCE(u.avatar, ''), COALESCE(u.vip, '0'), COALESCE(u.prefix, ''),
+	rows, err := d.Query(ctx, `SELECT u.id, u.name, COALESCE(u.avatar, ''), COALESCE(u.prefix, ''),
 		COALESCE(u.intro, ''), g.name, g.slug, COALESCE(g.theme_color, '')
 		FROM users u
 		LEFT JOIN guild_members gm ON gm.user_id = u.id
@@ -28,7 +28,7 @@ func (d *DB) GetEmbedUsers(ctx context.Context, ids []string) ([]models.EmbedUse
 	for rows.Next() {
 		var u models.EmbedUser
 		var guildName, guildSlug, guildTheme *string
-		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro,
+		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.Prefix, &u.Intro,
 			&guildName, &guildSlug, &guildTheme); err != nil {
 			return nil, err
 		}
@@ -40,7 +40,7 @@ func (d *DB) GetEmbedUsers(ctx context.Context, ids []string) ([]models.EmbedUse
 	return users, rows.Err()
 }
 
-// GetEmbedPosts 引用卡片帖子（仅 status=1 且作者未封禁）。
+// GetEmbedPosts 引用卡片帖子（仅已发布、status=1 且作者未封禁）。
 func (d *DB) GetEmbedPosts(ctx context.Context, ids []string) ([]models.EmbedPost, error) {
 	posts := []models.EmbedPost{}
 	if len(ids) == 0 {
@@ -50,7 +50,7 @@ func (d *DB) GetEmbedPosts(ctx context.Context, ids []string) ([]models.EmbedPos
 		COALESCE(p.category, ''), p.created_at, COALESCE(g.name, '')
 		FROM posts p JOIN users u ON u.id = p.user_id
 		LEFT JOIN guilds g ON g.id = p.guild_id
-		WHERE p.id = ANY($1::text[]) AND p.status = 1 AND u.is_banned = 0`, ids)
+		WHERE p.id = ANY($1::text[]) AND p.status = 1 AND p.published_at <= NOW() AND u.is_banned = 0`, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func (d *DB) GetEmbedArticles(ctx context.Context, ids []string) ([]models.Embed
 		FROM guild_articles a
 		LEFT JOIN users au ON au.id = a.author_user_id
 		LEFT JOIN guilds g ON g.id = a.guild_id
-		WHERE a.id = ANY($1::text[])`, ids)
+		WHERE a.id = ANY($1::text[]) AND a.published_at <= NOW()`, ids)
 	if err != nil {
 		return nil, err
 	}

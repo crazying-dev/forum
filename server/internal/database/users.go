@@ -2,24 +2,31 @@ package database
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"yj-forum/server/internal/models"
 )
 
-// 注：gender/age/intro/prefix 可为 NULL（历史数据，如个别账号 prefix 未写），读取时统一 COALESCE 兜底
-const userCols = `id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login`
+// 注：gender/age/intro/prefix 可为 NULL（历史数据，如个别账号 prefix 未写），读取时统一 COALESCE 兜底；
+// last_sign_in 可空（未签到），扫描后格式化为 YYYY-MM-DD
+const userCols = `id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), spirit, last_sign_in, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login`
 
 func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 	var u models.User
-	var createdAt, lastLogin *time.Time
-	err := row.Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.VIP,
+	var createdAt, lastLogin, lastSignIn *time.Time
+	err := row.Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.Spirit, &lastSignIn,
 		&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin)
 	if err != nil {
 		return nil, err
 	}
 	u.CreatedAt = createdAt
 	u.LastLogin = lastLogin
+	if lastSignIn != nil {
+		u.LastSignIn = lastSignIn.Format("2006-01-02")
+	}
 	return &u, nil
 }
 
@@ -32,16 +39,19 @@ func (d *DB) GetUserByID(ctx context.Context, id string) (*models.User, error) {
 func (d *DB) GetUserByName(ctx context.Context, name string) (*models.User, string, error) {
 	var u models.User
 	var pwd string
-	var createdAt, lastLogin *time.Time
-	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, password
+	var createdAt, lastLogin, lastSignIn *time.Time
+	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), spirit, last_sign_in, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, password
 		FROM users WHERE name=$1`, name).
-		Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.VIP,
+		Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.Spirit, &lastSignIn,
 			&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin, &pwd)
 	if err != nil {
 		return nil, "", err
 	}
 	u.CreatedAt = createdAt
 	u.LastLogin = lastLogin
+	if lastSignIn != nil {
+		u.LastSignIn = lastSignIn.Format("2006-01-02")
+	}
 	return &u, pwd, nil
 }
 
@@ -49,28 +59,49 @@ func (d *DB) GetUserByName(ctx context.Context, name string) (*models.User, stri
 func (d *DB) GetUserByEmail(ctx context.Context, email string) (*models.User, string, error) {
 	var u models.User
 	var pwd string
-	var createdAt, lastLogin *time.Time
-	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, password
+	var createdAt, lastLogin, lastSignIn *time.Time
+	err := d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), spirit, last_sign_in, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, password
 		FROM users WHERE email=$1`, email).
-		Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.VIP,
+		Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.Spirit, &lastSignIn,
 			&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin, &pwd)
 	if err != nil {
 		return nil, "", err
 	}
 	u.CreatedAt = createdAt
 	u.LastLogin = lastLogin
+	if lastSignIn != nil {
+		u.LastSignIn = lastSignIn.Format("2006-01-02")
+	}
 	return &u, pwd, nil
 }
 
 // NewUser 注册新用户。email/name 冲突返回对应错误。
 func (d *DB) NewUser(ctx context.Context, name, email, passwordHash, avatar string) (string, error) {
 	id := GenID("RL")
-	_, err := d.Exec(ctx, `INSERT INTO users (id, name, avatar, email, password, vip) VALUES ($1,$2,$3,$4,$5,'0')`,
+	_, err := d.Exec(ctx, `INSERT INTO users (id, name, avatar, email, password) VALUES ($1,$2,$3,$4,$5)`,
 		id, name, avatar, email, passwordHash)
 	if err != nil {
 		return "", err
 	}
 	return id, nil
+}
+
+// SignInToday 每日签到：当日未签到则灵力 +10 并刷新签到日期。
+// 返回最新灵力与签到日期；当日已签到返回 (0, "", false, nil)。
+func (d *DB) SignInToday(ctx context.Context, userID string) (int, string, bool, error) {
+	var spirit int
+	var lastSignIn *time.Time
+	// 签到日界固定为 Asia/Shanghai（东八区）：避免库会话时区（UTC）导致跨零点口径偏差
+	err := d.QueryRow(ctx, `UPDATE users SET spirit = spirit + 10, last_sign_in = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date
+		WHERE id = $1 AND (last_sign_in IS NULL OR last_sign_in < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date)
+		RETURNING spirit, last_sign_in`, userID).Scan(&spirit, &lastSignIn)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, "", false, nil
+	}
+	if err != nil {
+		return 0, "", false, err
+	}
+	return spirit, lastSignIn.Format("2006-01-02"), true, nil
 }
 
 // UpdateUserProfile 更新资料（白名单字段）。
@@ -169,7 +200,7 @@ func (d *DB) HasFavoritedPost(ctx context.Context, postID, userID string) bool {
 	return n > 0
 }
 
-// GetUserFavorites 用户收藏帖子列表。
+// GetUserFavorites 用户收藏帖子列表（仅已发布）。
 func (d *DB) GetUserFavorites(ctx context.Context, userID string, page, pageSize int) ([]models.PostListItem, error) {
 	if page < 1 {
 		page = 1
@@ -178,37 +209,18 @@ func (d *DB) GetUserFavorites(ctx context.Context, userID string, page, pageSize
 		pageSize = 20
 	}
 	offset := (page - 1) * pageSize
-	rows, err := d.Query(ctx, `SELECT p.id, p.user_id, p.title, `+postSummaryExpr+`, p.category, p.likes, p.views,
+	return d.queryPostListItems(ctx, `SELECT p.id, p.user_id, p.title, `+postSummaryExpr+`, p.category, p.likes, p.views,
 		p.created_at, u.name, u.avatar,
 		(SELECT COUNT(*) FROM comments c WHERE c.post_id = p.id AND c.status = 1) AS comment_count,
 		p.guild_id, g.name, g.theme_color,
-		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false)
+		COALESCE(ug.name, ''), COALESCE(ug.theme_color, ''), COALESCE(ug.leader_user_id = p.user_id, false),
+		p.published_at
 		FROM post_favorites f JOIN posts p ON f.post_id = p.id JOIN users u ON p.user_id = u.id
 		LEFT JOIN guilds g ON g.id = p.guild_id
 		LEFT JOIN guild_members ugm ON ugm.user_id = p.user_id
 		LEFT JOIN guilds ug ON ug.id = ugm.guild_id
-		WHERE f.user_id = $1 AND p.status = 1 ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
+		WHERE f.user_id = $1 AND p.status = 1 AND p.published_at <= NOW() ORDER BY f.created_at DESC LIMIT $2 OFFSET $3`,
 		userID, pageSize, offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var posts []models.PostListItem
-	for rows.Next() {
-		var p models.PostListItem
-		var createdAt *time.Time
-		var guildID *int64
-		var guildName, guildTheme *string
-		if err := rows.Scan(&p.ID, &p.UserID, &p.Title, &p.Summary, &p.Category, &p.Likes, &p.Views, &createdAt, &p.UserName, &p.UserAvatar, &p.CommentCount,
-			&guildID, &guildName, &guildTheme,
-			&p.UserGuildName, &p.UserGuildThemeColor, &p.UserIsLeader); err != nil {
-			return nil, err
-		}
-		p.CreatedAt = createdAt
-		p.GuildID, p.GuildName, p.GuildThemeColor = guildCols(guildID, guildName, guildTheme)
-		posts = append(posts, p)
-	}
-	return posts, rows.Err()
 }
 
 // ToggleFollow 关注/取消（禁自关）。
@@ -271,8 +283,8 @@ func (d *DB) followList(ctx context.Context, side, userID, viewerID string, page
 		mutual = `(COALESCE($4, '') <> '' AND $4 <> $1 AND EXISTS(
 			SELECT 1 FROM user_follows f3 WHERE f3.follower_id = $4 AND f3.following_id = u.id))`
 	}
-	// 历史数据中 name/avatar/vip/prefix/intro 可能为 NULL（如个别账号 prefix 未写），统一 COALESCE 兜底
-	rows, err := d.Query(ctx, `SELECT u.id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.vip, '0'), COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
+	// 历史数据中 name/avatar/prefix/intro 可能为 NULL（如个别账号 prefix 未写），统一 COALESCE 兜底
+	rows, err := d.Query(ctx, `SELECT u.id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
 		(u.id = $4) AS is_self,
 		EXISTS(SELECT 1 FROM user_follows f2 WHERE f2.follower_id = $4 AND f2.following_id = u.id) AS is_following,
 		`+mutual+` AS is_mutual
@@ -286,7 +298,7 @@ func (d *DB) followList(ctx context.Context, side, userID, viewerID string, page
 	users := []models.UserBrief{}
 	for rows.Next() {
 		var u models.UserBrief
-		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing, &u.IsMutual); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing, &u.IsMutual); err != nil {
 			return nil, false, err
 		}
 		users = append(users, u)
@@ -311,7 +323,7 @@ func (d *DB) GetMutualList(ctx context.Context, userID, viewerID string, page, p
 	}
 	offset := (page - 1) * pageSize
 	// 同 followList：nullable 列统一 COALESCE 兜底
-	rows, err := d.Query(ctx, `SELECT u.id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.vip, '0'), COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
+	rows, err := d.Query(ctx, `SELECT u.id, COALESCE(u.name, ''), COALESCE(u.avatar, ''), COALESCE(u.prefix, ''), COALESCE(u.intro, ''),
 		(u.id = $4) AS is_self, TRUE AS is_following, TRUE AS is_mutual
 		FROM user_follows a JOIN user_follows b ON b.following_id = a.following_id
 		JOIN users u ON u.id = a.following_id
@@ -325,7 +337,7 @@ func (d *DB) GetMutualList(ctx context.Context, userID, viewerID string, page, p
 	users := []models.UserBrief{}
 	for rows.Next() {
 		var u models.UserBrief
-		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing, &u.IsMutual); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.Prefix, &u.Intro, &u.IsSelf, &u.IsFollowing, &u.IsMutual); err != nil {
 			return nil, false, err
 		}
 		users = append(users, u)

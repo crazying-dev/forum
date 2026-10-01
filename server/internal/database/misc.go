@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"yj-forum/server/internal/models"
 )
@@ -116,6 +119,104 @@ func (d *DB) ReportBug(ctx context.Context, title, detail, steps, contact, repor
 	return id, err
 }
 
+// ---- Bug 反馈公开读取（脱敏：不下发 reporter_id/reporter_name/contact/user_agent/page_url）----
+
+// ListBugReports 公开反馈列表（status 可选过滤，created_at DESC）。
+func (d *DB) ListBugReports(ctx context.Context, status *int, page, pageSize int) ([]models.BugReportListItem, int, bool, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 50 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
+	where := ""
+	args := []any{}
+	if status != nil {
+		args = append(args, *status)
+		where = " WHERE status = $1"
+	}
+	var total int
+	_ = d.QueryRow(ctx, "SELECT COUNT(*) FROM bug_reports"+where, args...).Scan(&total)
+	// 列表接口只下发 detail 前 200 字符，避免公开分页接口一次性暴露全文（详情接口保留全文）
+	rows, err := d.Query(ctx, `SELECT id, title, LEFT(detail, 200), status, created_at FROM bug_reports`+where+
+		` ORDER BY created_at DESC LIMIT $`+itoa(len(args)+1)+` OFFSET $`+itoa(len(args)+2),
+		append(args, pageSize, offset)...)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	defer rows.Close()
+	items := []models.BugReportListItem{}
+	for rows.Next() {
+		var it models.BugReportListItem
+		var createdAt *time.Time
+		if err := rows.Scan(&it.ID, &it.Title, &it.Detail, &it.Status, &createdAt); err != nil {
+			return nil, 0, false, err
+		}
+		it.CreatedAt = createdAt
+		items = append(items, it)
+	}
+	hasMore := offset+len(items) < total
+	return items, total, hasMore, rows.Err()
+}
+
+// GetBugReportStats 反馈状态统计（0/1/2/3 四态均返回，无数据计 0）。
+func (d *DB) GetBugReportStats(ctx context.Context) ([]models.BugReportStat, error) {
+	counts := map[int]int{}
+	rows, err := d.Query(ctx, `SELECT status, COUNT(*) FROM bug_reports GROUP BY status`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status, count int
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, err
+		}
+		counts[status] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	stats := make([]models.BugReportStat, 0, 4)
+	for s := 0; s <= 3; s++ {
+		stats = append(stats, models.BugReportStat{Status: s, Count: counts[s]})
+	}
+	return stats, nil
+}
+
+// GetBugReportDetail 公开反馈详情与状态日志（logs 按时间升序，不合成首条）；不存在返回 (nil, nil, nil)。
+func (d *DB) GetBugReportDetail(ctx context.Context, id int64) (*models.BugReport, []models.BugReportLog, error) {
+	var r models.BugReport
+	var createdAt *time.Time
+	err := d.QueryRow(ctx, `SELECT id, title, detail, steps, status, created_at FROM bug_reports WHERE id=$1`, id).
+		Scan(&r.ID, &r.Title, &r.Detail, &r.Steps, &r.Status, &createdAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	r.CreatedAt = createdAt
+	rows, err := d.Query(ctx, `SELECT from_status, to_status, note, created_at FROM bug_report_logs
+		WHERE report_id = $1 ORDER BY created_at ASC`, id)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+	logs := []models.BugReportLog{}
+	for rows.Next() {
+		var l models.BugReportLog
+		var logCreatedAt *time.Time
+		if err := rows.Scan(&l.FromStatus, &l.ToStatus, &l.Note, &logCreatedAt); err != nil {
+			return nil, nil, err
+		}
+		l.CreatedAt = logCreatedAt
+		logs = append(logs, l)
+	}
+	return &r, logs, rows.Err()
+}
+
 // ---- 搜索 ----
 
 // SearchPosts 帖子搜索（ILIKE 多词 AND + 相关性）。
@@ -133,8 +234,8 @@ func (d *DB) SearchPosts(ctx context.Context, keyword string, page, pageSize int
 	if len(terms) == 0 {
 		return []models.PostListItem{}, 0, false, nil
 	}
-	// 组装 WHERE
-	where := "WHERE p.status = 1"
+	// 组装 WHERE（仅已发布帖子）
+	where := "WHERE p.status = 1 AND p.published_at <= NOW()"
 	args := []any{}
 	for _, t := range terms {
 		args = append(args, "%"+t+"%")
@@ -196,7 +297,7 @@ func (d *DB) SearchUsers(ctx context.Context, keyword string, page, pageSize int
 	var total int
 	_ = d.QueryRow(ctx, "SELECT COUNT(*) FROM users "+where, args...).Scan(&total)
 	// 相关性排序简化为 created_at（保持与 legacy 近似行为）
-	rows, err := d.Query(ctx, `SELECT id, name, avatar, vip, COALESCE(prefix, ''), COALESCE(intro, '') FROM users `+where+` ORDER BY created_at DESC LIMIT $`+itoa(len(args)+1)+` OFFSET $`+itoa(len(args)+2),
+	rows, err := d.Query(ctx, `SELECT id, name, avatar, COALESCE(prefix, ''), COALESCE(intro, '') FROM users `+where+` ORDER BY created_at DESC LIMIT $`+itoa(len(args)+1)+` OFFSET $`+itoa(len(args)+2),
 		append(args, pageSize, offset)...)
 	if err != nil {
 		return nil, 0, false, err
@@ -205,7 +306,7 @@ func (d *DB) SearchUsers(ctx context.Context, keyword string, page, pageSize int
 	var users []models.UserBrief
 	for rows.Next() {
 		var u models.UserBrief
-		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.VIP, &u.Prefix, &u.Intro); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.Avatar, &u.Prefix, &u.Intro); err != nil {
 			return nil, 0, false, err
 		}
 		users = append(users, u)

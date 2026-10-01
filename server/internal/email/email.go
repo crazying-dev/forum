@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log"
+	"net"
 	"net/smtp"
 	"strings"
 	"sync"
@@ -69,11 +70,14 @@ func (s *Sender) Send(subject, body string, receivers []string, htmlContent stri
 
 	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
 	auth := smtp.PlainAuth("", s.User, s.Password, s.Host)
-	conn, err := tls.Dial("tcp", addr, &tls.Config{ServerName: s.Host})
+	// 超时保护：拨号 10s，连接整个会话 30s，避免 SMTP 挂起拖死调用方；失败路径由 defer 统一清理
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: s.Host})
 	if err != nil {
 		return false, err
 	}
 	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 	client, err := smtp.NewClient(conn, s.Host)
 	if err != nil {
 		return false, err

@@ -14,7 +14,6 @@ type UserInfo struct {
 	Gender        int
 	Age           string
 	Intro         string
-	VIP           string
 	Prefix        string
 	IsBanned      int
 	EmailVerified int
@@ -26,7 +25,7 @@ type UserInfo struct {
 func scanUserWithPassword(row interface{ Scan(...any) error }) (*UserInfo, error) {
 	var u UserInfo
 	var createdAt, lastLogin *time.Time
-	err := row.Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.VIP,
+	err := row.Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro,
 		&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin, &u.Password)
 	if err != nil {
 		return nil, err
@@ -38,13 +37,13 @@ func scanUserWithPassword(row interface{ Scan(...any) error }) (*UserInfo, error
 
 // GetUserByNameWithPassword 按用户名查（含密码）。
 func (d *DB) GetUserByNameWithPassword(ctx context.Context, name string) (*UserInfo, error) {
-	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''),
+	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), COALESCE(prefix, ''),
 		is_banned, email_verified, created_at, last_login, password FROM users WHERE name=$1`, name))
 }
 
 // GetUserByEmailWithPassword 按邮箱查（含密码）。
 func (d *DB) GetUserByEmailWithPassword(ctx context.Context, email string) (*UserInfo, error) {
-	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), vip, COALESCE(prefix, ''),
+	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), COALESCE(prefix, ''),
 		is_banned, email_verified, created_at, last_login, password FROM users WHERE email=$1`, email))
 }
 

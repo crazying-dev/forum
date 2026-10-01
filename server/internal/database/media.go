@@ -16,10 +16,10 @@ type MediaAsset struct {
 	Mime     string
 }
 
-// CreateMediaAsset 记录用户上传图片资产（status=1 正常）。
-func (d *DB) CreateMediaAsset(ctx context.Context, id, fileName, originalName, mime string, size int64, uploaderID string) error {
+// CreateMediaAsset 记录用户上传图片资产（status=1 正常；scene 标记用途，如 post_image/comment_image）。
+func (d *DB) CreateMediaAsset(ctx context.Context, id, fileName, originalName, mime string, size int64, uploaderID, scene string) error {
 	_, err := d.Exec(ctx, `INSERT INTO media_assets (id, file_name, original_name, mime, size, uploader_user_id, scene, status)
-		VALUES ($1,$2,$3,$4,$5,$6,'post_image',1)`, id, fileName, originalName, mime, size, uploaderID)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,1)`, id, fileName, originalName, mime, size, uploaderID, scene)
 	return err
 }
 

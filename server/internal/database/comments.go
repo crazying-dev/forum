@@ -9,11 +9,11 @@ import (
 	"yj-forum/server/internal/models"
 )
 
-// AddComment 添加评论/回复。
-func (d *DB) AddComment(ctx context.Context, postID, userID, content string, parentID *string) (*models.Comment, error) {
+// AddComment 添加评论/回复（content 由调用方净化后传入；contentFormat 标记存储形态）。
+func (d *DB) AddComment(ctx context.Context, postID, userID, content, contentFormat string, parentID *string) (*models.Comment, error) {
 	id := GenID("CM")
-	_, err := d.Exec(ctx, `INSERT INTO comments (id, post_id, user_id, content, parent_id) VALUES ($1,$2,$3,$4,$5)`,
-		id, postID, userID, SafeHTML(content), parentID)
+	_, err := d.Exec(ctx, `INSERT INTO comments (id, post_id, user_id, content, content_format, parent_id) VALUES ($1,$2,$3,$4,$5,$6)`,
+		id, postID, userID, content, contentFormat, parentID)
 	if err != nil {
 		return nil, err
 	}
@@ -22,7 +22,7 @@ func (d *DB) AddComment(ctx context.Context, postID, userID, content string, par
 
 // GetComment 单条评论（JOIN 用户）。
 func (d *DB) GetComment(ctx context.Context, id string) (*models.Comment, error) {
-	row := d.QueryRow(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
+	row := d.QueryRow(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.content_format, c.parent_id, c.likes, c.status,
 		c.created_at, u.name, u.avatar,
 		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false)
 		FROM comments c JOIN users u ON c.user_id = u.id
@@ -31,13 +31,21 @@ func (d *DB) GetComment(ctx context.Context, id string) (*models.Comment, error)
 		WHERE c.id = $1`, id)
 	var c models.Comment
 	var createdAt *time.Time
-	err := row.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar,
+	err := row.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ContentFormat, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar,
 		&c.UserGuildName, &c.UserGuildThemeColor, &c.UserIsLeader)
 	if err != nil {
 		return nil, err
 	}
 	c.CreatedAt = createdAt
 	return &c, nil
+}
+
+// GetCommentPostAndStatus 查询评论所属帖子与状态（parent_id 回复校验用）；不存在返回 pgx.ErrNoRows。
+func (d *DB) GetCommentPostAndStatus(ctx context.Context, id string) (string, int, error) {
+	var postID string
+	var status int
+	err := d.QueryRow(ctx, "SELECT post_id, status FROM comments WHERE id=$1", id).Scan(&postID, &status)
+	return postID, status, err
 }
 
 // GetPostComments 帖子评论列表。
@@ -49,7 +57,7 @@ func (d *DB) GetPostComments(ctx context.Context, postID string, page, pageSize 
 		pageSize = 50
 	}
 	offset := (page - 1) * pageSize
-	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
+	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.content_format, c.parent_id, c.likes, c.status,
 		c.created_at, u.name, u.avatar,
 		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false)
 		FROM comments c JOIN users u ON c.user_id = u.id
@@ -61,11 +69,11 @@ func (d *DB) GetPostComments(ctx context.Context, postID string, page, pageSize 
 		return nil, err
 	}
 	defer rows.Close()
-	var comments []models.Comment
+	comments := []models.Comment{}
 	for rows.Next() {
 		var c models.Comment
 		var createdAt *time.Time
-		if err := rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar,
+		if err := rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &c.ContentFormat, &c.ParentID, &c.Likes, &c.Status, &createdAt, &c.UserName, &c.UserAvatar,
 			&c.UserGuildName, &c.UserGuildThemeColor, &c.UserIsLeader); err != nil {
 			return nil, err
 		}
@@ -173,7 +181,7 @@ func (d *DB) GetRepliesToMyComments(ctx context.Context, userID string, page, pa
 	_ = d.QueryRow(ctx, `SELECT COUNT(*) FROM comments c
 		WHERE c.parent_id IN (SELECT id FROM comments WHERE user_id = $1 AND status = 1)
 		AND c.status = 1 AND c.user_id <> $1`, userID).Scan(&total)
-	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
+	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.content_format, c.parent_id, c.likes, c.status,
 		c.created_at, u.name, u.avatar,
 		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false),
 		p.title
@@ -188,11 +196,11 @@ func (d *DB) GetRepliesToMyComments(ctx context.Context, userID string, page, pa
 		return nil, 0, err
 	}
 	defer rows.Close()
-	var replies []models.ReplyItem
+	replies := []models.ReplyItem{}
 	for rows.Next() {
 		var r models.ReplyItem
 		var createdAt *time.Time
-		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar,
+		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ContentFormat, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar,
 			&r.UserGuildName, &r.UserGuildThemeColor, &r.UserIsLeader, &r.PostTitle); err != nil {
 			return nil, 0, err
 		}
@@ -213,7 +221,7 @@ func (d *DB) GetUserComments(ctx context.Context, userID string, page, pageSize 
 	offset := (page - 1) * pageSize
 	var total int
 	_ = d.QueryRow(ctx, `SELECT COUNT(*) FROM comments WHERE user_id = $1 AND status = 1`, userID).Scan(&total)
-	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.parent_id, c.likes, c.status,
+	rows, err := d.Query(ctx, `SELECT c.id, c.post_id, c.user_id, c.content, c.content_format, c.parent_id, c.likes, c.status,
 		c.created_at, u.name, u.avatar,
 		COALESCE(g.name, ''), COALESCE(g.theme_color, ''), COALESCE(g.leader_user_id = c.user_id, false),
 		p.title
@@ -227,11 +235,11 @@ func (d *DB) GetUserComments(ctx context.Context, userID string, page, pageSize 
 		return nil, 0, err
 	}
 	defer rows.Close()
-	var replies []models.ReplyItem
+	replies := []models.ReplyItem{}
 	for rows.Next() {
 		var r models.ReplyItem
 		var createdAt *time.Time
-		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar,
+		if err := rows.Scan(&r.ID, &r.PostID, &r.UserID, &r.Content, &r.ContentFormat, &r.ParentID, &r.Likes, &r.Status, &createdAt, &r.UserName, &r.UserAvatar,
 			&r.UserGuildName, &r.UserGuildThemeColor, &r.UserIsLeader, &r.PostTitle); err != nil {
 			return nil, 0, err
 		}

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"html"
 	"log"
 	"net/http"
 	"strings"
@@ -66,6 +67,25 @@ func (h *PostsHandler) Random(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "posts": posts})
 }
 
+// ---- GET /api/v1/posts/picker-defaults ----
+
+// PickerDefaults 引用选择器默认项（登录用户；关注/收藏各至多 20 条，依赖 viewer 不做共享缓存）。
+func (h *PostsHandler) PickerDefaults(c *gin.Context) {
+	uid := CurrentUser(c)
+	if uid == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "请先登录"})
+		return
+	}
+	following, favorites, err := h.DB.GetPickerDefaultPosts(c.Request.Context(), uid)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"following_posts": following, "favorite_posts": favorites,
+	}})
+}
+
 // ---- POST /api/v1/posts ----
 
 type createPostReq struct {
@@ -75,6 +95,8 @@ type createPostReq struct {
 	GuildID  *int64 `json:"guild_id"`
 	// GuildUUID 会馆稳定标识（优先于 guild_id）
 	GuildUUID string `json:"guild_uuid"`
+	// PublishedAt 定时发布时间（RFC3339 字符串，可选；未来时间即定时未发布）
+	PublishedAt string `json:"published_at"`
 }
 
 // Create 发帖（可选 guild_uuid/guild_id：需为会馆成员，分类取自该馆配置）。
@@ -100,10 +122,37 @@ func (h *PostsHandler) Create(c *gin.Context) {
 		return
 	}
 	sanitizedContent := sanitize.SanitizeRichContent(req.Content)
+	// 内容节点上限（净化后计数）：防超大 DOM 结构拖垮渲染与存储
+	if strings.Count(sanitizedContent, "<img") > 60 || strings.Count(sanitizedContent, "data-embed=") > 30 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "图片/引用数量过多"})
+		return
+	}
 	hasRichMedia := strings.Contains(sanitizedContent, "<img") || strings.Contains(sanitizedContent, "data-embed")
 	if sanitize.StripTagsAndTrim(sanitizedContent) == "" && !hasRichMedia {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "正文不能为空"})
 		return
+	}
+	// 定时发布（可选）：RFC3339 解析；必须晚于当前时间 1 分钟且不超过 365 天
+	var publishedAt *time.Time
+	if raw := strings.TrimSpace(req.PublishedAt); raw != "" {
+		t, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "定时发布时间格式错误，需 RFC3339"})
+			return
+		}
+		now := time.Now()
+		if !t.After(now.Add(time.Minute)) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "定时发布时间需晚于当前时间 1 分钟"})
+			return
+		}
+		if t.After(now.Add(365 * 24 * time.Hour)) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "定时发布时间不能超过 365 天"})
+			return
+		}
+		// 时间列与比较基准均为库内 NOW()/CURRENT_TIMESTAMP（实测该库时区为 UTC）；
+		// 统一转 UTC 存储，保证 published_at <= NOW() 口径一致
+		utc := t.UTC()
+		publishedAt = &utc
 	}
 	var (
 		cat     string
@@ -134,13 +183,15 @@ func (h *PostsHandler) Create(c *gin.Context) {
 	} else {
 		cat = normalizeCategory(req.Category)
 	}
-	postID, err := h.DB.SendPost(c.Request.Context(), uid, title, req.Content, cat, guildID)
+	postID, err := h.DB.SendPost(c.Request.Context(), uid, title, req.Content, cat, guildID, publishedAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "发布失败"})
 		return
 	}
-	// 粉丝通知（异步）
-	go h.notifyFollowers(uid, postID, title)
+	if publishedAt == nil {
+		// 立即帖异步通知粉丝；定时帖由 ProcessScheduledPublishes 到点补发
+		go h.notifyFollowers(uid, postID, title)
+	}
 	h.Cache.Posts.DeletePrefix("posts:list:")
 	c.JSON(http.StatusCreated, gin.H{"success": true, "id": postID})
 }
@@ -153,8 +204,9 @@ func (h *PostsHandler) notifyFollowers(userID, postID, title string) {
 		return
 	}
 	plain := "你的关注者 " + userID + " 发布了新帖《" + title + "》\n" + "https://" + h.Cfg.PublicBaseURL + "/post/" + postID
-	html := email.BuildHTML("新帖通知", "关注的人发布了新帖",
-		[]string{"你的关注者发布了新帖", "<strong>" + title + "</strong>", "点击查看详情"},
+	// HTML 邮件中对帖子标题转义，防止用户构造的标题注入 HTML
+	htmlBody := email.BuildHTML("新帖通知", "关注的人发布了新帖",
+		[]string{"你的关注者发布了新帖", "<strong>" + html.EscapeString(title) + "</strong>", "点击查看详情"},
 		"查看帖子", "https://"+h.Cfg.PublicBaseURL+"/post/"+postID, "")
 	// 分批 100 封
 	for start := 0; start < len(emails); start += 100 {
@@ -162,9 +214,49 @@ func (h *PostsHandler) notifyFollowers(userID, postID, title string) {
 		if end > len(emails) {
 			end = len(emails)
 		}
-		_, _ = h.Mailer.Send("【妖精论坛】你的关注者发布了新帖", plain, emails[start:end], html)
+		_, _ = h.Mailer.Send("【妖精论坛】你的关注者发布了新帖", plain, emails[start:end], htmlBody)
 	}
 	log.Printf("[POST] 发帖通知已发送 %d 位粉丝", len(emails))
+}
+
+// postVisible 帖子可见性校验：不存在、已软删（status != 1）、或定时未发布且 viewer 非作者时写入 404 并返回 false。
+// 供点赞/收藏/举报/评论等路径复用（GetPostPublishInfo 仅取发布状态，不含帖子正文）；
+// 软删帖与 Detail 行为一致，一律视为不可见，不能再评论/点赞/收藏/举报/读评论列表。
+func (h *PostsHandler) postVisible(c *gin.Context, postID, viewer string) bool {
+	authorID, publishedAt, status, exists, err := h.DB.GetPostPublishInfo(c.Request.Context(), postID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return false
+	}
+	if !exists || status != 1 || (publishedAt.After(time.Now()) && viewer != authorID) {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "帖子不存在"})
+		return false
+	}
+	return true
+}
+
+// ProcessScheduledPublishes 定时补发任务：把到点的定时帖原子标记为已通知（每次至多 50 条）
+// 并补发粉丝通知；有新帖转公开时失效帖子列表/搜索/详情缓存。由 main 每分钟 ticker 调用。
+func (h *PostsHandler) ProcessScheduledPublishes(ctx context.Context) {
+	pending, err := h.DB.ClaimPendingPublishPosts(ctx)
+	if err != nil {
+		log.Printf("[POST] 定时发布认领失败: %v", err)
+		return
+	}
+	if len(pending) == 0 {
+		return
+	}
+	for _, p := range pending {
+		// 逐帖异步通知（与立即帖策略一致）：邮件发送不阻塞定时任务主循环
+		go h.notifyFollowers(p.UserID, p.ID, p.Title)
+	}
+	// 定时帖转为可见：失效帖子列表、搜索与单帖详情缓存
+	h.Cache.Posts.DeletePrefix("posts:list:")
+	h.Cache.Search.DeletePrefix("search:")
+	for _, p := range pending {
+		h.Cache.PostDetail.Delete("post:detail:" + p.ID)
+	}
+	log.Printf("[POST] 定时发布完成 %d 篇", len(pending))
 }
 
 // ---- GET /api/v1/posts/:id ----
@@ -185,6 +277,11 @@ func (h *PostsHandler) Detail(c *gin.Context) {
 	}
 	post, err := h.DB.GetPost(c.Request.Context(), id)
 	if err != nil || post == nil || post.Status != 1 {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "帖子不存在"})
+		return
+	}
+	// 定时帖未到发布时间：仅作者本人可见，其余视角一律 404
+	if post.PublishedAt != nil && post.PublishedAt.After(time.Now()) && me != post.UserID {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "帖子不存在"})
 		return
 	}
@@ -239,6 +336,9 @@ func (h *PostsHandler) Like(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
+	if !h.postVisible(c, id, uid) {
+		return
+	}
 	liked, likes, err := h.DB.LikePost(c.Request.Context(), id, uid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "操作失败"})
@@ -259,6 +359,9 @@ func (h *PostsHandler) Favorite(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
+	if !h.postVisible(c, id, uid) {
+		return
+	}
 	favorited, err := h.DB.ToggleFavorite(c.Request.Context(), id, uid)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "操作失败"})
@@ -303,6 +406,9 @@ func (h *PostsHandler) Report(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
+	if !h.postVisible(c, id, uid) {
+		return
+	}
 	var req reportPostReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})

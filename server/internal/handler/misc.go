@@ -4,10 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"html"
 	"log"
 	"math/big"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -261,13 +263,69 @@ func (h *MiscHandler) ReportBug(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "提交失败"})
 		return
 	}
-	// 通知管理员
+	// 通知管理员（HTML 邮件中对用户可控片段转义，防注入）
 	go func() {
 		plain := "Bug 报告 #" + fmt.Sprintf("%d", id) + "\n标题: " + req.Title + "\n详情: " + req.Detail
-		html := email.BuildHTML("Bug 报告", "收到新的 Bug 报告", []string{"标题: " + req.Title, "详情: " + req.Detail, "提交人: " + reporterName}, "", "", "")
-		_, _ = h.Mailer.Send("【妖精论坛】Bug 报告 #"+fmt.Sprintf("%d", id), plain, []string{h.Cfg.ReceiverAll}, html)
+		htmlBody := email.BuildHTML("Bug 报告", "收到新的 Bug 报告", []string{"标题: " + html.EscapeString(req.Title), "详情: " + html.EscapeString(req.Detail), "提交人: " + reporterName}, "", "", "")
+		_, _ = h.Mailer.Send("【妖精论坛】Bug 报告 #"+fmt.Sprintf("%d", id), plain, []string{h.Cfg.ReceiverAll}, htmlBody)
 	}()
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Bug 提交成功", "id": id})
+}
+
+// ---- Bug 反馈公开读取（脱敏）----
+
+// ListBugReports 反馈列表（公开；status 可选过滤；不含提交人信息）。
+func (h *MiscHandler) ListBugReports(c *gin.Context) {
+	var status *int
+	if s := strings.TrimSpace(c.Query("status")); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 0 || n > 3 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+			return
+		}
+		status = &n
+	}
+	page, pageSize := parsePageWithDefault(c, 10)
+	if pageSize > 50 {
+		pageSize = 10
+	}
+	items, total, hasMore, err := h.DB.ListBugReports(c.Request.Context(), status, page, pageSize)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"items": items, "total": total, "page": page, "page_size": pageSize, "has_more": hasMore,
+	}})
+}
+
+// BugReportStats 反馈状态统计（公开；0/1/2/3 四态均返回）。
+func (h *MiscHandler) BugReportStats(c *gin.Context) {
+	stats, err := h.DB.GetBugReportStats(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"stats": stats}})
+}
+
+// BugReportDetail 反馈详情与状态日志（公开；不存在 404）。
+func (h *MiscHandler) BugReportDetail(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "反馈不存在"})
+		return
+	}
+	report, logs, err := h.DB.GetBugReportDetail(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+		return
+	}
+	if report == nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "反馈不存在"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"report": report, "logs": logs}})
 }
 
 // ---- 彩蛋 ----

@@ -136,8 +136,16 @@ func (h *MediaHandler) UploadImage(c *gin.Context) {
 	}
 
 	assetID := database.GenID("MD")
+	// 用途 scene（form/query 均可传）：仅允许 post_image/comment_image，非法或缺省回退 post_image
+	scene := strings.TrimSpace(c.PostForm("scene"))
+	if scene == "" {
+		scene = strings.TrimSpace(c.Query("scene"))
+	}
+	if scene != "post_image" && scene != "comment_image" {
+		scene = "post_image"
+	}
 	if err := h.DB.CreateMediaAsset(c.Request.Context(), assetID, fileName,
-		truncateRunes(filepath.Base(file.Filename), 255), imageMime(ext), written, uid); err != nil {
+		truncateRunes(filepath.Base(file.Filename), 255), imageMime(ext), written, uid, scene); err != nil {
 		_ = os.Remove(full)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "保存失败"})
 		return

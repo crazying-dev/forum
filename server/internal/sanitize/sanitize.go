@@ -3,7 +3,7 @@
 //
 //	<div data-embed="user|post|article" data-id="{1-64位[A-Za-z0-9_-]}"
 //	     [data-variant="card|compact"] [data-size="sm|md|lg"]
-//	     [data-fields="intro,vip,guild 逗号子集，空串=全不显示，缺省=全显示"]
+//	     [data-fields="intro,guild 逗号子集，空串=全不显示，缺省=全显示"]
 //	     [data-align="left|center"]></div>
 package sanitize
 
@@ -32,6 +32,7 @@ func newPolicy() *bluemonday.Policy {
 	p.AllowElements("p", "br", "hr", "h1", "h2", "h3", "h4",
 		"strong", "b", "em", "i", "u", "s", "strike",
 		"ul", "ol", "li", "blockquote", "figure", "figcaption",
+		"pre", "code",
 		"a", "img", "div")
 	p.AllowAttrs("href").OnElements("a")
 	// 图片宽度/高度由管理端编辑器写入（整数），此处不做值约束

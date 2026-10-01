@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"html"
 	"net/http"
 	"strings"
 	"time"
@@ -11,7 +12,11 @@ import (
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/email"
 	"yj-forum/server/internal/models"
+	"yj-forum/server/internal/sanitize"
 )
+
+// maxCommentContentBytes 评论原始正文长度上限（64KB，与发帖富文本一致）。
+const maxCommentContentBytes = 64 * 1024
 
 // ---- GET /api/v1/posts/:id/comments ----
 
@@ -21,6 +26,10 @@ func (h *PostsHandler) Comments(c *gin.Context) {
 	page, _ := parsePage(c)
 	pageSize := 50
 	me := currentUserFromCookie(c, h.Sessions)
+	// 定时未发布帖（非作者视角）与不存在的帖子：评论列表同样 404
+	if !h.postVisible(c, id, me) {
+		return
+	}
 	key := "comments:post:" + id + ":" + itoa(page)
 	if me == "" {
 		if v, ok := h.Cache.Comments.Get(key); ok {
@@ -53,7 +62,7 @@ type createCommentReq struct {
 	ParentID *string `json:"parent_id"`
 }
 
-// CreateComment 评论/回复。
+// CreateComment 评论/回复（富文本，与发帖共用净化白名单）。
 func (h *PostsHandler) CreateComment(c *gin.Context) {
 	uid := CurrentUser(c)
 	if uid == "" {
@@ -61,17 +70,47 @@ func (h *PostsHandler) CreateComment(c *gin.Context) {
 		return
 	}
 	postID := c.Param("id")
+	// 定时未发布帖（非作者视角）与不存在的帖子不可评论
+	if !h.postVisible(c, postID, uid) {
+		return
+	}
 	var req createCommentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
 		return
 	}
-	content := strings.TrimSpace(req.Content)
-	if content == "" || len([]rune(content)) > 500 {
+	// 原始 HTML 长度上限
+	if len(req.Content) > maxCommentContentBytes {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "内容过长"})
+		return
+	}
+	// 富文本净化（与发帖一致）；纯文本需 1-500 字，纯图片/纯引用卡视为有效
+	content := sanitize.SanitizeRichContent(strings.TrimSpace(req.Content))
+	// 内容节点上限（净化后计数）：防超大 DOM 结构拖垮渲染与存储
+	if strings.Count(content, "<img") > 20 || strings.Count(content, "data-embed=") > 10 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "图片/引用数量过多"})
+		return
+	}
+	plain := sanitize.StripTagsAndTrim(content)
+	plainLen := len([]rune(plain))
+	hasRichMedia := strings.Contains(content, "<img") || strings.Contains(content, "data-embed")
+	if plainLen > 500 || (plainLen == 0 && !hasRichMedia) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "内容需1-500字符"})
 		return
 	}
-	comment, err := h.DB.AddComment(c.Request.Context(), postID, uid, content, req.ParentID)
+	// 回复校验：父评论必须存在、与本帖同帖且未删除
+	parentID := req.ParentID
+	if parentID != nil && strings.TrimSpace(*parentID) == "" {
+		parentID = nil
+	}
+	if parentID != nil {
+		parentPostID, parentStatus, err := h.DB.GetCommentPostAndStatus(c.Request.Context(), *parentID)
+		if err != nil || parentPostID != postID || parentStatus != 1 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "回复的评论不存在或已删除"})
+			return
+		}
+	}
+	comment, err := h.DB.AddComment(c.Request.Context(), postID, uid, content, "html", parentID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "评论失败"})
 		return
@@ -110,9 +149,10 @@ func (h *PostsHandler) notifyComment(comment *models.Comment) {
 	if targetEmail == "" || targetUserID == comment.UserID {
 		return
 	}
-	plain := "你收到一条新回复：\n" + comment.Content
-	html := email.BuildHTML("评论通知", "收到新回复", []string{"你收到一条新回复：", comment.Content}, "", "", "")
-	_, _ = h.Mailer.Send("【妖精论坛】收到新回复", plain, []string{targetEmail}, html)
+	// 邮件正文取剥标签纯文本（HTML 邮件中转义）
+	plain := "你收到一条新回复：\n" + sanitize.StripTagsAndTrim(comment.Content)
+	htmlBody := email.BuildHTML("评论通知", "收到新回复", []string{"你收到一条新回复：", html.EscapeString(plain)}, "", "", "")
+	_, _ = h.Mailer.Send("【妖精论坛】收到新回复", plain, []string{targetEmail}, htmlBody)
 }
 
 // ---- DELETE /api/v1/comments/:id ----
@@ -125,10 +165,16 @@ func (h *PostsHandler) DeleteComment(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
+	comment, _ := h.DB.GetComment(c.Request.Context(), id)
 	ok, err := h.DB.DeleteComment(c.Request.Context(), id, uid)
 	if err != nil || !ok {
 		c.JSON(http.StatusForbidden, gin.H{"success": false, "message": "无权限删除该评论"})
 		return
+	}
+	// 使评论列表与帖子详情缓存失效
+	if comment != nil {
+		h.Cache.Comments.DeletePrefix("comments:post:" + comment.PostID)
+		h.Cache.PostDetail.Delete("post:detail:" + comment.PostID)
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }

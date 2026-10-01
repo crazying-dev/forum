@@ -12,8 +12,8 @@ import (
 	"yj-forum/server/internal/middleware"
 )
 
-// Register 注册全部路由（RESTful /api/v1）。
-func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth.SessionManager, mailer *email.Sender) {
+// Register 注册全部路由（RESTful /api/v1）；返回帖子处理器，供后台定时发布任务复用 DB/缓存句柄。
+func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth.SessionManager, mailer *email.Sender) *PostsHandler {
 	r.Use(middleware.Logger())
 	r.Use(middleware.SecurityHeaders())
 	r.Use(middleware.CORS(cfg.CORSOrigins))
@@ -27,6 +27,7 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	guildsH := &GuildsHandler{DB: db, Cache: cacheSet, Sessions: sessions}
 	mediaH := &MediaHandler{DB: db, Cfg: cfg}
 	embedsH := &EmbedsHandler{DB: db}
+	guidesH := &GuidesHandler{DB: db}
 
 	api := r.Group("/api/v1")
 
@@ -45,6 +46,7 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	// ---- 用户 ----
 	api.GET("/users/me", authH.Me)
 	api.PATCH("/users/me", authH.AuthRequired(), authH.UpdateMe)
+	api.POST("/users/me/sign-in", authH.AuthRequired(), authH.SignIn)
 	api.GET("/users/me/replies", authH.AuthRequired(), authH.MyReplies)
 	api.POST("/users/me/verify-email", authH.AuthRequired(), miscH.SendVerifyEmailCode)
 	api.POST("/users/me/verify-email/confirm", authH.AuthRequired(), miscH.VerifyCodeEmail)
@@ -60,6 +62,7 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	// ---- 帖子 ----
 	api.GET("/posts", postsH.List)
 	api.GET("/posts/random", postsH.Random)
+	api.GET("/posts/picker-defaults", postsH.AuthRequired(), postsH.PickerDefaults)
 	api.GET("/posts/:id", postsH.Detail)
 	api.POST("/posts", postsH.AuthRequired(), postsH.Create)
 	api.POST("/posts/:id/like", postsH.AuthRequired(), postsH.Like)
@@ -90,6 +93,10 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	// ---- 搜索 ----
 	api.GET("/search", postsH.Search)
 
+	// ---- 指南（公开读取）----
+	api.GET("/guides", guidesH.List)
+	api.GET("/guides/:id", guidesH.Detail)
+
 	// ---- 引用卡片 / 媒体 ----
 	api.GET("/embeds", embedsH.List)
 	api.POST("/media/images", middleware.RateLimit("media_image", 30, 600*time.Second), authH.AuthRequired(), mediaH.UploadImage)
@@ -98,9 +105,15 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	// ---- 投票 / 举报 / 杂项 ----
 	api.POST("/votes/version", miscH.VoteVersion)
 	api.GET("/votes/version/stats", miscH.VoteVersionStats)
-	api.POST("/reports/bug", miscH.ReportBug)
+	// 反馈接口限流：提交 20 次/小时，公开读取 120 次/分钟（按 IP 分桶）
+	api.POST("/reports/bug", middleware.RateLimit("report_bug_create", 20, time.Hour), miscH.ReportBug)
+	api.GET("/reports/bug", middleware.RateLimit("report_bug_list", 120, time.Minute), miscH.ListBugReports)
+	api.GET("/reports/bug/stats", middleware.RateLimit("report_bug_stats", 120, time.Minute), miscH.BugReportStats)
+	api.GET("/reports/bug/:id", middleware.RateLimit("report_bug_detail", 120, time.Minute), miscH.BugReportDetail)
 	api.GET("/easter-egg", miscH.EasterEgg)
 
 	api.POST("/users/me/avatar", authH.AuthRequired(), postsH.UploadAvatar)
 	api.GET("/avatar/:filename", postsH.ServeAvatar)
+
+	return postsH
 }
