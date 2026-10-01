@@ -189,6 +189,8 @@
     gap: 16px;
     max-height: 500px;
     overflow-y: auto;
+    /* 显式声明横向滚动：深层评论的物理缩进超出容器时由本容器承载（勿改为 visible/hidden，否则深层内容会被裁掉） */
+    overflow-x: auto;
     padding-right: 8px;
 }
 
@@ -222,7 +224,27 @@
 
 .comment-body {
     flex: 1;
-    min-width: 0;
+    /* 窗宽下限 160px：无限嵌套把正文区挤压到该宽度后不再收窄，避免深层正文被夹成 0 宽不可读；
+       .comment-text 固定 200px（最窄可读宽度），因此窗宽 160–200px 时产生 0–40px 内滚动；
+       更深的物理缩进（整块被推出容器）由外层评论列表 .comment-list 横向滚动承载 */
+    min-width: 160px;
+    /* 无限层级把正文区挤得过窄时，只允许正文区横向滚动：头像不随动、卡片不被撑破 */
+    overflow-x: auto;
+    scrollbar-width: thin; /* Firefox 极简细滚动条 */
+}
+
+/* 正文横向滚动条压到约 6px 高，与主题色系一致（默认不出现，仅在挤压到最窄可读宽度以下时出现） */
+.comment-body::-webkit-scrollbar {
+    height: 6px;
+}
+
+.comment-body::-webkit-scrollbar-thumb {
+    background: var(--color-border-search);
+    border-radius: 3px;
+}
+
+.comment-body::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .comment-header {
@@ -253,6 +275,10 @@
     color: var(--color-text-primary);
     line-height: 1.6;
     word-break: break-word;
+    /* 最窄可读宽度：当逐级缩进把正文区窗宽压到 200px 以下时，正文溢出、
+       .comment-body 出现横向滚动条（窗宽下限 160px，内滚动最多 40px），
+       避免无限层级把文字挤成细条；更深层级由评论列表横向滚动承载 */
+    min-width: 200px;
 }
 
 .comment-footer {
@@ -353,11 +379,12 @@
     color: var(--color-primary);
 }
 
-.comment-replies {
-    /* 每条主评论下方的回复区整体向内缩进 8 空格深度；所有回复 1/2/3… 都在同一列左对齐，不再逐级后移 */
-    margin-left: 64px;
-    padding-left: 0;
-    border-left: none;
+.comment-children {
+    /* 子评论容器：逐级缩进，每级视觉缩进步长约 32px（margin 24 + padding 8 + 竖线 2）；
+       淡色竖线标示层级；不要 overflow:hidden，否则会裁掉正文的横向滚动条 */
+    margin-left: 24px;
+    padding-left: 8px;
+    border-left: 2px solid var(--color-border-divider);
     margin-top: 8px;
 }
 
@@ -370,11 +397,6 @@
     height: 28px;
 }
 
-.comment-replies-hidden {
-    display: none;
-    margin-top: 8px;
-}
-
 .comment-replies-toggle {
     background: transparent;
     border: none;
@@ -382,8 +404,9 @@
     cursor: pointer;
     font-size: 12px;
     padding: 4px 0;
-    margin-top: 4px;
+    margin-top: 2px;
     transition: opacity 0.2s;
+    white-space: nowrap; /* 深层容器被挤压时按钮文字保持单行（避免竖排） */
 }
 
 .comment-replies-toggle:hover {
@@ -392,5 +415,14 @@
 
 .comment-replies-toggle i {
     margin-right: 4px;
+}
+
+/* 移动端：每级缩进减半（margin 8 + padding 6 + 竖线 2，合计约 16px），
+   避免小屏下无限层级过快触发横向滚动 */
+@media (max-width: 700px) {
+    .comment-children {
+        margin-left: 8px;
+        padding-left: 6px;
+    }
 }
 

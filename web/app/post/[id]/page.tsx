@@ -27,7 +27,7 @@ export default function PostDetailPage() {
   const [liked, setLiked] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [replyTo, setReplyTo] = useState<{ id: string; name: string } | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; name: string; path: string[] } | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
   const [showReport, setShowReport] = useState(false);
