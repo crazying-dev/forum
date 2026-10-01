@@ -276,6 +276,17 @@
     gap: 16px;
 }
 
+/* 个人中心帖子卡片：定时发布标签在桌面跟随标签行展示（order 1）；统计列右对齐 */
+.post-item-footer .post-scheduled-tag-wrap {
+    order: 1;
+    margin-left: 6px;
+}
+
+.post-item-footer .post-item-stats {
+    order: 2;
+    margin-left: auto;
+}
+
 .post-item-category {
     padding: 2px 10px;
     border-radius: 10px;
@@ -345,6 +356,11 @@
     color: #f59e0b;
     font-size: 12px;
     white-space: nowrap;
+}
+
+/* 定时发布标签容器：移动端独占一行（包裹层保留标签自然宽度；桌面随行内联） */
+.post-scheduled-tag-wrap {
+    display: inline-flex;
 }
 
 /* 本人「今日签到 +10」按钮（复用 .user-follow-btn 的定位/主色） */
@@ -448,6 +464,7 @@
     .user-profile-meta {
         order: 2;
         justify-content: center;
+        margin-top: 12px;
     }
 
     /* 简介之后先展示会馆/馆长标签，性别年龄等 meta 置于其后 */
@@ -478,6 +495,37 @@
 
     .post-item-title {
         font-size: 16px;
+    }
+
+    /* 移动端：页脚纵向分行——其他标签 / 浏览量等统计 / 定时发布（最后一行） */
+    .post-item-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .post-item-tags {
+        flex-wrap: wrap;
+    }
+
+    .post-item-footer .post-item-stats {
+        margin-left: 0;
+    }
+
+    .post-item-footer .post-scheduled-tag-wrap {
+        order: 3;
+        margin-left: 0;
+        flex-basis: auto;
+    }
+
+    /* 收藏列表页脚单行右对齐（保持原视觉） */
+    .post-item-footer-right {
+        align-items: flex-end;
+    }
+
+    /* 帖子详情页：定时发布标签独占一行（wrap 为 meta-top 直接子项） */
+    .post-scheduled-tag-wrap {
+        flex-basis: 100%;
     }
 }
 

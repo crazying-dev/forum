@@ -396,11 +396,6 @@ export default function UserPage() {
                       <div className="post-item-tags">
                         <CategoryBadge category={p.category} className="post-item-category" />
                         <SpaceBadge name={p.guild_name} color={p.guild_theme_color} />
-                        {isSelf && isScheduled(p.published_at) && (
-                          <span className="post-scheduled-tag" title="尚未到达发布时间，仅自己可见">
-                            <i className="fa fa-clock-o"></i> 定时发布 {fmtDateTime(p.published_at)}
-                          </span>
-                        )}
                       </div>
                       <div className="post-item-stats">
                         <span><i className="fa fa-eye"></i> {p.views || 0}</span>
@@ -408,6 +403,13 @@ export default function UserPage() {
                         <span><i className="fa fa-comment"></i> {p.comment_count ?? 0}</span>
                         <span><i className="fa fa-clock-o"></i> {fmtDate(p.created_at)}</span>
                       </div>
+                      {isSelf && isScheduled(p.published_at) && (
+                        <span className="post-scheduled-tag-wrap">
+                          <span className="post-scheduled-tag" title="尚未到达发布时间，仅自己可见">
+                            <i className="fa fa-clock-o"></i> 定时发布 {fmtDateTime(p.published_at)}
+                          </span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))

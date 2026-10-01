@@ -448,11 +448,13 @@ header{
     color: var(--color-primary);
 }
 
+/* 控制台 WIKI 图标：显式重置（对抗全局 svg,img{all:inherit} 从按钮继承的 min-height/padding/背景），仅保留 24px 图标本体 */
 .console-tile img {
+    all: unset;
+    display: block;
     width: 24px;
     height: 24px;
-    border-radius: 50%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .console-theme {
