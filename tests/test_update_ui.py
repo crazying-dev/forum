@@ -252,15 +252,42 @@ def test_is_installer_detects_setup_name():
     assert updater.is_installer("") is False
 
 
-def test_installer_script_silent_and_restarts():
-    script = updater._installer_script_text(Path(r"C:\u\1.3.2\forum_setup.exe"),
-                                            Path(r"C:\app\forum.exe"))
-    assert "/SILENT" in script
-    assert "/NORESTART" in script
-    assert "forum_setup.exe" in script
-    assert 'start "" /wait' in script
-    assert 'start "" "%APP%"' in script
-    assert "tasklist" in script
+class _NoopAtexit:
+    """替代 atexit：只记录回调，绝不真的注册（避免测试进程退出时 Popen 假 exe）。"""
+
+    def __init__(self) -> None:
+        self.handlers: list = []
+
+    def register(self, fn, *args, **kwargs):
+        self.handlers.append(fn)
+        return fn
+
+
+def test_run_pending_install_schedules_on_exit():
+    """「退出时自动安装」不再经 .cmd，而是登记到 atexit 直接唤起安装包。"""
+    target = paths.update_dir("9.9.5") / "forum_setup.exe"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"x")
+    fake = _NoopAtexit()
+    _patch(updater, "atexit", fake)
+    _patch(updater, "_EXIT_INSTALLER", None)
+    _patch(updater, "_EXIT_HOOK_REGISTERED", False)
+    try:
+        updater.clear_pending_install()
+        assert updater.set_pending_install(target, "9.9.5") is True
+        assert updater.run_pending_install() is True
+        # 登记文件已被消费，避免下次启动重复安装
+        assert updater.pending_install() is None
+        assert updater._EXIT_INSTALLER == target
+        assert len(fake.handlers) == 1
+        assert fake.handlers[0] is updater._run_exit_installer
+    finally:
+        _restore_all()
+        updater.clear_pending_install()
+        try:
+            target.unlink()
+        except OSError:
+            pass
 
 
 # ────────────────────── 退出时自动安装 ──────────────────────

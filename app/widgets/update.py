@@ -286,6 +286,8 @@ def download_and_install(parent: QWidget | None, info, *, on_status=None) -> Non
         if choice != "now":
             toast("安装包已保存，可在「下载」页稍后安装")
             return
+        # 「立即安装」成功时 launch_installer 会直接 sys.exit(0)：SystemExit 不是
+        # Exception 的子类，会穿透下面的 except 正常结束进程（atexit 随之唤起安装包）。
         try:
             ok, message = updater.launch_installer(path)
         except Exception as exc:  # noqa: BLE001

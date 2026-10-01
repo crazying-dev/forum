@@ -266,18 +266,13 @@ def test_remove_part_deletes_part_file():
 def test_write_script_never_produces_double_cr():
     """回归：脚本必须先拼 CRLF 再以 newline="" 原样落盘，绝不得出现 \\r\\r\\n。"""
     target = paths.update_dir("9.9.9") / "apply_update.cmd"
-    texts = [
-        updater._script_text(Path("C:/u/a.exe"), Path("C:/app/forum.exe")),
-        updater._installer_script_text(Path("C:/u/forum_setup.exe"),
-                                       Path("C:/app/forum.exe")),
-    ]
     try:
-        for text in texts:
-            updater._write_script(target, text)
-            data = target.read_bytes()
-            assert b"\r\r\n" not in data, "出现 \\r\\r\\n，cmd 会解析失败"
-            assert b"\r\n" in data
-            assert b"\n" not in data.replace(b"\r\n", b""), "存在裸 LF"
+        updater._write_script(
+            target, updater._script_text(Path("C:/u/a.exe"), Path("C:/app/forum.exe")))
+        data = target.read_bytes()
+        assert b"\r\r\n" not in data, "出现 \\r\\r\\n，cmd 会解析失败"
+        assert b"\r\n" in data
+        assert b"\n" not in data.replace(b"\r\n", b""), "存在裸 LF"
     finally:
         try:
             target.unlink()
@@ -287,34 +282,119 @@ def test_write_script_never_produces_double_cr():
 
 def test_scripts_avoid_timeout_and_use_ping():
     """无控制台（GUI 拉起的 cmd）里 timeout 不可用，改用 ping 做延时。"""
-    installer = updater._installer_script_text(Path(r"C:\u\1.3.4\forum_setup.exe"),
-                                              Path(r"C:\app\forum.exe"))
     legacy = updater._script_text(Path(r"C:\u\a.exe"), Path(r"C:\app\forum.exe"))
-    for script in (installer, legacy):
-        assert "ping -n 2 127.0.0.1" in script
-        assert "timeout /t" not in script
-    # 原有行为不能回退
-    for token in ("/SILENT", "/NORESTART", "forum_setup.exe", 'start "" /wait',
-                  'start "" "%APP%"', "tasklist", "for /L %%i"):
-        assert token in installer, "安装脚本缺少 %s" % token
-
-
-def test_installer_script_optional_log():
-    log = Path(r"C:\u\apply_update.log")
-    script = updater._installer_script_text(Path(r"C:\u\forum_setup.exe"),
-                                           Path(r"C:\app\forum.exe"), log)
-    assert "apply_update.log" in script
-    assert "apply_update start" in script
-    assert "installer finished" in script
-    plain = updater._installer_script_text(Path(r"C:\u\forum_setup.exe"),
-                                          Path(r"C:\app\forum.exe"))
-    assert "apply_update.log" not in plain
+    assert "ping -n 2 127.0.0.1" in legacy
+    assert "timeout /t" not in legacy
+    # 热替换脚本的原有行为不能回退
+    for token in ("move /y", "tasklist", "for /L %%i", 'start "" "%DST%"'):
+        assert token in legacy, "热替换脚本缺少 %s" % token
 
 
 def test_spawn_script_redirects_standard_streams():
     source = inspect.getsource(updater._spawn_script)
     assert "DETACHED_PROCESS" in source
     assert "DEVNULL" in source
+
+
+# ───────────── 安装包直启（CREATE_NO_WINDOW + atexit） ─────────────
+
+
+class _FakeAtexit:
+    """替代 atexit：只记录回调，绝不真的注册。
+
+    否则 pytest / run_tests 自己退出时会去 Popen 测试用的假 exe。
+    """
+
+    def __init__(self) -> None:
+        self.handlers: list = []
+
+    def register(self, fn, *args, **kwargs):
+        self.handlers.append(fn)
+        return fn
+
+
+def test_spawn_installer_uses_create_no_window():
+    """安装包必须用 CREATE_NO_WINDOW 直接唤起，不能再经 cmd / .cmd 中转。"""
+    source = inspect.getsource(updater._spawn_installer)
+    assert "CREATE_NO_WINDOW" in source
+    assert "shell=False" in source
+    assert '"cmd"' not in source and "'cmd'" not in source
+
+    recorded: dict = {}
+    _patch(updater.subprocess, "Popen",
+           lambda argv, **kw: recorded.update(argv=argv, kw=kw))
+    try:
+        updater._spawn_installer(Path(r"C:\u\1.3.7\forum_setup.exe"))
+    finally:
+        _restore_all()
+    assert recorded["argv"][0] == r"C:\u\1.3.7\forum_setup.exe"
+    assert list(recorded["argv"][1:]) == list(updater.INSTALLER_ARGS)
+    assert recorded["kw"].get("shell") is False
+    assert recorded["kw"].get("creationflags") == getattr(
+        updater.subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def test_schedule_install_on_exit_registers_hook():
+    target = paths.update_dir("9.9.7") / "forum_setup.exe"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"x")
+    fake = _FakeAtexit()
+    spawned: list = []
+    _patch(updater, "atexit", fake)
+    _patch(updater, "_EXIT_INSTALLER", None)
+    _patch(updater, "_EXIT_HOOK_REGISTERED", False)
+    _patch(updater, "_spawn_installer", lambda path: spawned.append(path))
+    try:
+        assert updater.schedule_install_on_exit(target) is True
+        assert fake.handlers and fake.handlers[0] is updater._run_exit_installer
+        assert updater._EXIT_INSTALLER == target
+        # 重复登记不重复注册钩子，但会刷新目标
+        assert updater.schedule_install_on_exit(target) is True
+        assert len(fake.handlers) == 1
+        # 退出回调：唤起一次并清空登记
+        updater._run_exit_installer()
+        assert spawned == [target]
+        assert updater._EXIT_INSTALLER is None
+        # 再调一次不会重复唤起
+        updater._run_exit_installer()
+        assert spawned == [target]
+        # 安装包不存在时不登记
+        assert updater.schedule_install_on_exit(target.parent / "missing.exe") is False
+    finally:
+        _restore_all()
+        try:
+            target.unlink()
+        except OSError:
+            pass
+
+
+def test_launch_installer_installer_branch_exits_with_zero():
+    """「立即安装」：登记退出钩子 → 退出事件循环 → sys.exit(0)。"""
+    target = paths.update_dir("9.9.6") / "forum_setup.exe"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(b"x")
+    fake = _FakeAtexit()
+    quit_called: list = []
+    _patch(updater, "atexit", fake)
+    _patch(updater, "_EXIT_INSTALLER", None)
+    _patch(updater, "_EXIT_HOOK_REGISTERED", False)
+    _patch(updater, "_quit_app", lambda: quit_called.append(True))
+    _patch(updater.sys, "frozen", True)
+    code = "not-raised"
+    try:
+        try:
+            updater.launch_installer(str(target))
+        except SystemExit as exc:
+            code = exc.code
+    finally:
+        _restore_all()
+        try:
+            target.unlink()
+        except OSError:
+            pass
+    assert code == 0
+    assert quit_called == [True]
+    assert len(fake.handlers) == 1
 
 
 def test_launch_installer_rejects_dev_mode():

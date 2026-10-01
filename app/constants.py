@@ -17,7 +17,7 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.6"
+APP_VERSION = "1.3.7"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
 
 # ────────────────────────── 启动「支持作者」弹窗 ──────────────────────────

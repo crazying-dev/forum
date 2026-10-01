@@ -2,14 +2,14 @@
 ; Inno Setup script for the Forum Windows client (optional path).
 ; build.ps1 uses this automatically when ISCC.exe is installed.
 ; Compile manually:
-;   ISCC.exe /DMyAppVersion=1.3.6 /DStageDir=..\output\installer_stage CrForum.iss
+;   ISCC.exe /DMyAppVersion=1.3.7 /DStageDir=..\output\installer_stage CrForum.iss
 ; ============================================================
 
 #define MyAppName "Forum Client"
 #define MyAppExeName "forum.exe"
 
 #ifndef MyAppVersion
-  #define MyAppVersion "1.3.6"
+  #define MyAppVersion "1.3.7"
 #endif
 ; 安装包自身的文件信息（四段式版本号，便于在文件属性里看到版本）
 #define MyAppVersion4 MyAppVersion + ".0"
@@ -34,6 +34,11 @@ WizardStyle=modern
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 AllowNoIcons=yes
+; The client may still briefly hold forum.exe: let Restart Manager close it, then
+; overwrite the files (replaces the old .cmd "wait for the app to exit" loop).
+; RestartApplications=no: [Run] relaunches the client, so don't restart it twice.
+CloseApplications=yes
+RestartApplications=no
 VersionInfoVersion={#MyAppVersion4}
 VersionInfoProductVersion={#MyAppVersion}
 VersionInfoProductName={#MyAppName}
@@ -63,4 +68,7 @@ Root: HKCU; Subkey: "Software\Classes\Crforum\DefaultIcon"; ValueType: string; V
 Root: HKCU; Subkey: "Software\Classes\Crforum\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
+; NOTE: skipifsilent was removed on purpose: in /SILENT mode Setup now relaunches
+; the client itself once the install finishes. Previously the .cmd wrapper did the
+; "start" after install; the installer no longer goes through a .cmd helper.
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall

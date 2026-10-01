@@ -191,6 +191,15 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     赞赏码仍是远端图 `constants.PROMO_QR_URL`，由 `widgets.images.image_cache` 落盘缓存，
     首次下载后离线可用；与网页端（`base.html` 里的 `data-src`）、安卓端
     （`Constants.REWARD_QR_URL`）同源同图，改图只需换图床文件、三端一起生效。
+14. **更新安装不再经过 `.cmd` 中转（v1.3.7）**：「立即安装」与「退出时自动安装」都改为由
+    `app.updater.schedule_install_on_exit()` 登记到 `atexit`，进程退出时用
+    `subprocess.CREATE_NO_WINDOW` 直接唤起 `forum_setup.exe`（`shell=False`、标准流接空设备），
+    彻底消除旧版 `apply_update.cmd` 带来的「闪黑框 / 控制台一直开着卡住不响应」。
+    热替换分支（旧版裸 exe）必须等主程序退出才能覆盖自身，仍保留 `.cmd`。
+    安装器侧 `CrForum.iss` 显式声明 `CloseApplications=yes`（用 Restart Manager 关掉
+    仍占用 `forum.exe` 的客户端）+ `RestartApplications=no`，并去掉 `[Run]` 的
+    `skipifsilent`——`/SILENT` 静默安装装完后由安装器自己拉起客户端
+    （替代被移除的 `.cmd` 里那句 `start "" "%APP%"`）。
 
 ---
 

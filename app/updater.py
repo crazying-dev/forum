@@ -7,13 +7,17 @@
   :data:`constants.UPDATE_EXE_URL` 的指纹探测
 * 本地记录：``~/.Cr/forum/update/manifest.json``（``etag`` / ``last_modified`` / ``size`` / ``checked_at``）
 * 每个版本的安装包单独放在 ``~/.Cr/forum/update/<版本>/`` 下，互不污染
-* 下载物按文件名区分：``forum_setup*.exe`` 走静默安装（``/SILENT``，装完自动重启），
-  其余（旧版裸 exe）走热替换脚本
-* 约定：**对外函数都不抛异常**，失败原因写进 :class:`UpdateInfo.message`（中文，可直接展示）
+* 下载物按文件名区分：``forum_setup*.exe`` 走静默安装（``/SILENT``，装完由安装器
+  自己拉起客户端），其余（旧版裸 exe）走热替换脚本
+* 安装包**不再经 ``.cmd`` 中转**：由 :func:`schedule_install_on_exit` 登记到 :mod:`atexit`，
+  进程退出时用 ``CREATE_NO_WINDOW`` 直接唤起（消除黑框与卡住的控制台窗口）
+* 约定：**对外函数都不抛异常**（唯一例外：:func:`launch_installer` 的「立即安装」
+  会 ``sys.exit(0)`` 结束当前进程），失败原因写进 :class:`UpdateInfo.message`（中文，可直接展示）
 """
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import json
 import os
@@ -624,48 +628,22 @@ def _script_text(source: Path, target: Path) -> str:
     return "\r\n".join(lines)
 
 
-def _installer_script_text(setup: Path, app: Path, log: Path | None = None) -> str:
-    """安装包脚本：等主程序退出 → 静默安装（进度条可见）→ 重新启动客户端。
+def _spawn_installer(setup: Path) -> None:
+    """用 ``CREATE_NO_WINDOW`` 直接唤起安装包（不再经 ``.cmd`` 中转）。
 
-    Inno Setup 的 ``[Run]`` 段带 ``skipifsilent``，``/SILENT`` 下安装器
-    不会自己拉起程序，所以装完必须在这里手动 ``start``。
-    ``log`` 不为空时把关键节点写入日志，便于排查「安装器没启动」。
+    * ``shell=False`` + 可执行文件全路径，完全不经过命令解释器；
+    * ``CREATE_NO_WINDOW`` 不给子进程分配控制台窗口 —— 这正是旧版 ``.cmd``
+      中转「闪黑框 / 控制台一直开着卡住不响应」的根因；
+    * 标准流接空设备，避免把 GUI 进程无效的控制台句柄继承给子进程；
+    * ``/CLOSEAPPLICATIONS`` 让安装器用 Restart Manager 关掉仍在运行的客户端，
+      补偿被移除的「批处理等主程序退出」逻辑。
     """
-    name = app.name
-    args = " ".join(INSTALLER_ARGS)
-    lines = [
-        "@echo off",
-        "setlocal enableextensions",
-        'set "SETUP=' + str(setup) + '"',
-        'set "APP=' + str(app) + '"',
-    ]
-    if log is not None:
-        lines += [
-            'set "LOG=' + str(log) + '"',
-            'echo [%date% %time%] apply_update start> "%LOG%"',
-        ]
-    lines += [
-        "rem wait for the app to exit (max {} seconds), then install silently".format(WAIT_SECONDS),
-        # 同 _script_text：%%i 必须原样落到 .cmd，不能被 % 格式化折叠成 %i
-        "for /L %%i in (1,1,{}) do (".format(WAIT_SECONDS),
-        '  tasklist /fi "imagename eq ' + name + '" 2>nul | findstr /i "' + name + '" >nul',
-        "  if errorlevel 1 goto install",
-        "  ping -n 2 127.0.0.1 >nul",
-        ")",
-        ":install",
-        'start "" /wait "%SETUP%" ' + args,
-        "rem give the installer a moment to finish writing files",
-        "ping -n 3 127.0.0.1 >nul",
-        'start "" "%APP%"',
-    ]
-    if log is not None:
-        lines.append('echo [%date% %time%] installer finished>> "%LOG%"')
-    lines += [
-        'del "%~f0" >nul 2>&1',
-        "endlocal",
-        "",
-    ]
-    return "\r\n".join(lines)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    kwargs = {"creationflags": flags, "shell": False, "close_fds": True}
+    devnull = getattr(subprocess, "DEVNULL", None)
+    if devnull is not None:
+        kwargs.update(stdin=devnull, stdout=devnull, stderr=devnull)
+    subprocess.Popen([str(setup), *INSTALLER_ARGS], **kwargs)
 
 
 def _spawn_script(script: Path) -> None:
@@ -698,11 +676,57 @@ def _quit_app() -> None:
         _log.debug("退出当前进程失败：%s", exc)
 
 
+# ──────────────────── 退出时安装（atexit 钩子） ────────────────────
+#
+# 安装包不再写 ``.cmd`` 中转：而是在退出阶段用 ``CREATE_NO_WINDOW`` 直接唤起。
+# 钩子只在首次登记时注册，进程真正退出后才拉起安装器，
+# 因此不会在客户端仍占用 ``forum.exe`` 时启动安装程序。
+
+_EXIT_INSTALLER: Path | None = None
+_EXIT_HOOK_REGISTERED = False
+
+
+def _run_exit_installer() -> None:
+    """``atexit`` 回调：进程退出阶段唤起已登记的安装包。"""
+    global _EXIT_INSTALLER
+    path = _EXIT_INSTALLER
+    _EXIT_INSTALLER = None
+    if path is None:
+        return
+    try:
+        if not Path(path).is_file():
+            _log.warning("退出时安装：安装包已不存在，跳过：%s", path)
+            return
+        _spawn_installer(Path(path))
+        _log.info("退出时已唤起安装包：%s", path)
+    except Exception as exc:  # noqa: BLE001
+        _log.error("退出时唤起安装包失败：%s", exc, exc_info=True)
+
+
+def schedule_install_on_exit(exe_path) -> bool:
+    """登记「退出程序后自动安装」；安装包不存在时返回 False。
+
+    只在首次登记时注册 ``atexit`` 钩子（避免重复），进程退出后由
+    :func:`_run_exit_installer` 用 ``CREATE_NO_WINDOW`` 直接唤起安装包。
+    """
+    global _EXIT_INSTALLER, _EXIT_HOOK_REGISTERED
+    target = Path(str(exe_path or "")).expanduser()
+    if not target.is_file():
+        return False
+    _EXIT_INSTALLER = target
+    if not _EXIT_HOOK_REGISTERED:
+        atexit.register(_run_exit_installer)
+        _EXIT_HOOK_REGISTERED = True
+    _log.info("已登记退出时自动安装：%s", target)
+    return True
+
+
 def launch_installer(exe_path) -> tuple[bool, str]:
     """启动更新并退出当前进程，返回 ``(是否成功, 中文提示)``。
 
-    * 安装包（``forum_setup*.exe``）→ 静默安装（``/SILENT``，进度条可见、
-      不走向导），装完由脚本重新拉起客户端
+    * 安装包（``forum_setup*.exe``）→ 登记退出钩子后立即结束当前进程；
+      进程退出时用 ``CREATE_NO_WINDOW`` 直接唤起安装包（``/SILENT``，
+      不走向导），装完由安装器自己拉起客户端
     * 其它（旧版裸 exe）→ 保留原有热替换脚本
 
     开发态（``sys.executable`` 是 python.exe）直接拒绝，不做任何替换。
@@ -715,25 +739,27 @@ def launch_installer(exe_path) -> tuple[bool, str]:
         if not source.is_file():
             return (False, "更新包不存在，请重新下载")
 
-        script = paths.update_dir() / SCRIPT_NAME
-        log = paths.update_dir() / "apply_update.log"
-
         if is_installer(source):
-            _write_script(script, _installer_script_text(source, Path(sys.executable), log))
-            _spawn_script(script)
-            _log.info("已启动静默安装：%s", source)
+            if not schedule_install_on_exit(source):
+                return (False, "更新包不存在，请重新下载")
+            # 双保险：先让事件循环退出；即使下面这句 SystemExit 被 Qt 吞掉，
+            # main() 正常收尾时也会触发 atexit，安装包照样会被唤起。
             _quit_app()
-            return (True, "安装程序已启动，程序将退出，安装完成后会自动重新启动")
+            _log.info("立即安装：已登记退出后唤起 %s", source)
+            sys.exit(0)
 
         target = Path(sys.executable)
         if source.resolve() == target.resolve():
             return (False, "更新包与当前程序路径相同，无需替换")
 
+        script = paths.update_dir() / SCRIPT_NAME
         _write_script(script, _script_text(source, target))
         _spawn_script(script)
         _log.info("已启动更新脚本：%s → %s", source, target)
         _quit_app()
         return (True, "更新脚本已启动，程序将退出并自动完成替换")
+    except SystemExit:
+        raise
     except Exception as exc:  # noqa: BLE001
         _log.error("启动更新失败：%s", exc, exc_info=True)
         return (False, "启动更新失败：%s" % exc)
@@ -798,16 +824,12 @@ def clear_pending_install() -> None:
 
 
 def run_pending_install() -> bool:
-    """退出程序时执行「退出时自动安装」；返回是否已把安装移交给脚本。"""
+    """退出程序时执行「退出时自动安装」；返回是否已登记到退出钩子。"""
     info = pending_install()
     if not info:
         return False
-    try:
-        ok, message = launch_installer(info["path"])
-    except Exception as exc:  # noqa: BLE001
-        _log.warning("执行退出时安装失败：%s", exc)
+    if not schedule_install_on_exit(info["path"]):
         return False
-    if ok:
-        clear_pending_install()
-        _log.info("已移交退出时安装：%s", message)
-    return bool(ok)
+    clear_pending_install()
+    _log.info("已登记退出时安装：%s", info["path"])
+    return True
