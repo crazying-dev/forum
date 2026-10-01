@@ -263,6 +263,26 @@ class Api(private val prefs: Prefs) {
     suspend fun sendRegisterCode(email: String): ApiResult =
         post("/api/email/send-register-code", JSONObject().put("email", email.trim()))
 
+    /** 注销账号验证码：发到当前绑定邮箱（需登录；未绑定有效邮箱服务端返回 400）。 */
+    suspend fun sendDeleteAccountCode(): ApiResult =
+        post("/api/email/send-delete-account-code")
+
+    /**
+     * 自助注销账号。
+     *
+     * @param mode     "purge" 彻底删除 / "anonymize" 匿名化保留
+     * @param password 账号密码（与 [code] 二选一，可为 null）
+     * @param code     邮箱验证码（与 [password] 二选一，可为 null）
+     */
+    suspend fun deleteAccount(mode: String, password: String?, code: String?): ApiResult {
+        val body = JSONObject()
+            .put("mode", mode)
+            .put("confirm", "注销账号")
+        if (!password.isNullOrBlank()) body.put("password", password)
+        if (!code.isNullOrBlank()) body.put("code", code.trim())
+        return post("/api/user/delete", body)
+    }
+
     suspend fun me(): ApiResult {
         val result = get("/api/user/info")
         if (result.ok) adoptUser(result)

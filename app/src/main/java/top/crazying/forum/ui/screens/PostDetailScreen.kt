@@ -9,9 +9,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +33,62 @@ import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.*
 
+/**
+ * 楼中楼扁平化后的一行：评论 + 层级深度 + 被回复人昵称。
+ *
+ * 用「扁平列表 + depth 缩进」交给 [LazyColumn] 渲染，性能优于递归 Composable；
+ * `key` 唯一稳定（优先取评论 id，极端空 id 才退化为位置键）。
+ */
+private data class CommentNode(
+    val comment: CommentItem,
+    val depth: Int,
+    val replyToName: String?,
+    val parent: CommentItem?,
+    val key: String,
+)
+
+/**
+ * 把扁平的评论列表按 `parentId` 组装成「父在前、子紧随其后」的扁平序列。
+ *
+ * - 根节点保持服务端返回顺序（时间序），子节点保持其在原列表中的相对顺序；
+ * - `parentId` 在列表中找不到（孤儿）、或指向自身时按根节点处理，绝不丢评论；
+ * - `visited` 集合防御自环 / 多父导致的无限递归与重复渲染。
+ */
+private fun buildCommentThread(comments: List<CommentItem>): List<CommentNode> {
+    if (comments.isEmpty()) return emptyList()
+    val byId = HashMap<String, CommentItem>(comments.size)
+    for (c in comments) if (c.id.isNotBlank()) byId[c.id] = c
+
+    val children = HashMap<String, MutableList<CommentItem>>()
+    val roots = ArrayList<CommentItem>()
+    for (c in comments) {
+        val pid = c.parentId
+        if (pid.isNotBlank() && pid != c.id && byId.containsKey(pid)) {
+            children.getOrPut(pid) { ArrayList() }.add(c)
+        } else {
+            roots.add(c)
+        }
+    }
+
+    val out = ArrayList<CommentNode>(comments.size)
+    val visited = HashSet<String>()
+    fun emit(c: CommentItem, depth: Int, parent: CommentItem?) {
+        if (c.id.isNotBlank() && !visited.add(c.id)) return
+        out.add(
+            CommentNode(
+                comment = c,
+                depth = depth,
+                replyToName = parent?.userName,
+                parent = parent,
+                key = c.id.ifBlank { "idx-${out.size}" },
+            )
+        )
+        children[c.id]?.forEach { emit(it, depth + 1, c) }
+    }
+    for (r in roots) emit(r, 0, null)
+    return out
+}
+
 /** 帖子详情：正文 + 点赞/收藏 + 评论列表 + 发评论。 */
 @Composable
 fun PostDetailScreen(nav: Navigator, postId: String) {
@@ -48,6 +106,9 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
     var input by remember { mutableStateOf("") }
     var replyTo by remember { mutableStateOf<CommentItem?>(null) }
     var sending by remember { mutableStateOf(false) }
+    var pendingDeletePost by remember { mutableStateOf(false) }
+    var pendingDeleteComment by remember { mutableStateOf<CommentItem?>(null) }
+    var deleting by remember { mutableStateOf(false) }
 
     suspend fun load() {
         loading = true
@@ -65,6 +126,9 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
     }
 
     LaunchedEffect(postId) { load() }
+
+    // 楼中楼：由扁平评论列表派生出带 depth 的渲染序列（不额外请求、不丢评论）。
+    val nodes = remember(comments) { buildCommentThread(comments) }
 
     fun requireLogin(): Boolean {
         if (App.isLoggedIn) return true
@@ -85,8 +149,54 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
             if (result.ok) {
                 input = ""
                 replyTo = null
+                // 局部插入新评论，避免重新 getPost 让服务端浏览量 +1。
+                val added = result.jsonObj("comment")?.let { CommentItem.from(it) }
+                if (added != null) {
+                    comments = comments + added
+                    post = post?.let { p -> p.copy(commentCount = p.commentCount + 1) }
+                } else {
+                    // 极端情况下接口未回评论体，才兜底全量刷新（正常不会走到）。
+                    load()
+                }
                 toast(context, "评论已发布")
-                load()
+            } else {
+                toast(context, result.message)
+            }
+        }
+    }
+
+    fun deletePost() {
+        val p = post ?: return
+        if (deleting) return
+        scope.launch {
+            deleting = true
+            val result = App.api.deletePost(p.id)
+            deleting = false
+            pendingDeletePost = false
+            if (result.ok) {
+                toast(context, "帖子已删除")
+                // 返回上一页；列表页是独立组合，pop 后会重新进入并自动刷新。
+                nav.pop()
+            } else {
+                toast(context, result.message)
+            }
+        }
+    }
+
+    fun deleteComment(target: CommentItem) {
+        if (deleting) return
+        scope.launch {
+            deleting = true
+            val result = App.api.deleteComment(target.id)
+            deleting = false
+            pendingDeleteComment = null
+            if (result.ok) {
+                // 本地移除该评论；其子评论若变孤儿，由 buildCommentThread 提升为根继续展示，不丢失。
+                comments = comments.filterNot { it.id == target.id }
+                post = post?.let { p ->
+                    p.copy(commentCount = (p.commentCount - 1).coerceAtLeast(0))
+                }
+                toast(context, "评论已删除")
             } else {
                 toast(context, result.message)
             }
@@ -187,8 +297,9 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                                     scope.launch {
                                         val r = App.api.likePost(postId)
                                         if (r.ok) {
-                                            liked = true
-                                            load()
+                                            // 用接口返回的 liked/likes 就地更新，绝不重新 getPost（否则浏览量 +1）。
+                                            liked = r.bool("liked", !liked)
+                                            post = post?.let { cur -> cur.copy(likes = r.int("likes", cur.likes)) }
                                         } else toast(context, r.message)
                                     }
                                 },
@@ -201,13 +312,21 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                                     scope.launch {
                                         val r = App.api.favoritePost(postId)
                                         if (r.ok) {
-                                            favorited = true
-                                            load()
+                                            // 收藏接口只回 favorited，就地更新即可，不重新 getPost。
+                                            favorited = r.bool("favorited", !favorited)
                                         } else toast(context, r.message)
                                     }
                                 },
                                 tint = if (favorited) colors.primary else null,
                             )
+                            if (meId.isNotBlank() && p.userId == meId) {
+                                GhostButton(
+                                    text = if (deleting) "删除中…" else "删除",
+                                    enabled = !deleting,
+                                    tint = colors.danger,
+                                    onClick = { pendingDeletePost = true },
+                                )
+                            }
                         }
                     }
                 }
@@ -220,9 +339,10 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                     item(key = "empty") { EmptyBox("还没有评论，快来抢沙发") }
                 }
 
-                items(items = comments, key = { it.id }) { c ->
+                items(items = nodes, key = { it.key }) { node ->
+                    val c = node.comment
                     CommentRow(
-                        comment = c,
+                        node = node,
                         isMine = meId.isNotBlank() && c.userId == meId,
                         onUser = { if (c.userId.isNotBlank()) nav.push(Screen.UserProfile(c.userId)) },
                         onReply = {
@@ -231,27 +351,78 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                                 toast(context, "正在回复 ${c.userName}")
                             }
                         },
+                        onReplyToParent = {
+                            // 点击「回复 @昵称」：有父节点就回复父节点（不跳转，也不会崩）。
+                            val parent = node.parent
+                            if (parent != null && requireLogin()) {
+                                replyTo = parent
+                                toast(context, "正在回复 ${parent.userName}")
+                            }
+                        },
+                        onDelete = { pendingDeleteComment = c },
                     )
                 }
             }
+        }
+
+        if (pendingDeletePost) {
+            AlertDialog(
+                onDismissRequest = { if (!deleting) pendingDeletePost = false },
+                title = { Text("删除帖子") },
+                text = { Text("确定要删除这篇帖子吗？删除后不可恢复。") },
+                confirmButton = {
+                    TextButton(onClick = { deletePost() }, enabled = !deleting) {
+                        Text(if (deleting) "删除中…" else "删除", color = colors.danger)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeletePost = false }, enabled = !deleting) {
+                        Text("取消")
+                    }
+                },
+            )
+        }
+
+        val targetComment = pendingDeleteComment
+        if (targetComment != null) {
+            AlertDialog(
+                onDismissRequest = { if (!deleting) pendingDeleteComment = null },
+                title = { Text("删除评论") },
+                text = { Text("确定要删除这条评论吗？删除后不可恢复。") },
+                confirmButton = {
+                    TextButton(onClick = { deleteComment(targetComment) }, enabled = !deleting) {
+                        Text(if (deleting) "删除中…" else "删除", color = colors.danger)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeleteComment = null }, enabled = !deleting) {
+                        Text("取消")
+                    }
+                },
+            )
         }
     }
 }
 
 @Composable
 private fun CommentRow(
-    comment: CommentItem,
+    node: CommentNode,
     isMine: Boolean,
     onUser: () -> Unit,
     onReply: () -> Unit,
+    onReplyToParent: () -> Unit,
+    onDelete: () -> Unit,
 ) {
     val colors = ForumTheme.colors
+    val comment = node.comment
+    // 层级缩进：根 12dp，每深一层 +22dp（最多 4 层，避免窄屏过挤）。
+    val indent = (12 + node.depth.coerceAtMost(4) * 22).dp
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(colors.bgCard)
-            .padding(start = if (comment.isReply) 34.dp else 12.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = indent, end = 12.dp, top = 10.dp, bottom = 10.dp),
     ) {
         Avatar(comment.userAvatar, 30.dp, onClick = onUser)
         Spacer(Modifier.width(10.dp))
@@ -272,6 +443,17 @@ private fun CommentRow(
                 Spacer(Modifier.weight(1f))
                 Text(TimeFmt.fmtTime(comment.createdAt), color = colors.textMuted, fontSize = 11.sp)
             }
+            val replyToName = node.replyToName
+            if (!replyToName.isNullOrBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "回复 @$replyToName",
+                    color = colors.textAccent,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    modifier = Modifier.clickable { onReplyToParent() },
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = comment.content,
@@ -288,6 +470,15 @@ private fun CommentRow(
                     fontSize = 11.sp,
                     modifier = Modifier.clickable { onReply() },
                 )
+                if (isMine) {
+                    Spacer(Modifier.width(14.dp))
+                    Text(
+                        text = "删除",
+                        color = colors.danger,
+                        fontSize = 11.sp,
+                        modifier = Modifier.clickable { onDelete() },
+                    )
+                }
             }
         }
     }

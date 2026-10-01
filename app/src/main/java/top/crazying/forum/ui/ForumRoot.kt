@@ -27,12 +27,14 @@ import top.crazying.forum.core.App
 import top.crazying.forum.core.Updater
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.screens.AuthScreen
+import top.crazying.forum.ui.screens.DeleteAccountScreen
 import top.crazying.forum.ui.screens.EasterEggScreen
 import top.crazying.forum.ui.screens.ForumScreen
 import top.crazying.forum.ui.screens.HomeScreen
 import top.crazying.forum.ui.screens.MeScreen
 import top.crazying.forum.ui.screens.PostCreateScreen
 import top.crazying.forum.ui.screens.PostDetailScreen
+import top.crazying.forum.ui.screens.PrivacyScreen
 import top.crazying.forum.ui.screens.SearchScreen
 import top.crazying.forum.ui.screens.UserScreen
 import top.crazying.forum.ui.screens.WikiScreen
@@ -109,6 +111,8 @@ fun ForumRoot() {
                     Screen.Wiki -> WikiScreen()
                     Screen.EasterEgg -> EasterEggScreen(nav)
                     Screen.Me -> MeScreen(nav)
+                    Screen.Privacy -> PrivacyScreen(nav)
+                    Screen.DeleteAccount -> DeleteAccountScreen(nav)
                     is Screen.PostDetail -> PostDetailScreen(nav, s.postId)
                     is Screen.PostCreate -> PostCreateScreen(nav, s.category)
                     is Screen.Search -> SearchScreen(nav, s.keyword)

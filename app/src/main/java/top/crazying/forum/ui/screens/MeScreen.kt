@@ -260,6 +260,14 @@ fun MeScreen(nav: Navigator) {
             SettingEntry("发布新帖子") { nav.push(Screen.PostCreate()) }
             SettingEntry("访问 WIKI") { nav.switchTab(Screen.Wiki) }
             SettingEntry("进入世界频道") { nav.switchTab(Screen.World) }
+            SettingEntry("隐私政策") { nav.push(Screen.Privacy) }
+            // 注销账号：危险操作，仅在登录后可用。
+            SettingEntry(
+                text = "注销账号",
+                danger = true,
+                enabled = App.isLoggedIn,
+                onClick = { nav.push(Screen.DeleteAccount) },
+            )
         }
 
         EmptyBox("妖精论坛 · 三端同步")
@@ -267,17 +275,27 @@ fun MeScreen(nav: Navigator) {
 }
 
 @Composable
-private fun SettingEntry(text: String, onClick: () -> Unit) {
+private fun SettingEntry(
+    text: String,
+    danger: Boolean = false,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
     val colors = ForumTheme.colors
+    val fg = when {
+        !enabled -> colors.textMuted
+        danger -> colors.danger
+        else -> colors.textPrimary
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .clickable { onClick() }
+            .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 12.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, color = colors.textPrimary, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Text(text, color = fg, fontSize = 14.sp, modifier = Modifier.weight(1f))
         Text("›", color = colors.textMuted, fontSize = 16.sp)
     }
 }
