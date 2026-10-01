@@ -7,6 +7,7 @@ import { absoluteUrl, fetchApi, pageMetadata, stripHtml, truncate } from "@/lib/
 // 帖子详情动态 SEO（服务端 layout 方案：页面本体保持客户端组件不变，
 // 此布局负责 generateMetadata、JSON-LD 与 404 判定）。
 // 说明：React cache 在生产构建下使 metadata 与布局复用同一次拉取（dev 下可能重复一次）。
+// SSR 拉取带 track=0，仅用于 SEO，不计入浏览量。
 
 interface PostDetailResp {
   post?: {
@@ -23,7 +24,7 @@ interface PostDetailResp {
 }
 
 const getPost = cache(async (id: string) => {
-  const r = await fetchApi<PostDetailResp>(`/api/v1/posts/${encodeURIComponent(id)}`);
+  const r = await fetchApi<PostDetailResp>(`/api/v1/posts/${encodeURIComponent(id)}?track=0`);
   return { ok: r.ok, status: r.status, post: r.data?.post ?? null };
 });
 

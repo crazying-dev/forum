@@ -82,6 +82,39 @@ func (c *Cache) Set(key string, value any, ttl ...time.Duration) {
 	}
 }
 
+// SetIfAbsent 原子占位：仅当键不存在（或已过期）时写入并返回 true；已存在则返回 false。
+// 用于去重等「先占位再执行」场景（Get+Set 组合在并发下不原子）。
+func (c *Cache) SetIfAbsent(key string, value any, ttl ...time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if elem, ok := c.items[key]; ok {
+		ent := elem.Value.(*entry)
+		if c.ttl > 0 && time.Now().After(ent.expireAt) {
+			// 已过期：删除后按新项写入
+			c.lru.Remove(elem)
+			delete(c.items, key)
+		} else {
+			c.lru.MoveToFront(elem)
+			return false
+		}
+	}
+	t := c.ttl
+	if len(ttl) > 0 && ttl[0] > 0 {
+		t = ttl[0]
+	}
+	ent := &entry{key: key, value: value, expireAt: time.Now().Add(t)}
+	c.items[key] = c.lru.PushFront(ent)
+	for c.lru.Len() > c.capacity {
+		last := c.lru.Back()
+		if last == nil {
+			break
+		}
+		c.lru.Remove(last)
+		delete(c.items, last.Value.(*entry).key)
+	}
+	return true
+}
+
 // Delete 删除。
 func (c *Cache) Delete(key string) {
 	c.mu.Lock()

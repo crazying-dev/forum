@@ -170,11 +170,13 @@ func (h *PostsHandler) notifyFollowers(userID, postID, title string) {
 // ---- GET /api/v1/posts/:id ----
 
 // Detail 帖子详情（匿名缓存 post:detail:ID；登录用户实时返回含个人状态）。
+// track=0：SEO 等服务端拉取不计数、不走缓存；其余请求同一访客同帖 30 分钟内只计一次（匿名按 IP / 登录按 uid）。
 func (h *PostsHandler) Detail(c *gin.Context) {
 	id := c.Param("id")
 	me := currentUserFromCookie(c, h.Sessions)
+	noTrack := c.Query("track") == "0"
 	key := "post:detail:" + id
-	if me == "" {
+	if !noTrack && me == "" {
 		if v, ok := h.Cache.PostDetail.Get(key); ok {
 			c.Header("X-Cache", "HIT")
 			c.JSON(http.StatusOK, v)
@@ -186,8 +188,22 @@ func (h *PostsHandler) Detail(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "帖子不存在"})
 		return
 	}
-	_ = h.DB.IncrementPostViews(c.Request.Context(), id)
-	post.Views++
+	if !noTrack {
+		// 同一访客同帖 30 分钟内只计一次（匿名按 IP / 登录按 uid；进程内近似去重，容忍 NAT 与多实例误差）
+		voterKey := "ip:" + c.ClientIP()
+		if me != "" {
+			voterKey = "u:" + me
+		}
+		dedupKey := "post:view:" + id + ":" + voterKey
+		// 原子占位：并发/重复请求只有一个能占位成功并计数；计数失败则回滚占位，允许下次重试
+		if h.Cache.ViewDedup.SetIfAbsent(dedupKey, true) {
+			if err := h.DB.IncrementPostViews(c.Request.Context(), id); err == nil {
+				post.Views++
+			} else {
+				h.Cache.ViewDedup.Delete(dedupKey)
+			}
+		}
+	}
 
 	liked, favorited := false, false
 	if me != "" {
@@ -200,7 +216,10 @@ func (h *PostsHandler) Detail(c *gin.Context) {
 		markCommentLikedByMe(h.DB, c.Request.Context(), me, comments)
 	}
 	resp := gin.H{"success": true, "post": post, "comments": comments, "liked": liked, "favorited": favorited}
-	if me == "" {
+	if noTrack {
+		// track=0 的服务端拉取不写共享缓存，避免覆盖/污染读者视角的数据
+		c.Header("X-Cache", "BYPASS")
+	} else if me == "" {
 		h.Cache.PostDetail.Set(key, resp, 60*time.Second)
 		c.Header("X-Cache", "MISS")
 	} else {

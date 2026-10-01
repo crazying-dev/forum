@@ -14,6 +14,7 @@ type CacheSet struct {
 	Guilds     *cache.Cache // 30s
 	Search     *cache.Cache // 120s / 600s
 	Comments   *cache.Cache // 60s / 300s
+	ViewDedup  *cache.Cache // 浏览去重 30min
 }
 
 // NewCacheSet 创建默认缓存集。
@@ -25,6 +26,7 @@ func NewCacheSet() *CacheSet {
 		Guilds:     cache.New(100, 30*time.Second),
 		Search:     cache.New(100, 120*time.Second),
 		Comments:   cache.New(200, 60*time.Second),
+		ViewDedup:  cache.New(10000, 30*time.Minute),
 	}
 }
 

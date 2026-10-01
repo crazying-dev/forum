@@ -43,7 +43,7 @@
 |---|---|---|---|
 | GET | `/posts?page=&page_size=&category=` | 帖子列表（缓存 30s，page_size 上限 50） | 否 |
 | GET | `/posts/random` | 随机 200 条 | 否 |
-| GET | `/posts/:id` | 详情 + 评论 + liked/favorited（缓存 60s） | 否 |
+| GET | `/posts/:id` | 详情 + 评论 + liked/favorited（缓存 60s；`?track=0` 时不计数、不读写缓存，SEO 用） | 否 |
 | POST | `/posts` | 发帖（title/content/category，可选 `guild_uuid` / `guild_id`） | 是 |
 | POST | `/posts/:id/like` | 点赞/取消 | 是 |
 | POST | `/posts/:id/favorite` | 收藏/取消 | 是 |
@@ -54,6 +54,7 @@
 > - 作者会馆字段：上述列表项与详情还含作者所属会馆的 `user_guild_name` / `user_guild_theme_color` / `user_is_leader`（无会馆时为 `""` / `""` / `false`）；评论、信息流（`items[]`）与搜索结果（`posts`）中的帖子同构。
 > - 发帖请求体：`{title, content, category, guild_uuid?, guild_id?}`；`guild_uuid`（string）为会馆稳定标识且优先，`guild_id`（number）为旧字段兼容——**仅在未传 `guild_uuid` 时生效**；`guild_uuid` 对应的会馆不存在（含非法 UUID 文本）返回 404「会馆不存在」。归属会馆时必须是该会馆成员（否则 403），`category` 由该馆自定义分类归一（缺省/非法值回退「综合」或第一项）；不传会馆标识时 `category` 走公共白名单。
 > - 公共分类白名单：`general` / `talk` / `question` / `share` / `creative`，并兼容旧中文 `求助` / `创意`；缺省或非法值统一归一为 `general`。
+> - 浏览量计数：`GET /posts/:id` 默认对同一访客（匿名按 IP / 登录按 uid）同帖 30 分钟内只计一次；`?track=0`（服务端 SEO 拉取）完全不计、不读不写缓存（响应头 `X-Cache: BYPASS`）。
 
 ## 评论 Comments
 
