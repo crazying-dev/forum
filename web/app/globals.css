@@ -4,7 +4,7 @@
 
 /* ===== 样式入口（拆分自原 globals.css，内容与顺序 1:1）=====
    分片位于 ./styles/，导入顺序 = 原区块顺序；修改样式请到对应分片
-   约定：Tailwind 指令（@theme/@apply/@source）只写本入口；分片内如确需 @apply，请加 @reference "../globals.css";
+   约定：Tailwind 指令（@theme/@apply/@source）只写本入口；分片内可直接 @apply（分片已在入口 @import 链内），仅独立编译的样式文件才需要 @reference
    分片：tokens base header-nav header-responsive footer elements windows-card easter-egg privacy
          wiki video-player auth mouse-page user-profile home forum-common search-page post-detail
          post-comments forum-publish legacy-base-html legacy-inline toast user-comments user-popup
