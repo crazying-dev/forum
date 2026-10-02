@@ -187,6 +187,42 @@ def test_markdown_view_renders():
     assert "纯文本" in view.document().toPlainText()
 
 
+def test_markdown_no_html_is_literal():
+    """三端口径：不渲染 HTML 语法，HTML 标签按字面文字展示。"""
+    _app_instance()
+    from app.widgets import MarkdownView
+    view = MarkdownView()
+    view.set_markdown("<div>原文标签</div>\n\n普通段落")
+    text = view.document().toPlainText()
+    assert "<div>" in text and "</div>" in text, "HTML 标签必须按字面文字显示"
+    assert "普通段落" in text
+    view.deleteLater()
+
+
+def test_markdown_single_newline_keeps_line_break():
+    """三端口径：单换行即换行（对齐网页端 marked 的 breaks: true）。"""
+    _app_instance()
+    from app.widgets import MarkdownView
+    view = MarkdownView()
+    view.set_markdown("第一行\n第二行")
+    text = view.document().toPlainText()
+    assert "第一行" in text and "第二行" in text
+    assert "第一行 第二行" not in text, "单换行不能被合并成空格"
+    view.deleteLater()
+
+
+def test_apply_hard_breaks_skips_code_fence():
+    """硬换行预处理：代码围栏内部原样保留，且冪等。"""
+    from app.widgets.markdown import apply_hard_breaks
+    src = "行一\n行二\n\n```\ncode_a\ncode_b\n```\n\n尾行"
+    out = apply_hard_breaks(src)
+    assert "行一  \n行二  \n" in out
+    assert "code_a\ncode_b" in out, "代码围栏内部不得补硬换行"
+    assert "尾行  " in out
+    assert apply_hard_breaks(out) == out, "重复调用必须冪等"
+    assert apply_hard_breaks("单行") == "单行"
+
+
 def test_toast_manager():
     app = _app_instance()
     from PyQt6.QtWidgets import QWidget

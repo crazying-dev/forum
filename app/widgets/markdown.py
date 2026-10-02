@@ -1,6 +1,15 @@
 # -*- coding: utf-8 -*-
 """Markdown 渲染：基于 Qt 自带的 CommonMark 解析器（QTextDocument.setMarkdown）。
 
+三端口径统一（与 Web 的 marked、Android 的 MarkdownBody 一致）：
+
+* **不渲染 HTML 语法** —— GitHub 方言再叠加 ``MarkdownNoHTML``：不加这个标志
+  Qt 会把 ``<div>hi</div>`` 直接吞成 ``hi``（等于悄悄解析了 HTML），叠上之后
+  正文里的 HTML 标签按字面文字展示；
+* **单换行即换行** —— Qt 走 CommonMark 口径，段落内的单个换行会被合并成空格
+  （``line1\\nline2`` → ``line1 line2``）。这里用 :func:`apply_hard_breaks`
+  预处理成硬换行（行尾两个空格），与网页端 marked 的 ``breaks: true`` 对齐。
+
 * 样式通过 :func:`app.theme.document_css` 注入，与整体主题保持一致
 * 外链不直接打开，发 :attr:`MarkdownView.link_clicked` 交给上层做安全确认
 * 内嵌远端图片走 :mod:`app.widgets.images` 缓存；首次渲染不阻塞，
@@ -17,29 +26,70 @@ from .. import constants, logger, theme
 
 _log = logger.get_logger("markdown")
 
+# 代码围栏前缀（三个反引号 / 三个波浪线）：内部原样保留，不补硬换行
+_FENCE_PREFIXES = ("```", "~~~")
+
 
 def _markdown_features():
-    """尽量启用 GitHub 方言（表格 / 删除线）；不支持时返回 None。"""
+    """GitHub 方言（表格 / 删除线）+ 关闭 HTML 解析；不支持时返回 None。"""
     try:
-        return QTextDocument.MarkdownFeature.MarkdownDialectGitHub
+        features = QTextDocument.MarkdownFeature.MarkdownDialectGitHub
     except AttributeError:
         return None
+    no_html = getattr(QTextDocument.MarkdownFeature, "MarkdownNoHTML", None)
+    if no_html is not None:
+        # Qt 把 MarkdownNoHTML 定义为 0x20 | MarkdownDialectCommonMark，按位或即可叠加
+        features = features | no_html
+    return features
+
+
+def apply_hard_breaks(text: str) -> str:
+    """把「单换行」转成 Markdown 硬换行（行尾两个空格）。
+
+    Qt 的 CommonMark 解析器会让段落内的单个换行退化成空格，而三端口径是
+    「单换行即换行」（网页端 marked 配的 breaks: true），因此这里做等价预处理。
+
+    代码围栏（三个反引号 / 三个波浪线）内部原样保留；空行与已以两个空格
+    结尾的行不动（幂等）。
+    """
+    if not text or "\n" not in text:
+        return text
+    out = []
+    fence = None
+    for line in text.split("\n"):
+        stripped = line.lstrip()
+        marker = stripped[:3] if stripped.startswith(_FENCE_PREFIXES) else None
+        if fence is not None:
+            out.append(line)
+            if marker == fence:
+                fence = None
+            continue
+        if marker is not None:
+            fence = marker
+            out.append(line)
+            continue
+        if line.strip() and not line.endswith("  "):
+            out.append(line + "  ")
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def set_document_markdown(document: QTextDocument, text: str) -> None:
     """把 Markdown 写入 QTextDocument（自动降级到默认方言）。"""
+    prepared = apply_hard_breaks(text or "")
     features = _markdown_features()
     try:
         if features is not None:
-            document.setMarkdown(text or "", features)
+            document.setMarkdown(prepared, features)
         else:
-            document.setMarkdown(text or "")
+            document.setMarkdown(prepared)
     except TypeError:
-        document.setMarkdown(text or "")
+        document.setMarkdown(prepared)
 
 
 def markdown_to_html(text: str, mode: str | None = None) -> str:
-    """Markdown → 带样式的 HTML（供 tooltip 等场景使用）。"""
+    """仅供内部调用的 Markdown → HTML（供 tooltip 等场景使用）。"""
     document = QTextDocument()
     document.setDefaultStyleSheet(theme.document_css(mode))
     set_document_markdown(document, text)

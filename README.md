@@ -214,6 +214,16 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
 17. **V1.3.10：评论楼中楼压平为两层**：对「回复的回复」（第 3 层及更深）不再逐级
     缩进，而是压平到第 2 层，并在评论头部用「回复 @某人」标明它实际回复的是谁
     （仅压平项显示 @，直接回复根评论的第 2 层不显示）。版本号升至 1.3.10。
+18. **V1.3.11：正文换行 / HTML 口径与 Web、Android 三端对齐**：
+    * **单换行即换行**——Qt 的 CommonMark 解析器会把段落内的单个换行合并成空格
+      （`line1\nline2` 显示为 `line1 line2`），而网页端 marked 配的是
+      `breaks: true`。`app/widgets/markdown.py` 新增 `apply_hard_breaks()`，
+      渲染前把单换行预处理成硬换行（行尾两个空格），代码围栏内部原样保留。
+    * **不渲染 HTML 语法**——原先 Qt 会把 `<div>hi</div>` 直接吞成 `hi`
+      （等于静默解析了 HTML）。现给 GitHub 方言叠加 `MarkdownNoHTML`，
+      正文里的 HTML 标签按字面文字展示，与网页端 / 安卓端一致。
+    * 安卓客户端发帖已改为原文直传（不再包装 `<p>…<br>…</p>`），
+      历史 HTML 正文由服务端 `tool/content_migrate.py` 一次性还原。版本号升至 1.3.11。
 
 ---
 
