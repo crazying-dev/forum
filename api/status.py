@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """状态码日志 + 查询接口。
 
-记录每次 HTTP 响应的「时间 + 状态码」，按 2xx / 4xx / 5xx 归类；
-落盘为追加式文本文件（每行一个 JSON），仅保留最近 ``STATUS_LOG_MAX`` 条。
+记录每次 HTTP 响应的「时间 + 状态码」，按 2xx / 4xx / 5xx 归类（1xx / 3xx 不入库）；
+落盘为追加式文本文件（每行一个 JSON，只有 ``time`` 与 ``status``），仅保留最近 ``STATUS_LOG_MAX`` 条。
 
 - 写入：由 app.py 的 after_request 钩子调用 :func:`record`
-- 读取：``GET /api/status-log``（公开，无需鉴权），返回最近若干条明细
+- 读取：``GET /api/status-log``（公开、无鉴权、无参数），返回全部明细（最新在前）
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ import os
 import threading
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 import config
 
@@ -26,8 +26,6 @@ _TRACKED = ("2xx", "4xx", "5xx")
 _LOCK = threading.Lock()
 
 _DEFAULT_MAX = 1000
-_DEFAULT_LIMIT = 100
-_MAX_LIMIT = 1000
 
 
 def _max_entries() -> int:
@@ -59,14 +57,14 @@ def _now() -> str:
 
 
 def record(status_code) -> None:
-    """记录一次响应；仅当状态码属于 2xx / 4xx / 5xx 时写入。"""
+    """记录一次响应；仅当状态码属于 2xx / 4xx / 5xx 时写入（只存时间 + 状态码）。"""
     cls = status_class(status_code)
     if cls not in _TRACKED:
         return
     path = _path()
     if not path:
         return
-    entry = {"time": _now(), "status": int(status_code), "class": cls}
+    entry = {"time": _now(), "status": int(status_code)}
     line = json.dumps(entry, ensure_ascii=False)
     with _LOCK:
         try:
@@ -98,8 +96,8 @@ def _trim(path: str) -> None:
         pass
 
 
-def recent(limit: int = _DEFAULT_LIMIT) -> list:
-    """返回最近 ``limit`` 条明细（按时间倒序，最新的在最前）。"""
+def recent() -> list:
+    """返回全部已记录的明细（按时间倒序，最新的在最前）。"""
     path = _path()
     if not path or not os.path.isfile(path):
         return []
@@ -117,23 +115,15 @@ def recent(limit: int = _DEFAULT_LIMIT) -> list:
             out.append(json.loads(raw))
         except ValueError:
             continue
-        if len(out) >= limit:
-            break
     return out
 
 
 @status_bp.route("/status-log", methods=["GET"])
 def status_log_api():
-    """最近的状态码日志明细（2xx / 4xx / 5xx），支持 ?limit=。"""
-    try:
-        limit = int(request.args.get("limit", _DEFAULT_LIMIT))
-    except (TypeError, ValueError):
-        limit = _DEFAULT_LIMIT
-    limit = max(1, min(limit, _MAX_LIMIT))
-    entries = recent(limit)
+    """状态码日志明细（2xx / 4xx / 5xx 的发生时间）；无参数，返回全部（最新在前）。"""
+    entries = recent()
     return jsonify({
         "success": True,
         "count": len(entries),
-        "limit": limit,
         "entries": entries,
     })

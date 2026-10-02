@@ -52,10 +52,10 @@ def test_record_only_tracks_2xx_4xx_5xx(tmp_path, monkeypatch):
     st.record(500)
     st.record(302)  # 3xx 不记录
     st.record(101)  # 1xx 不记录
-    entries = st.recent(100)
-    assert [e["class"] for e in entries] == ["5xx", "4xx", "2xx"], "应为倒序（最新在前）"
+    entries = st.recent()
+    assert [e["status"] for e in entries] == [500, 404, 200], "应为倒序（最新在前）"
     for e in entries:
-        assert set(e) == {"time", "status", "class"}, "只记录时间 + 状态码"
+        assert set(e) == {"time", "status"}, "只记录时间 + 状态码（无 class、无路径）"
         assert "T" in e["time"], "时间应为 ISO 格式"
 
 
@@ -65,7 +65,7 @@ def test_trim_keeps_latest_n(tmp_path, monkeypatch):
         st.record(200)
     lines = [ln for ln in (tmp_path / "status.log").read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert len(lines) == 5, "日志文件应裁剪到最近 5 条"
-    assert len(st.recent(100)) == 5
+    assert len(st.recent()) == 5
 
 
 def test_api_returns_recent_entries(tmp_path, monkeypatch):
@@ -78,20 +78,21 @@ def test_api_returns_recent_entries(tmp_path, monkeypatch):
     assert data["success"] is True
     assert data["count"] == 2
     assert data["entries"][0]["status"] == 404
-    assert data["entries"][0]["class"] == "4xx"
     assert data["entries"][1]["status"] == 200
+    # 返回项不包含 class / 路径等额外字段
+    assert set(data["entries"][0]) == {"time", "status"}
 
 
-def test_api_limit_and_clamp(tmp_path, monkeypatch):
+def test_api_has_no_parameters(tmp_path, monkeypatch):
+    """接口不接受任何参数：带查询串也一律返回全部明细。"""
     st = _use_tmp_log(tmp_path, monkeypatch)
     for _ in range(5):
         st.record(200)
     c = _client()
-    assert c.get("/api/status-log?limit=2").get_json()["count"] == 2
-    # 非法 limit 回落默认（100），仍能取全 5 条
-    assert c.get("/api/status-log?limit=abc").get_json()["count"] == 5
-    # 超大 limit 被夹到上限 1000
-    assert c.get("/api/status-log?limit=99999").get_json()["limit"] == 1000
+    assert c.get("/api/status-log").get_json()["count"] == 5
+    assert c.get("/api/status-log?limit=2").get_json()["count"] == 5
+    assert c.get("/api/status-log?foo=bar").get_json()["count"] == 5
+    assert "limit" not in c.get("/api/status-log").get_json()
 
 
 def test_api_empty_without_file(tmp_path, monkeypatch):
