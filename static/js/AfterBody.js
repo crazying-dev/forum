@@ -746,14 +746,36 @@
   app.isExternalLink = _isExternalLink;
 
   // ── Markdown 渲染（使用 marked.js）──
-  // 配置：headerIds 关闭避免 id 冲突；mangle 关闭避免邮箱被转义；
-  // 默认 marked 已对原始 HTML 做转义，这里再显式关闭内联 HTML 解析。
+  // 配置：breaks 单换行即换行；gfm 表格/删除线等。
+  // headerIds / mangle 是旧版选项，marked v15 已忽略，保留仅为兼容旧版打包。
   if (typeof marked !== 'undefined') {
     marked.setOptions({
       headerIds: false,
       mangle: false,
       breaks: true,
       gfm: true
+    });
+  }
+
+  // 全站统一：**不渲染 HTML 语法**。
+  // 覆写 html 渲染器（marked v15 传 token 对象），把 HTML 标签整体转义成字面文字；
+  // 代码块 / 行内代码走各自的渲染器，内容仍由 marked 转义，不受影响。
+  function _escapeHtmlLiteral(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+  if (typeof marked !== 'undefined' && typeof marked.use === 'function') {
+    marked.use({
+      renderer: {
+        html: function (token) {
+          var isToken = !!token && typeof token === 'object' && 'text' in token;
+          var raw = isToken ? token.text : String(token == null ? '' : token);
+          var out = _escapeHtmlLiteral(raw);
+          return (isToken && token.block) ? '<p>' + out + '</p>\n' : out;
+        }
+      }
     });
   }
 

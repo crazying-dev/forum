@@ -42,8 +42,10 @@ def _to_list_item(r):
 def create_post(user_id, title, content, category="general"):
     """发布新帖子，返回 {"success": True, "id": post_id}。
 
-    内容以原始 Markdown 存储，不在入库时做 HTML 净化；
-    前端用 marked.js 渲染，渲染产物由 marked 默认转义保护。
+    内容以**用户原文**（Markdown / 纯文本）原样入库，不做任何 HTML 包装、
+    不在入库时做 HTML 净化。三端渲染口径统一：一律按 Markdown 渲染，
+    HTML 标签按字面文字展示（前端覆写 marked 的 html 渲染器，不解析 HTML）。
+    历史上安卓客户端写入的 `<p>…<br>…</p>` 正文由 tool/content_migrate.py 迁移。
     """
     post_id = _gen_id()
     if category not in config.ALLOWED_CATEGORIES:
