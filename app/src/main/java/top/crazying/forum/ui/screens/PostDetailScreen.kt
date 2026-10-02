@@ -308,7 +308,7 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                         )
                         HDivider()
                         if (p.content.isNotBlank()) {
-                            HtmlBody(p.content)
+                            MarkdownBodyView(p.content)
                         }
                         HDivider()
                         Text(

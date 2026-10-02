@@ -1,26 +1,21 @@
 package top.crazying.forum.core
 
 /**
- * 帖子正文渲染：Markdown / HTML 双模式。
+ * 帖子正文渲染：Markdown（**不渲染 HTML 语法**）。
  *
- * 服务端 `content` 存的是**原文**，两种来源混用：
- * * 网页端发帖存的是 Markdown（`# 标题`、`- 列表`、空行分段…）；
- * * 安卓端发帖存的是简单 HTML（`<p>…<br>…</p>`，见 PostCreateScreen）。
+ * 三端统一口径：服务端 `content` 存的是**用户原文**，一律按 Markdown 渲染；
+ * 正文里的 HTML 标签按字面文字展示（不解析、不执行）。入库侧同样：安卓发帖
+ * 已不再把纯文本包装成 `<p>…<br>…</p>`（见 PostCreateScreen），历史上被包装
+ * 过的正文由服务端 `tool/content_migrate.py` 一次性还原成原文。
  *
- * 安卓此前一律走 HtmlCompat.fromHtml，Markdown 来源的换行与分段全被吃掉
- * （表现为「正文换行有问题」）。这里先判定内容形态：
- * * 含 HTML 标签 → 原样交给 HtmlCompat（与网页端 marked 的「原样透传」口径一致）；
- * * 否则按 Markdown 子集渲染成 HTML：标题 / 列表 / 引用 / 代码块 / 粗斜体 /
- *   删除线 / 行内代码 / 链接。段落内换行 → `<br>`，空行分段 → 新 `<p>`。
+ * 这里把 Markdown 子集转成 HTML 再交 HtmlCompat 渲染：标题 / 列表 / 引用 /
+ * 代码块 / 分隔线 / 粗斜体 / 删除线 / 行内代码 / 链接。段落内换行 → `<br>`，
+ * 空行分段 → 新 `<p>`（单换行即换行，对齐网页端 marked 的 breaks:true）。
+ * 行内文本统一先做 HTML 转义，所以 `<div>` 这类标签会以字面文字出现。
  *
  * 纯 Kotlin 实现（无 Android 依赖），逻辑可单独验证。
  */
 object MarkdownBody {
-
-    /** 出现这些标签就当作 HTML（网页端 marked 也是原样透传）。 */
-    private val HTML_TAG = Regex(
-        "(?i)</?(?:p|br|div|span|h[1-6]|ul|ol|li|blockquote|pre|code|strong|em|b|i|u|s|strike|a|img|table|thead|tbody|tr|td|th|hr|font|small|big|sub|sup)\\b[^>]*>"
-    )
 
     private val FENCE = Regex("^\\s*(`{3,}|~{3,})(.*)$")
     private val HEADING = Regex("^(#{1,6})\\s+(.*)$")
@@ -38,17 +33,9 @@ object MarkdownBody {
     private val RE_ITALIC_STAR = Regex("\\*([^*\\n]+)\\*")
     private val RE_ITALIC_UNDER = Regex("(?<![0-9A-Za-z_])_([^_\\n]+)_(?![0-9A-Za-z_])")
 
-    /** 内容里是否已经带 HTML 标签。 */
-    fun looksLikeHtml(src: String): Boolean = HTML_TAG.containsMatchIn(src)
-
-    /** 正文 → HTML：HTML 来源原样返回，Markdown 来源转成 HTML。 */
-    fun bodyToHtml(src: String): String {
-        if (src.isBlank()) return ""
-        return if (looksLikeHtml(src)) src else toHtml(src)
-    }
-
-    /** Markdown（子集） → HTML。 */
+    /** 正文（Markdown 子集） → HTML。HTML 标签会被转义成字面文字。 */
     fun toHtml(src: String): String {
+        if (src.isBlank()) return ""
         val lines = src.replace("\r\n", "\n").replace('\r', '\n').split('\n')
         val out = StringBuilder(src.length + 64)
         val para = ArrayList<String>()

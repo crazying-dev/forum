@@ -23,8 +23,9 @@ import top.crazying.forum.ui.components.*
 /**
  * 发帖页。
  *
- * 服务端 `content` 字段存的是 **HTML**，这里把纯文本按空行拆段、段落内换行转 `<br>`，
- * 并对 `& < >` 做转义，既不引入富文本编辑器，也不会把用户输入当成 HTML 注入。
+ * 正文**原样直传**服务端，不做任何 HTML 包装 / 转义：三端统一为
+ * 「原文入库 + 一律按 Markdown 渲染，HTML 标签按字面文字展示」。
+ * 历史上这里会把纯文本包装成 `<p>…<br>…</p>`，已废弃。
  */
 @Composable
 fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
@@ -62,7 +63,7 @@ fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
         }
         busy = true
         scope.launch {
-            val result = App.api.createPost(t, toHtml(c), category)
+            val result = App.api.createPost(t, c, category)
             busy = false
             if (result.ok) {
                 toast(context, "发布成功")
@@ -150,21 +151,5 @@ fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
 
             EmptyBox("发布后可在帖子详情页查看与回复")
         }
-    }
-}
-
-/** 纯文本 → 服务端存储用的 HTML。 */
-internal fun toHtml(text: String): String {
-    val escaped = text
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-    val paragraphs = escaped
-        .split(Regex("\\n\\s*\\n"))
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-    if (paragraphs.isEmpty()) return ""
-    return paragraphs.joinToString(separator = "") { p ->
-        "<p>" + p.replace("\n", "<br>") + "</p>"
     }
 }

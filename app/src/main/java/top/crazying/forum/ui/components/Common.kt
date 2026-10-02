@@ -252,17 +252,16 @@ fun ErrorBox(message: String, onRetry: (() -> Unit)? = null, modifier: Modifier 
 // ────────────────── HTML 正文 ──────────────────
 
 /**
- * 帖子正文（服务端存的是 Markdown 原文或简单 HTML，两种来源混用）。
+ * HTML → 富文本（**仅供可信的自有 HTML**：wiki README、彩蛋文本等）。
  *
- * 先用 [MarkdownBody.bodyToHtml] 归一：Markdown 来源转成 HTML（保住换行与分段），
- * HTML 来源原样透传；再用系统 TextView + HtmlCompat 渲染，保留段落/粗体/链接/
- * 代码块等常用标签；`<>` 内联图片本轮不展示（已在 README「已知限制」中标注）。
+ * 用户内容的正文一律走 [MarkdownBodyView]，不要用本函数 —— 三端口径是
+ * 「不渲染 HTML 语法」，正文里的 HTML 标签必须按字面文字展示。
  */
 @Composable
 fun HtmlBody(html: String, modifier: Modifier = Modifier, fontSizeSp: Float = 15f) {
     val colors = ForumTheme.colors
     val spanned = remember(html) {
-        val safe = MarkdownBody.bodyToHtml(html)
+        val safe = html
             .replace(Regex("(?i)<img[^>]*>"), "")
             .replace(Regex("(?i)<script[\\s\\S]*?</script>"), "")
         runCatching { HtmlCompat.fromHtml(safe, HtmlCompat.FROM_HTML_MODE_COMPACT) }
@@ -285,6 +284,20 @@ fun HtmlBody(html: String, modifier: Modifier = Modifier, fontSizeSp: Float = 15
             tv.movementMethod = LinkMovementMethod.getInstance()
         },
     )
+}
+
+// ────────────────── 帖子正文（Markdown） ──────────────────
+
+/**
+ * 帖子正文：**一律按 Markdown 渲染**，正文里的 HTML 标签按字面文字展示。
+ *
+ * 服务端 `content` 存的是用户原文（Markdown / 纯文本），三端口径一致：
+ * 不解析 HTML 语法。实现上先由 [MarkdownBody.toHtml] 转成 HTML 再交给
+ * [HtmlBody] 用系统 TextView 渲染（保留段落 / 粗体 / 链接 / 代码块等标签）。
+ */
+@Composable
+fun MarkdownBodyView(text: String, modifier: Modifier = Modifier, fontSizeSp: Float = 15f) {
+    HtmlBody(MarkdownBody.toHtml(text), modifier = modifier, fontSizeSp = fontSizeSp)
 }
 
 // ────────────────── 帖子卡片 ──────────────────
