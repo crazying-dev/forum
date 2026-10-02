@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.text.HtmlCompat
 import coil3.compose.AsyncImage
+import top.crazying.forum.core.MarkdownBody
 import top.crazying.forum.core.TimeFmt
 import top.crazying.forum.data.Post
 import top.crazying.forum.theme.ForumTheme
@@ -251,16 +252,17 @@ fun ErrorBox(message: String, onRetry: (() -> Unit)? = null, modifier: Modifier 
 // ────────────────── HTML 正文 ──────────────────
 
 /**
- * 帖子正文（服务端存的是 HTML）。
+ * 帖子正文（服务端存的是 Markdown 原文或简单 HTML，两种来源混用）。
  *
- * 用系统 TextView + HtmlCompat 渲染，保留段落/粗体/链接/代码块等常用标签；
- * `<>` 内联图片本轮不展示（已在 README「已知限制」中标注）。
+ * 先用 [MarkdownBody.bodyToHtml] 归一：Markdown 来源转成 HTML（保住换行与分段），
+ * HTML 来源原样透传；再用系统 TextView + HtmlCompat 渲染，保留段落/粗体/链接/
+ * 代码块等常用标签；`<>` 内联图片本轮不展示（已在 README「已知限制」中标注）。
  */
 @Composable
 fun HtmlBody(html: String, modifier: Modifier = Modifier, fontSizeSp: Float = 15f) {
     val colors = ForumTheme.colors
     val spanned = remember(html) {
-        val safe = html
+        val safe = MarkdownBody.bodyToHtml(html)
             .replace(Regex("(?i)<img[^>]*>"), "")
             .replace(Regex("(?i)<script[\\s\\S]*?</script>"), "")
         runCatching { HtmlCompat.fromHtml(safe, HtmlCompat.FROM_HTML_MODE_COMPACT) }

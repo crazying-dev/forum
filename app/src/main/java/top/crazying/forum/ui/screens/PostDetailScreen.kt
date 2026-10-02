@@ -264,6 +264,9 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 val p = post!!
+                // 评论数：优先服务端 comment_count（接口已返回）；
+                // 老服务端没有该字段时回退为已加载的评论条数，不再恒显示 0。
+                val commentTotal = if (p.commentCount > 0) p.commentCount else comments.size
                 item(key = "head") {
                     Column(
                         modifier = Modifier
@@ -309,7 +312,7 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                         }
                         HDivider()
                         Text(
-                            text = "赞 ${p.likes} · 阅 ${p.views} · 评 ${p.commentCount} · ${TimeFmt.fmtDateTime(p.createdAt)}",
+                            text = "赞 ${p.likes} · 阅 ${p.views} · 评 $commentTotal · ${TimeFmt.fmtDateTime(p.createdAt)}",
                             color = colors.textMuted,
                             fontSize = 12.sp,
                         )
@@ -356,7 +359,7 @@ fun PostDetailScreen(nav: Navigator, postId: String) {
                 }
 
                 item(key = "ct") {
-                    SectionTitle("评论（${comments.size}）")
+                    SectionTitle("评论（$commentTotal）")
                 }
 
                 if (comments.isEmpty()) {
