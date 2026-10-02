@@ -11,6 +11,16 @@ def _gen_id(prefix=None):
     return f"{p}{uuid.uuid4().hex[:16].upper()}"
 
 
+# ── 评论数（列表 / 详情统一附带）──────────────────
+# 只统计未删除的评论（comments.status = 1）。子查询别名固定为 cm，
+# 不占用外层 p / u / pf 等别名。客户端靠 ``comment_count`` 显示「评 N」，
+# 之前接口不返回该字段，安卓端一律显示 0（历史 Bug）。
+COMMENT_COUNT_SQL = (
+    "(SELECT COUNT(*) FROM comments cm"
+    " WHERE cm.post_id = p.id AND cm.status = 1) AS comment_count"
+)
+
+
 # ── 列表项公共字段 ──────────────────────────────
 def _to_list_item(r):
     return {
@@ -21,6 +31,7 @@ def _to_list_item(r):
         "category": r.get("category"),
         "likes": r.get("likes") or 0,
         "views": r.get("views") or 0,
+        "comment_count": r.get("comment_count") or 0,
         "created_at": str(r.get("created_at")) if r.get("created_at") else None,
         "user_name": r.get("user_name"),
         "user_avatar": r.get("user_avatar"),
@@ -51,9 +62,10 @@ def create_post(user_id, title, content, category="general"):
 def get_post(post_id):
     """获取帖子详情（含作者信息），不存在或已删除返回 None。"""
     row = execute_query(
-        """
+        f"""
         SELECT p.id, p.user_id, p.title, p.content, p.category, p.likes, p.views,
-               p.status, p.created_at, p.updated_at, u.name AS user_name, u.avatar AS user_avatar
+               p.status, p.created_at, p.updated_at, u.name AS user_name, u.avatar AS user_avatar,
+               {COMMENT_COUNT_SQL}
         FROM posts p
         JOIN users u ON p.user_id = u.id
         WHERE p.id = %s AND p.status = 1
@@ -71,6 +83,7 @@ def get_post(post_id):
         "category": row.get("category"),
         "likes": row.get("likes") or 0,
         "views": row.get("views") or 0,
+        "comment_count": row.get("comment_count") or 0,
         "status": row.get("status"),
         "created_at": str(row.get("created_at")) if row.get("created_at") else None,
         "updated_at": str(row.get("updated_at")) if row.get("updated_at") else None,
@@ -93,7 +106,8 @@ def get_post_list(page=1, page_size=20, category=None, sort="time"):
     order_sql = _SORT_ORDER_SQL.get(sort, _SORT_ORDER_SQL["time"])
     base_select = (
         "SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,"
-        " p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar"
+        " p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar,"
+        " " + COMMENT_COUNT_SQL +
         " FROM posts p JOIN users u ON p.user_id = u.id WHERE p.status = 1"
     )
     if category:
@@ -114,9 +128,10 @@ def get_post_list(page=1, page_size=20, category=None, sort="time"):
 def get_random_posts(user_id=None, limit=200):
     """随机获取帖子（user_id 保留兼容）。"""
     rows = execute_query(
-        """
+        f"""
         SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
-               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar
+               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar,
+               {COMMENT_COUNT_SQL}
         FROM posts p
         JOIN users u ON p.user_id = u.id
         WHERE p.status = 1
@@ -141,9 +156,10 @@ def get_user_posts(user_id, page=1, page_size=20):
     """
     offset = (page - 1) * page_size
     rows = execute_query(
-        """
+        f"""
         SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
-               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar
+               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar,
+               {COMMENT_COUNT_SQL}
         FROM posts p
         JOIN users u ON p.user_id = u.id
         WHERE p.user_id = %s AND p.status = 1
@@ -258,9 +274,10 @@ def get_user_favorites(user_id, page=1, page_size=20):
     """获取用户收藏的帖子列表。"""
     offset = (page - 1) * page_size
     rows = execute_query(
-        """
+        f"""
         SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
-               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar
+               p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar,
+               {COMMENT_COUNT_SQL}
         FROM post_favorites pf
         JOIN posts p ON pf.post_id = p.id
         JOIN users u ON p.user_id = u.id

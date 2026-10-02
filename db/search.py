@@ -1,5 +1,6 @@
 """搜索数据访问（帖子 + 用户，多关键词 AND 相关性排序）。"""
 from db import execute_query
+from db.post import COMMENT_COUNT_SQL
 
 
 def _build_tokens(keyword):
@@ -40,6 +41,7 @@ def search_posts(keyword, page=1, page_size=20):
         f"""
         SELECT p.id, p.user_id, p.title, LEFT(p.content, 200) AS summary, p.category,
                p.likes, p.views, p.created_at, u.name AS user_name, u.avatar AS user_avatar,
+               {COMMENT_COUNT_SQL},
                ({score_expr}) AS relevance
         FROM posts p
         JOIN users u ON p.user_id = u.id
@@ -60,6 +62,7 @@ def search_posts(keyword, page=1, page_size=20):
             "category": r.get("category"),
             "likes": r.get("likes") or 0,
             "views": r.get("views") or 0,
+            "comment_count": r.get("comment_count") or 0,
             "created_at": str(r.get("created_at")) if r.get("created_at") else None,
             "user_name": r.get("user_name"),
             "user_avatar": r.get("user_avatar"),
