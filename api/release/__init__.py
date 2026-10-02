@@ -39,7 +39,7 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-01T14:20:00+08:00",
+    "updated_at": "2026-10-02T17:20:00+08:00",
     "platforms": [
         {
             "key": "windows",
@@ -73,17 +73,17 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Android 7.0 及以上",
             "releases": [
                 {
-                    "version": "1.0.6",
+                    "version": "1.0.7",
                     "channel": "stable",
-                    "date": "2026-10-01",
-                    "size": 8103356,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.6/forum-android-1.0.6.apk",
-                    "filename": "forum-android-1.0.6.apk",
-                    "sha256": "a7c676e0cd278ef4e48b564c507df6c42c9d465001b8263db10baf6ff556a512",
+                    "date": "2026-10-02",
+                    "size": 8119740,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.7/forum-android-1.0.7.apk",
+                    "filename": "forum-android-1.0.7.apk",
+                    "sha256": "8121854c517e8008f21da680cd0c12ef7998561450581a5c2601158dc159cdc9",
                     "notes": [
-                        "评论楼中楼压平为两层：对回复的回复不再逐级缩进，深层压平到第 2 层",
-                        "用「回复 @某人」标明实际回复对象（仅压平项显示 @，直接回复根评论不显示）",
-                        "窄屏下评论层级更清爽，读取从属关系更直观",
+                        "正文换行修复：帖子正文改按 Markdown / HTML 双模式渲染，Markdown 来源的换行与分段不再丢失",
+                        "评论数修复：帖子详情与列表正确显示评论数（服务端 comment_count），不再恒为 0",
+                        "版本号 versionCode 8 / versionName 1.0.7",
                     ],
                     "mandatory": False,
                 }
