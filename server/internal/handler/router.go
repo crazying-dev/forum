@@ -24,12 +24,17 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	cacheSet := NewCacheSet()
 	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions}
 	miscH := &MiscHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions}
+	accountH := &AccountHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions, Cache: cacheSet}
+	siteH := &SiteHandler{DB: db}
 	guildsH := &GuildsHandler{DB: db, Cache: cacheSet, Sessions: sessions}
 	mediaH := &MediaHandler{DB: db, Cfg: cfg}
 	embedsH := &EmbedsHandler{DB: db}
 	guidesH := &GuidesHandler{DB: db}
 
 	api := r.Group("/api/v1")
+
+	// 邮箱换绑两步验证共用同一 IP 频控桶（两侧使用同一实例才能共享计数）
+	emailChangeVerifyLimit := middleware.RateLimit("email_change_verify", 15, 5*time.Minute)
 
 	// ---- 认证 ----
 	api.POST("/auth/register", authH.Register)
@@ -39,8 +44,9 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 
 	// ---- 验证码/邮件 ----
 	api.POST("/auth/register/code", miscH.SendRegisterCode)
-	api.POST("/auth/password/reset/code", miscH.SendResetPasswordCode)
-	api.POST("/auth/password/reset", miscH.ResetPasswordByCode)
+	api.POST("/auth/password/reset/link", middleware.RateLimit("reset_link", 10, time.Hour), miscH.SendResetLink)
+	api.GET("/auth/password/reset/validate", middleware.RateLimit("reset_validate", 30, 5*time.Minute), miscH.ValidateResetToken)
+	api.POST("/auth/password/reset/confirm", miscH.ResetPasswordByToken)
 	api.GET("/auth/verify-token", miscH.VerifyToken)
 
 	// ---- 用户 ----
@@ -49,7 +55,12 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.POST("/users/me/sign-in", authH.AuthRequired(), authH.SignIn)
 	api.GET("/users/me/replies", authH.AuthRequired(), authH.MyReplies)
 	api.POST("/users/me/verify-email", authH.AuthRequired(), miscH.SendVerifyEmailCode)
-	api.POST("/users/me/verify-email/confirm", authH.AuthRequired(), miscH.VerifyCodeEmail)
+	api.POST("/users/me/verify-email/confirm", middleware.RateLimit("verify_email", 10, 5*time.Minute), authH.AuthRequired(), miscH.VerifyCodeEmail)
+	api.POST("/users/me/delete", middleware.RateLimit("account_delete", 5, 300*time.Second), authH.AuthRequired(), accountH.DeleteAccount)
+	api.POST("/users/me/email-change/code", middleware.RateLimit("email_change_code", 10, 10*time.Minute), authH.AuthRequired(), accountH.SendEmailChangeOldCode)
+	api.POST("/users/me/email-change/verify-old", emailChangeVerifyLimit, authH.AuthRequired(), accountH.VerifyEmailChangeOld)
+	api.POST("/users/me/email-change/new-code", middleware.RateLimit("email_change_new", 10, 10*time.Minute), authH.AuthRequired(), accountH.SendEmailChangeNewCode)
+	api.POST("/users/me/email-change/confirm", emailChangeVerifyLimit, authH.AuthRequired(), accountH.ConfirmEmailChange)
 	api.GET("/users/:id", authH.UserProfile)
 	api.GET("/users/:id/posts", authH.UserPosts)
 	api.GET("/users/:id/comments", authH.UserComments)
@@ -96,6 +107,9 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	// ---- 指南（公开读取）----
 	api.GET("/guides", guidesH.List)
 	api.GET("/guides/:id", guidesH.Detail)
+
+	// ---- 站点配置（公开）----
+	api.GET("/site/config", siteH.SiteConfig)
 
 	// ---- 引用卡片 / 媒体 ----
 	api.GET("/embeds", embedsH.List)

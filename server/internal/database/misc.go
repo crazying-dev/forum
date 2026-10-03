@@ -71,9 +71,24 @@ func (d *DB) MarkVerifyCodeUsed(ctx context.Context, email, code, purpose string
 	return err
 }
 
-// IncrementVerifyCodeAttempts 失败次数 +1。
-func (d *DB) IncrementVerifyCodeAttempts(ctx context.Context, email, purpose string) error {
-	_, err := d.Exec(ctx, `UPDATE verify_codes SET attempts = attempts + 1 WHERE email=$1 AND purpose=$2`, email, purpose)
+// GetActiveVerifyCodeAttempts 当前有效验证码的累计失败次数（无有效码时为 0）。
+func (d *DB) GetActiveVerifyCodeAttempts(ctx context.Context, email, purpose string) (int, error) {
+	var n int
+	err := d.QueryRow(ctx, `SELECT COALESCE(MAX(attempts), 0) FROM verify_codes
+		WHERE email=$1 AND purpose=$2 AND used=0 AND expires_at > NOW()`, email, purpose).Scan(&n)
+	return n, err
+}
+
+// BumpActiveVerifyCodeAttempts 当前有效验证码失败次数 +1。
+func (d *DB) BumpActiveVerifyCodeAttempts(ctx context.Context, email, purpose string) error {
+	_, err := d.Exec(ctx, `UPDATE verify_codes SET attempts = attempts + 1
+		WHERE email=$1 AND purpose=$2 AND used=0 AND expires_at > NOW()`, email, purpose)
+	return err
+}
+
+// InvalidateActiveVerifyCodes 作废当前有效验证码（失败次数达上限时调用）。
+func (d *DB) InvalidateActiveVerifyCodes(ctx context.Context, email, purpose string) error {
+	_, err := d.Exec(ctx, `UPDATE verify_codes SET used=1 WHERE email=$1 AND purpose=$2 AND used=0`, email, purpose)
 	return err
 }
 
@@ -81,6 +96,105 @@ func (d *DB) IncrementVerifyCodeAttempts(ctx context.Context, email, purpose str
 func (d *DB) CleanExpiredVerifyCodes(ctx context.Context) error {
 	_, err := d.Exec(ctx, `DELETE FROM verify_codes WHERE expires_at < NOW() OR used=1`)
 	return err
+}
+
+// ---- 账号操作限流与密码重置 token ----
+
+// TryAcquireActionLimit 原子尝试占用操作配额：窗口期内不存在同（动作,邮箱）记录时插入一条并返回 true。
+func (d *DB) TryAcquireActionLimit(ctx context.Context, action, email string, windowSeconds int) (bool, error) {
+	// 显式 ::varchar 转换：INSERT 目标列与子查询比较对参数的类型推断不一致（text vs varchar），
+	// 不转换时 PostgreSQL 报 42P08 inconsistent types deduced for parameter。
+	// pg_advisory_xact_lock 以「动作+邮箱」为键对“检查+插入”串行化，避免并发下各自快照均看到
+	// “不存在”而重复插入（READ COMMITTED 竞态）；锁随隐式事务在本语句结束时释放。
+	affected, err := d.Exec(ctx, `WITH lock AS (
+		SELECT pg_advisory_xact_lock(hashtext($1::varchar || ':' || $2::varchar)) AS l
+	)
+	INSERT INTO account_action_limits (action, email)
+	SELECT $1::varchar, $2::varchar FROM lock
+	WHERE NOT EXISTS (
+		SELECT 1 FROM account_action_limits
+		WHERE action = $1::varchar AND email = $2::varchar AND created_at > NOW() - ($3::int * INTERVAL '1 second')
+	)`, action, email, windowSeconds)
+	if err != nil {
+		return false, err
+	}
+	return affected > 0, nil
+}
+
+// CheckActionLimit 检查操作配额：窗口期内次数 < maxCount，且（minGapSeconds>0 时）距上次操作已超过 minGapSeconds。
+func (d *DB) CheckActionLimit(ctx context.Context, action, email string, maxCount, windowSeconds, minGapSeconds int) (bool, error) {
+	var count int
+	var last *time.Time
+	err := d.QueryRow(ctx, `SELECT COUNT(*), MAX(created_at) FROM account_action_limits
+		WHERE action = $1::varchar AND email = $2::varchar AND created_at > NOW() - ($3::int * INTERVAL '1 second')`,
+		action, email, windowSeconds).Scan(&count, &last)
+	if err != nil {
+		return false, err
+	}
+	if count >= maxCount {
+		return false, nil
+	}
+	if minGapSeconds > 0 && last != nil && time.Since(*last) < time.Duration(minGapSeconds)*time.Second {
+		return false, nil
+	}
+	return true, nil
+}
+
+// CreateResetToken 创建密码重置 token（10 分钟有效，最多可打开 3 次）。
+func (d *DB) CreateResetToken(ctx context.Context, userID string) (string, error) {
+	return d.CreateVerifyToken(ctx, userID, "password_reset", 10)
+}
+
+// ConsumeResetTokenVisit 打开重置链接：占用一次访问（最多 3 次），返回 user_id。
+func (d *DB) ConsumeResetTokenVisit(ctx context.Context, token string) (string, error) {
+	var userID string
+	err := d.QueryRow(ctx, `UPDATE verify_tokens SET visits = visits + 1
+		WHERE token = $1 AND token_type = 'password_reset' AND expires_at > NOW() AND used_at IS NULL AND visits < 3
+		RETURNING user_id`, token).Scan(&userID)
+	if err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
+// GetResetTokenForSubmit 提交新密码前校验重置 token（不占用访问次数）。
+func (d *DB) GetResetTokenForSubmit(ctx context.Context, token string) (string, error) {
+	var userID string
+	err := d.QueryRow(ctx, `SELECT user_id FROM verify_tokens
+		WHERE token = $1 AND token_type = 'password_reset' AND expires_at > NOW() AND used_at IS NULL`, token).Scan(&userID)
+	if err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
+// MarkUserResetTokensUsed 核销该用户全部未使用的重置 token。
+func (d *DB) MarkUserResetTokensUsed(ctx context.Context, userID string) error {
+	_, err := d.Exec(ctx, `UPDATE verify_tokens SET used_at = NOW()
+		WHERE user_id = $1 AND token_type = 'password_reset' AND used_at IS NULL`, userID)
+	return err
+}
+
+// CleanExpiredVerifyTokens 清理已过期或已核销的验证 token。
+func (d *DB) CleanExpiredVerifyTokens(ctx context.Context) error {
+	_, err := d.Exec(ctx, `DELETE FROM verify_tokens WHERE expires_at < NOW() OR used_at IS NOT NULL`)
+	return err
+}
+
+// CleanOldAccountActionLimits 清理 48 小时前的操作限流记录。
+func (d *DB) CleanOldAccountActionLimits(ctx context.Context) error {
+	_, err := d.Exec(ctx, `DELETE FROM account_action_limits WHERE created_at < NOW() - INTERVAL '48 hours'`)
+	return err
+}
+
+// GetUserIDByEmail 按邮箱取未注销用户 id（不存在返回 pgx.ErrNoRows）。
+func (d *DB) GetUserIDByEmail(ctx context.Context, email string) (string, error) {
+	var id string
+	err := d.QueryRow(ctx, `SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL`, email).Scan(&id)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // ---- 投票 ----
@@ -288,7 +402,7 @@ func (d *DB) SearchUsers(ctx context.Context, keyword string, page, pageSize int
 	if len(terms) == 0 {
 		return []models.UserBrief{}, 0, false, nil
 	}
-	where := "WHERE 1=1"
+	where := "WHERE deleted_at IS NULL"
 	args := []any{}
 	for _, t := range terms {
 		args = append(args, "%"+t+"%")

@@ -20,7 +20,7 @@ func (d *DB) GetEmbedUsers(ctx context.Context, ids []string) ([]models.EmbedUse
 		FROM users u
 		LEFT JOIN guild_members gm ON gm.user_id = u.id
 		LEFT JOIN guilds g ON g.id = gm.guild_id
-		WHERE u.id = ANY($1::text[]) AND u.is_banned = 0`, ids)
+		WHERE u.id = ANY($1::text[]) AND u.is_banned = 0 AND u.deleted_at IS NULL`, ids)
 	if err != nil {
 		return nil, err
 	}

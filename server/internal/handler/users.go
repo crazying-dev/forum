@@ -22,6 +22,12 @@ func (h *AuthHandler) guildProfile(ctx context.Context, userID string) (*models.
 	return ms, ms.IsLeader
 }
 
+// isDeletedUser 用户是否已注销（不存在返回 false）。
+func (h *AuthHandler) isDeletedUser(ctx context.Context, id string) bool {
+	u, err := h.DB.GetUserByID(ctx, id)
+	return err == nil && u.DeletedAt != nil
+}
+
 // ---- /api/v1/users/me ----
 
 // Me 当前登录用户。
@@ -48,6 +54,15 @@ func (h *AuthHandler) UserProfile(c *gin.Context) {
 	u, err := h.DB.GetUserByID(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "用户不存在"})
+		return
+	}
+	if u.DeletedAt != nil {
+		// 已注销账号：仅下发最小档案（沿用原 user 结构并附加 deleted 标志）
+		profile := *u
+		profile.Email = ""
+		profile.Deleted = true
+		c.JSON(http.StatusOK, gin.H{"success": true, "user": profile, "stats": models.Stats{}, "follow_stats": models.FollowStats{},
+			"is_following": false, "is_self": false, "guild": nil, "is_leader": false})
 		return
 	}
 	stats, _ := h.DB.GetUserStats(c.Request.Context(), id)
@@ -80,6 +95,10 @@ func (h *AuthHandler) UserProfile(c *gin.Context) {
 func (h *AuthHandler) UserPosts(c *gin.Context) {
 	id := c.Param("id")
 	page, pageSize := parsePage(c)
+	if h.isDeletedUser(c.Request.Context(), id) {
+		c.JSON(http.StatusOK, gin.H{"success": true, "posts": []models.PostListItem{}, "page": page, "page_size": pageSize})
+		return
+	}
 	viewer := h.CurrentUserFromCookie(c)
 	posts, err := h.DB.GetUserPosts(c.Request.Context(), id, viewer, page, pageSize)
 	if err != nil {
@@ -117,6 +136,10 @@ func (h *AuthHandler) UpdateMe(c *gin.Context) {
 		clean := database.StripEasterEgg(*req.Name)
 		if len([]rune(clean)) < 2 || len([]rune(clean)) > 20 {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "用户名需2-20个字符"})
+			return
+		}
+		if strings.HasPrefix(strings.TrimSpace(clean), "已注销") {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "该用户名为保留名称"})
 			return
 		}
 		fields["name"] = *req.Name
@@ -179,6 +202,10 @@ func (h *AuthHandler) ToggleFollow(c *gin.Context) {
 		return
 	}
 	target := c.Param("id")
+	if h.isDeletedUser(c.Request.Context(), target) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "该账号已注销"})
+		return
+	}
 	following, err := h.DB.ToggleFollow(c.Request.Context(), uid, target)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "操作失败"})
@@ -261,6 +288,10 @@ func (h *AuthHandler) MyReplies(c *gin.Context) {
 func (h *AuthHandler) UserComments(c *gin.Context) {
 	id := c.Param("id")
 	page, pageSize := parsePage(c)
+	if h.isDeletedUser(c.Request.Context(), id) {
+		c.JSON(http.StatusOK, gin.H{"success": true, "comments": []models.ReplyItem{}, "total": 0, "page": page, "page_size": pageSize})
+		return
+	}
 	comments, total, err := h.DB.GetUserComments(c.Request.Context(), id, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
@@ -275,6 +306,10 @@ func (h *AuthHandler) UserComments(c *gin.Context) {
 func (h *AuthHandler) UserFavorites(c *gin.Context) {
 	id := c.Param("id")
 	page, pageSize := parsePage(c)
+	if h.isDeletedUser(c.Request.Context(), id) {
+		c.JSON(http.StatusOK, gin.H{"success": true, "posts": []models.PostListItem{}, "page": page, "page_size": pageSize})
+		return
+	}
 	posts, err := h.DB.GetUserFavorites(c.Request.Context(), id, page, pageSize)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})

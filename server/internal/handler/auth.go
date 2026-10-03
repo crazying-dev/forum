@@ -57,6 +57,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "用户名需2-20个字符"})
 		return
 	}
+	if strings.HasPrefix(strings.TrimSpace(cleanName), "已注销") {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "该用户名为保留名称"})
+		return
+	}
 	if len(password) < 8 {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码至少8位"})
 		return
@@ -65,9 +69,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码需包含字母和数字"})
 		return
 	}
-	// 验证码校验
-	ok, err := h.DB.GetVerifyCode(c.Request.Context(), emailAddr, code, "register")
-	if err != nil || !ok {
+	// 验证码校验（含失败次数限制）
+	ok, err := verifyCodeWithLimit(c.Request.Context(), h.DB, emailAddr, code, "register")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	}
+	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码错误或已过期"})
 		return
 	}
@@ -89,8 +97,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": msg})
 		return
 	}
-	_ = h.DB.MarkVerifyCodeUsed(c.Request.Context(), emailAddr, code, "register")
-	// 注册已通过邮箱验证码验证（证明邮箱归属），直接标记已认证
+	// 注册已通过邮箱验证码验证（证明邮箱归属；验证码已由校验流程核销），直接标记已认证
 	_ = h.DB.UpdateUserEmailVerified(c.Request.Context(), uid)
 
 	// 自动登录

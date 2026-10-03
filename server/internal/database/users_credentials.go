@@ -35,16 +35,22 @@ func scanUserWithPassword(row interface{ Scan(...any) error }) (*UserInfo, error
 	return &u, nil
 }
 
-// GetUserByNameWithPassword 按用户名查（含密码）。
+// GetUserByNameWithPassword 按用户名查（含密码；已注销账号不可登录）。
 func (d *DB) GetUserByNameWithPassword(ctx context.Context, name string) (*UserInfo, error) {
 	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), COALESCE(prefix, ''),
-		is_banned, email_verified, created_at, last_login, password FROM users WHERE name=$1`, name))
+		is_banned, email_verified, created_at, last_login, password FROM users WHERE name=$1 AND deleted_at IS NULL`, name))
 }
 
-// GetUserByEmailWithPassword 按邮箱查（含密码）。
+// GetUserByEmailWithPassword 按邮箱查（含密码；已注销账号不可登录）。
 func (d *DB) GetUserByEmailWithPassword(ctx context.Context, email string) (*UserInfo, error) {
 	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), COALESCE(prefix, ''),
-		is_banned, email_verified, created_at, last_login, password FROM users WHERE email=$1`, email))
+		is_banned, email_verified, created_at, last_login, password FROM users WHERE email=$1 AND deleted_at IS NULL`, email))
+}
+
+// GetUserByIDWithPassword 按 ID 查（含密码；已注销账号不可用）。
+func (d *DB) GetUserByIDWithPassword(ctx context.Context, id string) (*UserInfo, error) {
+	return scanUserWithPassword(d.QueryRow(ctx, `SELECT id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), COALESCE(prefix, ''),
+		is_banned, email_verified, created_at, last_login, password FROM users WHERE id=$1 AND deleted_at IS NULL`, id))
 }
 
 // UserExistsByEmail 邮箱是否已存在。

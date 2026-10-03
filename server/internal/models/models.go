@@ -19,6 +19,8 @@ type User struct {
 	EmailVerified int        `json:"email_verified"`
 	CreatedAt     *time.Time `json:"created_at"`
 	LastLogin     *time.Time `json:"last_login"`
+	DeletedAt     *time.Time `json:"-"`                 // 注销时间（非空即已注销，不下发）
+	Deleted       bool       `json:"deleted,omitempty"` // 已注销标记（仅注销账号返回 true）
 }
 
 // UserBrief 列表/关联场景的用户摘要。

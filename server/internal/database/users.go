@@ -12,13 +12,13 @@ import (
 
 // 注：gender/age/intro/prefix 可为 NULL（历史数据，如个别账号 prefix 未写），读取时统一 COALESCE 兜底；
 // last_sign_in 可空（未签到），扫描后格式化为 YYYY-MM-DD
-const userCols = `id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), spirit, last_sign_in, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login`
+const userCols = `id, name, avatar, email, COALESCE(gender, 0), COALESCE(age, ''), COALESCE(intro, ''), spirit, last_sign_in, COALESCE(prefix, ''), is_banned, email_verified, created_at, last_login, deleted_at`
 
 func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 	var u models.User
 	var createdAt, lastLogin, lastSignIn *time.Time
 	err := row.Scan(&u.ID, &u.Name, &u.Avatar, &u.Email, &u.Gender, &u.Age, &u.Intro, &u.Spirit, &lastSignIn,
-		&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin)
+		&u.Prefix, &u.IsBanned, &u.EmailVerified, &createdAt, &lastLogin, &u.DeletedAt)
 	if err != nil {
 		return nil, err
 	}

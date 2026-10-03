@@ -51,6 +51,12 @@ func (m *SessionManager) Delete(ctx context.Context, token string) error {
 	return err
 }
 
+// DeleteByUserID 删除某用户全部会话（重置密码/注销后强制下线）。
+func (m *SessionManager) DeleteByUserID(ctx context.Context, userID string) error {
+	_, err := m.DB.Exec(ctx, `DELETE FROM sessions WHERE user_id=$1`, userID)
+	return err
+}
+
 // Cleanup 清理过期会话（由后台 goroutine 定期执行）。
 func (m *SessionManager) Cleanup(ctx context.Context) {
 	_, _ = m.DB.Exec(ctx, `DELETE FROM sessions WHERE expires_at < NOW()`)

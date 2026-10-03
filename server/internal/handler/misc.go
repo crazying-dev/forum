@@ -91,8 +91,8 @@ func (h *MiscHandler) SendVerifyEmailCode(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "验证码已发送"})
 }
 
-// SendResetPasswordCode 重置密码验证码。
-func (h *MiscHandler) SendResetPasswordCode(c *gin.Context) {
+// SendResetLink 发送密码重置链接（替代验证码流程；账号是否存在不对外区分）。
+func (h *MiscHandler) SendResetLink(c *gin.Context) {
 	var req struct {
 		Email string `json:"email" binding:"required"`
 	}
@@ -101,20 +101,105 @@ func (h *MiscHandler) SendResetPasswordCode(c *gin.Context) {
 		return
 	}
 	emailAddr := strings.ToLower(strings.TrimSpace(req.Email))
-	code := genCode(6)
-	if err := h.DB.CreateVerifyCode(c.Request.Context(), emailAddr, code, "password_reset", 5); err != nil {
-		log.Printf("[CODE] password_reset code insert failed (%s): %v", emailAddr, err)
+	allowed, err := h.DB.TryAcquireActionLimit(c.Request.Context(), "password_reset", emailAddr, 3600)
+	if err != nil {
+		log.Printf("[RESET] 操作限流检查失败 (%s): %v", emailAddr, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
 	}
-	h.sendCode(c, "重置密码验证码", emailAddr, code)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "验证码已发送（若邮箱存在）"})
+	if !allowed {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "message": "请求过于频繁，请 1 小时后再试"})
+		return
+	}
+	if userID, uerr := h.DB.GetUserIDByEmail(c.Request.Context(), emailAddr); uerr == nil {
+		if token, terr := h.DB.CreateResetToken(c.Request.Context(), userID); terr != nil {
+			log.Printf("[RESET] 重置 token 创建失败 (%s): %v", emailAddr, terr)
+		} else {
+			link := normalizeBaseURL(h.Cfg.PublicBaseURL) + "/reset-password?token=" + token
+			plain := "我们收到了你的密码重置请求，请打开以下链接设置新密码：\n" + link + "\n链接 10 分钟内有效，最多可打开 3 次。\n若非本人操作请忽略本邮件。"
+			htmlBody := email.BuildHTML("重置密码", "重置你的密码",
+				[]string{"我们收到了你的密码重置请求，请点击下方按钮设置新密码：", "链接 10 分钟内有效，最多可打开 3 次。"},
+				"重置密码", link, "若非本人操作请忽略本邮件。")
+			go func() {
+				_, _ = h.Mailer.Send("【妖精论坛】重置密码", plain, []string{emailAddr}, htmlBody)
+			}()
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "重置链接已发送（若邮箱存在）"})
+}
+
+// ValidateResetToken 打开重置链接时校验并占用一次访问（每个链接最多 3 次）。
+func (h *MiscHandler) ValidateResetToken(c *gin.Context) {
+	token := strings.TrimSpace(c.Query("token"))
+	if token == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "链接无效或已失效，请重新申请重置"})
+		return
+	}
+	userID, err := h.DB.ConsumeResetTokenVisit(c.Request.Context(), token)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "链接无效或已失效，请重新申请重置"})
+		return
+	}
+	u, err := h.DB.GetUserByID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "链接无效或已失效，请重新申请重置"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"email": maskEmail(u.Email)}})
+}
+
+// ResetPasswordByToken 凭链接 token 设置新密码（强度校验与注册一致）。
+func (h *MiscHandler) ResetPasswordByToken(c *gin.Context) {
+	var req struct {
+		Token    string `json:"token" binding:"required"`
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+		return
+	}
+	if len(req.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码至少8位"})
+		return
+	}
+	if !hasLetterAndDigit(req.Password) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码需包含字母和数字"})
+		return
+	}
+	userID, err := h.DB.GetResetTokenForSubmit(c.Request.Context(), strings.TrimSpace(req.Token))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "链接无效或已失效，请重新申请重置"})
+		return
+	}
+	hash, err := bcryptHash(req.Password)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	}
+	if err := h.DB.UpdateUserProfile(c.Request.Context(), userID, map[string]any{"password": hash}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "重置失败"})
+		return
+	}
+	if err := h.DB.MarkUserResetTokensUsed(c.Request.Context(), userID); err != nil {
+		log.Printf("[RESET] 重置 token 核销失败 (uid=%s): %v", userID, err)
+	}
+	if err := h.Sessions.DeleteByUserID(c.Request.Context(), userID); err != nil {
+		log.Printf("[RESET] 重置后会话清理失败 (uid=%s): %v", userID, err)
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "密码重置成功，请使用新密码登录"})
+}
+
+// sendCodeMail 异步发送 6 位验证码邮件（注册/换绑等通用）。
+func sendCodeMail(mailer *email.Sender, label, to, code string) {
+	plain := fmt.Sprintf("【妖精论坛】%s：%s，5分钟内有效。", label, code)
+	htmlBody := email.BuildHTML(label, "你的验证码", []string{"请在 5 分钟内输入以下验证码：", `<div style="font-size:32px;font-weight:700;color:#4f46e5;text-align:center;letter-spacing:8px">` + code + `</div>`}, "", "", "")
+	go func() {
+		_, _ = mailer.Send("【妖精论坛】"+label, plain, []string{to}, htmlBody)
+	}()
 }
 
 func (h *MiscHandler) sendCode(c *gin.Context, label, to, code string) {
-	plain := fmt.Sprintf("【妖精论坛】%s：%s，5分钟内有效。", label, code)
-	html := email.BuildHTML(label, "你的验证码", []string{"请在 5 分钟内输入以下验证码：", `<div style="font-size:32px;font-weight:700;color:#4f46e5;text-align:center;letter-spacing:8px">` + code + `</div>`}, "", "", "")
-	go func() {
-		_, _ = h.Mailer.Send("【妖精论坛】"+label, plain, []string{to}, html)
-	}()
+	sendCodeMail(h.Mailer, label, to, code)
 }
 
 // ---- 验证码校验（注册/邮箱/重置）----
@@ -138,45 +223,50 @@ func (h *MiscHandler) VerifyCodeEmail(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "用户不存在"})
 		return
 	}
-	ok, _ := h.DB.GetVerifyCode(c.Request.Context(), u.Email, req.Code, "email_verify")
+	ok, err := verifyCodeWithLimit(c.Request.Context(), h.DB, u.Email, req.Code, "email_verify")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	}
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码错误或已过期"})
 		return
 	}
-	_ = h.DB.MarkVerifyCodeUsed(c.Request.Context(), u.Email, req.Code, "email_verify")
 	_ = h.DB.UpdateUserEmailVerified(c.Request.Context(), uid)
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "邮箱验证成功"})
 }
 
-// ResetPasswordByCode 验证码重置密码。
-func (h *MiscHandler) ResetPasswordByCode(c *gin.Context) {
-	var req struct {
-		Email    string `json:"email" binding:"required"`
-		Code     string `json:"code" binding:"required"`
-		Password string `json:"password" binding:"required"`
+// ---- 工具 ----
+
+// normalizeBaseURL 规整站点对外地址：已带 http(s) 前缀直接用；localhost/127./[::1] 补 http://，其余补 https://。
+func normalizeBaseURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return s
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
-		return
+	s = strings.TrimRight(s, "/")
+	lower := strings.ToLower(s)
+	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+		return s
 	}
-	emailAddr := strings.ToLower(strings.TrimSpace(req.Email))
-	ok, _ := h.DB.GetVerifyCode(c.Request.Context(), emailAddr, req.Code, "password_reset")
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码错误或已过期"})
-		return
+	if strings.HasPrefix(lower, "localhost") || strings.HasPrefix(lower, "127.") || strings.HasPrefix(lower, "[::1]") {
+		return "http://" + s
 	}
-	user, err := h.DB.GetUserByEmailWithPassword(c.Request.Context(), emailAddr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码错误或已过期"})
-		return
-	}
-	hash, _ := bcryptHash(req.Password)
-	_ = h.DB.UpdateUserProfile(c.Request.Context(), user.ID, map[string]any{"password": hash})
-	_ = h.DB.MarkVerifyCodeUsed(c.Request.Context(), emailAddr, req.Code, "password_reset")
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "密码重置成功"})
+	return "https://" + s
 }
 
-// ---- 工具 ----
+// maskEmail 邮箱脱敏：保留首字符与域名（a***@example.com）。
+func maskEmail(addr string) string {
+	at := strings.LastIndexByte(addr, '@')
+	if at <= 0 {
+		return "***"
+	}
+	local := []rune(addr[:at])
+	if len(local) == 0 {
+		return "***" + addr[at:]
+	}
+	return string(local[:1]) + "***" + addr[at:]
+}
 
 func genCode(n int) string {
 	const digits = "0123456789"
@@ -353,7 +443,12 @@ func (h *MiscHandler) EasterEgg(c *gin.Context) {
 // VerifyToken 邮箱验证 token 消费（verify-email 页）。
 func (h *MiscHandler) VerifyToken(c *gin.Context) {
 	token := c.Query("token")
+	// 仅支持 email_verify：避免通过 type 参数消费其他类型（如 password_reset）的令牌
 	tokenType := c.DefaultQuery("type", "email_verify")
+	if tokenType != "email_verify" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "不支持的验证类型"})
+		return
+	}
 	if token == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "缺少 token"})
 		return
