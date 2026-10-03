@@ -11,6 +11,9 @@ import android.content.SharedPreferences
  * 以及隐私政策同意标记（`privacyAgreedVersion`，与 `Constants.PRIVACY_POLICY_VERSION` 比对）。
  * 注意：`themePref` **只允许** day / night / auto 三个基础值，
  * 国庆限定主题是假期内的运行时叠加层，绝不能写进来。
+ *
+ * 本地缓存统一「最多 24 小时」（V1.0.10，见 [CachePolicy]）：用户缓存写入时
+ * 同时记下时间戳（[userJsonSavedAt]），过期后仍先用旧数据渲染、再静默刷新覆盖。
  */
 class Prefs(context: Context) {
 
@@ -26,9 +29,25 @@ class Prefs(context: Context) {
         set(value) = sp.edit().putString(KEY_YEAR, value).apply()
 
     /** 用户对象缓存（JSON 字符串），用于冷启动直接渲染头部。 */
-    var userJson: String
+    val userJson: String
         get() = sp.getString(KEY_USER, "") ?: ""
-        set(value) = sp.edit().putString(KEY_USER, value).apply()
+
+    /** 用户缓存的写入时间戳（毫秒）；0 表示无时间信息。 */
+    val userJsonSavedAt: Long
+        get() = sp.getLong(KEY_USER_SAVED_AT, 0L)
+
+    /**
+     * 写入用户缓存（同时记录写入时间）。
+     *
+     * 本地缓存「最多 24 小时」（见 [CachePolicy]）：过期后仍先用旧数据渲染，
+     * 再静默刷新覆盖；刷新失败保留旧数据。
+     */
+    fun saveUserJson(json: String) {
+        sp.edit()
+            .putString(KEY_USER, json)
+            .putLong(KEY_USER_SAVED_AT, System.currentTimeMillis())
+            .apply()
+    }
 
     /** CookieJar 的序列化存储（见 `PrefsCookieJar`）。 */
     var cookieStore: String
@@ -60,7 +79,7 @@ class Prefs(context: Context) {
 
     /** 退出登录 / 掉线时清理会话（保留主题、年制与隐私政策同意标记）。 */
     fun clearSession() {
-        sp.edit().remove(KEY_USER).remove(KEY_COOKIES).apply()
+        sp.edit().remove(KEY_USER).remove(KEY_USER_SAVED_AT).remove(KEY_COOKIES).apply()
     }
 
     private companion object {
@@ -68,6 +87,7 @@ class Prefs(context: Context) {
         const val KEY_THEME = "theme_pref"
         const val KEY_YEAR = "year_mode"
         const val KEY_USER = "user_json"
+        const val KEY_USER_SAVED_AT = "user_json_saved_at"
         const val KEY_COOKIES = "cookie_store"
         const val KEY_LAST_NAME = "last_name"
         const val KEY_UPDATE_CHECK_AT = "update_check_at"

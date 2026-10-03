@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.9**（`versionCode = 10`） |
+| 当前版本 | **V1.0.10**（`versionCode = 11`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -185,7 +185,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 五、本轮已实现 / 未实现
 
-### 已实现（V1.0.9）
+### 已实现（V1.0.10）
 
 * **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + 密码直注）、退出登录、本地会话恢复与失效清理
 * **首页**：最新发布 / 综合排序 / 随机推荐 / 我的收藏 四个信息流，分页加载
@@ -210,6 +210,11 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **评论数显示**：帖子详情与列表优先采用服务端 `comment_count`，字段缺失时回退为已加载评论条数（修复「评论数恒为 0」）
 * **正文渲染**：`core/MarkdownBody.kt` 纯 Kotlin 实现 Markdown 子集解析（标题 / 列表 / 引用 / 代码块 / 分隔线 / 粗斜体 / 删除线 / 行内代码 / 链接），无 Android 依赖；单换行即换行（对齐网页端 `breaks:true`）、空行分段，行内文本先做 HTML 转义（HTML 标签以字面文字出现）
 * **正文换行修复（V1.0.9）**：段落 / 引用块此前是「先把多行拼成 `<br>`、再整体做 HTML 转义」，结果 `<br>` 被自己的转义逻辑变成字面文字，正文里直接显示「`<br>`」而不是换行（数据库存的其实是普通 `\n`）。现改为**逐行 `inline()` 之后再拼 `<br>`**；并新增 `app/src/test/java/top/crazying/forum/core/MarkdownBodyTest.kt`（6 例）作为回归覆盖，`gradlew testDebugUnitTest` **6/6 通过**。
+* **本地缓存「最多 24 小时」（V1.0.10）**：`core/CachePolicy.kt` 新统一策略（`MAX_AGE_MS = 24h`），三处接入：
+  * **图片缓存**：`ForumApp` 实现 `SingletonImageLoader.Factory` 自定义 Coil 单例，磁盘缓存按 24 小时时段分目录（`cacheDir/image_cache/<时段>`），启动时整体作废上一时段 —— 任何图片最多被使用 24 小时；
+  * **更新包缓存**：`cacheDir/updates/` 启动时清掉 mtime 超过 24 小时的安装包；
+  * **用户资料缓存**：`Prefs.saveUserJson()` 同时记写入时间戳，`App.userCacheStale` 暴露过期状态；过期后仍先用旧数据渲染头部，再静默刷新覆盖（失败保留旧数据）。
+  * 新增 `app/src/test/java/top/crazying/forum/core/CachePolicyTest.kt`（7 例）。
 
 ### 未实现（后续多轮持续补齐）
 

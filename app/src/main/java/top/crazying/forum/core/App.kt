@@ -54,8 +54,17 @@ object App {
 
     fun setUser(obj: JSONObject?) {
         user.value = if (obj == null || obj.length() == 0) null else obj
-        prefs.userJson = user.value?.toString() ?: ""
+        prefs.saveUserJson(user.value?.toString() ?: "")
     }
+
+    /**
+     * 本地用户缓存是否已超过 24 小时（V1.0.10，见 [CachePolicy]）。
+     *
+     * 过期不影响使用：`App.init` 仍会先用旧数据渲染头部，随后由 `ForumRoot`
+     * 静默刷新覆盖；刷新失败保留旧数据（离线仍可见）。
+     */
+    val userCacheStale: Boolean
+        get() = prefs.userJson.isNotBlank() && CachePolicy.isStale(prefs.userJsonSavedAt)
 
     fun setThemePref(value: String) {
         val v = if (value == Constants.THEME_NIGHT || value == Constants.THEME_DAY) value

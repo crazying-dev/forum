@@ -12,7 +12,7 @@ object Constants {
     const val BASE_URL = "https://www.yjlt.top"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.9"
+    const val APP_VERSION = "1.0.10"
 
     /** 请求 UA，便于服务端日志区分端。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
@@ -47,6 +47,9 @@ object Constants {
 
     /** 安装包存放目录（App 私有缓存，下载后交给系统安装器，装完可丢）。 */
     const val UPDATE_DIR = "updates"
+
+    /** 图片磁盘缓存目录（App 私有缓存；按 24 小时时段分桶，见 `CachePolicy`）。 */
+    const val IMAGE_CACHE_DIR = "image_cache"
 
     /**
      * GitHub 直链的公共加速前缀（与 Windows 端 `constants.ACCELERATOR_MIRRORS` 同源）。

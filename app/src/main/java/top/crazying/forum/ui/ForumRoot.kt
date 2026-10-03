@@ -74,10 +74,11 @@ fun ForumRoot() {
 
         val nav = remember { Navigator() }
 
-        // 启动时若本地存有会话（cookie + 用户缓存），静默刷新一次当前用户。
+        // 本地用户缓存「最多 24 小时」（V1.0.10，见 CachePolicy）：
+        // `App.init` 已先用旧数据渲染头部；这里静默刷新一次覆盖缓存（过期时必定刷新）。
         // 失败（如 cookie 失效）由 Api 内部触发 onUnauthorized 清理，不打扰用户。
         LaunchedEffect(Unit) {
-            if (App.prefs.userJson.isNotBlank()) {
+            if (App.prefs.userJson.isNotBlank() || App.userCacheStale) {
                 runCatching { App.api.me() }
             }
             // 冷启动静默检查更新：距上次检查不足 24 小时会被 `autoCheck` 跳过；

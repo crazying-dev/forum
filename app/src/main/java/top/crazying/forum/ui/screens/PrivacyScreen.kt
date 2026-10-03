@@ -122,8 +122,9 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Heading("3.1 Android 客户端"),
     PBlock.Paragraph("以下数据保存在应用私有目录中，其他应用无法访问："),
     PBlock.Bullet("· forum_prefs — SharedPreferences：主题偏好（theme_pref）、国庆模式（year_mode）、本地用户信息（user_json）、登录 Cookie（cookie_store）、上次登录用户名（last_name）、更新检查时间与跳过版本"),
-    PBlock.Bullet("· cacheDir/updates/ — 应用缓存目录：已下载的更新安装包"),
-    PBlock.Bullet("· Coil 磁盘缓存 — 应用缓存目录：帖子图片缓存"),
+    PBlock.Bullet("· cacheDir/updates/ — 应用缓存目录：已下载的更新安装包（超过 24 小时自动清理）"),
+    PBlock.Bullet("· Coil 磁盘缓存 — 应用缓存目录：帖子图片缓存（按 24 小时时段分目录，过期整体作废）"),
+    PBlock.Paragraph("本地缓存策略：上述本地缓存均最多保留 24 小时。过期后仍会先用旧数据展示，随后在后台静默刷新并覆盖；刷新失败时保留旧数据（离线也能看到上次的内容）。"),
     PBlock.Paragraph("说明：Android 端的登录 Cookie 以明文形式保存在应用私有 SharedPreferences 中。由于该文件位于应用沙盒内、其他应用无法读取，我们暂未额外加密；卸载应用会一并删除。"),
     PBlock.Paragraph("权限说明（Android）：仅申请「网络访问」与「安装未知来源应用」（用于应用内更新）；不申请通讯录、短信、定位、相机、麦克风等敏感权限。"),
 
