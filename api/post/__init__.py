@@ -3,7 +3,7 @@
 接口：
     GET  /api/posts                帖子列表（page/page_size/category）
     GET  /api/posts/random         随机帖子
-    GET  /api/posts/<post_id>      帖子详情（含评论、点赞/收藏状态，浏览量+1）
+    GET  /api/posts/<post_id>      帖子详情（含评论、点赞/收藏状态；登录用户浏览量每小时最多 +1）
     POST /api/posts/create         发布帖子（需登录）
     POST /api/posts/<post_id>/like 点赞/取消点赞（需登录）
     POST /api/posts/<post_id>/favorite 收藏/取消收藏（需登录）
@@ -101,8 +101,10 @@ def api_post_detail(post_id):
     user = getattr(g, "user", None)
     uid = user.get("id") if user else None
     comments = db.comment.get_post_comments(post_id, 1, 50, user_id=uid)
-    db.post.increment_post_views(post_id)
-    post["views"] = (post.get("views") or 0) + 1
+    # 浏览量：仅登录用户计数；同一用户对同一帖子 60 分钟内最多 +1（防刷）。
+    # 未登录访问不计数（旧行为是无条件 +1，刷新即可无限刷量）。
+    if uid and db.post.try_count_post_view(post_id, uid):
+        post["views"] = (post.get("views") or 0) + 1
     liked = db.post.has_liked_post(post_id, uid) if uid else False
     favorited = db.post.has_favorited_post(post_id, uid) if uid else False
     return jsonify({

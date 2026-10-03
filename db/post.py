@@ -1,5 +1,7 @@
 """帖子数据访问。"""
 import random
+import threading
+import time
 import uuid
 
 import config
@@ -198,6 +200,66 @@ def get_user_stats(user_id):
 
 def increment_post_views(post_id):
     execute_query("UPDATE posts SET views = views + 1 WHERE id = %s", (post_id,))
+
+
+# ── 浏览量去重：同一登录用户对同一帖子 60 分钟内最多 +1 ──────────────
+# 规则：仅登录用户浏览帖子详情时计数；未登录访问不计。
+# 用 post_view_log 记录每个 (post_id, user_id) 的「最近一次计数时间」，
+# 滚动窗口内重复访问不再 +1（防刷新刷量）。
+VIEW_WINDOW_SECONDS = 3600
+
+# 过期记录清理：每 _PURGE_INTERVAL_SECONDS 秒最多执行一次（进程内节流，静默失败）
+_PURGE_INTERVAL_SECONDS = 600
+_purge_state = {"last": 0.0}
+_purge_lock = threading.Lock()
+
+
+def _maybe_purge_view_log(now=None):
+    """偶发清理超出窗口期的历史记录，避免表无限增长。"""
+    now = time.time() if now is None else now
+    if now - _purge_state["last"] < _PURGE_INTERVAL_SECONDS:
+        return
+    with _purge_lock:
+        if now - _purge_state["last"] < _PURGE_INTERVAL_SECONDS:
+            return
+        _purge_state["last"] = now
+    try:
+        execute_query(
+            "DELETE FROM post_view_log"
+            " WHERE viewed_at < NOW() - make_interval(secs => %s)",
+            (VIEW_WINDOW_SECONDS,),
+        )
+    except Exception:
+        pass
+
+
+def try_count_post_view(post_id, user_id, window_seconds=VIEW_WINDOW_SECONDS):
+    """登录用户浏览帖子时尝试计数，成功 +1 返回 True。
+
+    单条 UPSERT 原子判定，并发安全：
+      * 首次浏览 → 插入成功 → 计数；
+      * 已存在且距上次计数已超过 window_seconds → 刷新 viewed_at → 计数；
+      * 仍在窗口内 → ``WHERE`` 不成立、``RETURNING`` 无行 → 本次不计数。
+    """
+    if not post_id or not user_id:
+        return False
+    _maybe_purge_view_log()
+    row = execute_query(
+        """
+        INSERT INTO post_view_log (post_id, user_id, viewed_at)
+        VALUES (%s, %s, NOW())
+        ON CONFLICT (post_id, user_id)
+        DO UPDATE SET viewed_at = NOW()
+        WHERE post_view_log.viewed_at < NOW() - make_interval(secs => %s)
+        RETURNING id
+        """,
+        (post_id, user_id, window_seconds),
+        fetch=True,
+    )
+    if not row:
+        return False
+    increment_post_views(post_id)
+    return True
 
 
 # ── 点赞 ────────────────────────────────────────

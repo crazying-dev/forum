@@ -185,6 +185,18 @@ CREATE TABLE IF NOT EXISTS comment_reports (
 );
 """
 
+CREATE_POST_VIEW_LOG_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS post_view_log (
+    id SERIAL PRIMARY KEY,
+    post_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(64) NOT NULL,
+    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(post_id, user_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+"""
+
 CREATE_INDEX_SQLS = [
     # pg_trgm 扩展：为 ILIKE '%关键词%' 模糊搜索提供 GIN 索引加速
     "CREATE EXTENSION IF NOT EXISTS pg_trgm;",
@@ -202,6 +214,7 @@ CREATE_INDEX_SQLS = [
     "CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id);",
     "CREATE INDEX IF NOT EXISTS idx_user_follows_following ON user_follows(following_id);",
     "CREATE INDEX IF NOT EXISTS idx_post_reports_post_id ON post_reports(post_id);",
+    "CREATE INDEX IF NOT EXISTS idx_post_view_log_viewed_at ON post_view_log(viewed_at);",
     "CREATE INDEX IF NOT EXISTS idx_bug_reports_created_at ON bug_reports(created_at DESC);",
     "CREATE INDEX IF NOT EXISTS idx_bug_reports_status ON bug_reports(status);",
     "CREATE INDEX IF NOT EXISTS idx_verify_codes_email_purpose ON verify_codes(email, purpose);",
@@ -229,6 +242,7 @@ ALL_TABLE_SQL = [
     CREATE_BUG_REPORTS_TABLE_SQL,
     CREATE_VERIFY_CODES_TABLE_SQL,
     CREATE_COMMENT_REPORTS_TABLE_SQL,
+    CREATE_POST_VIEW_LOG_TABLE_SQL,
     # 兼容既有库：新增 users.title 头衔列（幂等）
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS title VARCHAR(64) DEFAULT '';",
     # 兼容既有库：新增 users.deleted_at 注销时间列（幂等；匿名化注销时写入，NULL = 正常账号）
