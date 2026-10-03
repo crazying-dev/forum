@@ -631,7 +631,7 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .comment-head a { color: var(--color-text-accent); }
 .comment-content { font-size: 14px; word-break: break-word; }
 .comment-reply { font-size: 12px; color: var(--color-text-tertiary); cursor: pointer; margin-top: 4px; background: none; border: none; }
-.comment-input { display: flex; gap: 10px; margin-top: 12px; align-items: flex-end; }
+.comment-input { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; align-items: flex-end; }
 .comment-input textarea { flex: 1; min-width: 0; }
 /* 评论发送按钮收窄：小尺寸，不再是一大块 */
 .comment-input button {
@@ -1037,6 +1037,9 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 
 /* ── 评论回复 / 楼中楼 ── */
 .reply-bar {
+  /* 独占第一行：flex-basis 100% 让其换行到独立一行，避免收缩输入框 */
+  flex: 1 1 100%;
+  min-width: 0;
   display: flex; align-items: center; gap: 10px;
   width: 100%;
   margin-bottom: 8px;
