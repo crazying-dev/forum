@@ -277,6 +277,7 @@ class Shell(QMainWindow):
     """主窗口。"""
 
     theme_changed = pyqtSignal(str)
+    version_blocked = pyqtSignal(dict)   # 服务端「最低版本闸门」拦截（工作线程发射 → 主线程弹窗）
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -336,6 +337,8 @@ class Shell(QMainWindow):
         self.world_panel.start()
 
         api_mod.api().add_unauthorized_listener(self._on_unauthorized)
+        self.version_blocked.connect(self._show_version_too_low)
+        api_mod.api().add_version_too_low_listener(self._on_version_too_low)
 
     # ────────────────────── 顶部栏 ──────────────────────
     def _build_topbar(self) -> QWidget:
@@ -758,6 +761,35 @@ class Shell(QMainWindow):
 
     def isVisibleFromTray(self) -> bool:
         return True
+
+    # ────────────────────── 版本过低（强制更新） ──────────────────────
+    def _on_version_too_low(self, payload: dict | None = None) -> None:
+        """工作线程回调：只负责把事件抛到主线程。"""
+        try:
+            self.version_blocked.emit(dict(payload or {}))
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _show_version_too_low(self, payload: dict | None = None) -> None:
+        """主线程：弹出不可关闭的「版本过低」弹窗。"""
+        payload = payload if isinstance(payload, dict) else {}
+        minimum = str(payload.get("min_version") or "")
+        message = str(payload.get("message") or "版本过低，请更新")
+        if minimum:
+            message = "%s\n\n当前版本：%s\n最低要求：%s" % (
+                message, constants.APP_VERSION, minimum)
+        url = str(payload.get("download_url") or constants.APP_DOWNLOAD_PAGE)
+        _log.warning("服务端要求最低版本 %s（当前 %s）", minimum or "?",
+                     constants.APP_VERSION)
+        try:
+            self.show_window()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from .widgets.dialogs import version_too_low_box
+            version_too_low_box(self, message, url)
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("版本过低弹窗不可用：%s", exc)
 
     # ────────────────────── 窗口 ──────────────────────
     def show_window(self) -> None:

@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QGuiApplication
-from PyQt6.QtWidgets import (QButtonGroup, QComboBox, QDialog, QLabel, QLineEdit,
-                             QMessageBox, QPlainTextEdit, QRadioButton,
+from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSignal
+from PyQt6.QtGui import QDesktopServices, QGuiApplication
+from PyQt6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QDialog, QLabel,
+                             QLineEdit, QMessageBox, QPlainTextEdit, QRadioButton,
                              QScrollArea, QVBoxLayout, QWidget)
 
 from .. import api as api_mod
@@ -27,7 +27,7 @@ class BaseDialog(QDialog):
     """统一风格的模态对话框骨架。"""
 
     def __init__(self, parent: QWidget | None = None, *, title: str = "",
-                 width: int = 440) -> None:
+                 width: int = 440, closable: bool = True) -> None:
         super().__init__(parent)
         self.setWindowTitle(title or constants.APP_NAME)
         self.setModal(True)
@@ -38,8 +38,9 @@ class BaseDialog(QDialog):
         self.title_label = TitleLabel(title)
         header.addWidget(self.title_label)
         header.addStretch(1)
-        close_btn = button("✕", "ghost", self.reject, tooltip="关闭")
-        header.addWidget(close_btn)
+        if closable:
+            close_btn = button("✕", "ghost", self.reject, tooltip="关闭")
+            header.addWidget(close_btn)
         self.root.addLayout(header)
 
         self.body = vbox(spacing=10)
@@ -101,6 +102,68 @@ def info_box(parent: QWidget | None, title: str, text: str, *,
     message.setWordWrap(True)
     dialog.body.addWidget(message)
     dialog.add_action(ok_text, "primary", dialog.accept)
+    dialog.exec()
+
+
+# ────────────── 版本过低（服务端最低版本闸门，强制更新） ──────────────
+
+
+VERSION_TOO_LOW_TITLE = "版本过低"
+
+
+class VersionTooLowDialog(BaseDialog):
+    """强制更新弹窗：**不可关闭**，只能「去更新」或「退出应用」。
+
+    Esc / 标题栏关闭 / 外部点击一律无效；两个按钮都会结束进程（先去更新则
+    先在系统浏览器打开更新地址）。
+    """
+
+    def __init__(self, message: str, download_url: str = "",
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent, title=VERSION_TOO_LOW_TITLE, width=420,
+                         closable=False)
+        self._url = str(download_url or "").strip()
+        text = QLabel(message or "版本过低，请更新")
+        text.setWordWrap(True)
+        self.body.addWidget(text)
+        if self._url:
+            hint = Muted("更新地址：%s" % self._url)
+            hint.setWordWrap(True)
+            self.body.addWidget(hint)
+        self.add_action("退出应用", None, self._quit)
+        self.add_action("去更新", "primary", self._update)
+
+    # ── 强制：任何关闭路径都无效 ──
+    def reject(self) -> None:  # noqa: D102
+        return
+
+    def closeEvent(self, event) -> None:  # noqa: N802,D102
+        event.ignore()
+
+    def _update(self) -> None:
+        url = self._url or constants.APP_DOWNLOAD_PAGE
+        try:
+            if url.startswith(("http://", "https://")):
+                full = url
+            else:
+                full = constants.BASE_URL + "/" + url.lstrip("/")
+            QDesktopServices.openUrl(QUrl(full))
+        except Exception:  # noqa: BLE001
+            pass
+        self._quit()
+
+    def _quit(self) -> None:
+        try:
+            QApplication.quit()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def version_too_low_box(parent: QWidget | None, message: str,
+                        download_url: str = "") -> None:
+    """弹出「版本过低」强制更新弹窗（阻塞至应用退出）。"""
+    dialog = VersionTooLowDialog(message=message, download_url=download_url,
+                                 parent=parent)
     dialog.exec()
 
 

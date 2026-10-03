@@ -17,8 +17,15 @@ from .paths import data_dir, resource
 APP_ID = "crforum"
 APP_NAME = "妖精论坛"
 APP_NAME_EN = "Yaojing Forum"
-APP_VERSION = "1.3.13"
+APP_VERSION = "1.3.14"
 CLIENT_UA = "CrForum-Windows/%s" % APP_VERSION
+
+# 客户端版本标识：随每一个请求发往服务器，供服务端「最低版本闸门」识别。
+CLIENT_PLATFORM = "windows"
+CLIENT_HEADERS = {
+    "X-Client-Platform": CLIENT_PLATFORM,
+    "X-Client-Version": APP_VERSION,
+}
 
 # ────────────────────────── 启动「支持作者」弹窗 ──────────────────────────
 

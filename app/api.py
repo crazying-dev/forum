@@ -27,6 +27,9 @@ NET_ERROR_TEXT = "网络错误，请检查网络连接后重试"
 REQUEST_FAILED_TEXT = "请求失败"
 PARSE_ERROR_TEXT = "响应解析失败"
 
+# 服务端「最低版本闸门」拦截时返回的业务码（HTTP 426）
+VERSION_TOO_LOW_CODE = "VERSION_TOO_LOW"
+
 
 # ────────────────────────── 响应包装 ──────────────────────────
 
@@ -186,10 +189,13 @@ class ForumApi:
             "User-Agent": constants.CLIENT_UA,
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "zh-CN,zh;q=0.9",
+            **constants.CLIENT_HEADERS,
         })
         self._lock = threading.RLock()
         self._user: dict | None = self.store.user
         self._unauth_listeners: list[Callable[[], None]] = []
+        self._version_listeners: list[Callable[[dict], None]] = []
+        self._version_blocked = False
         self._restore_cookies()
 
     # ── Cookie / 登录状态 ──
@@ -257,6 +263,23 @@ class ForumApi:
         for fn in list(self._unauth_listeners):
             try:
                 fn()
+            except Exception:
+                pass
+
+    # ── 版本过低（服务端最低版本闸门）──
+    def add_version_too_low_listener(self, fn: Callable[[dict], None]) -> None:
+        """注册「版本过低」回调（入参为服务端 426 响应体）。"""
+        if fn not in self._version_listeners:
+            self._version_listeners.append(fn)
+
+    def _notify_version_too_low(self, payload: dict) -> None:
+        """首次被闸门拦截时通知一次（避免风暴式弹窗）。"""
+        if self._version_blocked:
+            return
+        self._version_blocked = True
+        for fn in list(self._version_listeners):
+            try:
+                fn(dict(payload or {}))
             except Exception:
                 pass
 
@@ -330,7 +353,12 @@ class ForumApi:
                     self._notify_unauthorized()
             if parsed is None and status < 400 and text.strip():
                 return Result(status, None, PARSE_ERROR_TEXT, url)
-            return Result(status, parsed, None, url)
+            result = Result(status, parsed, None, url)
+            if status == 426 or (isinstance(parsed, dict)
+                                 and parsed.get("code") == VERSION_TOO_LOW_CODE):
+                self._notify_version_too_low(
+                    parsed if isinstance(parsed, dict) else {})
+            return result
         return Result(0, None, last_error or NET_ERROR_TEXT, url)
 
     def _sync_cookies(self) -> None:
@@ -637,7 +665,8 @@ class ForumApi:
         try:
             response = requests.get(url, timeout=timeout,
                                     headers={"Accept": "text/plain",
-                                             "User-Agent": constants.CLIENT_UA})
+                                             "User-Agent": constants.CLIENT_UA,
+                                             **constants.CLIENT_HEADERS})
             if response.status_code >= 400:
                 return ""
             return response.text.strip()
@@ -647,7 +676,8 @@ class ForumApi:
     def fetch_json(self, url: str, timeout: tuple[int, int] = (5, 8)) -> Any:
         try:
             response = requests.get(url, timeout=timeout,
-                                    headers={"User-Agent": constants.CLIENT_UA})
+                                    headers={"User-Agent": constants.CLIENT_UA,
+                                             **constants.CLIENT_HEADERS})
             if response.status_code >= 400:
                 return None
             return response.json()

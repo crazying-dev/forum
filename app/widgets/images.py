@@ -147,7 +147,8 @@ class ImageCache(QObject):
         target.parent.mkdir(parents=True, exist_ok=True)
         response = requests.get(
             str(url), timeout=(8, 25),
-            headers={"User-Agent": constants.CLIENT_UA, "Accept": "image/*,*/*"})
+            headers={"User-Agent": constants.CLIENT_UA, "Accept": "image/*,*/*",
+                     **constants.CLIENT_HEADERS})
         if response.status_code >= 400:
             raise RuntimeError("HTTP %s" % response.status_code)
         data = response.content

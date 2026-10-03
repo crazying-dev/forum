@@ -146,7 +146,8 @@ def _probe(url: str, timeout) -> tuple[dict, int]:
     先发 ``HEAD``；方法不被支持或失败时降级为 ``GET`` + ``Range: bytes=0-0``。
     不可达时抛 :class:`_Unavailable`。
     """
-    request_headers = {"User-Agent": constants.CLIENT_UA}
+    request_headers = {"User-Agent": constants.CLIENT_UA,
+                       **constants.CLIENT_HEADERS}
     head_error = ""
     try:
         resp = requests.head(url, timeout=timeout, allow_redirects=True,
@@ -366,7 +367,7 @@ def download_to(url: str, dest, *, expected: int = 0, resume: bool = True,
         except OSError:
             offset = 0
 
-    headers = {"User-Agent": constants.CLIENT_UA}
+    headers = {"User-Agent": constants.CLIENT_UA, **constants.CLIENT_HEADERS}
     mode = "wb"
     if offset > 0:
         headers["Range"] = "bytes=%d-" % offset

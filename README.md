@@ -242,6 +242,20 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
       `ImageCache.age()/stale()`，头像、正文内嵌图片、Wiki 动图在缓存超过
       24 小时时「先显旧图 + 后台静默重取」；`app/releases.py` 的 `CACHE_TTL`
       由 600 秒统一为 24 小时（下载页仍可手动刷新）。版本号升至 1.3.13。
+21. **V1.3.14：最低版本闸门（客户端侧）**：服务端发布清单新增 `min_versions`，
+    客户端每次请求都携带自身平台与版本号，低于最低要求时服务端返回 `426` +
+    `code="VERSION_TOO_LOW"`，客户端弹出**不可关闭**的「版本过低」弹窗：
+    * 新增 `constants.CLIENT_PLATFORM` / `constants.CLIENT_HEADERS`，统一在
+      `requests.Session` 默认头、`fetch_text` / `fetch_json`、图片缓存下载、
+      更新包探测 / 下载处发出 `X-Client-Platform: windows` +
+      `X-Client-Version: <版本>`；
+    * `app/api.py` 新增 `add_version_too_low_listener()`，命中 `426`（或响应体
+      `code == VERSION_TOO_LOW`）时通知一次（避免风暴式弹窗）；
+    * `app/widgets/dialogs.py` 新增 `VersionTooLowDialog`（`BaseDialog` 新增
+      `closable=False`）：只提供「去更新」（系统浏览器打开更新地址）与
+      「退出应用」两个按钮，Esc / 标题栏关闭 / 外部点击均无效；
+    * `app/shell.py` 通过 `version_blocked` 信号把工作线程的事件抛回主线程弹窗
+      （服务端 `/api/app/*`、`/healthz` 与静态资源不在闸门范围内）。版本号升至 1.3.14。
 
 ---
 
