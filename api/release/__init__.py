@@ -40,6 +40,11 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
     "updated_at": "2026-10-03T13:35:00+08:00",
+    "min_versions": {
+        "windows": "1.3.13",
+        "android": "1.0.10",
+        "web": "0",
+    },
     "platforms": [
         {
             "key": "windows",
@@ -199,6 +204,115 @@ def compare_versions(a, b) -> int:
     return 0
 
 
+# ──────────────────────────────────────────────
+# 最低版本闸门（客户端版本过低 → 426，客户端据此弹窗提示更新）
+# ──────────────────────────────────────────────
+# 客户端应在每个请求上携带：
+#   X-Client-Platform: windows | android | web
+#   X-Client-Version:  1.3.13
+# 旧客户端没有这两个头，则从 User-Agent「CrForum-Windows/1.3.13」兜底解析。
+# 清单顶层 min_versions 字典给出各平台最低版本；「web」键被忽略（网页由服务端
+# 自身提供，不存在版本落后问题）。
+CLIENT_PLATFORM_HEADER = "X-Client-Platform"
+CLIENT_VERSION_HEADER = "X-Client-Version"
+VERSION_TOO_LOW_CODE = "VERSION_TOO_LOW"
+WEB_PLATFORM = "web"
+
+# User-Agent 兜底：CrForum-Windows/1.3.13、CrForum-Android/1.0.10
+CLIENT_UA_RE = re.compile(r"CrForum-([A-Za-z0-9_.-]+)/([0-9][0-9A-Za-z._-]*)")
+
+
+def min_versions() -> dict:
+    """清单顶层 min_versions 字典；缺失或类型不对时回退内置默认。"""
+    value = load_manifest().get("min_versions")
+    if isinstance(value, dict):
+        return value
+    fallback = DEFAULT_MANIFEST.get("min_versions")
+    return fallback if isinstance(fallback, dict) else {}
+
+
+def min_version_for(platform):
+    """平台最低版本号（字符串）；未配置 / 为空 / web 返回 None（表示不校验）。"""
+    if not isinstance(platform, str):
+        return None
+    key = platform.strip().lower()
+    if not key or key == WEB_PLATFORM:
+        return None
+    value = min_versions().get(key)
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def resolve_client(headers, user_agent=""):
+    """确定客户端 (平台, 版本)：优先 X-Client-* 请求头，其次 User-Agent 兜底。
+
+    返回（小写平台名, 原始版本字符串）；无法判断时返回 ("", "")，调用方应放行。
+    """
+    platform = ""
+    version = ""
+    try:
+        platform = str(headers.get(CLIENT_PLATFORM_HEADER) or "").strip()
+        version = str(headers.get(CLIENT_VERSION_HEADER) or "").strip()
+    except Exception:  # noqa: BLE001 — headers 不是映射时忽略
+        platform, version = "", ""
+    if not platform:
+        match = CLIENT_UA_RE.search(user_agent or "")
+        if match:
+            platform = match.group(1)
+            if not version:
+                version = match.group(2)
+    return platform.strip().lower(), version
+
+
+def _download_url_for(platform) -> str:
+    """该平台最新安装包直链；取不到返回空串。"""
+    platform_data = find_platform(platform)
+    if not platform_data:
+        return ""
+    latest = pick_latest(platform_data)
+    if not latest:
+        return ""
+    return str(latest.get("url") or "")
+
+
+def version_gate_violation(platform, version):
+    """版本低于最低版本则返回 426 响应体；否则（含无法判断 / web）返回 None。"""
+    minimum = min_version_for(platform)
+    if not minimum:
+        return None
+    # 平台已知但版本缺失 → 视为 0，强制更新
+    current = parse_version(version) or (0,)
+    if compare_versions(current, minimum) >= 0:
+        return None
+    return {
+        "success": False,
+        "code": VERSION_TOO_LOW_CODE,
+        "message": "版本过低，请更新",
+        "platform": platform,
+        "current": version or "",
+        "min_version": minimum,
+        "download_url": _download_url_for(platform),
+        "download_page": (getattr(config, "SITE_BASE_URL", "") or "").rstrip("/") + "/Download",
+    }
+
+
+def should_block_request(method, path, headers, user_agent=""):
+    """通用闸门判定：需要拦截时返回 426 响应体，否则返回 None。
+
+    豁免：OPTIONS 预检；非 /api/ 路径（页面与静态资源）；/api/app/*
+    （清单 / 检查 / 反代下载，保证客户端能自助更新）；web 平台；
+    无法判断平台时放行（fail-open）。
+    """
+    if (method or "").upper() == "OPTIONS":
+        return None
+    if not path or not path.startswith("/api/") or path.startswith("/api/app/"):
+        return None
+    platform, version = resolve_client(headers, user_agent)
+    return version_gate_violation(platform, version)
+
+
 def pick_latest(platform) -> dict | None:
     """取平台上版本号最大的 release；优先 channel == 'stable'，没有 stable 就取全部。"""
     if not isinstance(platform, dict):
@@ -247,6 +361,7 @@ def list_releases():
         "success": True,
         "schema": data.get("schema", 1),
         "updated_at": data.get("updated_at", ""),
+        "min_versions": min_versions(),
         "platforms": platforms(),
     }), 200
 
@@ -270,6 +385,8 @@ def check_update():
     if not found:
         return jsonify({"success": False, "message": "未知平台"}), 404
 
+    minimum = min_version_for(found.get("key", key))
+
     payload = {
         "success": True,
         "platform": found.get("key", key),
@@ -278,6 +395,8 @@ def check_update():
         "available": False,
         "mandatory": False,
         "release": None,
+        "min_version": minimum or "",
+        "too_low": bool(minimum and compare_versions(current, minimum) < 0),
         "message": "当前已是最新版本",
     }
 

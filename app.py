@@ -116,6 +116,32 @@ def create_app() -> Flask:
         }
 
 
+    # ── 最低版本闸门：客户端版本过低 → 426（客户端据此弹「版本过低，请更新」）──
+    # 客户端应在每个请求携带 X-Client-Platform（windows/android/web）与
+    # X-Client-Version（如 1.3.13）；旧版客户端无此头，则从 User-Agent
+    # 「CrForum-Windows/1.3.13」兜底解析。清单顶层 min_versions 给出各平台最低
+    # 版本，其中 web 键被忽略（网页由服务端自身提供，不存在版本落后）。
+    # 豁免：非 /api/ 路径（页面与静态资源）、/api/app/*（清单 / 检查 / 反代下载，
+    #       保证客户端能自助更新）、OPTIONS 预检。
+    # 无法判断平台时放行（fail-open），避免误伤未知客户端。
+    # 可用环境变量 MIN_VERSION_GATE=0 关闭。
+    if os.getenv("MIN_VERSION_GATE", "1") != "0":
+        from api.release import should_block_request
+
+        @app.before_request
+        def _enforce_min_client_version():
+            violation = should_block_request(
+                request.method,
+                request.path,
+                request.headers,
+                request.headers.get("User-Agent", ""),
+            )
+            if violation:
+                resp = jsonify(violation)
+                resp.status_code = 426
+                return resp
+            return None
+
     # ── 数据库初始化（首次请求兜底执行一次，替代被废弃的 before_first_request） ──
     def _ensure_db_once():
         if _db_inited["done"]:

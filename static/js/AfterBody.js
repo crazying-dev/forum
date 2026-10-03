@@ -2,6 +2,13 @@
 (function () {
   'use strict';
 
+  // 客户端标识：网页端在每个请求携带平台名 + 版本号（服务端最低版本闸门用；
+  // 清单 min_versions 的 web 键被忽略，此值仅作标识与统计，可在页面覆盖）。
+  window.__WEB_CLIENT_VERSION__ = window.__WEB_CLIENT_VERSION__ || '1.0.0';
+  window.__clientHeaders = window.__clientHeaders || function () {
+    return { 'X-Client-Platform': 'web', 'X-Client-Version': window.__WEB_CLIENT_VERSION__ };
+  };
+
   // ── API 封装（含同请求去重 / GET 短暂缓存）──────────────
   // 相同 (method, url, body) 请求合并为一次 in-flight Promise。
   // 对 GET：成功响应再内存缓存 800ms，防止极短时间内重复请求（比如换一批点击、渲染并发）。
@@ -41,7 +48,7 @@
       return _pendingFetches.get(key);
     }
 
-    var headers = Object.assign({ 'Content-Type': 'application/json' }, o.headers || {});
+    var headers = Object.assign({ 'Content-Type': 'application/json' }, window.__clientHeaders(), o.headers || {});
     var promise = (async function () {
       var resp = await fetch(url, {
         method: method,
@@ -1508,7 +1515,7 @@
       var fd = new FormData();
       fd.append('avatar', file);
       el('editError').textContent = '上传中...';
-      fetch('/api/user/avatar/upload', { method: 'POST', body: fd, credentials: 'same-origin' })
+      fetch('/api/user/avatar/upload', { method: 'POST', body: fd, credentials: 'same-origin', headers: window.__clientHeaders() })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.success) { pendingAvatar = d.avatar; el('editError').style.color = '#2ecc71'; el('editError').textContent = '头像已上传'; }
