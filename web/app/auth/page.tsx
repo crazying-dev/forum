@@ -26,13 +26,18 @@ function LoginInner() {
   const [countdown, setCountdown] = useState(0);
   const [pwdMatch, setPwdMatch] = useState<"" | "ok" | "no">("");
 
-  // URL ?mode=reset&token= 兼容（旧 token 链接流程：需要验证码模式）
+  // URL ?mode=reset&token= 兼容：带 token 的旧链接跳转到重置链接页；仅 mode=reset 时落到忘记密码
   const modeParam = params.get("mode");
+  const tokenParam = params.get("token");
   useEffect(() => {
     if (modeParam === "reset") {
-      setMode("forgot");
+      if (tokenParam) {
+        router.replace(`/reset-password?token=${encodeURIComponent(tokenParam)}`);
+      } else {
+        setMode("forgot");
+      }
     }
-  }, [modeParam]);
+  }, [modeParam, tokenParam, router]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -86,31 +91,14 @@ function LoginInner() {
     }
   };
 
-  const sendResetCode = async () => {
+  const sendResetLink = async () => {
     if (!email) return showMsg("请输入邮箱", "warning");
     setBusy(true);
     try {
-      await authApi.sendResetCode(email);
-      showMsg("验证码已发送（若邮箱存在）", "success");
-      setCountdown(60);
+      await authApi.sendResetLink(email);
+      showMsg("重置链接已发送至邮箱（若邮箱存在），10 分钟内有效、最多可打开 3 次，请前往邮箱查收", "success");
     } catch (e) {
       showMsg(e instanceof ApiException ? e.message : "发送失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const resetPassword = async () => {
-    if (!email || !code || !password) return showMsg("请填写完整信息", "warning");
-    if (password.length < 8) return showMsg("密码至少8位", "warning");
-    if (password !== password2) return showMsg("两次密码不一致", "warning");
-    setBusy(true);
-    try {
-      await authApi.resetPassword(email, code, password);
-      showMsg("密码重置成功，请使用新密码登录", "success");
-      setMode("login");
-    } catch (e) {
-      showMsg(e instanceof ApiException ? e.message : "重置失败");
     } finally {
       setBusy(false);
     }
@@ -186,19 +174,10 @@ function LoginInner() {
           <div className="auth-form" id="forgotPasswordForm">
             <div className="auth-header">
               <h2>重置密码</h2>
-              <p>输入邮箱获取验证码，设置新密码</p>
+              <p>输入注册邮箱，我们将发送重置链接</p>
             </div>
-            <AuthInput icon="envelope" type="email" placeholder="注册邮箱" value={email} onChange={setEmail} />
-            <div className="auth-input-group auth-code-group">
-              <span className="auth-icon"><i className="fa fa-shield"></i></span>
-              <input type="text" placeholder="验证码（6位数字）" maxLength={6} inputMode="numeric" pattern="[0-9]*" value={code} onChange={(e) => setCode(e.target.value)} />
-              <button className="auth-btn code-btn" disabled={busy || countdown > 0} onClick={sendResetCode}>
-                {countdown > 0 ? `${countdown}s` : "获取验证码"}
-              </button>
-            </div>
-            <AuthInput icon="lock" type="password" placeholder="新密码（至少8位，含字母和数字）" value={password} onChange={setPassword} />
-            <AuthInput icon="lock" type="password" placeholder="确认新密码" value={password2} onChange={setPassword2} />
-            <button className="auth-btn primary" disabled={busy} onClick={resetPassword}>{busy ? "提交中..." : "重置密码"}</button>
+            <AuthInput icon="envelope" type="email" placeholder="注册邮箱" value={email} onChange={setEmail} onKeyDown={(e) => e.key === "Enter" && sendResetLink()} />
+            <button className="auth-btn primary" disabled={busy} onClick={sendResetLink}>{busy ? "发送中..." : "发送重置链接"}</button>
             <button className="auth-btn secondary" style={{ marginTop: 12, background: "var(--color-bg-icon)", color: "var(--color-text-secondary)" }} onClick={() => switchMode("login")}>返回登录</button>
           </div>
         )}

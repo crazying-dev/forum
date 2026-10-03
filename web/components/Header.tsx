@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { miscApi } from "@/lib/api";
+import { getSiteConfig } from "@/lib/site-config";
+import { fetchDailyQuote, QUOTE_CHANCE } from "@/lib/daily-quote";
 import { useCenterCard } from "./CenterCard";
 import { useToast } from "./Toast";
 import Modal from "./ui/Modal";
@@ -91,6 +93,22 @@ export default function Header() {
   };
 
   const showEasterEgg = async () => {
+    // 站点配置开启「每日一言」时，按概率改走引言彩蛋（居中弹窗）；否则维持原彩蛋 Toast
+    const cfg = await getSiteConfig();
+    if (cfg?.daily_quote.enabled && Math.random() < QUOTE_CHANCE) {
+      const q = await fetchDailyQuote();
+      if (q) {
+        show(
+          <div className="egg-quote">
+            {/* 直接用文本节点渲染第三方内容，不做 HTML 解析 */}
+            <div className="egg-quote-text">{q.text}</div>
+            {q.from ? <div className="egg-quote-from">—— {q.from}</div> : null}
+            <div className="egg-quote-tag">彩蛋 · 每日一言</div>
+          </div>
+        );
+        return;
+      }
+    }
     try {
       const egg = await miscApi.easterEgg();
       toast(`${egg.Name}：${egg.Text}`, "info");

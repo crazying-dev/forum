@@ -1,0 +1,415 @@
+/* ===== 账号安全相关：重置密码链接页 / 账号注销页 / 个人主页账号设置 ===== */
+
+/* --- 重置密码链接页 --- */
+.reset-password-card {
+    max-width: 460px;
+}
+
+.reset-status {
+    text-align: center;
+}
+
+.reset-status h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.reset-icon {
+    margin-bottom: 14px;
+    font-size: 46px;
+    color: var(--color-primary);
+}
+
+.reset-icon.invalid {
+    color: #e74c3c;
+}
+
+.reset-desc {
+    margin: 0 0 22px;
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+    line-height: 1.6;
+    word-break: break-all;
+}
+
+.reset-link-btn {
+    display: block;
+    line-height: 48px;
+    text-align: center;
+    text-decoration: none;
+}
+
+/* --- 账号注销页 --- */
+.account-page {
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.account-card {
+    padding: 32px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px var(--color-shadow-card);
+}
+
+.account-page-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 8px;
+    font-size: 24px;
+    color: var(--color-text-primary);
+}
+
+.account-page-header p {
+    margin: 0 0 20px;
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+}
+
+.account-warn-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 12px 16px;
+    border: 1px solid rgba(231, 76, 60, 0.35);
+    border-radius: 10px;
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+    font-size: 14px;
+}
+
+.account-mode-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.account-mode-card {
+    padding: 18px 20px;
+    border: 2px solid var(--color-border-primary);
+    border-radius: 14px;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.account-mode-card:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-1px);
+}
+
+.account-mode-card.selected {
+    border-color: var(--color-primary);
+    background: var(--color-bg-item-hover);
+    box-shadow: 0 4px 14px var(--color-shadow-card);
+}
+
+.account-mode-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.account-mode-head h3 {
+    margin: 0;
+    font-size: 17px;
+    color: var(--color-text-primary);
+}
+
+.account-mode-radio {
+    position: relative;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--color-border-checkbox);
+    border-radius: 50%;
+}
+
+.account-mode-card.selected .account-mode-radio {
+    border-color: var(--color-primary);
+}
+
+.account-mode-card.selected .account-mode-radio::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    transform: translate(-50%, -50%);
+}
+
+.account-mode-desc {
+    margin: 10px 0 8px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.account-mode-notes {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.account-mode-notes li::marker {
+    color: #e74c3c;
+}
+
+.account-confirm-area {
+    margin-top: 26px;
+    padding-top: 22px;
+    border-top: 1px dashed var(--color-border-primary);
+}
+
+.account-confirm-area h3 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    color: var(--color-text-primary);
+}
+
+.account-field {
+    margin-bottom: 16px;
+}
+
+.account-field label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.account-field input {
+    width: 100%;
+    height: 46px;
+    padding: 0 14px;
+    box-sizing: border-box;
+    background: var(--color-bg-input);
+    border: 2px solid var(--color-border-primary);
+    border-radius: 12px;
+    font-size: 14px;
+    color: var(--color-text-primary);
+    transition: all 0.3s ease;
+}
+
+.account-field input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+}
+
+.account-field input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+.account-field-hint {
+    margin: -8px 0 12px;
+    color: #e74c3c;
+    font-size: 12px;
+}
+
+.account-btn-danger {
+    height: 46px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 12px;
+    background: #e74c3c;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.account-btn-danger:hover:not(:disabled) {
+    background: #d62c1a;
+    box-shadow: 0 6px 18px rgba(231, 76, 60, 0.35);
+}
+
+.account-btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.account-submit-btn {
+    width: 100%;
+}
+
+/* CenterCard 二次确认内容 */
+.account-delete-confirm h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px;
+    color: #e74c3c;
+    font-size: 18px;
+}
+
+.account-delete-confirm p {
+    margin: 0 0 10px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.account-delete-confirm-mode strong {
+    color: var(--color-text-primary);
+}
+
+.account-delete-confirm-warn,
+.account-delete-confirm-error {
+    color: #e74c3c !important;
+}
+
+.account-delete-confirm-error {
+    font-size: 13px;
+}
+
+.account-delete-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.account-btn-cancel {
+    height: 42px;
+    padding: 0 20px;
+    border: 1px solid var(--color-border-primary);
+    border-radius: 12px;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.account-btn-cancel:hover:not(:disabled) {
+    background: var(--color-bg-icon-hover);
+}
+
+.account-btn-cancel:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* --- 个人主页：账号设置小组 + 已注销简洁态 --- */
+.user-account-settings {
+    flex-basis: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--color-border-divider);
+}
+
+.user-account-settings-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 4px;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+}
+
+.account-settings-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--color-border-primary);
+    border-radius: 16px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.account-settings-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.account-settings-danger {
+    color: #e74c3c;
+}
+
+.account-settings-danger:hover {
+    border-color: #e74c3c;
+    color: #e74c3c;
+}
+
+.user-profile-deleted {
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+    padding: 48px 32px;
+    text-align: center;
+}
+
+.user-profile-deleted .user-profile-avatar-wrapper,
+.user-profile-deleted .user-profile-avatar {
+    width: 96px;
+    height: 96px;
+}
+
+.user-profile-deleted .user-profile-info {
+    flex: none;
+    text-align: center;
+}
+
+.user-profile-deleted .user-profile-info h2 {
+    justify-content: center;
+}
+
+.user-profile-deleted-name {
+    color: var(--color-text-tertiary);
+}
+
+.user-profile-deleted .user-profile-intro {
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .account-page {
+        margin: 20px auto;
+        padding: 0 12px;
+    }
+
+    .account-card {
+        padding: 20px;
+    }
+
+    .account-mode-card {
+        padding: 14px 16px;
+    }
+
+    .account-delete-confirm-actions {
+        flex-direction: column-reverse;
+    }
+
+    .account-btn-cancel,
+    .account-delete-confirm-actions .account-btn-danger {
+        width: 100%;
+    }
+
+    .user-account-settings {
+        justify-content: center;
+    }
+}

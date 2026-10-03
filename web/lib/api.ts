@@ -28,6 +28,8 @@ export interface User {
   prefix?: string;
   email_verified?: number;
   created_at?: string;
+  // 已注销用户（GET /users/:id 返回的用户附带 deleted=true，仅最小档案）
+  deleted?: boolean;
   // 灵力值（签到累计）与最近签到日期（YYYY-MM-DD，未签到为空）
   spirit: number;
   last_sign_in?: string;
@@ -427,10 +429,15 @@ export const authApi = {
     request<{ id: string }>("/auth/register", { method: "POST", body: JSON.stringify({ name, email, password, code }) }),
   sendRegisterCode: (email: string) =>
     request<{ message: string }>("/auth/register/code", { method: "POST", body: JSON.stringify({ email }) }),
-  sendResetCode: (email: string) =>
-    request<{ message: string }>("/auth/password/reset/code", { method: "POST", body: JSON.stringify({ email }) }),
-  resetPassword: (email: string, code: string, password: string) =>
-    request<{ message: string }>("/auth/password/reset", { method: "POST", body: JSON.stringify({ email, code, password }) }),
+  // 发送重置链接（10 分钟内有效、最多可打开 3 次；邮箱不存在也返回成功提示，429 = 过于频繁）
+  sendResetLink: (email: string) =>
+    request<{ message: string }>("/auth/password/reset/link", { method: "POST", body: JSON.stringify({ email }) }),
+  // 校验重置链接 token（返回掩码邮箱；400 = 无效/过期/次数用尽）
+  validateResetToken: (token: string) =>
+    request<{ data: { email: string } }>(`/auth/password/reset/validate?token=${encodeURIComponent(token)}`),
+  // 使用重置链接设置新密码
+  confirmResetPassword: (token: string, password: string) =>
+    request<{ message: string }>("/auth/password/reset/confirm", { method: "POST", body: JSON.stringify({ token, password }) }),
 };
 
 // ---- 用户 ----
@@ -470,6 +477,17 @@ export const userApi = {
   verifyEmail: () => request<{ message: string }>("/users/me/verify-email", { method: "POST" }),
   verifyEmailConfirm: (code: string) =>
     request<{ message: string }>("/users/me/verify-email/confirm", { method: "POST", body: JSON.stringify({ code }) }),
+  // 注销账号：mode=purge（彻底删除）/ anonymize（匿名化保留）；需密码 + 用户名确认
+  deleteAccount: (data: { mode: "purge" | "anonymize"; password: string; confirmName: string }) =>
+    request<{ message: string }>("/users/me/delete", { method: "POST", body: JSON.stringify(data) }),
+  // 邮箱换绑：① 验证当前邮箱 ② 绑定新邮箱
+  sendEmailChangeOldCode: () => request<{ message?: string }>("/users/me/email-change/code", { method: "POST" }),
+  verifyEmailChangeOld: (code: string) =>
+    request<{ message?: string }>("/users/me/email-change/verify-old", { method: "POST", body: JSON.stringify({ code }) }),
+  sendEmailChangeNewCode: (newEmail: string) =>
+    request<{ message?: string }>("/users/me/email-change/new-code", { method: "POST", body: JSON.stringify({ newEmail }) }),
+  confirmEmailChange: (code: string) =>
+    request<{ message?: string }>("/users/me/email-change/confirm", { method: "POST", body: JSON.stringify({ code }) }),
   uploadAvatar: (file: File) => {
     const fd = new FormData();
     fd.append("avatar", file);

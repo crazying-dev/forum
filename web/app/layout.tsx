@@ -3,9 +3,11 @@ import "./globals.css";
 import "font-awesome/css/font-awesome.min.css";
 import "github-markdown-css/github-markdown.css";
 import { StoreProvider } from "@/lib/store";
-import { OG_IMAGE, SITE_DESCRIPTION, SITE_TITLE, siteUrl } from "@/lib/seo";
+import { fetchApi, OG_IMAGE, SITE_DESCRIPTION, SITE_TITLE, siteUrl } from "@/lib/seo";
+import { DEFAULT_SITE_CONFIG, isFestivalActive, type SiteConfig } from "@/lib/site-config";
 import { CenterCardProvider } from "@/components/CenterCard";
 import { ToastProvider } from "@/components/Toast";
+import FestivalThemeSync from "@/components/FestivalThemeSync";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 
@@ -63,11 +65,17 @@ const themeScript = `
 })();
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // 国庆主题：服务端按站点配置判定（60s 缓存），失败回退默认配置；
+  // 客户端由 <FestivalThemeSync /> 在挂载 / 窗口聚焦时校正。
+  const siteRes = await fetchApi<{ data: SiteConfig }>("/api/v1/site/config", 60);
+  const rawConfig = siteRes.ok ? siteRes.data?.data : null;
+  const festivalActive = isFestivalActive(rawConfig ?? DEFAULT_SITE_CONFIG);
+
   return (
     // suppressHydrationWarning: 防闪屏脚本（themeScript）会在 hydration 前给 <html> 加 night-mode class，
     // 这是「hydration 前外部修改 DOM」的官方推荐场景，属性差异不报错且保留客户端已应用的主题
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning className={festivalActive ? "theme-national" : undefined}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
@@ -75,6 +83,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <StoreProvider>
           <ToastProvider>
             <CenterCardProvider>
+              {/* 国庆主题客户端校正（无渲染输出） */}
+              <FestivalThemeSync />
               {/* 全局导航栏：跨页面保持挂载，避免导航时品牌图等重载 */}
               <Header />
               <main className="app-main">{children}</main>

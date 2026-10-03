@@ -10,7 +10,7 @@
          post-comments forum-publish legacy-base-html legacy-inline toast user-comments user-popup
          loading article-cards huiguan article-detail publish-page filters huiguan-entry ui-fixes
          huiguan-members rich-editor quote-cards quote-picker night-adapt huiguan-intro
-         feedback guide ===== */
+         feedback guide account email-change ===== */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/header-nav.css";
@@ -52,3 +52,5 @@
 @import "./styles/huiguan-intro.css";
 @import "./styles/feedback.css";
 @import "./styles/guide.css";
+@import "./styles/account.css";
+@import "./styles/email-change.css";

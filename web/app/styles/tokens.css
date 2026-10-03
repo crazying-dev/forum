@@ -46,6 +46,8 @@
     --color-shadow-dropdown: rgba(58, 95, 107, 0.15);
     --color-shadow-card: rgba(58, 95, 107, 0.2);
     --color-shadow-qr: rgba(0,0,0,0.2);
+    --color-shadow-primary: rgba(106, 140, 137, 0.25);
+    --color-shadow-secondary: rgba(87, 148, 145, 0.25);
 
     --color-primary: #6A8C89;
     --color-secondary: #579491;
@@ -90,8 +92,119 @@
     --color-shadow-header: rgba(0, 0, 0, 0.1);
     --color-shadow-dropdown: rgba(0, 0, 0, 0.3);
     --color-shadow-card: rgba(0, 0, 0, 0.4);
+    --color-shadow-primary: rgba(132, 168, 185, 0.25);
+    --color-shadow-secondary: rgba(184, 210, 216, 0.25);
 }
 
+/* ===== 国庆红金主题：日间（.theme-national，由根布局服务端判定 + 客户端校正注入）===== */
+.theme-national {
+    --color-text-primary: #3C2422;
+    --color-text-secondary: #6F4038;
+    --color-text-tertiary: #B08A80;
+    --color-text-light: #F7E8E0;
+    --color-text-muted: #F3E0D8;
+    --color-text-accent: #A53C34;
+    --color-text-accent-light: #E8C7B8;
+    --color-text-accent-muted: #C79A8C;
+
+    --color-bg-body: #F3E0D8;
+    --color-bg-header: rgba(255, 244, 238, 0.85);
+    --color-bg-footer: #9E2828;
+    --color-bg-search: rgba(255, 255, 255, 0.6);
+    --color-bg-search-hover: rgba(255, 255, 255, 0.85);
+    --color-bg-search-focus: rgba(255, 255, 255, 0.95);
+    --color-bg-dropdown: rgba(255, 251, 248, 0.96);
+    --color-bg-icon: rgba(194, 47, 47, 0.12);
+    --color-bg-icon-hover: rgba(194, 47, 47, 0.22);
+    --color-bg-item-hover: rgba(194, 47, 47, 0.08);
+    --color-bg-item-active: rgba(194, 47, 47, 0.14);
+    --color-bg-avatar: linear-gradient(135deg, #D9A84E 0%, #C22F2F 100%);
+    --color-bg-checkbox-active: linear-gradient(135deg, #C22F2F 0%, #B98A2F 100%);
+    --color-bg-card: rgba(255, 251, 248, 0.97);
+    --color-bg-mask: rgba(40, 10, 10, 0.45);
+    --color-bg-autofill: #FFF7F2;
+    --color-bg-item: rgba(255, 251, 248, 0.7);
+    --color-bg-input: rgba(255, 255, 255, 0.85);
+    --color-bg-secondary: rgba(255, 251, 248, 0.95);
+
+    --color-border-primary: rgba(194, 47, 47, 0.22);
+    --color-border: rgba(194, 47, 47, 0.22);
+    --color-border-search: rgba(194, 47, 47, 0.28);
+    --color-border-search-hover: rgba(194, 47, 47, 0.5);
+    --color-border-focus: #C22F2F;
+    --color-border-divider: rgba(194, 47, 47, 0.12);
+    --color-border-checkbox: rgba(194, 47, 47, 0.4);
+    --color-border-card: rgba(194, 47, 47, 0.22);
+
+    --color-shadow-header: rgba(122, 38, 32, 0.1);
+    --color-shadow-search: rgba(122, 38, 32, 0.08);
+    --color-shadow-search-hover: rgba(122, 38, 32, 0.12);
+    --color-shadow-search-focus: rgba(194, 47, 47, 0.2);
+    --color-shadow-avatar: rgba(194, 47, 47, 0.3);
+    --color-shadow-dropdown: rgba(122, 38, 32, 0.18);
+    --color-shadow-card: rgba(122, 38, 32, 0.2);
+    --color-shadow-qr: rgba(0, 0, 0, 0.2);
+    --color-shadow-primary: rgba(194, 47, 47, 0.25);
+    --color-shadow-secondary: rgba(185, 138, 47, 0.25);
+
+    --color-primary: #C22F2F;
+    --color-secondary: #B98A2F;
+}
+
+/* ===== 国庆红金主题：夜间（.theme-national.night-mode，跟随防闪屏脚本/主题切换）===== */
+.theme-national.night-mode {
+    --color-text-primary: #F5E6DE;
+    --color-text-secondary: #E6C4B8;
+    --color-text-tertiary: #BE9287;
+    --color-text-light: #E9C9BC;
+    --color-text-muted: #C89B90;
+    --color-text-accent: #E8A48F;
+    --color-text-accent-light: #F0C7B8;
+    --color-text-accent-muted: #C89B90;
+
+    --color-bg-body: #2A1618;
+    --color-bg-header: rgba(62, 27, 29, 0.85);
+    --color-bg-footer: #5E1F20;
+    --color-bg-search: rgba(42, 22, 24, 0.65);
+    --color-bg-search-hover: rgba(42, 22, 24, 0.82);
+    --color-bg-search-focus: rgba(42, 22, 24, 0.92);
+    --color-bg-dropdown: rgba(42, 22, 24, 0.96);
+    --color-bg-icon: rgba(224, 90, 80, 0.14);
+    --color-bg-icon-hover: rgba(224, 90, 80, 0.28);
+    --color-bg-item-hover: rgba(224, 90, 80, 0.14);
+    --color-bg-item-active: rgba(224, 90, 80, 0.2);
+    --color-bg-avatar: linear-gradient(135deg, #E0A85C 0%, #9E2828 100%);
+    --color-bg-checkbox-active: linear-gradient(135deg, #E05A50 0%, #D9A84E 100%);
+    --color-bg-card: rgba(48, 24, 26, 0.96);
+    --color-bg-mask: rgba(0, 0, 0, 0.5);
+    --color-bg-autofill: #3A2022;
+    --color-bg-item: rgba(58, 28, 30, 0.55);
+    --color-bg-input: rgba(42, 22, 24, 0.8);
+    --color-bg-secondary: rgba(48, 24, 26, 0.9);
+
+    --color-border-primary: rgba(224, 90, 80, 0.25);
+    --color-border: rgba(224, 90, 80, 0.25);
+    --color-border-search: rgba(224, 90, 80, 0.3);
+    --color-border-search-hover: rgba(224, 90, 80, 0.5);
+    --color-border-focus: #E05A50;
+    --color-border-divider: rgba(224, 90, 80, 0.14);
+    --color-border-checkbox: rgba(224, 90, 80, 0.4);
+    --color-border-card: rgba(224, 90, 80, 0.25);
+
+    --color-shadow-header: rgba(0, 0, 0, 0.15);
+    --color-shadow-search: rgba(0, 0, 0, 0.2);
+    --color-shadow-search-hover: rgba(0, 0, 0, 0.25);
+    --color-shadow-search-focus: rgba(224, 90, 80, 0.25);
+    --color-shadow-avatar: rgba(224, 90, 80, 0.3);
+    --color-shadow-dropdown: rgba(0, 0, 0, 0.35);
+    --color-shadow-card: rgba(0, 0, 0, 0.45);
+    --color-shadow-qr: rgba(0, 0, 0, 0.3);
+    --color-shadow-primary: rgba(224, 90, 80, 0.25);
+    --color-shadow-secondary: rgba(217, 168, 78, 0.25);
+
+    --color-primary: #E05A50;
+    --color-secondary: #D9A84E;
+}
 
 @font-face {
     font-family: 'OriginalHandWrite';

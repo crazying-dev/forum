@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import PostCard from "@/components/PostCard";
 import FollowListModal, { FollowTab } from "@/components/FollowListModal";
 import UserProfileModal from "@/components/UserProfileModal";
+import EmailChangeModal from "@/components/EmailChangeModal";
 import CategoryBadge from "@/components/ui/CategoryBadge";
 import SpaceBadge from "@/components/ui/SpaceBadge";
 import Markdown from "@/components/Markdown";
@@ -70,6 +71,7 @@ export default function UserPage() {
   const [followLoadingMore, setFollowLoadingMore] = useState(false);
   const followPageRef = useRef(1);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showEmailChange, setShowEmailChange] = useState(false);
   const [activeTab, setActiveTab] = useState<"posts" | "comments">("posts");
   const [postView, setPostView] = useState<"posts" | "favorites">("posts");
   const [comments, setComments] = useState<ReplyItem[] | null>(null);
@@ -82,6 +84,17 @@ export default function UserPage() {
     try {
       const r = await userApi.profile(id);
       setProfile(r.user);
+      // 已注销用户：仅最小档案，不请求帖子/评论等列表数据
+      if (r.user.deleted) {
+        setStats(null);
+        setFollowStats(null);
+        setIsFollowing(false);
+        setIsSelf(false);
+        setGuild(null);
+        setIsLeader(false);
+        setPosts([]);
+        return;
+      }
       setSignedToday(!!r.user.last_sign_in && r.user.last_sign_in === shanghaiDateStr());
       setStats(r.stats);
       setFollowStats(r.follow_stats);
@@ -239,6 +252,27 @@ export default function UserPage() {
   if (loading) return <div className="loading-text" style={{ padding: 40 }}>加载中...</div>;
   if (!profile) return <div className="loading-text" style={{ padding: 40 }}>用户不存在</div>;
 
+  // 已注销用户：简洁态（默认头像 + 说明文案，隐藏 Tab/帖子列表/关注等交互）
+  if (profile.deleted) {
+    return (
+      <div className="user-profile-page">
+        <div className="user-profile-card user-profile-deleted">
+          <div className="user-profile-avatar-wrapper">
+            <div className="user-profile-avatar">
+              <i className="fa fa-user avatar-fallback avatar-fallback-lg"></i>
+            </div>
+          </div>
+          <div className="user-profile-info">
+            <h2>
+              <span className="user-profile-deleted-name">已注销账户</span>
+            </h2>
+            <p className="user-profile-intro">该账号已注销，内容已匿名化保留</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="user-profile-page">
@@ -347,6 +381,17 @@ export default function UserPage() {
             >
               <i className="fa fa-calendar-check-o"></i> {signedToday ? "今日已签到" : "今日签到 +10"}
             </button>
+          )}
+          {isSelf && !profile.deleted && (
+            <div className="user-account-settings" id="user-account-settings">
+              <span className="user-account-settings-label"><i className="fa fa-cog"></i> 账号设置</span>
+              <button type="button" className="account-settings-btn" onClick={() => setShowEmailChange(true)}>
+                <i className="fa fa-envelope-o"></i> 更换邮箱
+              </button>
+              <Link href="/account/delete" className="account-settings-btn account-settings-danger">
+                <i className="fa fa-user-times"></i> 注销账号
+              </Link>
+            </div>
           )}
         </div>
 
@@ -505,6 +550,10 @@ export default function UserPage() {
 
       {showProfileModal && profile && (
         <UserProfileModal profile={profile} isSelf={isSelf} onClose={() => setShowProfileModal(false)} onSaved={onProfileSaved} />
+      )}
+
+      {showEmailChange && (
+        <EmailChangeModal onClose={() => setShowEmailChange(false)} />
       )}
 
       {showFollowList && (

@@ -7,3 +7,41 @@
     max-width: 100%;
 }
 
+/* ===== 每日一言彩蛋卡片（.egg-quote，CenterCard 居中弹窗内容，由 Header.showEasterEgg 渲染）===== */
+.egg-quote {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px 2px;
+    text-align: center;
+}
+
+/* 正文：宽度自适应，长句换行不溢出弹窗 */
+.egg-quote-text {
+    max-width: 100%;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--color-text-primary);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+/* 出处：有 author/source 时才渲染 */
+.egg-quote-from {
+    max-width: 100%;
+    font-size: 13px;
+    color: var(--color-text-accent);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+/* 小字标注 */
+.egg-quote-tag {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--color-text-tertiary);
+}
+

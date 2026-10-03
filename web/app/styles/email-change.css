@@ -1,0 +1,131 @@
+/* ===== 更换邮箱弹窗（EmailChangeModal）===== */
+.email-change-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.email-change-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.email-change-card {
+    position: relative;
+    width: 90%;
+    max-width: 440px;
+    padding: 24px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: 16px;
+    box-shadow: 0 16px 48px var(--color-shadow-card);
+    animation: emailChangeScaleIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes emailChangeScaleIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.email-change-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    padding: 4px 8px;
+    border: none;
+    background: none;
+    color: var(--color-text-tertiary);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.email-change-close:hover {
+    color: var(--color-text-primary);
+}
+
+.email-change-title {
+    margin: 0 0 16px;
+    font-size: 18px;
+    color: var(--color-text-primary);
+}
+
+.email-change-tabs {
+    display: flex;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--color-border-divider);
+}
+
+.email-change-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: -1px;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.email-change-tab.active {
+    border-bottom-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.email-change-tab.locked {
+    color: var(--color-text-tertiary);
+    cursor: not-allowed;
+}
+
+.email-change-step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--color-bg-icon);
+    color: var(--color-text-secondary);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.email-change-tab.active .email-change-step,
+.email-change-step.done {
+    background: var(--color-primary);
+    color: #fff;
+}
+
+.email-change-tip {
+    margin: 0 0 8px;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    word-break: break-all;
+}
+
+.email-change-tip strong {
+    color: var(--color-text-primary);
+}
+
+.email-change-desc {
+    margin: 0 0 16px;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.email-change-body .auth-btn.primary {
+    margin-top: 4px;
+}
