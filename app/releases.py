@@ -15,11 +15,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from . import api as api_mod
-from . import constants, logger, util
+from . import cachepolicy, constants, logger, util
 
 _log = logger.get_logger("releases")
 
-CACHE_TTL = 600            # 清单缓存有效期（秒）
+#: 清单缓存有效期（秒）——与全端本地缓存一致，上限 24 小时（可手动刷新）。
+CACHE_TTL = cachepolicy.MAX_AGE_SECONDS
 STATUS_AVAILABLE = "available"
 STATUS_COMING_SOON = "coming_soon"
 

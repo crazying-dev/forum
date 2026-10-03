@@ -231,6 +231,17 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     `PlainLabel`（显式 `setTextFormat(PlainText)`，`\n` 照常换行），`Muted` /
     `Chip` / `ElidedLabel` 一并改为纯文本；帖子详情与评论、世界频道（页面 + 侧栏）、
     帖子卡片、个人主页 / 用户主页的评论与简介全部换用。版本号升至 1.3.12。
+20. **V1.3.13：本地缓存统一「最多 24 小时」策略**：帖子缓存、头像 / 图片缓存、
+    发布清单缓存此前要么永久保留（图片、头像），要么只有条数上限（帖子缓存
+    300 条、无时效），导致换头像 / 换图 / 改正文后本地可能长期显示旧内容。
+    新增 `app/cachepolicy.py`（`MAX_AGE_SECONDS = 24h`）统一口径：
+    * **过期先用旧数据**——超时后仍先渲染本地旧数据（秒开、离线可用），
+      随后后台静默重新拉取，拿到新数据再覆盖缓存；
+    * **失败保留旧数据**——刷新失败（离线 / 4xx / 5xx）不清缓存；
+    * `app/postcache.py` 新增 `is_stale()`；`app/widgets/images.py` 新增
+      `ImageCache.age()/stale()`，头像、正文内嵌图片、Wiki 动图在缓存超过
+      24 小时时「先显旧图 + 后台静默重取」；`app/releases.py` 的 `CACHE_TTL`
+      由 600 秒统一为 24 小时（下载页仍可手动刷新）。版本号升至 1.3.13。
 
 ---
 

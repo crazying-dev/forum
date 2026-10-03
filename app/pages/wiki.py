@@ -268,6 +268,15 @@ class WikiPage(Page):
         local = image_cache.local(url)
         if local:
             self._start_movie(holder, local, token)
+            # 本地动图缓存最多 24 小时：过期后先继续放旧图，再后台静默重取
+            if image_cache.stale(url):
+                def _refresh_ok(_url, path, t=token):
+                    if t != self._build_token:
+                        return
+                    self._start_movie(holder, str(path), t)
+
+                image_cache.fetch(url, on_ready=_refresh_ok,
+                                  on_error=lambda _m: None, force=True)
             return card
 
         def _ok(_url, path, t=token):

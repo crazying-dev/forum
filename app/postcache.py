@@ -6,7 +6,9 @@
 * **本地优先**：进帖先渲染本地缓存（秒开），随后一律联网刷新并覆盖缓存；
 * 互动数据（点赞数 / 是否已赞 / 是否已收藏 / 首屏评论）与正文存在同一条记录里，
   因此「联网状态下再次进入本帖」会一并重新获取；
-* 请求失败时保留旧缓存，页面上给出提示——离线也能看到上次的内容。
+* 请求失败时保留旧缓存，页面上给出提示——离线也能看到上次的内容；
+* **缓存最多保留 24 小时**（V1.3.13，见 :mod:`app.cachepolicy`）：超过 24 小时的缓存
+  仍可先渲染（保底 / 离线可用），但 :func:`is_stale` 会返回 True，调用方需重新拉取。
 
 写入使用「临时文件 + 原子替换」避免半截文件；文件名经 :func:`paths.safe_component`
 清洗，防止帖子 ID 里的路径分隔符逃出缓存目录。
@@ -21,12 +23,13 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import logger, paths
+from . import cachepolicy, logger, paths
 
 _log = logger.get_logger("postcache")
 
 SCHEMA_VERSION = 1
 MAX_ENTRIES = 300          # 最多保留多少篇帖子的缓存
+MAX_AGE = cachepolicy.MAX_AGE_SECONDS   # 单条缓存最多保留 24 小时
 _EXT = ".json"
 _lock = threading.RLock()
 
@@ -75,6 +78,15 @@ def age(post_id: str) -> float:
     if stamp <= 0:
         return -1.0
     return max(time.time() - stamp, 0.0)
+
+
+def is_stale(post_id: str) -> bool:
+    """缓存是否已超过 :data:`MAX_AGE`（默认 24 小时）。
+
+    无缓存 / 无时间戳时返回 ``False``（交由调用方按「没有缓存」处理）。
+    过期不代表不可用：应先渲染旧数据，再联网刷新覆盖。
+    """
+    return cachepolicy.is_stale_timestamp(saved_at(post_id))
 
 
 def save(post_id: str, **fields: Any) -> bool:

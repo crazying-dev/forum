@@ -184,6 +184,13 @@ class MarkdownView(QTextBrowser):
                 absolute = constants.absolute(raw)
                 pixmap = image_cache.cached_pixmap(absolute)
                 if pixmap is not None and not pixmap.isNull():
+                    # 本地图片缓存最多 24 小时：过期时先继续用旧图，后台静默重取
+                    if image_cache.stale(absolute) and absolute not in self._requested:
+                        self._requested.add(absolute)
+                        image_cache.fetch(absolute,
+                                          on_ready=lambda _u, _p: self._schedule_rerender(),
+                                          on_error=lambda _m: None,
+                                          force=True)
                     return pixmap
                 if absolute not in self._requested:
                     self._requested.add(absolute)

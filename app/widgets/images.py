@@ -3,12 +3,17 @@
 
 所有远端图片落地到 ``~/.Cr/forum/cache/avatar/``、``~/.Cr/forum/cache/image/``，
 同一 URL 只请求一次，之后直接用本地文件。
+
+**本地缓存最多 24 小时**（V1.3.13，见 :mod:`app.cachepolicy`）：文件 mtime 超过
+:data:`MAX_AGE` 即视为过期——过期后仍先用旧图渲染，再后台静默重新下载覆盖，
+刷新失败则保留旧图（离线也能看到上次的图）。
 """
 
 from __future__ import annotations
 
 import hashlib
 import threading
+import time
 from pathlib import Path
 
 import requests
@@ -17,11 +22,14 @@ from PyQt6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPixmap
 from PyQt6.QtWidgets import QLabel, QSizePolicy, QWidget
 
 from .. import api as api_mod
-from .. import constants, logger, paths
+from .. import cachepolicy, constants, logger, paths
 
 _log = logger.get_logger("images")
 
 _MEMORY_LIMIT = 400
+
+#: 本地图片 / 头像缓存最多保留多久（秒）——24 小时（见 :mod:`app.cachepolicy`）。
+MAX_AGE = cachepolicy.MAX_AGE_SECONDS
 
 
 class ImageCache(QObject):
@@ -53,6 +61,24 @@ class ImageCache(QObject):
             return ""
         path = self.path_for(url)
         return str(path) if path.is_file() else ""
+
+    def age(self, url: str) -> float:
+        """本地文件年龄（秒）；不存在返回 ``-1``。"""
+        try:
+            return max(time.time() - self.path_for(url).stat().st_mtime, 0.0)
+        except OSError:
+            return -1.0
+
+    def stale(self, url: str) -> bool:
+        """本地已有文件、但已超过 :data:`MAX_AGE`（默认 24 小时）时返回 ``True``。
+
+        过期不代表不可用：调用方应先用旧图渲染，再后台重新下载覆盖，
+        下载失败则保留旧图。
+        """
+        path = self.path_for(url)
+        if not path.is_file():
+            return False
+        return cachepolicy.is_stale_file(path)
 
     def cached_pixmap(self, url: str) -> QPixmap | None:
         """只读缓存（不发请求）。"""
@@ -212,6 +238,9 @@ class Avatar(QWidget):
 
         ``force=True`` 时忽略「已命中本地缓存就直接返回」，强制重新下载并覆盖
         本地缓存（进他人主页时保证头像是最新的）；下载失败则保留旧图。
+
+        本地缓存最多保留 24 小时：超时后同样先显示旧图再后台静默刷新
+        （见 :meth:`ImageCache.stale`）。
         """
         url = str(url or "").strip()
         self._url = url
@@ -221,9 +250,10 @@ class Avatar(QWidget):
             return
         absolute = constants.absolute(url)
         cached = avatar_cache.cached_pixmap(absolute)
+        expired = avatar_cache.stale(absolute)
         if cached is not None:
             self._set_source(cached)
-            if not force:
+            if not force and not expired:
                 return
         else:
             self._pixmap = QPixmap()
@@ -240,7 +270,8 @@ class Avatar(QWidget):
             # 强制刷新失败时保留已有缓存图（不清空），静默处理
             return
 
-        avatar_cache.fetch(absolute, on_ready=_ok, on_error=_fail, force=force)
+        avatar_cache.fetch(absolute, on_ready=_ok, on_error=_fail,
+                           force=bool(force) or expired)
 
     def _set_source(self, source: QPixmap) -> None:
         self._pixmap = _circular(source, self._size)
@@ -303,11 +334,15 @@ class AsyncImage(QLabel):
             return
         absolute = constants.absolute(url)
         cached = image_cache.cached_pixmap(absolute)
+        expired = image_cache.stale(absolute)
         if cached is not None:
             self._source = cached
             self._apply()
-            return
-        self.setText("图片加载中…")
+            if not expired:
+                return
+            # 本地缓存超 24 小时：先留着旧图，下面后台静默重取并覆盖
+        else:
+            self.setText("图片加载中…")
 
         def _ok(_u, local_path):
             pixmap = QPixmap(local_path)
@@ -321,7 +356,7 @@ class AsyncImage(QLabel):
             if self._url == url and _alive(self):
                 self.setText("图片加载失败")
 
-        image_cache.fetch(absolute, on_ready=_ok, on_error=_fail)
+        image_cache.fetch(absolute, on_ready=_ok, on_error=_fail, force=expired)
 
     def set_local(self, path: str) -> None:
         pixmap = QPixmap(path)
