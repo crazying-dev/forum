@@ -16,8 +16,8 @@ android {
         applicationId = "top.crazying.forum"
         minSdk = 24
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.0.8"
+        versionCode = 10
+        versionName = "1.0.9"
         // 中文优先即可，服务端只返回中文文案
         resourceConfigurations += listOf("zh", "en")
     }
@@ -101,4 +101,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // 纯 Kotlin 逻辑（如 MarkdownBody）的 JVM 单元测试
+    testImplementation("junit:junit:4.13.2")
 }

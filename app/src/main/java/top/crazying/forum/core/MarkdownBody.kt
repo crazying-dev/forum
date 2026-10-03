@@ -44,14 +44,19 @@ object MarkdownBody {
 
         fun flushPara() {
             if (para.isEmpty()) return
-            out.append("<p>").append(inline(para.joinToString("<br>"))).append("</p><br>")
+            // 先逐行 inline（内含 HTML 转义）再拼 <br>：若先拼再转义，<br> 会被自己
+            // 的转义逻辑改成字面文字 "&lt;br&gt;"，正文里就会露出 <br> 而不是换行。
+            val body = para.joinToString("<br>") { inline(it) }
+            out.append("<p>").append(body).append("</p><br>")
             para.clear()
         }
 
         fun flushQuote() {
             if (quote.isEmpty()) return
+            // 同 flushPara：引用块内也必须是「先转义、后拼 <br>」
+            val body = quote.joinToString("<br>") { inline(it) }
             out.append("<blockquote>")
-                .append(inline(quote.joinToString("<br>")))
+                .append(body)
                 .append("</blockquote><br>")
             quote.clear()
         }

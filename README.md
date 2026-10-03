@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.8**（`versionCode = 9`） |
+| 当前版本 | **V1.0.9**（`versionCode = 10`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -185,7 +185,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 五、本轮已实现 / 未实现
 
-### 已实现（V1.0.8）
+### 已实现（V1.0.9）
 
 * **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + 密码直注）、退出登录、本地会话恢复与失效清理
 * **首页**：最新发布 / 综合排序 / 随机推荐 / 我的收藏 四个信息流，分页加载
@@ -209,6 +209,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **用户主页评论跳转**：评论列表显示「评论于 <帖子标题>」，点击整行进入对应帖子详情
 * **评论数显示**：帖子详情与列表优先采用服务端 `comment_count`，字段缺失时回退为已加载评论条数（修复「评论数恒为 0」）
 * **正文渲染**：`core/MarkdownBody.kt` 纯 Kotlin 实现 Markdown 子集解析（标题 / 列表 / 引用 / 代码块 / 分隔线 / 粗斜体 / 删除线 / 行内代码 / 链接），无 Android 依赖；单换行即换行（对齐网页端 `breaks:true`）、空行分段，行内文本先做 HTML 转义（HTML 标签以字面文字出现）
+* **正文换行修复（V1.0.9）**：段落 / 引用块此前是「先把多行拼成 `<br>`、再整体做 HTML 转义」，结果 `<br>` 被自己的转义逻辑变成字面文字，正文里直接显示「`<br>`」而不是换行（数据库存的其实是普通 `\n`）。现改为**逐行 `inline()` 之后再拼 `<br>`**；并新增 `app/src/test/java/top/crazying/forum/core/MarkdownBodyTest.kt`（6 例）作为回归覆盖，`gradlew testDebugUnitTest` **6/6 通过**。
 
 ### 未实现（后续多轮持续补齐）
 
