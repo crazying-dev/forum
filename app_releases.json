@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-10-03T13:35:00+08:00",
+  "updated_at": "2026-10-03T23:25:00+08:00",
   "min_versions": {
     "windows": "1.3.13",
     "android": "1.0.10",
@@ -15,17 +15,17 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.13",
+          "version": "1.3.14",
           "channel": "stable",
           "date": "2026-10-03",
-          "size": 48574686,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.13/forum_setup.exe",
+          "size": 48581713,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.14/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "98547b44a6a76e09f7c2611dee46b4b60e3b949a3e07d1f33f1a32e494de98cf",
+          "sha256": "d55ffcfcbaebdfa40a6776ef54afee084ce8c5c16104809ebfb491faef3dd3f1",
           "notes": [
-            "本地缓存统一 24 小时上限：过期后先用旧数据展示，再后台静默刷新，离线也能看上次内容",
-            "覆盖帖子缓存、头像与正文图片、Wiki GIF 与发布清单缓存",
-            "版本号升至 1.3.13"
+            "每次请求携带 X-Client-Platform / X-Client-Version，服务端可据此判定客户端版本",
+            "命中最低版本闸门（HTTP 426 / VERSION_TOO_LOW）时弹出不可关闭的强制更新窗，只能「去更新」或「退出应用」",
+            "版本号升至 1.3.14"
           ],
           "mandatory": false
         }
@@ -39,17 +39,17 @@
       "requirement": "Android 7.0 及以上",
       "releases": [
         {
-          "version": "1.0.10",
+          "version": "1.0.11",
           "channel": "stable",
           "date": "2026-10-03",
           "size": 8119736,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.10/forum-android-1.0.10.apk",
-          "filename": "forum-android-1.0.10.apk",
-          "sha256": "7cbd46a86cc6dad0a42753de94a0a598fe4478276df9f8a6489add79143a8b64",
+          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.11/forum-android-1.0.11.apk",
+          "filename": "forum-android-1.0.11.apk",
+          "sha256": "29511bed0828f0523123dc3a1d7e4203acd2463ff1a9e3ad61227a01ae23a0f1",
           "notes": [
-            "本地缓存统一 24 小时上限：过期后先用旧数据展示，再后台静默刷新，离线也能看上次内容",
-            "图片磁盘缓存按 24 小时时段分目录，启动时清理过期目录",
-            "版本号 versionCode 11 / versionName 1.0.10"
+            "每次请求携带 X-Client-Platform / X-Client-Version，服务端可据此判定客户端版本",
+            "命中最低版本闸门（HTTP 426 / VERSION_TOO_LOW）时弹出不可绕过的「版本过低」窗，只能「去更新」或「退出应用」",
+            "版本号 versionCode 12 / versionName 1.0.11"
           ],
           "mandatory": false
         }
