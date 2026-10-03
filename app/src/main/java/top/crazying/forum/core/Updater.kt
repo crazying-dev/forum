@@ -71,6 +71,8 @@ object Updater {
 
     /** 下载专用客户端：超时放宽（安装包 ~8MB，弱网下 25s 不够）。 */
     private val downloadClient: OkHttpClient = OkHttpClient.Builder()
+        // 同样携带客户端标识头（站内反代与日志都会用到）
+        .addInterceptor(Constants.clientHeaderInterceptor())
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)

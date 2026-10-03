@@ -1,5 +1,8 @@
 package top.crazying.forum.core
 
+import okhttp3.Interceptor
+import okhttp3.Request
+
 /**
  * 全局常量。
  *
@@ -12,10 +15,63 @@ object Constants {
     const val BASE_URL = "https://www.yjlt.top"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.10"
+    const val APP_VERSION = "1.0.11"
 
-    /** 请求 UA，便于服务端日志区分端。 */
+    /** 请求 UA，便于服务端日志区分端（服务端最低版本闸门也会回退解析它）。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
+
+    // ────────────────── 最低版本闸门 ──────────────────
+    /**
+     * 客户端平台标识。
+     *
+     * 与 Web（`static/js/AfterBody.js` 的 `web`）、Windows（`app/constants.py`
+     * 的 `CLIENT_PLATFORM`）同口径；服务端发布清单里的 `min_versions` 就按它取值。
+     */
+    const val CLIENT_PLATFORM = "android"
+
+    /**
+     * 每个请求都携带的客户端标识头。
+     *
+     * 服务端读 `X-Client-Platform` + `X-Client-Version`（两者缺失时回退解析
+     * `User-Agent: CrForum-Android/<版本>`）；低于清单 `min_versions.android`
+     * 时返回 **HTTP 426 + `VERSION_TOO_LOW`**，客户端据此弹出强制更新窗。
+     */
+    val CLIENT_HEADERS: Map<String, String> = mapOf(
+        "X-Client-Platform" to CLIENT_PLATFORM,
+        "X-Client-Version" to APP_VERSION,
+    )
+
+    /** 最低版本闸门的错误码（与 Web / Windows / 服务端同源）。 */
+    const val VERSION_TOO_LOW_CODE = "VERSION_TOO_LOW"
+
+    /**
+     * 是否命中「版本过低」闸门：HTTP 426，或响应体 `code` 为 [VERSION_TOO_LOW_CODE]。
+     *
+     * 服务端两种信号都会给，这里取「或」做双保险。纯函数，便于 JVM 单测。
+     */
+    fun isVersionTooLow(status: Int, code: String?): Boolean =
+        status == 426 || (code ?: "").trim() == VERSION_TOO_LOW_CODE
+
+    /**
+     * 给一个请求补上 [CLIENT_HEADERS]（纯函数，不改动入参，便于单测）。
+     *
+     * `header()` 是「先删后加」，重复调用不会把头叠加成多份。
+     */
+    fun applyClientHeaders(request: Request): Request {
+        val builder = request.newBuilder()
+        for ((k, v) in CLIENT_HEADERS) builder.header(k, v)
+        return builder.build()
+    }
+
+    /**
+     * 统一给所有 OkHttp 请求加客户端标识头的拦截器。
+     *
+     * 挂在请求链最外层后，[Api] 的 `request()` / 头像上传 / `fetchText` 与
+     * `Updater` 的下载客户端都会自动携带，无需逐处写 header。
+     */
+    fun clientHeaderInterceptor(): Interceptor = Interceptor { chain ->
+        chain.proceed(applyClientHeaders(chain.request()))
+    }
 
     /** WIKI 页（已改为原生 Compose 渲染，仅 Live2D 子页用 WebView 兜底）。 */
     const val WIKI_PATH = "/WIKI"

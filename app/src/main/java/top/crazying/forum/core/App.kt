@@ -35,6 +35,14 @@ object App {
      */
     val updateInfo: MutableState<UpdateInfo?> = mutableStateOf(null)
 
+    /**
+     * 服务端判定「客户端版本过低」时写入（HTTP 426 / `VERSION_TOO_LOW`）。
+     *
+     * 非空时 `ForumRoot` 弹出**不可关闭**的强制更新窗，只有「去更新」与「退出应用」
+     * 两个出口；只认第一个命中响应，避免并发请求把弹窗叠成一摞。
+     */
+    val versionGate: MutableState<VersionGate?> = mutableStateOf(null)
+
     fun init(context: Context) {
         prefs = Prefs(context.applicationContext)
         api = Api(prefs)
@@ -80,6 +88,12 @@ object App {
         prefs.yearMode = v
     }
 
+    /** 服务端返回 426 / `VERSION_TOO_LOW` 时调用：只处理第一个，之后入参直接丢弃。 */
+    fun onVersionTooLow(payload: JSONObject?) {
+        if (versionGate.value != null) return
+        versionGate.value = VersionGate.from(payload)
+    }
+
     /** 服务端返回 401 时调用：清本地会话，不弹错（避免首次启动未登录就误报）。 */
     fun onUnauthorized() {
         if (user.value == null && prefs.cookieStore.isEmpty()) return
@@ -92,5 +106,27 @@ object App {
         user.value = null
         prefs.clearSession()
         runCatching { api.clearCookies() }
+    }
+}
+
+/**
+ * 「版本过低」闸门状态：服务端 426 响应里给出的最低版本、下载地址与提示文案。
+ *
+ * 对应服务端 `{"success":false,"code":"VERSION_TOO_LOW","message":"版本过低，请更新",
+ * "min_version":"…","download_url":"…"}`。
+ */
+data class VersionGate(
+    val minVersion: String,
+    val downloadUrl: String,
+    val message: String,
+) {
+    companion object {
+        /** 从响应体解析；字段缺失时给出兜底文案，保证弹窗永远有话说。 */
+        fun from(payload: JSONObject?): VersionGate = VersionGate(
+            minVersion = payload?.optString("min_version", "")?.trim().orEmpty(),
+            downloadUrl = payload?.optString("download_url", "")?.trim().orEmpty(),
+            message = payload?.optString("message", "")?.trim().orEmpty()
+                .ifBlank { "版本过低，请更新" },
+        )
     }
 }

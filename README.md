@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.10**（`versionCode = 11`） |
+| 当前版本 | **V1.0.11**（`versionCode = 12`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -185,7 +185,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 五、本轮已实现 / 未实现
 
-### 已实现（V1.0.10）
+### 已实现（V1.0.11）
 
 * **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + 密码直注）、退出登录、本地会话恢复与失效清理
 * **首页**：最新发布 / 综合排序 / 随机推荐 / 我的收藏 四个信息流，分页加载
@@ -215,6 +215,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * **更新包缓存**：`cacheDir/updates/` 启动时清掉 mtime 超过 24 小时的安装包；
   * **用户资料缓存**：`Prefs.saveUserJson()` 同时记写入时间戳，`App.userCacheStale` 暴露过期状态；过期后仍先用旧数据渲染头部，再静默刷新覆盖（失败保留旧数据）。
   * 新增 `app/src/test/java/top/crazying/forum/core/CachePolicyTest.kt`（7 例）。
+* **最低版本闸门（V1.0.11）**：与 Web / Windows 三端同源。`Constants` 新增 `CLIENT_PLATFORM = "android"` 与 `CLIENT_HEADERS`（`X-Client-Platform` / `X-Client-Version`），由 `clientHeaderInterceptor()` 挂在 OkHttp 请求链最外层——`Api.request`、头像上传、`fetchText`、`Updater` 下载客户端全自动携带；服务端对低于发布清单 `min_versions.android` 的请求返回 **HTTP 426 + `code=VERSION_TOO_LOW`**，客户端在 `Api.request` 里识别后写入 `App.versionGate`，`ForumRoot` 随即弹出**不可绕过**的「版本过低」弹窗（返回键 / 外部点击均无效，只有「去更新」与「退出应用」两个出口）。新增 `app/src/test/java/top/crazying/forum/core/VersionGateTest.kt`。
 
 ### 未实现（后续多轮持续补齐）
 

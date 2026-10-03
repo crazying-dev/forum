@@ -57,6 +57,10 @@ fun ForumRoot() {
     ForumTheme {
         val colors = ForumTheme.colors
 
+        // 服务端「版本过低」闸门（HTTP 426 / VERSION_TOO_LOW）：
+        // 放在最外层、先于隐私门判断，保证任何界面都绕不过去。
+        VersionGateHost()
+
         // 首次启动（或隐私政策版本升级后）必须先手动同意隐私政策。
         // 未同意时既不渲染主界面，也不发起任何网络请求（合规：同意前不收集、不上传）。
         var agreed by remember {

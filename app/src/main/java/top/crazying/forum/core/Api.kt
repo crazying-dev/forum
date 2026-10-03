@@ -124,6 +124,8 @@ class Api(private val prefs: Prefs) {
     private val jar = PrefsCookieJar(prefs)
 
     private val client: OkHttpClient = OkHttpClient.Builder()
+        // 每个请求都带上 X-Client-Platform / X-Client-Version（最低版本闸门）
+        .addInterceptor(Constants.clientHeaderInterceptor())
         .cookieJar(jar)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
@@ -211,6 +213,9 @@ class Api(private val prefs: Prefs) {
         }
         if (result.status == 401) {
             runCatching { App.onUnauthorized() }
+        } else if (Constants.isVersionTooLow(result.status, result.str("code"))) {
+            // 服务端 426 / VERSION_TOO_LOW：交给 App 弹不可绕过的强制更新窗
+            runCatching { App.onVersionTooLow(result.obj()) }
         }
         result
     }
@@ -323,7 +328,11 @@ class Api(private val prefs: Prefs) {
                     .post(body)
                     .build()
                 val result = callOnce(request)
-                if (result.status == 401) runCatching { App.onUnauthorized() }
+                if (result.status == 401) {
+                    runCatching { App.onUnauthorized() }
+                } else if (Constants.isVersionTooLow(result.status, result.str("code"))) {
+                    runCatching { App.onVersionTooLow(result.obj()) }
+                }
                 result
             } catch (e: Exception) {
                 ApiResult(0, null, "网络错误，请检查网络连接后重试")
