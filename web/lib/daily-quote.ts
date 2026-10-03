@@ -25,7 +25,7 @@ export async function fetchDailyQuote(): Promise<DailyQuote | null> {
       source?: unknown;
     } | null;
     if (!data || typeof data.content !== "string" || !data.content.trim()) return null;
-    // 长度上限：防止第三方返回超长文本拖垮弹窗（超出截断并加省略号）
+    // 长度上限：防止第三方返回超长文本拖垮提示条（超出截断并加省略号）
     const raw = data.content.trim();
     const text = raw.length > 300 ? `${raw.slice(0, 300)}…` : raw;
     const from = [data.author, data.source]

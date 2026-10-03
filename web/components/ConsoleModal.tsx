@@ -58,7 +58,8 @@ export default function ConsoleModal({
           <i className="fa fa-download"></i>
           <span>安装论坛客户端</span>
         </button>
-        <button className="console-tile" type="button" onClick={() => { onClose(); onEasterEgg(); }}>
+        {/* 彩蛋：不关闭控制台，提示浮层叠加显示（可连续点击查看） */}
+        <button className="console-tile" type="button" onClick={onEasterEgg}>
           <i className="fa fa-gift"></i>
           <span>彩蛋</span>
         </button>

@@ -12,6 +12,15 @@ import { useToast } from "./Toast";
 import Modal from "./ui/Modal";
 import ConsoleModal from "./ConsoleModal";
 
+/** 彩蛋数据含少量 HTML（<br> 换行等）：转为单行纯文本，供胶囊提示展示 */
+function eggPlainText(s: string): string {
+  return s
+    .replace(/<\s*br\b[^>]*>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function Header() {
   const { setTheme, user, userId, logout } = useStore();
   const { show } = useCenterCard();
@@ -93,25 +102,20 @@ export default function Header() {
   };
 
   const showEasterEgg = async () => {
-    // 站点配置开启「每日一言」时，按概率改走引言彩蛋（居中弹窗）；否则维持原彩蛋 Toast
+    // 站点配置开启「每日一言」时，按概率改播引言（与彩蛋同为顶部胶囊提示）；否则维持原彩蛋
     const cfg = await getSiteConfig();
     if (cfg?.daily_quote.enabled && Math.random() < QUOTE_CHANCE) {
       const q = await fetchDailyQuote();
       if (q) {
-        show(
-          <div className="egg-quote">
-            {/* 直接用文本节点渲染第三方内容，不做 HTML 解析 */}
-            <div className="egg-quote-text">{q.text}</div>
-            {q.from ? <div className="egg-quote-from">—— {q.from}</div> : null}
-            <div className="egg-quote-tag">彩蛋 · 每日一言</div>
-          </div>
-        );
+        toast(`「${q.text}」${q.from ? ` —— ${q.from}` : ""}`, "info");
         return;
       }
     }
     try {
       const egg = await miscApi.easterEgg();
-      toast(`${egg.Name}：${egg.Text}`, "info");
+      const name = eggPlainText(egg.Name);
+      const text = eggPlainText(egg.Text);
+      toast(name && text ? `${name}：${text}` : name || text || "彩蛋", "info");
     } catch {
       toast("彩蛋获取失败", "error");
     }
