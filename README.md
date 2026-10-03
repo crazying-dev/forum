@@ -1,7 +1,7 @@
 # 妖精论坛 (Fairy Forum)
 
 > 《罗小黑战记》同人创作 · 仿官方妖精论坛系统
-> 当前版本：**ov2**（Next.js + Go 重构版）｜旧版 Flask（1.0.24）已归档至 `legacy/`
+> 当前版本：**ov2**（Next.js + Go 重构版）｜旧版 Flask（1.0.24）已归档：完整代码见上游 [crazying-dev/forum](https://github.com/crazying-dev/forum)，本机工作区克隆于 `forum-legacy/`
 
 ---
 
@@ -46,7 +46,7 @@
 - **数据库**：PostgreSQL（开发：本机 Docker PGSQL；生产：外部 PGSQL）
 - **部署**：自建服务器裸机 + systemd + Nginx 反代（前端 standalone 产物）
 
-> 旧版 Flask 实现已归档至 [`legacy/`](legacy/)（1.0.24），仅作对照参考，不再维护；新版部署不再依赖 Vercel/CDN 资源（全部本地化）。
+> 旧版 Flask 实现（1.0.24）已归档：完整代码见上游 [crazying-dev/forum](https://github.com/crazying-dev/forum)，本机工作区克隆于 `forum-legacy/`；仅作对照参考，不再维护；新版部署不再依赖 Vercel/CDN 资源（全部本地化）。
 
 ---
 
@@ -62,8 +62,7 @@
 │   ├── lib/             # api.ts / store.tsx（站点状态、主题）
 │   └── public/assets/   # 本地化静态资源（图片/字体/CSS/JS/Live2D）
 ├── deploy/          # 部署：dev.sh / systemd 单元 / Nginx 配置 / 部署指南
-├── docs/            # 架构 / API / 迁移对照 / 验收报告 / 资产清单 / 截图
-└── legacy/          # 旧版 Flask 实现（归档，1.0.24）
+└── docs/            # 架构 / API / 迁移对照 / 验收报告 / 资产清单 / 截图
 ```
 
 ---
@@ -142,7 +141,6 @@ make dev          # 一键启动：Docker PGSQL + Go 后端(:8090) + Next.js(:32
 >
 > 算了，你们肯定不会理解我的
 > 所以我给你们准备了惊喜
-> [惊喜点这里](legacy/doc/惊喜.md)
 
 ---
 
