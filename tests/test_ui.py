@@ -223,6 +223,39 @@ def test_apply_hard_breaks_skips_code_fence():
     assert apply_hard_breaks("单行") == "单行"
 
 
+def test_plain_label_renders_html_as_literal_text():
+    """三端口径：不渲染 HTML 语法；QLabel 默认 AutoText 会把 <div> 当富文本吞掉。"""
+    _app_instance()
+    from app.widgets import PlainLabel
+    label = PlainLabel("<div>原文标签</div>", wrap=True)
+    assert label.textFormat() == Qt.TextFormat.PlainText
+    assert "<div>" in label.text() and "</div>" in label.text()
+    assert label.wordWrap() is True
+    label.deleteLater()
+
+
+def test_comment_content_is_plain_text_with_newlines():
+    """评论是用户内容：HTML 按字面显示，且单换行必须保留。"""
+    _app_instance()
+    from app.widgets import CommentItem
+    item = CommentItem({"id": "C1", "content": "第一行\n第二行<div>x</div>",
+                        "user_name": "匿名用户"})
+    assert item.content.textFormat() == Qt.TextFormat.PlainText
+    assert "<div>x</div>" in item.content.text()
+    assert "\n" in item.content.text()
+    assert "第一行 第二行" not in item.content.text(), "单换行不能被合并成空格"
+    item.deleteLater()
+
+
+def test_muted_and_chip_are_plain_text():
+    """含用户文案的 Muted / Chip 也锁 PlainText（题注里的标签不得被当富文本）。"""
+    _app_instance()
+    from app.widgets import Chip, Muted
+    for widget in (Muted("评论于《<b>x</b>》"), Chip("<i>分区</i>")):
+        assert widget.textFormat() == Qt.TextFormat.PlainText
+        widget.deleteLater()
+
+
 def test_toast_manager():
     app = _app_instance()
     from PyQt6.QtWidgets import QWidget

@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import QFrame, QLabel, QLineEdit, QScrollArea, QWidget
 
 from .. import api as api_mod
 from .. import constants, logger, theme, yearmode
-from ..widgets import UserLink, button, hbox, vbox
+from ..widgets import PlainLabel, UserLink, button, hbox, vbox
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -50,11 +50,10 @@ class WorldMessageRow(QFrame):
             name.setObjectName("WorldName")
             name.activated.connect(on_user)
         else:
-            name = QLabel(sender_name)
+            name = PlainLabel(sender_name)
             name.setObjectName("WorldName")
         body.addWidget(name)
-        content = QLabel(str(message.get("content") or ""))
-        content.setWordWrap(True)
+        content = PlainLabel(str(message.get("content") or ""), wrap=True)
         content.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         body.addWidget(content)
         when = QLabel(yearmode.fmt_time(message.get("created_at")))

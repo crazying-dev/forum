@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QFrame, QLabel, QWidget
+from PyQt6.QtWidgets import QFrame, QWidget
 
 from .. import constants, yearmode
-from .common import Chip, Muted, UserLink, hbox, vbox
+from .common import Chip, Muted, PlainLabel, UserLink, hbox, vbox
 from .images import Avatar
 
 
@@ -46,13 +46,13 @@ class PostCard(QFrame):
 
         outer = vbox(self, margins=(13, 12, 13, 12), spacing=6)
 
-        self.title = QLabel(self)
+        self.title = PlainLabel(self)
         self.title.setObjectName("PostTitle")
         self.title.setWordWrap(True)
         self.title.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         outer.addWidget(self.title)
 
-        self.summary = QLabel(self)
+        self.summary = PlainLabel(self)
         self.summary.setObjectName("PostSummary")
         self.summary.setWordWrap(True)
         self.summary.setMaximumHeight(46)

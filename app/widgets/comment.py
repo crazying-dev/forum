@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from .. import logger, yearmode
-from .common import Muted, UserLink, button, clear_layout, hbox, vbox
+from .common import Muted, PlainLabel, UserLink, button, clear_layout, hbox, vbox
 from .images import Avatar
 
 _log = logger.get_logger("comments")
@@ -59,8 +59,8 @@ class CommentItem(QFrame):
         head.addStretch(1)
         body.addLayout(head)
 
-        self.content = QLabel(str(self._comment.get("content") or ""))
-        self.content.setWordWrap(True)
+        # 评论是用户内容：锁 PlainText，避免 <div> 之类被 Qt 当富文本解析（连内容一起吞掉）
+        self.content = PlainLabel(str(self._comment.get("content") or ""), wrap=True)
         self.content.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         body.addWidget(self.content)
 

@@ -13,12 +13,12 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLabel, QTabWidget, QWidget
+from PyQt6.QtWidgets import QTabWidget, QWidget
 
 from .. import constants, yearmode
-from ..widgets import (Card, Chip, EmptyHint, Muted, PostCard, ScrollPage,
-                       UserLink, UserListDialog, button, hbox, set_variant, vbox,
-                       with_author)
+from ..widgets import (Card, Chip, EmptyHint, Muted, PlainLabel, PostCard,
+                       ScrollPage, UserLink, UserListDialog, button, hbox,
+                       set_variant, vbox, with_author)
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -206,8 +206,7 @@ class UserPage(Page):
         stats.addStretch(1)
         info.addLayout(stats)
 
-        self.intro = QLabel("")
-        self.intro.setWordWrap(True)
+        self.intro = PlainLabel("", wrap=True)
         self.intro.hide()
         info.addWidget(self.intro)
 
@@ -257,8 +256,7 @@ class UserPage(Page):
 
     def _build_comment_widget(self, comment: dict) -> QWidget:
         card = Card(padding=(12, 10, 12, 10), spacing=6)
-        content = QLabel(str(comment.get("content") or ""))
-        content.setWordWrap(True)
+        content = PlainLabel(str(comment.get("content") or ""), wrap=True)
         card.body.addWidget(content)
 
         post_id = str(comment.get("_id") or "")

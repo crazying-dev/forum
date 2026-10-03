@@ -18,7 +18,7 @@ from .. import constants, postcache, yearmode
 from ..widgets import (Card, Chip, CommentList, MarkdownView, Muted, ScrollPage,
                        UserLink, button, divider, hbox, set_variant, vbox)
 # CardTitle 未在 widgets/__init__ 的显式导出中，直接取子模块
-from ..widgets.common import CardTitle
+from ..widgets.common import CardTitle, PlainLabel
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -79,7 +79,7 @@ class PostDetailPage(Page):
         name_row.addStretch(1)
         info.addLayout(name_row)
 
-        self.title = QLabel("")
+        self.title = PlainLabel("")
         self.title.setObjectName("PostTitle")
         self.title.setWordWrap(True)
         self.title.setTextInteractionFlags(

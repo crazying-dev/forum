@@ -23,8 +23,8 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
 
 from .. import constants, yearmode
 from ..widgets import (BaseDialog, Card, Chip, DeleteAccountDialog, EmptyHint,
-                       Muted, PostCard, ScrollPage, UserLink, UserListDialog,
-                       button, hbox, toast, vbox, with_author)
+                       Muted, PlainLabel, PostCard, ScrollPage, UserLink,
+                       UserListDialog, button, hbox, toast, vbox, with_author)
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -244,8 +244,7 @@ class ProfilePage(Page):
         stats.addStretch(1)
         info.addLayout(stats)
 
-        self.intro = QLabel("")
-        self.intro.setWordWrap(True)
+        self.intro = PlainLabel("", wrap=True)
         self.intro.hide()
         info.addWidget(self.intro)
 
@@ -311,8 +310,7 @@ class ProfilePage(Page):
 
     def _build_comment_widget(self, comment: dict) -> QWidget:
         card = Card(padding=(12, 10, 12, 10), spacing=6)
-        content = QLabel(str(comment.get("content") or ""))
-        content.setWordWrap(True)
+        content = PlainLabel(str(comment.get("content") or ""), wrap=True)
         card.body.addWidget(content)
 
         post_id = str(comment.get("post_id") or "")
@@ -346,8 +344,7 @@ class ProfilePage(Page):
         head.addStretch(1)
         card.body.addLayout(head)
 
-        reply = QLabel(str(row.get("reply_content") or ""))
-        reply.setWordWrap(True)
+        reply = PlainLabel(str(row.get("reply_content") or ""), wrap=True)
         card.body.addWidget(reply)
 
         my_comment = str(row.get("comment_content") or "")

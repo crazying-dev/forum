@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit, QScrollArea
 
 from .. import api as api_mod
 from .. import config, constants, logger, theme, yearmode
-from .common import UserLink, button, hbox, vbox
+from .common import PlainLabel, UserLink, button, hbox, vbox
 from .images import Avatar
 from .toast import toast
 
@@ -48,11 +48,10 @@ class WorldMessage(QFrame):
             name.setObjectName("WorldName")
             name.activated.connect(on_user)
         else:
-            name = QLabel(sender_name)
+            name = PlainLabel(sender_name)
             name.setObjectName("WorldName")
         body.addWidget(name)
-        content = QLabel(str(message.get("content") or ""))
-        content.setWordWrap(True)
+        content = PlainLabel(str(message.get("content") or ""), wrap=True)
         content.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         body.addWidget(content)
         time_label = QLabel(yearmode.fmt_time(message.get("created_at")))

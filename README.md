@@ -224,6 +224,13 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
       正文里的 HTML 标签按字面文字展示，与网页端 / 安卓端一致。
     * 安卓客户端发帖已改为原文直传（不再包装 `<p>…<br>…</p>`），
       历史 HTML 正文由服务端 `tool/content_migrate.py` 一次性还原。版本号升至 1.3.11。
+19. **V1.3.12：评论 / 世界频道等用户不再被 Qt 当富文本解析**：评论、世界频道消息、
+    帖子标题与摘要、个人简介此前都是 `QLabel`（默认 `AutoText`），字符串里出现
+    `<div>` 这类标签时会被当成 HTML 解析掉（标签消失，甚至连带内容一起被“吃掉”），
+    与「不渲染 HTML 语法」的三端口径冲突。`app/widgets/common.py` 新增
+    `PlainLabel`（显式 `setTextFormat(PlainText)`，`\n` 照常换行），`Muted` /
+    `Chip` / `ElidedLabel` 一并改为纯文本；帖子详情与评论、世界频道（页面 + 侧栏）、
+    帖子卡片、个人主页 / 用户主页的评论与简介全部换用。版本号升至 1.3.12。
 
 ---
 

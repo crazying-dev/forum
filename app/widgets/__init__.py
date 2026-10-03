@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from .comment import CommentItem, CommentList
 from .common import (Card, CardTitle, Chip, Divider, ElidedLabel, EmptyHint, FlowLayout,
-                     LoadingHint, Muted, ScrollPage, TitleLabel, UserLink,
+                     LoadingHint, Muted, PlainLabel, ScrollPage, TitleLabel, UserLink,
                      button, chip, clear_layout, divider, ghost_button, hbox,
                      set_active, set_variant, vbox)
 from .dialogs import (REPORT_REASONS, BaseDialog, BugReportDialog,
@@ -27,7 +27,7 @@ from .world_panel import WorldMessage, WorldPanel
 
 __all__ = [
     "Card", "CardTitle", "Chip", "Divider", "ElidedLabel", "EmptyHint", "FlowLayout",
-    "LoadingHint", "Muted", "ScrollPage", "TitleLabel", "UserLink",
+    "LoadingHint", "Muted", "PlainLabel", "ScrollPage", "TitleLabel", "UserLink",
     "button", "chip", "clear_layout", "divider", "ghost_button", "hbox",
     "set_active", "set_variant", "vbox",
     "REPORT_REASONS", "BaseDialog", "BugReportDialog", "DeleteAccountDialog",

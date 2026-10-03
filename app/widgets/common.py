@@ -77,7 +77,29 @@ def divider(parent: QWidget | None = None) -> Divider:
     return Divider(parent)
 
 
-class Chip(QLabel):
+class PlainLabel(QLabel):
+    """纯文本标签：``\\n`` 原样换行，且**不解析 HTML 语法**。
+
+    用户产生的文字（帖子标题 / 评论 / 世界频道消息 / 个人简介等）一律用它：
+    QLabel 默认是 AutoText，字符串里出现 ``<div>`` 这类标签时会被当成富文本
+    解析掉（标签消失，甚至连带内容一起被“吃掉”），与三端「不渲染 HTML 语法」
+    的口径冲突。显式锁成 PlainText 后按字面文字展示，换行照常保留。
+    """
+
+    def __init__(self, text: str = "", parent: QWidget | None = None, *,
+                 wrap: bool = False, muted: bool = False) -> None:
+        super().__init__(str(text or ""), parent)
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        if wrap:
+            self.setWordWrap(True)
+        if muted:
+            self.setProperty("muted", "true")
+
+    def setText(self, text: str) -> None:  # noqa: N802 - Qt 命名
+        super().setText(str(text or ""))
+
+
+class Chip(PlainLabel):
     """小标签（分区 / 头衔）。"""
 
     def __init__(self, text: str = "", kind: str = "category",
@@ -108,15 +130,14 @@ class CardTitle(QLabel):
         self.setObjectName("CardTitle")
 
 
-class Muted(QLabel):
+class Muted(PlainLabel):
     """次要文字。"""
 
     def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
-        super().__init__(text, parent)
-        self.setProperty("muted", "true")
+        super().__init__(text, parent, muted=True)
 
 
-class ElidedLabel(QLabel):
+class ElidedLabel(PlainLabel):
     """超长自动加省略号的单行标签（完整内容进 tooltip）。"""
 
     def __init__(self, text: str = "", parent: QWidget | None = None) -> None:
