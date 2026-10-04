@@ -44,6 +44,12 @@ except Exception as exc:  # noqa: BLE001
 hiddenimports += [
     "PyQt6.QtNetwork",
     "PyQt6.QtSvg",
+    # 人机验证（Cloudflare Turnstile）弹窗内嵌 QWebEngineView 需要；
+    # 显式声明可确保 PyQt6-WebEngine 的 hook 生效（QtWebEngineProcess.exe /
+    # resources / locales 会被自动收集）。
+    "PyQt6.QtWebEngineWidgets",
+    "PyQt6.QtWebEngineCore",
+    "PyQt6.QtWebChannel",
     "app.api",
     "app.deeplink",
     "app.tray",

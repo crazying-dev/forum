@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""V1.3.15 新增：滑块拼图人机验证的客户端侧离线用例。
+"""人机验证的客户端侧离线用例。
 
-覆盖：
+V1.3.15 新增（自研滑块）：
 
 * ``api.CAPTCHA_PROTECTED_ENDPOINTS`` 与 10 个受保护方法的 ``captcha_token`` 透传；
 * ``api._with_captcha`` 的合并语义（空串不写入，保持旧请求体口径）；
@@ -9,6 +9,12 @@
 * ``SliderCaptchaDialog._apply_challenge`` 的渲染状态（与网络解耦）；
 * ``SliderStage`` 的“手柄位置 ↔ 拼图块 x”映射与钳位；
 * 各调用点已接入 ``ask_captcha``（源码扫描）。
+
+V1.3.16 扩展（Cloudflare Turnstile）：
+
+* ``provider_of`` / ``embed_url`` / ``event_of`` / ``token_from_event`` 四个纯函数；
+* 弹窗在滑块舞台与内嵌 WebView 之间切换、以及接收 ``captcha:...`` 标题事件；
+* ``main.py`` 必须在 ``QApplication`` 之前导入 WebEngine（源码扫描）。
 
 不依赖 pytest / 不联网：直接由 tests/run_tests.py 调用。
 """
@@ -282,3 +288,197 @@ def test_call_sites_wire_captcha():
     assert "def _with_captcha" in api_src
     for _name, _invoke, path in _GATED_CALLS:
         assert '"%s"' % path in api_src, path
+
+
+# ────────────────────── provider / 内嵌验证页（V1.3.16） ──────────────────────
+
+
+def test_provider_constants_match_server():
+    from app.widgets import captcha as c
+
+    assert c.PROVIDER_SLIDER == "slider"
+    assert c.PROVIDER_TURNSTILE == "turnstile"
+    assert c.PROVIDER_OFF == "off"
+    assert c.EMBED_PATH == "/captcha-embed"
+    assert c.EVENT_PREFIX == "captcha:"
+    assert c.EMBED_SIZE == "flexible"
+
+
+def test_provider_of_normalises_and_falls_back_to_slider():
+    from app.widgets import captcha as c
+
+    assert c.provider_of("turnstile") == c.PROVIDER_TURNSTILE
+    assert c.provider_of("  TURNSTILE  ") == c.PROVIDER_TURNSTILE
+    assert c.provider_of("slider") == c.PROVIDER_SLIDER
+    for raw in ("off", "none", "disable", "disabled", "0", "false", "OFF"):
+        assert c.provider_of(raw) == c.PROVIDER_OFF, raw
+    for raw in ("", None, "???", "cloudflare"):
+        assert c.provider_of(raw) == c.PROVIDER_SLIDER, raw
+
+
+def test_embed_url_builds_absolute_url_with_query():
+    from app.widgets import captcha as c
+
+    url = c.embed_url("https://www.yjlt.top", "/captcha-embed", "dark", "normal")
+    assert url == "https://www.yjlt.top/captcha-embed?theme=dark&size=normal"
+
+
+def test_embed_url_defaults_are_light_and_flexible():
+    from app.widgets import captcha as c
+
+    # 末尾斜杠会被归一化；theme/size 非法一律回退 light + flexible
+    assert c.embed_url("https://www.yjlt.top/", None, None, None) == \
+        "https://www.yjlt.top/captcha-embed?theme=light&size=flexible"
+    assert c.embed_url("https://www.yjlt.top", "", "LIGHT", "huge").endswith(
+        "?theme=light&size=flexible")
+    assert c.embed_url("https://www.yjlt.top", None, "National", "").endswith(
+        "?theme=light&size=flexible")
+
+
+def test_embed_url_accepts_absolute_and_protocol_relative_paths():
+    from app.widgets import captcha as c
+
+    # 已带 query 时用 & 拼接
+    absolute = c.embed_url("https://www.yjlt.top",
+                           "https://cdn.example.com/embed?x=1", None, "compact")
+    assert absolute == "https://cdn.example.com/embed?x=1&theme=light&size=compact"
+    # 协议相对地址补 https:
+    assert c.embed_url("https://www.yjlt.top", "//cdn.example.com/e", "dark", "normal") == \
+        "https://cdn.example.com/e?theme=dark&size=normal"
+    # 相对路径自动补 / 与 base
+    assert c.embed_url("https://www.yjlt.top", "captcha-embed", None, None) == \
+        "https://www.yjlt.top/captcha-embed?theme=light&size=flexible"
+
+
+def test_event_of_parses_kind_and_payload():
+    from app.widgets import captcha as c
+
+    assert c.event_of("captcha:token:ABC") == ("token", "ABC")
+    assert c.event_of("captcha:error:disabled") == ("error", "disabled")
+    # 只在首个冒号处切分：token 里的冒号原样保留
+    assert c.event_of("captcha:token:a:b:c") == ("token", "a:b:c")
+    assert c.event_of("captcha:token:") == ("token", "")
+    assert c.event_of("captcha:TOKEN:X") == ("token", "X")
+    assert c.event_of("captcha::X") is None
+    assert c.event_of("captcha:") is None
+    assert c.event_of("安全验证") is None
+    assert c.event_of("about:blank") is None
+    assert c.event_of("") is None
+    assert c.event_of(None) is None
+
+
+def test_token_from_event_only_accepts_token_kind():
+    from app.widgets import captcha as c
+
+    long_token = "T" * 2048          # Turnstile token 上限 2048，且不能被截断
+    assert c.token_from_event("captcha:token:" + long_token) == long_token
+    assert c.token_from_event("captcha:token:  TK  ") == "TK"
+    assert c.token_from_event("captcha:token:") is None
+    assert c.token_from_event("captcha:error:x") is None
+    assert c.token_from_event("captcha:") is None
+    assert c.token_from_event("nope") is None
+    assert c.token_from_event(None) is None
+
+
+# ────────────────────── 弹窗：滑块 ↔ 内嵌页切换 ──────────────────────
+
+
+def test_dialog_switches_between_stage_and_embed():
+    _app_instance()
+    from app.widgets.captcha import SliderCaptchaDialog
+
+    dialog = SliderCaptchaDialog(None, autostart=False)
+    try:
+        assert dialog.provider == "slider"
+        assert dialog.stage.isHidden() is False
+        assert dialog.refresh_btn.text() == "换一张"
+        dialog._show_embed()
+        assert dialog.stage.isHidden() is True
+        dialog._show_stage()
+        assert dialog.stage.isHidden() is False
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_turnstile_without_sitekey_falls_back_to_slider():
+    _app_instance()
+    from app.widgets.captcha import SliderCaptchaDialog
+
+    dialog = SliderCaptchaDialog(None, autostart=False)
+    try:
+        # 服务端给了 provider 但没给 sitekey（理论上不会发生）→ 不能白屏
+        dialog._apply_turnstile({"provider": "turnstile"})
+        assert dialog.provider == "slider"
+        assert dialog.stage.isHidden() is False
+        assert dialog.refresh_btn.text() == "换一张"
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_consumes_embed_token_and_error_events():
+    _app_instance()
+    from PyQt6.QtWidgets import QDialog
+    from app.widgets.captcha import SliderCaptchaDialog
+
+    dialog = SliderCaptchaDialog(None, autostart=False)
+    try:
+        dialog.provider = "turnstile"
+        dialog._on_embed_title("安全验证")          # 页面标题，不属于协议 → 忽略
+        assert dialog.result_token == ""
+        dialog._on_embed_title("captcha:error:disabled")
+        assert "已关闭" in dialog.status.text()
+        dialog._on_embed_title("captcha:error:unconfigured")
+        assert "未配置" in dialog.status.text()
+        dialog._on_embed_title("captcha:error:组件炸了")   # 未知短码原样展示
+        assert dialog.status.text() == "组件炸了"
+        dialog._on_embed_title("captcha:token:" + "K" * 2048)
+        assert dialog.result_token == "K" * 2048
+        assert dialog.result() == QDialog.DialogCode.Accepted
+    finally:
+        dialog.deleteLater()
+
+
+def test_dialog_ignores_events_when_provider_is_slider():
+    _app_instance()
+    from app.widgets.captcha import SliderCaptchaDialog
+
+    dialog = SliderCaptchaDialog(None, autostart=False)
+    try:
+        assert dialog.provider == "slider"
+        dialog._on_embed_title("captcha:token:SHOULD-NOT-WIN")
+        assert dialog.result_token == "", "非 turnstile provider 不得采信标题事件"
+    finally:
+        dialog.deleteLater()
+
+
+# ────────────────────── 装配检查（源码扫描） ──────────────────────
+
+
+def test_captcha_module_wires_turnstile_embed():
+    src = _read(os.path.join("app", "widgets", "captcha.py"))
+    assert "PyQt6.QtWebEngineWidgets" in src
+    assert "titleChanged" in src
+    assert "PROVIDER_TURNSTILE" in src
+    assert "embed_url(" in src and "embed_path_of(" in src
+    assert "event_of(" in src and "token_from_event(" in src
+    assert "captcha_area" in src
+
+
+def test_main_imports_webengine_before_qapplication():
+    src = _read("main.py")
+    assert "PyQt6.QtWebEngineWidgets" in src
+    assert "AA_ShareOpenGLContexts" in src
+    idx_import = src.find("import PyQt6.QtWebEngineWidgets")
+    idx_app = src.find("QApplication(argv)")
+    assert idx_import != -1 and idx_app != -1
+    assert idx_import < idx_app, "WebEngine 必须在 QApplication 之前导入"
+
+
+def test_requirements_declare_webengine():
+    req = _read(os.path.join("requirements.txt"))
+    assert "PyQt6-WebEngine" in req, "内嵌 Turnstile 依赖必须写入 requirements.txt"
+
+
+def test_packaging_collects_webengine():
+    spec = _read(os.path.join("packaging", "forum.spec"))
+    assert "PyQt6.QtWebEngineWidgets" in spec, "打包配置必须显式收集 WebEngine"

@@ -24,7 +24,7 @@
 | 世界频道 | 右侧常驻面板（3 秒轮询、可拖拽调宽 240-560、可收起）+ 独立整页 |
 | WIKI | 总览 / 官方 / 个人 / 鼠标 / 鼠标 Linux 版 / Live2D 六页（与网页一致） |
 | 彩蛋 | 每日一言与 `/Easter-Egg` 随机展示 |
-| 其他 | 会馆列表、隐私政策、Bug 反馈、外链安全确认 |
+| 其他 | 会馆列表、隐私政策、Bug 反馈、外链安全确认、人机验证（Cloudflare Turnstile 内嵌 / 自研滑块） |
 | 外观 | 日间 / 夜间 / 跟随时间，对齐网页端配色 |
 | 年制 | 无限年 ⇄ 公元年（无限元年 = 公元 1604 年），全站时间显示随之切换 |
 | 鼠标指针 | 内置三套「罗小黑」指针包（普通 / 放大·动态 / 放大·静态），可在主窗口内启用，也可一键安装为 Windows 系统鼠标 |
@@ -115,7 +115,7 @@ python tests/run_tests.py --online   # 加上联网用例（会真实访问官�
 python tests/run_tests.py --verbose  # 打印每个用例名
 ```
 
-当前共 **89+ 条用例**，覆盖：常量与资源、加密与凭证、配置读写、年制换算、时间解析、
+当前共 **296 条用例**，覆盖：常量与资源、加密与凭证、配置读写、年制换算、时间解析、
 主题与 QSS、API 语义（含「无 `success` 字段」「端点不被同名方法顶掉」等回归）、
 异步回调线程、会话持久化、鼠标指针帧序列与 `.cur`/`.ani` 编码、Live2D 解包与引用完整性、
 组件构建与整卡点击、评论树与折叠、路由表与深链解析。
@@ -270,6 +270,20 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
       修改密码 / 更换邮箱 / 注销账号共 10 处调用点均先弹滑块再发请求；
     * 服务端不可用时 `CAPTCHA_ENABLED=0` 一刀切关闭，客户端自动跳过弹窗。
       版本号升至 1.3.15。
+23. **V1.3.16：人机验证接入 Cloudflare Turnstile（内嵌 WebEngine）**：自研滑块拼图
+    被证明可被低成本攻破，故三端统一改为 Cloudflare Turnstile；服务端提供 provider
+    开关（`slider` / `turnstile` / `off`，密钥缺失自动回退滑块），并新增独立嵌入页
+    `/captcha-embed`：
+    * `app/widgets/captcha.py` 新增纯函数 `provider_of()` / `embed_path_of()` /
+      `embed_url()` / `event_of()` / `token_from_event()`，`SliderCaptchaDialog`
+      变为 provider 感知：`turnstile` 时用内嵌 `QWebEngineView` 加载
+      `/captcha-embed`，通过页面 `document.title`（`captcha:<kind>:<payload>`）
+      回传 token / 错误，`slider` 时沿用原自研滑块，二者可随时切换；
+    * `main.py` 在任何 `QApplication` 构造前设置 `AA_ShareOpenGLContexts` 并尝试
+      提前导入 `PyQt6.QtWebEngineWidgets`，缺失时降级为滑块并给出提示；
+    * 新增依赖 `PyQt6-WebEngine==6.11.0`（安装包体积随之增加），打包配置
+      `packaging/forum.spec` 收集 `PyQt6.QtWebEngineWidgets` / `QtWebEngineCore` /
+      `QtWebChannel` 隐藏导入；版本号升至 1.3.16。
 
 ---
 
@@ -279,7 +293,9 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
 
 * 认证与用户：`/api/user/{login,logout,register,info,password,email,avatar/upload,<id>,<id>/follow,<id>/{posts,favorites,following,followers,comments}}`
 * 邮箱验证码：`/api/email/{send-register-code,send-verify-code,verify-code-email,send-code-reset-password,reset-password-by-code,send-change-password-code,send-change-email-code,send-change-email-old-code,send-delete-account-code}`
-* 人机验证（滑块拼图）：`/api/captcha/{challenge,verify}`
+* 人机验证：`/api/captcha/{challenge,verify}`（`challenge` 返回 `provider` /
+  `sitekey` / `embed_url`）、内嵌验证页 `/captcha-embed`（Cloudflare Turnstile，
+  仅当服务端 `CAPTCHA_PROVIDER=turnstile` 时使用；滑块回退时复用 `challenge` / `verify`）
 * 帖子与评论：`/api/posts*`、`/api/comments/*`、`/api/users/me/replies`
 * 其他：`/api/world/{ALL,Send}`、`/api/search`、`/api/huiguan`、`/api/report-bug`、`/Easter-Egg`、`/healthz`
 * 更新包反代（客户端四级回退的最后一级）：`/api/app/mirror/windows/<文件名>`——服务端实时拉取

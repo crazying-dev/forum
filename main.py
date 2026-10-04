@@ -29,10 +29,28 @@ def _bootstrap_path() -> None:
 
 _bootstrap_path()
 
-from PyQt6.QtCore import QTimer  # noqa: E402
+from PyQt6.QtCore import Qt, QTimer  # noqa: E402
 from PyQt6.QtGui import QFont, QIcon, QSurfaceFormat  # noqa: E402
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket  # noqa: E402
 from PyQt6.QtWidgets import QApplication  # noqa: E402
+
+# ── Qt WebEngine：必须在 QApplication 之前导入 ──
+# 人机验证（Cloudflare Turnstile）在弹窗里内嵌 QWebEngineView 加载站内
+# ``/captcha-embed`` 页面；QWebEngineView 要求模块在 QApplication 构造前导入，
+# 且需要开启 AA_ShareOpenGLContexts（官方要求），否则会输出
+# “QtWebEngineWidgets must be imported before a QCoreApplication instance is created”。
+# 导入失败（未安装 PyQt6-WebEngine）时静默降级：验证弹窗会自动退回自研滑块。
+WEBENGINE_AVAILABLE = False
+try:  # noqa: SIM105
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
+except Exception:  # noqa: BLE001
+    pass
+try:  # noqa: SIM105
+    import PyQt6.QtWebEngineWidgets  # noqa: E402,F401
+
+    WEBENGINE_AVAILABLE = True
+except Exception:  # noqa: BLE001
+    WEBENGINE_AVAILABLE = False
 
 from app import config as config_mod  # noqa: E402
 from app import api as api_mod  # noqa: E402

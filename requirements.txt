@@ -3,6 +3,9 @@
 
 # GUI 框架
 PyQt6==6.11.0
+# 人机验证（Cloudflare Turnstile）弹窗内嵌 QWebEngineView 需要；
+# 缺失时验证弹窗会自动退回自研滑块，不会崩。体积较大（约 +130MB 运行期）。
+PyQt6-WebEngine==6.11.0
 
 # HTTP（唯一出网库，负责 Cookie / 会话 / 流式下载）
 requests==2.34.2
