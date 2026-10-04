@@ -34,6 +34,28 @@ object Captcha {
     /** 提交滑块位置换取通过状态。 */
     const val VERIFY_PATH = "/api/captcha/verify"
 
+    // ────────────────── provider（服务端下发） ──────────────────
+    /** 自研滑块拼图（兜底）。 */
+    const val PROVIDER_SLIDER = "slider"
+
+    /** Cloudflare Turnstile（由 WebView 内嵌官方组件）。 */
+    const val PROVIDER_TURNSTILE = "turnstile"
+
+    /** 服务端已关闭人机验证，客户端直接放行。 */
+    const val PROVIDER_OFF = "off"
+
+    /**
+     * WebView 内嵌承载页，路径与 `forum/api/captcha/__init__.py` 的
+     * `CAPTCHA_EMBED_PATH` 同源。
+     */
+    const val EMBED_PATH = "/captcha-embed"
+
+    /** 承载页与宿主之间的消息前缀：`captcha:<kind>:<payload>`。 */
+    const val EVENT_PREFIX = "captcha:"
+
+    /** JS bridge 的名字（承载页里 `window.AndroidCaptcha.onEvent`）。 */
+    const val JS_BRIDGE_NAME = "AndroidCaptcha"
+
     /**
      * 需要携带人机验证 token 的接口路径。
      *
@@ -100,6 +122,76 @@ object Captcha {
     fun handleXFromPiece(pieceX: Float, travel: Float, maxPieceX: Float): Float {
         if (maxPieceX <= 0f || travel <= 0f) return 0f
         return (pieceX / maxPieceX * travel).coerceIn(0f, travel)
+    }
+
+    /**
+     * 归一化服务端下发的 provider；未知 / 空值一律回退 [PROVIDER_SLIDER]。
+     *
+     * 与服务端 `api/captcha/_provider()` 同口径（那边缺密钥时也会回退 slider），
+     * 双端都不信任对方一定给对值。纯函数。
+     */
+    fun providerOf(raw: String?): String =
+        when ((raw ?: "").trim().lowercase()) {
+            PROVIDER_TURNSTILE -> PROVIDER_TURNSTILE
+            PROVIDER_OFF, "none", "disable", "disabled", "0", "false" -> PROVIDER_OFF
+            else -> PROVIDER_SLIDER
+        }
+
+    /**
+     * 拼接 WebView 承载页 URL。
+     *
+     * @param baseUrl 站点根（[Constants.BASE_URL]）
+     * @param path    服务端下发的 `embed_url`（相对路径或完整 URL）
+     * @param theme   `dark` / `light`，其他值按 `light` 处理
+     * @param size    `normal` / `flexible` / `compact`，默认 flexible（弹窗容器窄）
+     */
+    fun embedUrl(
+        baseUrl: String,
+        path: String? = EMBED_PATH,
+        theme: String? = null,
+        size: String? = null,
+    ): String {
+        val root = (baseUrl ?: "").trim().trimEnd('/')
+        val p = (path ?: "").trim().ifBlank { EMBED_PATH }
+        val abs = when {
+            p.startsWith("http://") || p.startsWith("https://") -> p
+            p.startsWith("//") -> "https:$p"
+            p.startsWith("/") -> root + p
+            else -> "$root/$p"
+        }
+        val t = if ((theme ?: "").trim().lowercase() == "dark") "dark" else "light"
+        val s = when ((size ?: "").trim().lowercase()) {
+            "normal" -> "normal"
+            "compact" -> "compact"
+            else -> "flexible"
+        }
+        val sep = if (abs.contains('?')) '&' else '?'
+        return "$abs${sep}theme=$t&lang=zh-cn&size=$s"
+    }
+
+    /**
+     * 解析承载页回传的事件 `captcha:<kind>:<payload>`。
+     *
+     * 不是该格式（宿主不认识）返回 null。payload 允许含 `:`（只在第一个冒号切分）。
+     * 纯函数，便于 JVM 单测。
+     */
+    fun eventOf(raw: String?): Pair<String, String>? {
+        val s = (raw ?: "").trim()
+        if (!s.startsWith(EVENT_PREFIX)) return null
+        val rest = s.substring(EVENT_PREFIX.length)
+        val i = rest.indexOf(':')
+        val kind = (if (i < 0) rest else rest.substring(0, i)).trim().lowercase()
+        val payload = if (i < 0) "" else rest.substring(i + 1)
+        if (kind.isEmpty()) return null
+        return kind to payload
+    }
+
+    /** 取 `captcha:token:<TOKEN>` 里的 token；其他事件 / 空 token 返回 null。纯函数。 */
+    fun tokenFromEvent(raw: String?): String? {
+        val (kind, payload) = eventOf(raw) ?: return null
+        if (kind != "token") return null
+        val t = payload.trim()
+        return if (t.isEmpty()) null else t
     }
 }
 

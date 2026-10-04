@@ -10,8 +10,9 @@ import java.io.File
 /**
  * 滑块拼图人机验证的 JVM 单测。
  *
- * 只覆盖纯 Kotlin 逻辑：错误码 / 受保护端点表 / data URL 解析 / 拖拽坐标映射，
- * 以及「业务流程确实调了 askCaptcha()」的源码扫描。
+ * 只覆盖纯 Kotlin 逻辑：错误码 / 受保护端点表 / data URL 解析 / 拖拽坐标映射 /
+ * provider 归一化 / 承载页 URL 拼接 / 事件回传解析，
+ * 以及「业务流程确实调了 askCaptcha()」与「弹窗接了 Turnstile 桥」的源码扫描。
  * 全程不发起网络请求，也不触碰 Android 运行时与 Compose。
  */
 class CaptchaTest {
@@ -125,6 +126,95 @@ class CaptchaTest {
         assertEquals(0f, Captcha.pieceXFromDrag(10f, 100f, 0f), 0.001f)
     }
 
+    // ────────────────── provider（服务端下发） ──────────────────
+
+    @Test
+    fun providerConstantsMatchServer() {
+        assertEquals("slider", Captcha.PROVIDER_SLIDER)
+        assertEquals("turnstile", Captcha.PROVIDER_TURNSTILE)
+        assertEquals("off", Captcha.PROVIDER_OFF)
+        assertEquals("/captcha-embed", Captcha.EMBED_PATH)
+        assertEquals("captcha:", Captcha.EVENT_PREFIX)
+        assertEquals("AndroidCaptcha", Captcha.JS_BRIDGE_NAME)
+    }
+
+    @Test
+    fun providerOfNormalisesAndFallsBackToSlider() {
+        assertEquals(Captcha.PROVIDER_TURNSTILE, Captcha.providerOf("turnstile"))
+        assertEquals(Captcha.PROVIDER_TURNSTILE, Captcha.providerOf("  Turnstile "))
+        assertEquals(Captcha.PROVIDER_SLIDER, Captcha.providerOf("slider"))
+        // 空 / 未知一律回退滑块（与服务端 _provider() 同口径，两边都不互信）
+        assertEquals(Captcha.PROVIDER_SLIDER, Captcha.providerOf(null))
+        assertEquals(Captcha.PROVIDER_SLIDER, Captcha.providerOf(""))
+        assertEquals(Captcha.PROVIDER_SLIDER, Captcha.providerOf("weird"))
+        for (v in listOf("off", "none", "disable", "disabled", "0", "false")) {
+            assertEquals("off 同义词：$v", Captcha.PROVIDER_OFF, Captcha.providerOf(v))
+        }
+    }
+
+    // ────────────────── 承载页 URL 拼接 ──────────────────
+
+    @Test
+    fun embedUrlBuildsAbsoluteUrlWithQuery() {
+        assertEquals(
+            "https://www.yjlt.top/captcha-embed?theme=dark&lang=zh-cn&size=flexible",
+            Captcha.embedUrl("https://www.yjlt.top", "/captcha-embed", "dark", "flexible"),
+        )
+    }
+
+    @Test
+    fun embedUrlDefaultsAreLightAndFlexible() {
+        assertEquals(
+            "https://www.yjlt.top/captcha-embed?theme=light&lang=zh-cn&size=flexible",
+            Captcha.embedUrl("https://www.yjlt.top/", null, null, null),
+        )
+    }
+
+    @Test
+    fun embedUrlAcceptsAbsoluteAndProtocolRelativePaths() {
+        assertEquals(
+            "https://challenges.cloudflare.com/x?a=1&theme=light&lang=zh-cn&size=normal",
+            Captcha.embedUrl("https://www.yjlt.top", "https://challenges.cloudflare.com/x?a=1", "light", "normal"),
+        )
+        assertEquals(
+            "https://cdn.example.com/captcha-embed?theme=light&lang=zh-cn&size=compact",
+            Captcha.embedUrl("https://www.yjlt.top", "//cdn.example.com/captcha-embed", "light", "compact"),
+        )
+    }
+
+    @Test
+    fun embedUrlRejectsUnknownSizeAndTheme() {
+        val u = Captcha.embedUrl("https://a.b", "/e", "blue", "huge")
+        assertTrue("非法 theme / size 应回退 light + flexible：$u",
+            u.endsWith("?theme=light&lang=zh-cn&size=flexible"))
+    }
+
+    // ────────────────── 事件回传解析 ──────────────────
+
+    @Test
+    fun eventOfParsesKindAndPayload() {
+        assertEquals("token" to "abc.def-_123", Captcha.eventOf("captcha:token:abc.def-_123"))
+        assertEquals("error" to "超时", Captcha.eventOf("captcha:error:超时"))
+        assertEquals("error" to "", Captcha.eventOf("captcha:error"))
+        assertEquals("disabled" to "", Captcha.eventOf("  captcha:disabled  "))
+        // 不是宿主认识的格式
+        assertNull(Captcha.eventOf("安全验证"))
+        assertNull(Captcha.eventOf("captcha:"))
+        assertNull(Captcha.eventOf(""))
+        assertNull(Captcha.eventOf(null))
+    }
+
+    @Test
+    fun tokenFromEventOnlyAcceptsTokenKind() {
+        assertEquals("T", Captcha.tokenFromEvent("captcha:token:T"))
+        // payload 允许含冒号（只在第一个冒号切分）
+        assertEquals("a:b:c", Captcha.tokenFromEvent("captcha:token:a:b:c"))
+        assertNull(Captcha.tokenFromEvent("captcha:error:boom"))
+        assertNull(Captcha.tokenFromEvent("captcha:token:"))
+        assertNull(Captcha.tokenFromEvent("captcha:token:   "))
+        assertNull(Captcha.tokenFromEvent("nope"))
+    }
+
     // ────────────────── 接入点回归 ──────────────────
 
     @Test
@@ -154,6 +244,32 @@ class CaptchaTest {
         assertTrue("受保护接口未接入 Captcha.withToken（当前 $merges 处）", merges >= 8)
         assertTrue(text.contains("Captcha.CHALLENGE_PATH"))
         assertTrue(text.contains("Captcha.VERIFY_PATH"))
+    }
+
+    @Test
+    fun dialogFileWiresTurnstileBridge() {
+        val root = sourceRoot() ?: return
+        val f = File(root, "ui/CaptchaDialog.kt")
+        assertTrue("缺少源文件：ui/CaptchaDialog.kt", f.exists())
+        val text = f.readText()
+        assertTrue("未注册 JS bridge（AndroidCaptcha）", text.contains("Captcha.JS_BRIDGE_NAME"))
+        assertTrue("未使用 Captcha.embedUrl 拼接承载页", text.contains("Captcha.embedUrl("))
+        assertTrue("未接 onReceivedTitle 标题兜底回传", text.contains("onReceivedTitle"))
+        assertTrue("JS 桥未标注 @JavascriptInterface", text.contains("@JavascriptInterface"))
+        assertTrue("未按 provider 分流", text.contains("Captcha.PROVIDER_TURNSTILE"))
+        // 旧的滑块-only 文件必须已删除（否则 CaptchaHost 重复定义）
+        assertFalse(
+            "旧文件仍存在：ui/SliderCaptchaDialog.kt",
+            File(root, "ui/SliderCaptchaDialog.kt").exists(),
+        )
+    }
+
+    @Test
+    fun captchaHostIsDeclaredExactlyOnce() {
+        val root = sourceRoot() ?: return
+        val files = File(root, "ui").listFiles()?.filter { it.extension == "kt" } ?: emptyList()
+        val count = files.sumOf { Regex("fun CaptchaHost\\s*\\(").findAll(it.readText()).count() }
+        assertEquals("CaptchaHost 应只声明一次", 1, count)
     }
 
     /** 从工作目录（Gradle 单测默认是 `app/`）向上找 `app/src/main/java/top/crazying/forum`。 */

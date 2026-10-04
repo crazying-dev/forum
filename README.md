@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.12**（`versionCode = 13`） |
+| 当前版本 | **V1.0.13**（`versionCode = 14`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -185,7 +185,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ## 五、本轮已实现 / 未实现
 
-### 已实现（V1.0.12）
+### 已实现（V1.0.13）
 
 * **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + 密码直注）、退出登录、本地会话恢复与失效清理
 * **首页**：最新发布 / 综合排序 / 随机推荐 / 我的收藏 四个信息流，分页加载
@@ -216,11 +216,15 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * **用户资料缓存**：`Prefs.saveUserJson()` 同时记写入时间戳，`App.userCacheStale` 暴露过期状态；过期后仍先用旧数据渲染头部，再静默刷新覆盖（失败保留旧数据）。
   * 新增 `app/src/test/java/top/crazying/forum/core/CachePolicyTest.kt`（7 例）。
 * **最低版本闸门（V1.0.11）**：与 Web / Windows 三端同源。`Constants` 新增 `CLIENT_PLATFORM = "android"` 与 `CLIENT_HEADERS`（`X-Client-Platform` / `X-Client-Version`），由 `clientHeaderInterceptor()` 挂在 OkHttp 请求链最外层——`Api.request`、头像上传、`fetchText`、`Updater` 下载客户端全自动携带；服务端对低于发布清单 `min_versions.android` 的请求返回 **HTTP 426 + `code=VERSION_TOO_LOW`**，客户端在 `Api.request` 里识别后写入 `App.versionGate`，`ForumRoot` 随即弹出**不可绕过**的「版本过低」弹窗（返回键 / 外部点击均无效，只有「去更新」与「退出应用」两个出口）。新增 `app/src/test/java/top/crazying/forum/core/VersionGateTest.kt`。
-* **滑块拼图人机验证（V1.0.12）**：与 Web / Windows 三端同源，服务端自研的**滑块拼图**（`POST /api/captcha/challenge` → `bg` / `piece` 两张 data URL PNG；`POST /api/captcha/verify` 提交滑块 x 坐标）。
+* **人机验证（V1.0.12 自研滑块 → V1.0.13 接入 Cloudflare Turnstile）**：与 Web / Windows 三端同源，provider 由服务端 `/api/captcha/challenge` 下发（`turnstile` / `slider` / `enabled=false`）。
   * `core/Captcha.kt`：纯逻辑层——错误码 `CAPTCHA_REQUIRED`、受保护端点表、data URL 解析、拖拽坐标映射（`pieceXFromDrag` / `handleXFromPiece`），以及把业务协程挂起的 `CaptchaPrompt`（`ask()` / `complete()`）与顶层 `askCaptcha()`。
-  * `ui/SliderCaptchaDialog.kt`：`CaptchaHost()` 挂在 `ForumRoot`，由 `CaptchaPrompt.dialogVisible` 驱动——背景图 + 可拖动拼图块 + 滑条手柄（拖拽距离按舞台宽等比映射为拼图块 x，**1 dp = 1 图像像素**，故上报的 `captcha_x` 与服务端容差同尺）；通过则带 token 关闭，未通过自动换一张，服务端未启用（`enabled == false`）时直接以空串放行、不打扰用户。
+  * **默认 `turnstile`**：`ui/CaptchaDialog.kt` 用 WebView 加载服务端 `/captcha-embed?theme=&lang=&size=flexible`，Cloudflare 官方组件在网页内渲染；token 经 JS bridge（`AndroidCaptcha.onEvent`，`@JavascriptInterface` + `Handler(Looper.getMainLooper()).post` 切回主线程）回传，并以 `WebChromeClient.onReceivedTitle` 解析 `captcha:token:<TOKEN>` 作兜底。Turnstile token **一次性**，拿到即关弹窗，不再走 `/verify` 两步式。
+  * **兜底 `slider`**：仍保留自研滑块拼图（`CaptchaHost()` 挂在 `ForumRoot`，由 `CaptchaPrompt.dialogVisible` 驱动——背景图 + 可拖动拼图块 + 滑条手柄，拖拽距离按舞台宽等比映射为拼图块 x，**1 dp = 1 图像像素**，故上报的 `captcha_x` 与服务端容差同尺）；服务端未配置 Turnstile 密钥时自动回退到这条路径。
+  * **`enabled == false`**：服务端已关闭验证，直接以空 token 放行、不打扰用户。
+  * **修复（现象：拖到正确位置后没任何提示就直接重新开始）**：此前失败文案写入 `status` 后立即被 `load()` 重置为「正在加载验证图像…」，错误提示实际存活时长为 0。现拆成 `hint`（中性状态）与 `error`（失败原因）两个独立状态，失败原因作为参数传给 `load(errorText)` 保留显示。
   * 接入点（`captchaToken` 参数为空时不往请求体里加字段，保持老流程不变）：登录 / 注册 / 注销账号验证码 / 注销账号 / 修改密码验证码 / 更换邮箱-当前邮箱验证码 / 更换邮箱-新邮箱验证码，共 7 处；`/api/user/password`、`/api/user/email` 两个终步服务端未设闸门，客户端同样不带。
-  * 新增 `app/src/test/java/top/crazying/forum/core/CaptchaTest.kt`（12 例）。
+  * `core/Captcha.kt` 新增纯函数：`providerOf()`（未知 / 空值一律回退 slider）、`embedUrl()`（拼承载页 URL，含 theme / lang / size 归一化）、`eventOf()` / `tokenFromEvent()`（解析承载页回传事件）。
+  * `app/src/test/java/top/crazying/forum/core/CaptchaTest.kt` 扩到 24 例（含「弹窗确实接了 Turnstile 桥」「`CaptchaHost` 只声明一次」的源码扫描）。
 
 ### 未实现（后续多轮持续补齐）
 
@@ -262,10 +266,10 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | JDK | Microsoft OpenJDK **17.0.20.1**（JAVA_HOME / Gradle Daemon JVM 均为它） |
 | Android SDK | `cmdline-tools 16111833`、`platform-tools r37.0.1`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
-| 命令 | `.\gradlew.bat assembleDebug` |
-| 结果 | **BUILD SUCCESSFUL**（39 个任务，39 up-to-date） |
+| 命令 | `.\gradlew.bat testDebugUnitTest --console=plain` |
+| 结果 | **BUILD SUCCESSFUL**（47 例全部通过：CaptchaTest 24 / VersionGateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6） |
 | 产物 | `app\build\outputs\apk\debug\app-debug.apk`，**11 623 321 字节**，sha256 `07dbf7ba7e7409f7dffe556d918c12e41eaf09753745570b94ab5725a9fdd4ac` |
-| Release 产物（V1.0.12） | `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`，**8 136 120 字节**，sha256 `a9afe4c8a3cf4e3e60abb5580b5807f5cc65fabe1e80ceb3b1339269d12eda05`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| Release 产物（V1.0.13） | `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `86dee342000910b39ceeac56fac30b7a77437bc8d35ba0081450a04dcee81022`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
 
 编译过程中定位并修正的 3 类真实问题（供后续参考）：
 
