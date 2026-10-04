@@ -285,7 +285,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "40"
+STATIC_VERSION = "41"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -394,3 +394,14 @@ AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5MB
 
 # ── 邮箱验证 token 有效期（分钟）──
 VERIFY_TOKEN_EXPIRES_MINUTES = 30
+
+# ── 人机验证（滑块拼图，自研，无第三方依赖 / 国内可用）──
+# 服务端内存字典存答案（IP 绑定 + 一次性 token + 默认 5 分钟过期），重启即丢。
+# CAPTCHA_ENABLED=0 可整体关闭（验证接口一律放行，等同不校验）。
+CAPTCHA_ENABLED = os.getenv("CAPTCHA_ENABLED", "1") != "0"
+CAPTCHA_TTL_SECONDS = int(os.getenv("CAPTCHA_TTL_SECONDS", "300"))
+CAPTCHA_WIDTH = 320
+CAPTCHA_HEIGHT = 180
+CAPTCHA_PIECE = 50
+CAPTCHA_TOLERANCE = 6
+CAPTCHA_MAX_TOKENS = 5000

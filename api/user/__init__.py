@@ -27,6 +27,7 @@ import config
 import db
 import tool
 from api.ratelimit import rate_limit
+from api.captcha import captcha_required
 from api.encrypt import (
     generate_login_token,
     verify_login_token,
@@ -141,6 +142,7 @@ def login_required(fn: Callable) -> Callable:
 # 1. 登录
 # ──────────────────────────────────────────────
 @user_bp.route("/login", methods=["POST"])
+@captcha_required
 def api_user_login():
     """
     Body(JSON):
@@ -226,6 +228,7 @@ def api_user_logout():
 # 3. 注册
 # ──────────────────────────────────────────────
 @user_bp.route("/register", methods=["POST"])
+@captcha_required
 def api_user_register():
     """
     Body(JSON):
@@ -502,6 +505,7 @@ def api_user_change_email():
 # ──────────────────────────────────────────────
 @user_bp.route("/delete", methods=["POST"])
 @login_required
+@captcha_required
 def api_user_delete():
     """自助注销账号。
 

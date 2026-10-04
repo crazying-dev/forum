@@ -29,6 +29,20 @@ import api.email as email_api  # noqa: E402
 import api.ratelimit as ratelimit  # noqa: E402
 from api.encrypt import hash_password  # noqa: E402
 
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _disable_captcha():
+    """本文件聚焦注销业务逻辑；人机验证由 test_captcha.py 覆盖，这里一律关闭。"""
+    old = config.CAPTCHA_ENABLED
+    config.CAPTCHA_ENABLED = False
+    try:
+        yield
+    finally:
+        config.CAPTCHA_ENABLED = old
+
+
 _REAL_PASSWORD = "Abcd1234"
 _CONFIRM = config.DELETE_ACCOUNT_CONFIRM_TEXT
 

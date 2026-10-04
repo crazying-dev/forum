@@ -1,0 +1,356 @@
+"""滑块拼图人机验证（自研，无第三方依赖 / 无需外网，国内可用）。
+
+设计目标
+--------
+* 完全自托管：不依赖极验 / 腾讯云 / 阿里云 / Cloudflare Turnstile 等外部 JS-SDK，
+  便于 Windows（PyQt6）/ Android（Compose）原生客户端接入，也不给隐私政策
+  增加任何第三方域名；
+* 服务端内存字典存答案：{token: {answer_x, ip, expires, solved}}，与
+  api/ratelimit.py 同一风格（模块级 threading.Lock + dict），重启即丢；
+* 一次性 token：业务请求校验时 pop 掉，杜绝重放；
+* TTL 默认 5 分钟；绑定客户端 IP；水平容差默认 ±6px。
+
+接口
+----
+    POST /api/captcha/challenge   生成挑战（token + 背景图 + 拼图块，base64）
+    POST /api/captcha/verify      校验滑块位置（通过后同一 token 标记为已解答）
+
+客户端流程（两种都支持）
+------------------------
+A. 两步式（推荐，可即时反馈）：
+   1) POST /api/captcha/challenge                → {token, bg, piece, y, ...}
+   2) 用户拖动拼图块到缺口；POST /api/captcha/verify {captcha_token, captcha_x}
+   3) 通过后把同一个 captcha_token 塞进真实业务请求体；
+B. 一步式（客户端本地渲染后直接提交）：
+   把 challenge 拿到的 captcha_token 与用户拖到的 captcha_x 一并塞进业务请求体。
+
+业务端接入
+----------
+在需要的接口上加装饰器 ``@captcha_required`` 即可；服务端由此调用
+``verify_captcha(payload)`` 完成校验（CAPTCHA_ENABLED=0 时整体放行）。
+"""
+from __future__ import annotations
+
+import base64
+import io
+import random
+import secrets
+import threading
+import time
+from functools import wraps
+
+from flask import Blueprint, jsonify, request
+
+import config
+from api.ratelimit import rate_limit
+
+captcha_bp = Blueprint("captcha", __name__)
+
+# 挑战 token 状态：{token: {"answer_x": int, "ip": str, "expires": float, "solved": bool}}
+_lock = threading.Lock()
+_store: dict = {}
+
+# 校验失败时统一的错误码：客户端据此「刷新挑战 + 重新弹出滑块」
+CAPTCHA_REQUIRED_CODE = "CAPTCHA_REQUIRED"
+
+
+# ──────────────────────────────────────────────
+# 工具：真实客户端 IP（与 api/ratelimit.py 口径一致）
+# ──────────────────────────────────────────────
+def _client_ip() -> str:
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr or "0.0.0.0"
+
+
+def _ttl() -> int:
+    try:
+        value = int(getattr(config, "CAPTCHA_TTL_SECONDS", 300))
+    except (TypeError, ValueError):
+        value = 300
+    return value if value > 0 else 300
+
+
+def _tolerance() -> int:
+    try:
+        value = int(getattr(config, "CAPTCHA_TOLERANCE", 6))
+    except (TypeError, ValueError):
+        value = 6
+    return value if value >= 0 else 6
+
+
+# ──────────────────────────────────────────────
+# 图像生成（Pillow）：随机纹理背景 + 从背景裁出的拼图块
+# ──────────────────────────────────────────────
+def _rand_color(low: int = 0, high: int = 255):
+    return (random.randint(low, high), random.randint(low, high), random.randint(low, high))
+
+
+def _make_background(width: int, height: int):
+    """随机彩色背景：渐变底色 + 若干半透明色块 + 干扰线 + 噪点。"""
+    from PIL import Image, ImageDraw
+
+    base = _rand_color(40, 220)
+    img = Image.new("RGB", (width, height), base)
+    d = ImageDraw.Draw(img, "RGBA")
+    # 半透明色块（椭圆），增加纹理复杂度
+    for _ in range(random.randint(6, 10)):
+        x0 = random.randint(-width // 3, width)
+        y0 = random.randint(-height // 3, height)
+        w = random.randint(width // 5, int(width * 0.6))
+        h = random.randint(height // 5, int(height * 0.6))
+        color = (_rand_color(), random.randint(50, 130))
+        d.ellipse([x0, y0, x0 + w, y0 + h], fill=(color[0][0], color[0][1], color[0][2], color[1]))
+    # 干扰线
+    for _ in range(random.randint(8, 14)):
+        x0, y0 = random.randint(0, width), random.randint(0, height)
+        x1, y1 = random.randint(0, width), random.randint(0, height)
+        c = _rand_color()
+        d.line([x0, y0, x1, y1], fill=(c[0], c[1], c[2], random.randint(70, 150)),
+               width=random.randint(1, 2))
+    # 噪点（对抗纯色 / 边缘检测）
+    for _ in range(max(1, width * height // 40)):
+        x = random.randint(0, width - 1)
+        y = random.randint(0, height - 1)
+        c = random.randint(0, 255)
+        img.putpixel((x, y), (c, c, c))
+    return img
+
+
+def _piece_mask(size: int):
+    """拼图块形状遮罩（L 模式）：圆角方块 + 上凸 / 右凸两个圆形，做出拼图手感。"""
+    from PIL import Image, ImageDraw
+
+    scale = 4  # 超采样后缩放，得到平滑边缘
+    s = size * scale
+    mask = Image.new("L", (s, s), 0)
+    d = ImageDraw.Draw(mask)
+    d.rounded_rectangle([0, 0, s - 1, s - 1], radius=s // 6, fill=255)
+    knob = s // 5
+    cx = s // 2
+    d.ellipse([cx - knob, -knob, cx + knob, knob], fill=255)          # 上凸
+    cy = s // 2
+    d.ellipse([s - knob, cy - knob, s + knob, cy + knob], fill=255)    # 右凸
+    return mask.resize((size, size), Image.LANCZOS)
+
+
+def _edge_image(mask):
+    """由遮罩求边缘（用于给拼图块 / 缺口描边）。"""
+    from PIL import ImageFilter
+
+    edges = mask.filter(ImageFilter.FIND_EDGES)
+    return edges.point(lambda v: 255 if v > 30 else 0)
+
+
+def _render_challenge():
+    """渲染一帧挑战，返回 (背景图, 拼图块, answer_x, piece_y, width, height, piece)。"""
+    from PIL import Image
+
+    width = int(getattr(config, "CAPTCHA_WIDTH", 320))
+    height = int(getattr(config, "CAPTCHA_HEIGHT", 180))
+    piece = int(getattr(config, "CAPTCHA_PIECE", 50))
+    margin = 8
+
+    bg = _make_background(width, height)
+    mask = _piece_mask(piece)
+
+    # 缺口水平位置：留出足够拖动距离（不贴着左端），且完整落在图内
+    lo = min(piece + 20, max(0, width - piece - margin - 1))
+    hi = max(lo, width - piece - margin)
+    answer_x = random.randint(lo, hi)
+    piece_y = random.randint(10, max(10, height - piece - 10))
+
+    region = bg.crop((answer_x, piece_y, answer_x + piece, piece_y + piece))
+    piece_img = region.convert("RGBA")
+    piece_img.putalpha(mask)
+    # 拼图块描边（浅白），提升可辨识度
+    edges = _edge_image(mask)
+    stroke = Image.new("RGBA", (piece, piece), (255, 255, 255, 150))
+    piece_img.paste(stroke, (0, 0), edges)
+
+    # 背景挖缺口：半透明黑影 + 白色描边
+    bg_rgba = bg.convert("RGBA")
+    hole = Image.new("RGBA", (piece, piece), (0, 0, 0, 150))
+    bg_rgba.paste(hole, (answer_x, piece_y), mask)
+    bg_rgba.paste(Image.new("RGBA", (piece, piece), (255, 255, 255, 90)), (answer_x, piece_y), edges)
+
+    return bg_rgba.convert("RGB"), piece_img, answer_x, piece_y, width, height, piece
+
+
+def _data_url(img) -> str:
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+# ──────────────────────────────────────────────
+# token 存取
+# ──────────────────────────────────────────────
+def _prune_locked(now: float) -> None:
+    """清理过期 / 已消费的记录（调用方需已持有 _lock）。"""
+    stale = [k for k, v in _store.items() if v.get("expires", 0) < now]
+    for k in stale:
+        _store.pop(k, None)
+    # 容量上限：超限时优先淘汰最早过期的记录
+    limit = int(getattr(config, "CAPTCHA_MAX_TOKENS", 5000) or 5000)
+    if limit > 0 and len(_store) > limit:
+        for k, _ in sorted(_store.items(), key=lambda kv: kv[1].get("expires", 0)):
+            if len(_store) <= limit:
+                break
+            _store.pop(k, None)
+
+
+def create_challenge() -> dict:
+    """生成一次挑战并登记答案，返回可直接 jsonify 的负载。"""
+    bg, piece_img, answer_x, piece_y, width, height, piece = _render_challenge()
+    token = secrets.token_urlsafe(24)
+    now = time.time()
+    ttl = _ttl()
+    with _lock:
+        _prune_locked(now)
+        _store[token] = {
+            "answer_x": answer_x,
+            "ip": _client_ip(),
+            "expires": now + ttl,
+            "solved": False,
+        }
+    return {
+        "success": True,
+        "token": token,
+        "bg": _data_url(bg),
+        "piece": _data_url(piece_img),
+        "y": piece_y,
+        "width": width,
+        "height": height,
+        "piece_size": piece,
+        "expires_in": ttl,
+    }
+
+
+# ──────────────────────────────────────────────
+# 校验
+# ──────────────────────────────────────────────
+def verify_slider(token: str, x) -> tuple[bool, str]:
+    """校验滑块水平位置；通过则把该 token 标记为已解答（不消费）。
+
+    返回 (ok, message)；失败时该 token 失效（一次性，防爆破）。
+    """
+    if not token:
+        return False, "请先获取人机验证"
+    now = time.time()
+    with _lock:
+        record = _store.get(token)
+        if not record or record.get("expires", 0) < now:
+            _store.pop(token, None)
+            return False, "人机验证已过期，请重新验证"
+        if record.get("ip") != _client_ip():
+            _store.pop(token, None)
+            return False, "人机验证失效，请重新验证"
+        try:
+            pos = float(x)
+        except (TypeError, ValueError):
+            _store.pop(token, None)
+            return False, "人机验证失败，请重试"
+        if abs(pos - float(record.get("answer_x", 0))) > _tolerance():
+            _store.pop(token, None)
+            return False, "人机验证失败，请重试"
+        record["solved"] = True
+    return True, ""
+
+
+def verify_captcha(payload) -> tuple[bool, str]:
+    """业务请求接入点：消费 token 并校验（一次性）。
+
+    支持两种提交形态：
+      * {captcha_token, captcha_x}：一步式，直接校验滑块位置；
+      * {captcha_token}：两步式，需先经 /api/captcha/verify 标记 solved。
+    CAPTCHA_ENABLED=0 时直接放行。
+    """
+    if not getattr(config, "CAPTCHA_ENABLED", True):
+        return True, ""
+    data = payload if isinstance(payload, dict) else {}
+    token = str(data.get("captcha_token") or "").strip()
+    raw_x = data.get("captcha_x")
+    if not token:
+        return False, "请先完成人机验证"
+    now = time.time()
+    with _lock:
+        record = _store.pop(token, None)
+    if not record:
+        return False, "人机验证已过期，请重新验证"
+    if record.get("expires", 0) < now:
+        return False, "人机验证已过期，请重新验证"
+    if record.get("ip") != _client_ip():
+        return False, "人机验证失效，请重新验证"
+    if raw_x is not None and raw_x != "":
+        try:
+            pos = float(raw_x)
+        except (TypeError, ValueError):
+            return False, "人机验证失败，请重试"
+        if abs(pos - float(record.get("answer_x", 0))) > _tolerance():
+            return False, "人机验证失败，请重试"
+        return True, ""
+    if record.get("solved"):
+        return True, ""
+    return False, "请先完成人机验证"
+
+
+def captcha_required(fn):
+    """装饰器：为业务接口添加人机验证校验（失败返回 400 + code=CAPTCHA_REQUIRED）。
+
+    建议放在 @login_required 之内（下方），让鉴权先于人机验证执行。
+    """
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not getattr(config, "CAPTCHA_ENABLED", True):
+            return fn(*args, **kwargs)
+        payload = request.get_json(silent=True) or {}
+        ok, msg = verify_captcha(payload)
+        if not ok:
+            return jsonify({"success": False, "code": CAPTCHA_REQUIRED_CODE,
+                            "message": msg}), 400
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+# ──────────────────────────────────────────────
+# 接口
+# ──────────────────────────────────────────────
+@captcha_bp.route("/challenge", methods=["POST"])
+def api_captcha_challenge():
+    """生成滑块拼图挑战（无需登录）。"""
+    if not getattr(config, "CAPTCHA_ENABLED", True):
+        return jsonify({"success": True, "enabled": False, "token": ""}), 200
+    if rate_limit("captcha", 60, 300):
+        return jsonify({"success": False, "message": "请求过于频繁，请稍后再试"}), 429
+    try:
+        payload = create_challenge()
+    except Exception as e:  # noqa: BLE001 — 图像生成异常不应 500
+        print(f"[captcha] 生成挑战失败：{e}")
+        return jsonify({"success": False, "message": "生成人机验证失败"}), 500
+    return jsonify(payload), 200
+
+
+@captcha_bp.route("/verify", methods=["POST"])
+def api_captcha_verify():
+    """校验滑块位置（两步式的第一步）；通过后同一 token 可用于业务请求。"""
+    if not getattr(config, "CAPTCHA_ENABLED", True):
+        return jsonify({"success": True, "enabled": False}), 200
+    data = request.get_json(silent=True) or {}
+    token = str(data.get("captcha_token") or "").strip()
+    ok, msg = verify_slider(token, data.get("captcha_x"))
+    if not ok:
+        return jsonify({"success": False, "code": CAPTCHA_REQUIRED_CODE,
+                        "message": msg}), 400
+    return jsonify({"success": True, "token": token, "message": "验证通过"}), 200
+
+
+__all__ = [
+    "captcha_bp",
+    "captcha_required",
+    "verify_captcha",
+    "verify_slider",
+    "create_challenge",
+    "CAPTCHA_REQUIRED_CODE",
+]

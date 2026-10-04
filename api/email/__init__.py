@@ -29,6 +29,7 @@ import config
 import db
 from api.encrypt import validate_password, is_valid_email
 from api.ratelimit import rate_limit
+from api.captcha import captcha_required
 from api.user import login_required
 from Email import send_email, build_email_html
 
@@ -41,6 +42,7 @@ def _random_code() -> str:
 
 @email_bp.route("/email/send-verify-email", methods=["POST"])
 @login_required
+@captcha_required
 def api_send_verify_email():
     if rate_limit("verify_email", 3, 300):
         return jsonify({"success": False, "message": "请求过于频繁，请5分钟后再试"}), 429
@@ -187,6 +189,7 @@ def _cleanup_codes(email, purpose):
 
 
 @email_bp.route("/email/send-register-code", methods=["POST"])
+@captcha_required
 def api_send_register_code():
     """发送6位验证码到邮箱用于注册（无需登录）。"""
     if rate_limit("register_code", 3, 300):
@@ -296,6 +299,7 @@ def api_verify_code_email():
 
 
 @email_bp.route("/email/send-code-reset-password", methods=["POST"])
+@captcha_required
 def api_send_code_reset_password():
     """发送6位验证码到用户邮箱用于重置密码（防邮箱枚举）。"""
     if rate_limit("reset_pwd_code", 3, 300):
@@ -328,6 +332,7 @@ def api_send_code_reset_password():
 
 
 @email_bp.route("/email/reset-password-by-code", methods=["POST"])
+@captcha_required
 def api_reset_password_by_code():
     """使用6位验证码重置密码。"""
     if rate_limit("reset_pwd_code", 5, 300):
@@ -364,6 +369,7 @@ def api_reset_password_by_code():
 
 @email_bp.route("/email/send-change-password-code", methods=["POST"])
 @login_required
+@captcha_required
 def api_send_change_password_code():
     """发送6位验证码到当前登录用户的邮箱，用于「个人资料 → 修改密码」。
 
@@ -435,6 +441,7 @@ def consume_change_password_code(email: str, code: str):
 
 @email_bp.route("/email/send-change-email-code", methods=["POST"])
 @login_required
+@captcha_required
 def api_send_change_email_code():
     """发送6位验证码到「新邮箱」，用于「个人资料 → 更换邮箱」。
 
@@ -510,6 +517,7 @@ def consume_change_email_code(email: str, code: str):
 
 @email_bp.route("/email/send-change-email-old-code", methods=["POST"])
 @login_required
+@captcha_required
 def api_send_change_email_old_code():
     """发送6位验证码到「当前绑定邮箱」，用于「更换邮箱」的第一步身份验证。
 
@@ -583,6 +591,7 @@ def consume_change_email_old_code(email: str, code: str):
 
 @email_bp.route("/email/send-delete-account-code", methods=["POST"])
 @login_required
+@captcha_required
 def api_send_delete_account_code():
     """发送6位验证码到「当前绑定邮箱」，用于「个人资料 → 注销账号」身份验证。
 
