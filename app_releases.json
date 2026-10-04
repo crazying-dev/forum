@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-10-04T08:40:00+08:00",
+  "updated_at": "2026-10-04T15:13:00+08:00",
   "min_versions": {
     "windows": "1.3.13",
     "android": "1.0.10",
@@ -15,17 +15,19 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.15",
+          "version": "1.3.16",
           "channel": "stable",
           "date": "2026-10-04",
-          "size": 48592036,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.15/forum_setup.exe",
+          "size": 158184750,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.16/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "23d0a2fcd96662bbc9a0b3febef7ec23affe8cc2c031337f1e54011678acb9ee",
+          "sha256": "7ca8c0d2e2c6762f4d565cdca4fe8450f3645992fb7edfd4199bcd0fd7c63984",
           "notes": [
-            "新增滑块拼图人机验证：登录 / 注册 / 找回密码 / 资料安全等敏感流程均需先完成拼图",
-            "服务端自研（不依赖第三方）：一次性 token、5 分钟过期、绑定 IP、用后即焚，容差 ±6px",
-            "版本号升至 1.3.15"
+            "人机验证改为 Cloudflare Turnstile：弹窗内嵌浏览器组件加载官方验证控件，无需跳转外部浏览器",
+            "服务端 provider 开关自动适配：未配置密钥或本机缺少 WebEngine 时自动回退自研滑块，功能不会失效",
+            "Turnstile 令牌一次性有效（300 秒），拿到即提交，不再走两步式 verify",
+            "隐私政策升级 v2.1：新增 Cloudflare 第三方披露与境外传输提示",
+            "安装包因内嵌浏览器组件增大至约 151 MB，版本号升至 1.3.16"
           ],
           "mandatory": false
         }
@@ -39,17 +41,19 @@
       "requirement": "Android 7.0 及以上",
       "releases": [
         {
-          "version": "1.0.12",
+          "version": "1.0.13",
           "channel": "stable",
           "date": "2026-10-04",
-          "size": 8136120,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.12/forum-android-1.0.12.apk",
-          "filename": "forum-android-1.0.12.apk",
-          "sha256": "a9afe4c8a3cf4e3e60abb5580b5807f5cc65fabe1e80ceb3b1339269d12eda05",
+          "size": 8152504,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.13/forum-android-1.0.13.apk",
+          "filename": "forum-android-1.0.13.apk",
+          "sha256": "f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385",
           "notes": [
-            "新增滑块拼图人机验证：登录 / 注册 / 修改密码 / 更换邮箱 / 注销账号等敏感流程均需先完成拼图",
-            "弹窗拖动滑条手柄完成拼图；未通过自动「换一张」，服务端未启用时直接跳过且不打扰用户",
-            "版本号 versionCode 13 / versionName 1.0.12"
+            "人机验证改为 Cloudflare Turnstile：弹窗 WebView 内嵌官方验证控件，令牌一次性有效",
+            "服务端未配置密钥时自动回退自研滑块；关闭验证时直接跳过、不打扰用户",
+            "修复：失败提示写入后被立即重置，导致「拖到正确位置后没有任何提示就直接重新开始」",
+            "隐私政策升级 v2.1：新增 Cloudflare 第三方披露与境外传输提示（需重新同意）",
+            "版本号 versionCode 14 / versionName 1.0.13"
           ],
           "mandatory": false
         }
