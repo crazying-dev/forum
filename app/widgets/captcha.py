@@ -316,6 +316,9 @@ class SliderCaptchaDialog(BaseDialog):
         self._busy = False
         self._sitekey = ""
         self._embed_view = None
+        # Turnstile 解不出来时的回退状态（只回退一次；回退后「刷新」也不回 Turnstile）
+        self._tried_fallback = False
+        self._slider_only = False
 
         self.hint = Muted(SLIDER_HINT)
         self.body.addWidget(self.hint)
@@ -361,6 +364,7 @@ class SliderCaptchaDialog(BaseDialog):
             view.setMinimumHeight(EMBED_HEIGHT)
             view.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
             view.titleChanged.connect(self._on_embed_title)
+            view.loadFinished.connect(self._on_embed_load_finished)
         except Exception as exc:  # noqa: BLE001
             _log.warning("QWebEngineView 创建失败：%s", exc)
             return None
@@ -402,7 +406,29 @@ class SliderCaptchaDialog(BaseDialog):
 
     def _on_embed_error(self, payload: str) -> None:
         text = str(payload or "").strip()
+        # Turnstile 组件报错 / 加载失败 / 超时 → 自动回退自研滑块（只回退一次）。
+        if self.provider == PROVIDER_TURNSTILE and self._fallback_to_slider():
+            return
         self.status.setText(EMBED_ERROR_TEXT.get(text, text) or "验证失败，请重试")
+
+    def _on_embed_load_finished(self, ok: bool) -> None:
+        """承载页加载失败（网络 / 站点不可达）→ 回退自研滑块。"""
+        if ok or self.provider != PROVIDER_TURNSTILE:
+            return
+        self._on_embed_error("load")
+
+    def _fallback_to_slider(self) -> bool:
+        """Turnstile 解不出来时的兜底：改要一帧自研滑块挑战。
+
+        只回退一次（避免 Turnstile / 滑块来回抖动）；回退后 :attr:`_slider_only` 置位，
+        「换一张」也不再回到 Turnstile。返回是否真的发起了回退。
+        """
+        if self._tried_fallback:
+            return False
+        self._tried_fallback = True
+        self._slider_only = True
+        self.refresh(True)
+        return True
 
     def _release_embed(self) -> None:
         """关闭弹窗时停掉内嵌页面，避免后台继续跑脚本 / 残留进程。"""
@@ -425,7 +451,14 @@ class SliderCaptchaDialog(BaseDialog):
             pass
 
     # ────────────────────── 获取挑战 ──────────────────────
-    def refresh(self) -> None:
+    def refresh(self, force_slider=False) -> None:
+        """重新申请挑战；``force_slider`` 为真时强制要自研滑块（回退通道）。
+
+        注意：``refresh`` 也直接挂在「换一张」按钮的 ``clicked`` 信号上，
+        该信号会附带一个 ``checked`` 参数（恒为 False），故这里按真值判断。
+        """
+        if force_slider:
+            self._slider_only = True
         self._busy = True
         self._challenge_token = ""
         self.provider = PROVIDER_SLIDER
@@ -437,7 +470,8 @@ class SliderCaptchaDialog(BaseDialog):
         self.refresh_btn.setText("换一张")
         self.refresh_btn.setEnabled(False)
         self.status.setText("正在加载验证…")
-        api_mod.run_async(lambda: api_mod.api().captcha_challenge(),
+        want = PROVIDER_SLIDER if self._slider_only else ""
+        api_mod.run_async(lambda: api_mod.api().captcha_challenge(want),
                           self._on_challenge, self._on_challenge_failed,
                           label="人机验证")
 
@@ -465,9 +499,10 @@ class SliderCaptchaDialog(BaseDialog):
         """渲染 Turnstile 内嵌页（与网络解耦，便于离线测试）。"""
         sitekey = str(data.get("sitekey") or "").strip()
         if not sitekey:
-            # 服务端没给 sitekey（理论上不会发生）→ 退回自研滑块
-            self.provider = PROVIDER_SLIDER
-            self._apply_challenge(data)
+            # 服务端没给 sitekey（理论上不会发生）→ 改要一帧自研滑块挑战，不能白屏
+            if not self._fallback_to_slider():
+                self.provider = PROVIDER_SLIDER
+                self.status.setText("验证服务未配置，请联系管理员")
             return
         self._sitekey = sitekey
         self.stage.reset()
@@ -476,8 +511,10 @@ class SliderCaptchaDialog(BaseDialog):
         self.refresh_btn.setText("刷新")
         view = self._ensure_embed()
         if view is None:
-            self.status.setText(
-                "当前系统缺少内嵌验证组件（Qt WebEngine），请更新客户端后重试")
+            # 系统缺 Qt WebEngine（或创建失败）→ 改走自研滑块，不把用户卡死
+            if not self._fallback_to_slider():
+                self.status.setText(
+                    "当前系统缺少内嵌验证组件（Qt WebEngine），请更新客户端后重试")
             return
         self._show_embed()
         self.status.setText("请完成下方验证")

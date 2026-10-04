@@ -284,6 +284,17 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     * 新增依赖 `PyQt6-WebEngine==6.11.0`（安装包体积随之增加），打包配置
       `packaging/forum.spec` 收集 `PyQt6.QtWebEngineWidgets` / `QtWebEngineCore` /
       `QtWebChannel` 隐藏导入；版本号升至 1.3.16。
+24. **V1.3.17：Turnstile 失败自动回退自研滑块**：现场发现部分环境（QtWebEngine 内核
+    过旧 / Cloudflare 脚本被拦 / 网络抖动）无法完成 Turnstile 挑战，用户直接卡在验证弹窗。
+    现三端统一增加**自动回退**：Turnstile 组件报错 / 承载页加载失败 / 超时 → 立即改要一帧
+    自研滑块挑战（只回退一次，回退后「刷新」也不再回到 Turnstile）：
+    * 服务端 `POST /api/captcha/challenge?provider=slider` 可强制下发滑块
+      （`CAPTCHA_ENABLED=0` 时仍返回 `enabled=false`，不会把关掉的验证又打开）；
+      `verify_captcha` 改为按凭据形态判定——命中服务端内存里的滑块凭据即按滑块校验，
+      与全局 provider 解耦（滑块的 `captcha_x` 不会再被送去 siteverify）；
+    * `app/api.py` 的 `captcha_challenge(provider="")` 支持强制 provider；
+    * `app/widgets/captcha.py` 新增 `_fallback_to_slider()`，并把 `QWebEngineView.loadFinished`
+      接入（主文档加载失败即回退），`refresh()` 接受 `force_slider`；版本号升至 1.3.17。
 
 ---
 

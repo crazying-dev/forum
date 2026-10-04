@@ -174,6 +174,11 @@ def test_captcha_endpoints_paths_and_bodies():
     client.captcha_challenge()
     assert calls[-1][0] == "POST"
     assert calls[-1][1] == "/api/captcha/challenge"
+    # 回退通道：强制 provider=slider（大小写 / 空白归一化）
+    client.captcha_challenge("slider")
+    assert calls[-1][1] == "/api/captcha/challenge?provider=slider"
+    client.captcha_challenge("  SLIDER ")
+    assert calls[-1][1] == "/api/captcha/challenge?provider=slider"
     client.captcha_verify("TK", 123.5)
     method, path, body = calls[-1]
     assert method == "POST" and path == "/api/captcha/verify"
@@ -402,20 +407,24 @@ def test_dialog_switches_between_stage_and_embed():
 
 def test_dialog_turnstile_without_sitekey_falls_back_to_slider():
     _app_instance()
+    from app.widgets import captcha as c
     from app.widgets.captcha import SliderCaptchaDialog
 
     dialog = SliderCaptchaDialog(None, autostart=False)
+    orig = c.api_mod.run_async
+    c.api_mod.run_async = lambda fn, *a, **k: None   # 拦截网络
     try:
-        # 服务端给了 provider 但没给 sitekey（理论上不会发生）→ 不能白屏
+        # 服务端给了 provider 但没给 sitekey（理论上不会发生）→ 不能白屏，改走滑块
         dialog._apply_turnstile({"provider": "turnstile"})
         assert dialog.provider == "slider"
         assert dialog.stage.isHidden() is False
         assert dialog.refresh_btn.text() == "换一张"
     finally:
+        c.api_mod.run_async = orig
         dialog.deleteLater()
 
 
-def test_dialog_consumes_embed_token_and_error_events():
+def test_dialog_consumes_embed_token_events():
     _app_instance()
     from PyQt6.QtWidgets import QDialog
     from app.widgets.captcha import SliderCaptchaDialog
@@ -425,16 +434,46 @@ def test_dialog_consumes_embed_token_and_error_events():
         dialog.provider = "turnstile"
         dialog._on_embed_title("安全验证")          # 页面标题，不属于协议 → 忽略
         assert dialog.result_token == ""
-        dialog._on_embed_title("captcha:error:disabled")
-        assert "已关闭" in dialog.status.text()
-        dialog._on_embed_title("captcha:error:unconfigured")
-        assert "未配置" in dialog.status.text()
-        dialog._on_embed_title("captcha:error:组件炸了")   # 未知短码原样展示
-        assert dialog.status.text() == "组件炸了"
         dialog._on_embed_title("captcha:token:" + "K" * 2048)
         assert dialog.result_token == "K" * 2048
         assert dialog.result() == QDialog.DialogCode.Accepted
     finally:
+        dialog.deleteLater()
+
+
+def test_dialog_falls_back_to_slider_on_turnstile_error():
+    """Turnstile 报错 / 加载失败 → 自动回退自研滑块（只回退一次）。"""
+    _app_instance()
+    from app.widgets import captcha as c
+    from app.widgets.captcha import SliderCaptchaDialog
+
+    dialog = SliderCaptchaDialog(None, autostart=False)
+    orig = c.api_mod.run_async
+    c.api_mod.run_async = lambda fn, *a, **k: None   # 拦截网络
+    try:
+        dialog.provider = c.PROVIDER_TURNSTILE
+        dialog._on_embed_error("组件炸了")
+        assert dialog.provider == c.PROVIDER_SLIDER, "Turnstile 报错应回退自研滑块"
+        assert dialog.refresh_btn.text() == "换一张"
+        assert dialog.stage.isHidden() is False
+
+        # 回退已用过：再报错只展示文案，不再回退
+        dialog.provider = c.PROVIDER_TURNSTILE
+        dialog._on_embed_error("disabled")
+        assert "已关闭" in dialog.status.text()
+        dialog._on_embed_error("unconfigured")
+        assert "未配置" in dialog.status.text()
+        dialog._on_embed_error("组件炸了")          # 未知短码原样展示
+        assert dialog.status.text() == "组件炸了"
+
+        # 承载页加载失败同样触发回退（新弹窗）
+        other = SliderCaptchaDialog(None, autostart=False)
+        other.provider = c.PROVIDER_TURNSTILE
+        other._on_embed_load_finished(False)
+        assert other.provider == c.PROVIDER_SLIDER
+        other.deleteLater()
+    finally:
+        c.api_mod.run_async = orig
         dialog.deleteLater()
 
 
@@ -462,6 +501,9 @@ def test_captcha_module_wires_turnstile_embed():
     assert "embed_url(" in src and "embed_path_of(" in src
     assert "event_of(" in src and "token_from_event(" in src
     assert "captcha_area" in src
+    # 回退通道（Turnstile 解不出来 → 自研滑块）
+    assert "loadFinished" in src, "承载页加载失败必须能感知"
+    assert "_fallback_to_slider(" in src, "缺少 Turnstile → 滑块回退入口"
 
 
 def test_main_imports_webengine_before_qapplication():

@@ -710,9 +710,18 @@ class ForumApi:
         return bool(result.ok and (result.get("ok") or result.get("service")))
 
     # ────────────── 人机验证（滑块拼图，与网页端 / 安卓端同源）──────────────
-    def captcha_challenge(self) -> Result:
-        """获取一次滑块拼图挑战（背景图 + 拼图块 + 缺口纵向位置）。"""
-        return self.post("/api/captcha/challenge", {}, retries=1)
+    def captcha_challenge(self, provider: str = "") -> Result:
+        """获取一次人机验证挑战。
+
+        默认（不传 ``provider``）由服务端按全局配置下发 Turnstile 配置；
+        ``provider="slider"`` 时强制服务端下发**自研滑块**挑战——这是客户端在
+        Turnstile 解不出来（组件报错 / 承载页加载失败 / 超时）时的回退通道。
+        """
+        path = "/api/captcha/challenge"
+        forced = str(provider or "").strip().lower()
+        if forced:
+            path += "?provider=" + forced
+        return self.post(path, {}, retries=1)
 
     def captcha_verify(self, captcha_token: str, captcha_x) -> Result:
         """两步式第一步：校验滑块水平位置。
