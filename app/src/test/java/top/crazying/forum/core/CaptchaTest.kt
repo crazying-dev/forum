@@ -152,6 +152,19 @@ class CaptchaTest {
         }
     }
 
+    // ────────────────── 回退通道（Turnstile → 自研滑块） ──────────────────
+
+    @Test
+    fun challengePathForcesProviderOnlyWhenGiven() {
+        assertEquals("/api/captcha/challenge", Captcha.challengePath())
+        assertEquals("/api/captcha/challenge", Captcha.challengePath(""))
+        assertEquals("/api/captcha/challenge", Captcha.challengePath("   "))
+        assertEquals("/api/captcha/challenge", Captcha.challengePath(null))
+        assertEquals("/api/captcha/challenge?provider=slider", Captcha.challengePath("slider"))
+        // 归一化：大写 / 两侧空白
+        assertEquals("/api/captcha/challenge?provider=slider", Captcha.challengePath("  SLIDER "))
+    }
+
     // ────────────────── 承载页 URL 拼接 ──────────────────
 
     @Test
@@ -242,7 +255,7 @@ class CaptchaTest {
         // 8 个受保护接口 + challenge/verify 自身不带 token 合并，故至少 8 处。
         val merges = Regex("Captcha\\.withToken\\(").findAll(text).count()
         assertTrue("受保护接口未接入 Captcha.withToken（当前 $merges 处）", merges >= 8)
-        assertTrue(text.contains("Captcha.CHALLENGE_PATH"))
+        assertTrue(text.contains("Captcha.challengePath("))
         assertTrue(text.contains("Captcha.VERIFY_PATH"))
     }
 
@@ -262,6 +275,21 @@ class CaptchaTest {
             "旧文件仍存在：ui/SliderCaptchaDialog.kt",
             File(root, "ui/SliderCaptchaDialog.kt").exists(),
         )
+    }
+
+    @Test
+    fun dialogFallsBackToSliderWhenTurnstileFails() {
+        val root = sourceRoot() ?: return
+        val f = File(root, "ui/CaptchaDialog.kt")
+        assertTrue("缺少源文件：ui/CaptchaDialog.kt", f.exists())
+        val text = f.readText()
+        assertTrue("未定义回退入口 fallbackToSlider", text.contains("fun fallbackToSlider("))
+        assertTrue("回退未强制 provider=slider", text.contains("captchaChallenge(provider ="))
+        assertTrue("未处理承载页 error 事件", text.contains("\"error\" ->"))
+        assertTrue("未处理承载页 loaded 事件", text.contains("\"loaded\" ->"))
+        // 滑块渲染必须按实际可用宽度等比缩放（修复窄屏挤压变形）
+        assertTrue("滑块舞台未用 BoxWithConstraints 取实际宽度", text.contains("BoxWithConstraints("))
+        assertTrue("滑块未按 scale 缩放拼图块", text.contains("challenge.piece.width * scale"))
     }
 
     @Test

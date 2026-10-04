@@ -399,8 +399,11 @@ class Api(private val prefs: Prefs) {
      *
      * 返回 `{success, token, bg, piece, y, width, height, piece_size}`（`bg` / `piece`
      * 是 data URL PNG）；服务端未启用人机验证时返回 `{success: true, enabled: false}`。
+     *
+     * [provider] 非空时强制指定（`"slider"` = Turnstile 解不出来时的回退通道）。
      */
-    suspend fun captchaChallenge(): ApiResult = post(Captcha.CHALLENGE_PATH)
+    suspend fun captchaChallenge(provider: String = ""): ApiResult =
+        post(Captcha.challengePath(provider))
 
     /** 提交滑块 x 坐标；成功返回原 token，失败返回 400 + 可读文案。 */
     suspend fun captchaVerify(captchaToken: String, captchaX: Int): ApiResult =

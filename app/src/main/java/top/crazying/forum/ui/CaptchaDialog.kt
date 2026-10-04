@@ -8,6 +8,7 @@ import android.os.Looper
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -17,6 +18,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
 import top.crazying.forum.core.Captcha
@@ -124,6 +127,12 @@ private fun CaptchaDialog(onFinished: (String?) -> Unit) {
     var embedKey by remember { mutableStateOf(0) }
     /** 只认第一个完成事件（Turnstile 的 callback 可能被重复触发）。 */
     var finished by remember { mutableStateOf(false) }
+    /** 已回退过一次自研滑块（避免 Turnstile / 滑块来回抖动）。 */
+    var triedFallback by remember { mutableStateOf(false) }
+    /** 本次会话只走自研滑块（回退后连「刷新」也不再回到 Turnstile）。 */
+    var sliderOnly by remember { mutableStateOf(false) }
+    /** 承载页本体是否已加载完成（用于「页面压根没打开」的超时兜底）。 */
+    var embedReady by remember { mutableStateOf(false) }
 
     fun finish(token: String?) {
         if (finished) return
@@ -131,16 +140,24 @@ private fun CaptchaDialog(onFinished: (String?) -> Unit) {
         onFinished(token)
     }
 
-    /** 拉一次挑战（也是「换一张」/ 失败重试入口）。[errorText] 非空时保留上次失败原因。 */
-    fun load(errorText: String = "") {
+    /**
+     * 拉一次挑战（也是「换一张」/ 失败重试入口）。
+     *
+     * [errorText] 非空时保留上次失败原因；[forceSlider] 为 true 时强制向服务端要自研滑块
+     * （Turnstile 出错 / 加载超时后的兜底通道，见 [fallbackToSlider]）。
+     */
+    fun load(errorText: String = "", forceSlider: Boolean = false) {
+        if (forceSlider) sliderOnly = true
         loading = true
         challenge = null
         pieceX = 0f
         embedUrl = ""
+        embedReady = false
         error = errorText
         hint = "正在加载验证…"
+        val want = if (sliderOnly) Captcha.PROVIDER_SLIDER else ""
         scope.launch {
-            val r = App.api.captchaChallenge()
+            val r = App.api.captchaChallenge(provider = want)
             loading = false
             if (!r.ok) {
                 error = r.message.ifBlank { "验证加载失败，请点「刷新」重试" }
@@ -194,6 +211,19 @@ private fun CaptchaDialog(onFinished: (String?) -> Unit) {
         }
     }
 
+    /**
+     * Turnstile 出错 / 超时 → 自动回退自研滑块（只回退一次，避免来回抖动）。
+     *
+     * 服务端 `POST /api/captcha/challenge?provider=slider` 会强制下发拼图挑战，
+     * 即便全局 provider 仍是 turnstile；回退后 [sliderOnly] 置位，「刷新」也不再回到 Turnstile。
+     */
+    fun fallbackToSlider(): Boolean {
+        if (triedFallback) return false
+        triedFallback = true
+        load(forceSlider = true)
+        return true
+    }
+
     /** 松手后提交坐标；通过则回传 token，否则保留错误文案并换一张重来。 */
     fun verify() {
         val c = challenge ?: return
@@ -219,7 +249,10 @@ private fun CaptchaDialog(onFinished: (String?) -> Unit) {
                 val t = payload.trim()
                 if (t.isNotEmpty()) finish(t)
             }
+            "loaded" -> embedReady = true
             "error" -> {
+                // Turnstile 组件报错 / 加载失败 / WebView 打不开承载页 → 回退自研滑块。
+                if (fallbackToSlider()) return
                 error = when (payload.trim()) {
                     "disabled" -> "人机验证已关闭"
                     "unconfigured" -> "验证服务未配置，请联系管理员"
@@ -233,6 +266,15 @@ private fun CaptchaDialog(onFinished: (String?) -> Unit) {
     }
 
     LaunchedEffect(Unit) { load() }
+
+    // Turnstile 承载页「压根没打开」的兜底：WebView 静默失败时页面不会回报错事件。
+    // 仅在页面尚未 load 完成时回退，避免打扰正在点击验证的用户。
+    LaunchedEffect(provider, embedUrl, embedKey) {
+        if (provider == Captcha.PROVIDER_TURNSTILE && embedUrl.isNotEmpty() && !embedReady) {
+            delay(12000)
+            if (!finished && !embedReady) fallbackToSlider()
+        }
+    }
 
     val retryLabel = if (provider == Captcha.PROVIDER_TURNSTILE) "刷新" else "换一张"
 
@@ -390,6 +432,20 @@ private fun TurnstileEmbed(
                             target.contains("challenges.cloudflare.com") ||
                             target.startsWith("about:"))
                     }
+
+                    override fun onPageFinished(wv: WebView?, url: String?) {
+                        // 承载页本体已加载（组件是否就绪另由页面回报）→ 关闭宿主加载超时。
+                        events.value("loaded", "")
+                    }
+
+                    override fun onReceivedError(
+                        wv: WebView?,
+                        request: WebResourceRequest?,
+                        error: WebResourceError?,
+                    ) {
+                        // 只有主文档失败才算「页打不开」；Cloudflare 子资源失败由页面自行回报。
+                        if (request?.isForMainFrame == true) events.value("error", "load")
+                    }
                 }
 
                 webChromeClient = object : WebChromeClient() {
@@ -422,9 +478,12 @@ private fun TurnstileEmbed(
 /**
  * 拼图舞台：上方是背景图 + 可拖动的拼图块，下方是滑动条。
  *
- * 坐标体系：背景图 1 像素 = 1 dp，因此 320×180 的图渲染为 320×180 dp
- * （绝大多数手机宽屏都在 360 dp 以上，不会溢出）；拖拽位移换算成
- * 「图像像素」坐标后直接作为 `captcha_x` 上报，与服务端的容差判定同尺。
+ * 渲染宽度 = min(图片宽, 可用宽度)：窄屏（弹窗容器可能不足 320dp）按比例等比缩放，
+ * 背景与拼图块不会“挤压变形”（旧实现用固定 320dp 宽 + FillBounds，窄屏下会拉扁）。
+ * 滑块行程（travel）也按**实际渲染宽度**计算，因此上报的 `captcha_x` 与画面、与服务端
+ * 容差判定始终同尺——修复“图片变形 + 验证永远失败”。
+ *
+ * `captcha_x` 坐标系仍是服务端**图像像素**（`0..maxPieceX`，与 `Captcha.pieceXFromDrag` 同口径）。
  */
 @Composable
 private fun SliderStageView(
@@ -439,8 +498,6 @@ private fun SliderStageView(
 
     val stageW = challenge.width.toFloat()
     val stageH = challenge.height.toFloat()
-    val travel = (stageW - HANDLE_WIDTH).coerceAtLeast(1f)
-    val maxPieceX = (stageW - challenge.piece.width).coerceAtLeast(1f)
 
     // pointerInput 会长期持有首次创建的 lambda，回调必须取「最新」的那份。
     val onPieceXNow by rememberUpdatedState(onPieceX)
@@ -449,82 +506,92 @@ private fun SliderStageView(
     // 手柄已滑过的距离（与 travel 同单位，仅作为拖拽量累计）。
     var dragDp by remember { mutableStateOf(0f) }
 
-    val handleX = Captcha.handleXFromPiece(pieceX, travel, maxPieceX)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val availW = maxWidth.value
+        val renderW = (if (stageW > 0f && availW > 0f) minOf(stageW, availW) else maxOf(stageW, 1f))
+            .coerceAtLeast(1f)
+        val scale = if (stageW > 0f) renderW / stageW else 1f
+        val renderH = stageH * scale
+        // 行程与缩放都基于**实际渲染宽度**，拖动距离才与画面一致。
+        val travel = (renderW - HANDLE_WIDTH).coerceAtLeast(1f)
+        val maxPieceX = (stageW - challenge.piece.width).coerceAtLeast(1f)
+        val handleX = Captcha.handleXFromPiece(pieceX, travel, maxPieceX)
 
-    Column(
-        modifier = Modifier.width(stageW.dp),
-        verticalArrangement = Arrangement.spacedBy(TRACK_GAP.dp),
-    ) {
-        // ── 背景 + 拼图块 ──
-        Box(
-            modifier = Modifier
-                .width(stageW.dp)
-                .height(stageH.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(colors.bgInput),
+        Column(
+            modifier = Modifier.width(renderW.dp),
+            verticalArrangement = Arrangement.spacedBy(TRACK_GAP.dp),
         ) {
-            Image(
-                bitmap = challenge.background.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier.fillMaxSize(),
-            )
-            Image(
-                bitmap = challenge.piece.asImageBitmap(),
-                contentDescription = null,
-                contentScale = ContentScale.FillBounds,
-                modifier = Modifier
-                    .offset(x = pieceX.dp, y = challenge.pieceY.toFloat().dp)
-                    .size(challenge.piece.width.dp, challenge.piece.height.dp),
-            )
-        }
-
-        // ── 滑动条 ──
-        Box(
-            modifier = Modifier
-                .width(stageW.dp)
-                .height(TRACK_HEIGHT.dp)
-                .clip(RoundedCornerShape(TRACK_HEIGHT / 2f))
-                .background(colors.bgInput)
-                .border(1.dp, colors.border, RoundedCornerShape(TRACK_HEIGHT / 2f))
-                .pointerInput(enabled, travel, maxPieceX, density) {
-                    if (!enabled) return@pointerInput
-                    detectDragGestures(
-                        onDragStart = { },
-                        onDrag = { change, amount ->
-                            change.consume()
-                            val next = (dragDp + amount.x / density).coerceIn(0f, travel)
-                            dragDp = next
-                            onPieceXNow(Captcha.pieceXFromDrag(next, travel, maxPieceX))
-                        },
-                        onDragEnd = { onReleaseNow() },
-                        onDragCancel = { },
-                    )
-                },
-        ) {
-            // 已滑过区域
+            // ── 背景 + 拼图块 ──
             Box(
                 modifier = Modifier
-                    .fillMaxHeight()
-                    .width((handleX + HANDLE_WIDTH / 2f).dp)
-                    .background(colors.primary.copy(alpha = 0.22f)),
-            )
-            // 手柄
+                    .width(renderW.dp)
+                    .height(renderH.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(colors.bgInput),
+            ) {
+                Image(
+                    bitmap = challenge.background.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                Image(
+                    bitmap = challenge.piece.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = Modifier
+                        .offset(x = (pieceX * scale).dp, y = (challenge.pieceY * scale).dp)
+                        .size((challenge.piece.width * scale).dp, (challenge.piece.height * scale).dp),
+                )
+            }
+
+            // ── 滑动条 ──
             Box(
                 modifier = Modifier
-                    .offset(x = handleX.dp)
-                    .width(HANDLE_WIDTH.dp)
+                    .width(renderW.dp)
                     .height(TRACK_HEIGHT.dp)
                     .clip(RoundedCornerShape(TRACK_HEIGHT / 2f))
-                    .background(if (enabled) colors.primary else colors.bgItemActive),
-                contentAlignment = Alignment.Center,
+                    .background(colors.bgInput)
+                    .border(1.dp, colors.border, RoundedCornerShape(TRACK_HEIGHT / 2f))
+                    .pointerInput(enabled, travel, maxPieceX, density) {
+                        if (!enabled) return@pointerInput
+                        detectDragGestures(
+                            onDragStart = { },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                val next = (dragDp + amount.x / density).coerceIn(0f, travel)
+                                dragDp = next
+                                onPieceXNow(Captcha.pieceXFromDrag(next, travel, maxPieceX))
+                            },
+                            onDragEnd = { onReleaseNow() },
+                            onDragCancel = { },
+                        )
+                    },
             ) {
-                Text(
-                    text = "》",
-                    color = colors.primaryText,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
+                // 已滑过区域
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width((handleX + HANDLE_WIDTH / 2f).dp)
+                        .background(colors.primary.copy(alpha = 0.22f)),
                 )
+                // 手柄
+                Box(
+                    modifier = Modifier
+                        .offset(x = handleX.dp)
+                        .width(HANDLE_WIDTH.dp)
+                        .height(TRACK_HEIGHT.dp)
+                        .clip(RoundedCornerShape(TRACK_HEIGHT / 2f))
+                        .background(if (enabled) colors.primary else colors.bgItemActive),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "》",
+                        color = colors.primaryText,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
     }

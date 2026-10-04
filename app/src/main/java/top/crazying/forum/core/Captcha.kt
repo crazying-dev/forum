@@ -125,6 +125,17 @@ object Captcha {
     }
 
     /**
+     * 强制指定 provider 的挑战路径（客户端回退时用 `"slider"`）。
+     *
+     * `provider` 为空时返回原始 [CHALLENGE_PATH]；否则拼上 `?provider=<归一化值>`。
+     * 与服务端 `api/captcha/api_captcha_challenge()` 的 `request.args.get("provider")` 同源。纯函数。
+     */
+    fun challengePath(provider: String? = ""): String {
+        val p = (provider ?: "").trim().lowercase()
+        return if (p.isEmpty()) CHALLENGE_PATH else CHALLENGE_PATH + "?provider=" + p
+    }
+
+    /**
      * 归一化服务端下发的 provider；未知 / 空值一律回退 [PROVIDER_SLIDER]。
      *
      * 与服务端 `api/captcha/_provider()` 同口径（那边缺密钥时也会回退 slider），

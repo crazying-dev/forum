@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.13**（`versionCode = 14`） |
+| 当前版本 | **V1.0.14**（`versionCode = 15`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -219,13 +219,16 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **人机验证（V1.0.12 自研滑块 → V1.0.13 接入 Cloudflare Turnstile）**：与 Web / Windows 三端同源，provider 由服务端 `/api/captcha/challenge` 下发（`turnstile` / `slider` / `enabled=false`）。
   * `core/Captcha.kt`：纯逻辑层——错误码 `CAPTCHA_REQUIRED`、受保护端点表、data URL 解析、拖拽坐标映射（`pieceXFromDrag` / `handleXFromPiece`），以及把业务协程挂起的 `CaptchaPrompt`（`ask()` / `complete()`）与顶层 `askCaptcha()`。
   * **默认 `turnstile`**：`ui/CaptchaDialog.kt` 用 WebView 加载服务端 `/captcha-embed?theme=&lang=&size=flexible`，Cloudflare 官方组件在网页内渲染；token 经 JS bridge（`AndroidCaptcha.onEvent`，`@JavascriptInterface` + `Handler(Looper.getMainLooper()).post` 切回主线程）回传，并以 `WebChromeClient.onReceivedTitle` 解析 `captcha:token:<TOKEN>` 作兜底。Turnstile token **一次性**，拿到即关弹窗，不再走 `/verify` 两步式。
-  * **兜底 `slider`**：仍保留自研滑块拼图（`CaptchaHost()` 挂在 `ForumRoot`，由 `CaptchaPrompt.dialogVisible` 驱动——背景图 + 可拖动拼图块 + 滑条手柄，拖拽距离按舞台宽等比映射为拼图块 x，**1 dp = 1 图像像素**，故上报的 `captcha_x` 与服务端容差同尺）；服务端未配置 Turnstile 密钥时自动回退到这条路径。
+  * **兜底 `slider`**：仍保留自研滑块拼图（`CaptchaHost()` 挂在 `ForumRoot`，由 `CaptchaPrompt.dialogVisible` 驱动——背景图 + 可拖动拼图块 + 滑条手柄，拖拽距离按**实际渲染宽度**等比映射为拼图块 x，故上报的 `captcha_x` 与服务端容差同尺）；服务端未配置 Turnstile 密钥时自动回退到这条路径。
   * **`enabled == false`**：服务端已关闭验证，直接以空 token 放行、不打扰用户。
   * **修复（现象：拖到正确位置后没任何提示就直接重新开始）**：此前失败文案写入 `status` 后立即被 `load()` 重置为「正在加载验证图像…」，错误提示实际存活时长为 0。现拆成 `hint`（中性状态）与 `error`（失败原因）两个独立状态，失败原因作为参数传给 `load(errorText)` 保留显示。
   * 接入点（`captchaToken` 参数为空时不往请求体里加字段，保持老流程不变）：登录 / 注册 / 注销账号验证码 / 注销账号 / 修改密码验证码 / 更换邮箱-当前邮箱验证码 / 更换邮箱-新邮箱验证码，共 7 处；`/api/user/password`、`/api/user/email` 两个终步服务端未设闸门，客户端同样不带。
   * `core/Captcha.kt` 新增纯函数：`providerOf()`（未知 / 空值一律回退 slider）、`embedUrl()`（拼承载页 URL，含 theme / lang / size 归一化）、`eventOf()` / `tokenFromEvent()`（解析承载页回传事件）。
   * `app/src/test/java/top/crazying/forum/core/CaptchaTest.kt` 扩到 24 例（含「弹窗确实接了 Turnstile 桥」「`CaptchaHost` 只声明一次」的源码扫描）。
 * **隐私政策 v2.1（V1.0.13）**：新增 Cloudflare Turnstile 第三方披露（`challenges.cloudflare.com` — 人机验证；触达端：三端）与「境外传输提示」（验证请求由设备直连 Cloudflare，可能含 IP 与浏览器环境信息，不含账号信息）；`Constants.PRIVACY_POLICY_VERSION` 由 `2.0` 升至 `2.1`，首启同意门据此重新征得同意。
+* **Turnstile 失败自动回退 + 滑块窄屏修复（V1.0.14）**：
+  * **自动回退**：Turnstile 组件报错 / 承载页加载失败（`onReceivedError` 主文档）/ 12 秒内页面未加载完成 → 自动改要一帧自研滑块挑战（服务端 `?provider=slider` 强制下发），只回退一次；回退后「刷新」也不再回到 Turnstile。`core/Captcha.kt` 新增纯函数 `challengePath(provider)`，`Api.captchaChallenge(provider)` 支持强制 provider。
+  * **修复（现象：图片挤压变形、验证永远失败）**：`ui/CaptchaDialog.kt` 的 `SliderStageView` 原以固定 `320dp` 宽渲染 320px 图片，窄屏被 Compose 压缩后 `ContentScale.FillBounds` 把图拉扁，且滑块行程按**逻辑宽度**计算 → 上报 `captcha_x` 与实际对齐的缺口位置不符。现改用 `BoxWithConstraints` 取**实际可用宽度**等比缩放（背景 / 拼图块 / 行程 / 手感全部同尺），`captcha_x` 仍是服务端图像像素，服务端容差判定不变。
 
 ### 未实现（后续多轮持续补齐）
 
