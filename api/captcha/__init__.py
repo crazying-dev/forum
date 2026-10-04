@@ -1,33 +1,41 @@
-"""滑块拼图人机验证（自研，无第三方依赖 / 无需外网，国内可用）。
+"""人机验证中央入口：Cloudflare Turnstile（默认）/ 自研滑块（兜底）/ 关闭。
 
-设计目标
---------
-* 完全自托管：不依赖极验 / 腾讯云 / 阿里云 / Cloudflare Turnstile 等外部 JS-SDK，
-  便于 Windows（PyQt6）/ Android（Compose）原生客户端接入，也不给隐私政策
-  增加任何第三方域名；
+Provider（config.CAPTCHA_PROVIDER）
+----------------------------------
+* ``turnstile``（默认）：Cloudflare Turnstile，服务端调 siteverify 校验，
+  实现见 ``api/turnstile.py``；**sitekey/secret 未配置时自动回退 slider**，
+  避免改了默认值却忘记配密钥把线上打死。
+* ``slider``：本文件内的自研滑块拼图（无第三方依赖 / 无需外网，国内可用）。
+* ``off``：一律放行（等价于 CAPTCHA_ENABLED=0）。
+
+客户端统一契约
+--------------
+* ``POST /api/captcha/challenge`` 返回 ``provider`` 字段告知用哪种方式；
+  turnstile 时额外返回 ``sitekey`` / ``embed_url``（WebView 承载页地址）；
+* 客户端把凭据**统一放进 ``captcha_token`` 字段**提交业务请求 —— 因此
+  ``@captcha_required`` 与 11 个受保护接口零改动；
+* ``POST /api/captcha/verify`` 仅 slider 需要（两步式预校验）；Turnstile 的
+  token 一次性（Cloudflare 规定），必须留给业务请求消费，故此处只透传；
+* ``GET /captcha-embed``：给 Windows(QWebEngineView) / Android(WebView) 用的
+  承载页，加载 Turnstile 组件并把 token 回传宿主。
+
+自研滑块（slider）设计
+----------------------
 * 服务端内存字典存答案：{token: {answer_x, ip, expires, solved}}，与
   api/ratelimit.py 同一风格（模块级 threading.Lock + dict），重启即丢；
 * 一次性 token：业务请求校验时 pop 掉，杜绝重放；
-* TTL 默认 5 分钟；绑定客户端 IP；水平容差默认 ±6px。
+* TTL 默认 5 分钟；绑定客户端 IP；水平容差默认 ±12px（放宽以适配触屏）。
 
 接口
 ----
-    POST /api/captcha/challenge   生成挑战（token + 背景图 + 拼图块，base64）
-    POST /api/captcha/verify      校验滑块位置（通过后同一 token 标记为已解答）
-
-客户端流程（两种都支持）
-------------------------
-A. 两步式（推荐，可即时反馈）：
-   1) POST /api/captcha/challenge                → {token, bg, piece, y, ...}
-   2) 用户拖动拼图块到缺口；POST /api/captcha/verify {captcha_token, captcha_x}
-   3) 通过后把同一个 captcha_token 塞进真实业务请求体；
-B. 一步式（客户端本地渲染后直接提交）：
-   把 challenge 拿到的 captcha_token 与用户拖到的 captcha_x 一并塞进业务请求体。
+    POST /api/captcha/challenge   生成挑战（下发 provider 配置）
+    POST /api/captcha/verify      校验滑块位置（仅 slider）
+    GET  /captcha-embed           WebView 承载页（仅 turnstile）
 
 业务端接入
 ----------
 在需要的接口上加装饰器 ``@captcha_required`` 即可；服务端由此调用
-``verify_captcha(payload)`` 完成校验（CAPTCHA_ENABLED=0 时整体放行）。
+``verify_captcha(payload)`` 完成校验（provider=off 时整体放行）。
 """
 from __future__ import annotations
 
@@ -39,12 +47,22 @@ import threading
 import time
 from functools import wraps
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 
 import config
 from api.ratelimit import rate_limit
+from api.turnstile import (
+    TOKEN_FIELD,
+    configured as turnstile_configured,
+    sitekey as turnstile_sitekey,
+    verify_token as turnstile_verify,
+)
 
 captcha_bp = Blueprint("captcha", __name__)
+
+# WebView 承载页（Windows QWebEngineView / Android WebView）
+captcha_embed_bp = Blueprint("captcha_embed", __name__)
+CAPTCHA_EMBED_PATH = "/captcha-embed"
 
 # 挑战 token 状态：{token: {"answer_x": int, "ip": str, "expires": float, "solved": bool}}
 _lock = threading.Lock()
@@ -64,6 +82,21 @@ def _client_ip() -> str:
     return request.remote_addr or "0.0.0.0"
 
 
+def _provider() -> str:
+    """当前生效的人机验证 provider：turnstile / slider / off。"""
+    if not getattr(config, "CAPTCHA_ENABLED", True):
+        return "off"
+    raw = str(getattr(config, "CAPTCHA_PROVIDER", "turnstile") or "").strip().lower()
+    if raw in ("off", "none", "disable", "disabled", "0", "false"):
+        return "off"
+    if raw == "slider":
+        return "slider"
+    # 其余（含默认 turnstile）：密钥不齐则回退自研滑块，绝不让线上裸奔
+    if turnstile_configured():
+        return "turnstile"
+    return "slider"
+
+
 def _ttl() -> int:
     try:
         value = int(getattr(config, "CAPTCHA_TTL_SECONDS", 300))
@@ -74,10 +107,10 @@ def _ttl() -> int:
 
 def _tolerance() -> int:
     try:
-        value = int(getattr(config, "CAPTCHA_TOLERANCE", 6))
+        value = int(getattr(config, "CAPTCHA_TOLERANCE", 12))
     except (TypeError, ValueError):
-        value = 6
-    return value if value >= 0 else 6
+        value = 12
+    return value if value >= 0 else 12
 
 
 # ──────────────────────────────────────────────
@@ -260,17 +293,22 @@ def verify_slider(token: str, x) -> tuple[bool, str]:
 
 
 def verify_captcha(payload) -> tuple[bool, str]:
-    """业务请求接入点：消费 token 并校验（一次性）。
+    """业务请求接入点：按 provider 校验并消费一次性凭据。
 
-    支持两种提交形态：
-      * {captcha_token, captcha_x}：一步式，直接校验滑块位置；
-      * {captcha_token}：两步式，需先经 /api/captcha/verify 标记 solved。
-    CAPTCHA_ENABLED=0 时直接放行。
+    * provider=turnstile：把 captcha_token 当 Turnstile token 交给 siteverify；
+    * provider=slider：支持两种形态 —— {captcha_token, captcha_x}（一步式）
+      或 {captcha_token}（两步式，需先经 /api/captcha/verify 标记 solved）；
+    * provider=off：直接放行。
     """
-    if not getattr(config, "CAPTCHA_ENABLED", True):
+    provider = _provider()
+    if provider == "off":
         return True, ""
     data = payload if isinstance(payload, dict) else {}
-    token = str(data.get("captcha_token") or "").strip()
+    token = str(data.get(TOKEN_FIELD) or "").strip()
+    if provider == "turnstile":
+        if not token:
+            return False, "请先完成人机验证"
+        return turnstile_verify(token, _client_ip())
     raw_x = data.get("captcha_x")
     if not token:
         return False, "请先完成人机验证"
@@ -319,26 +357,46 @@ def captcha_required(fn):
 # ──────────────────────────────────────────────
 @captcha_bp.route("/challenge", methods=["POST"])
 def api_captcha_challenge():
-    """生成滑块拼图挑战（无需登录）。"""
-    if not getattr(config, "CAPTCHA_ENABLED", True):
+    """生成人机验证挑战（无需登录）；provider=slider 时才真正画图。"""
+    provider = _provider()
+    if provider == "off":
         return jsonify({"success": True, "enabled": False, "token": ""}), 200
     if rate_limit("captcha", 60, 300):
         return jsonify({"success": False, "message": "请求过于频繁，请稍后再试"}), 429
+    if provider == "turnstile":
+        # Turnstile 的挑战由客户端 JS / WebView 承载页完成，服务端只下发配置
+        return jsonify({
+            "success": True,
+            "enabled": True,
+            "provider": "turnstile",
+            "sitekey": turnstile_sitekey(),
+            "embed_url": CAPTCHA_EMBED_PATH,
+            "expires_in": 300,
+        }), 200
     try:
         payload = create_challenge()
     except Exception as e:  # noqa: BLE001 — 图像生成异常不应 500
         print(f"[captcha] 生成挑战失败：{e}")
         return jsonify({"success": False, "message": "生成人机验证失败"}), 500
+    payload["provider"] = "slider"
     return jsonify(payload), 200
 
 
 @captcha_bp.route("/verify", methods=["POST"])
 def api_captcha_verify():
-    """校验滑块位置（两步式的第一步）；通过后同一 token 可用于业务请求。"""
-    if not getattr(config, "CAPTCHA_ENABLED", True):
+    """两步式预校验（仅 slider）；turnstile 只透传 token。"""
+    provider = _provider()
+    if provider == "off":
         return jsonify({"success": True, "enabled": False}), 200
     data = request.get_json(silent=True) or {}
-    token = str(data.get("captcha_token") or "").strip()
+    token = str(data.get(TOKEN_FIELD) or "").strip()
+    if provider == "turnstile":
+        # Turnstile token 一次性：这里不能消费，必须留给业务请求去校验
+        if not token:
+            return jsonify({"success": False, "code": CAPTCHA_REQUIRED_CODE,
+                            "message": "请先完成人机验证"}), 400
+        return jsonify({"success": True, "provider": "turnstile", "token": token,
+                        "message": "请随业务请求提交该 token"}), 200
     ok, msg = verify_slider(token, data.get("captcha_x"))
     if not ok:
         return jsonify({"success": False, "code": CAPTCHA_REQUIRED_CODE,
@@ -346,8 +404,31 @@ def api_captcha_verify():
     return jsonify({"success": True, "token": token, "message": "验证通过"}), 200
 
 
+# ──────────────────────────────────────────────
+# WebView 承载页（Windows QWebEngineView / Android WebView）
+# ──────────────────────────────────────────────
+@captcha_embed_bp.route(CAPTCHA_EMBED_PATH, methods=["GET"])
+def captcha_embed_page():
+    """加载 Turnstile 组件，并通过 JS bridge / document.title 把 token 回传宿主。
+
+    query 参数：?theme=dark|light&lang=zh-cn
+    """
+    theme = "dark" if (request.args.get("theme") or "").strip().lower() == "dark" else "light"
+    lang = (request.args.get("lang") or "zh-cn").strip() or "zh-cn"
+    provider = _provider()
+    return render_template(
+        "captcha_embed.html",
+        provider=provider,
+        sitekey=turnstile_sitekey() if provider == "turnstile" else "",
+        theme=theme,
+        lang=lang,
+    )
+
+
 __all__ = [
     "captcha_bp",
+    "captcha_embed_bp",
+    "CAPTCHA_EMBED_PATH",
     "captcha_required",
     "verify_captcha",
     "verify_slider",

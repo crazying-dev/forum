@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="{{ theme }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>安全验证</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: transparent; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .wrap { padding: 10px; text-align: center; }
+  .msg { font-size: 13px; line-height: 1.5; margin-top: 8px; min-height: 18px; }
+  .msg.err { color: #e74c3c; }
+  .msg.ok { color: #2ecc71; }
+  .msg.muted { color: #999; }
+  .retry {
+    margin-top: 10px; font-size: 13px; padding: 6px 16px;
+    border-radius: 6px; border: 1px solid #888; background: transparent;
+    cursor: pointer;
+  }
+  [data-theme="dark"] body { color: #e6e6e6; }
+  [data-theme="light"] body { color: #222; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="ts"></div>
+  <div id="msg" class="msg muted">正在加载验证组件…</div>
+  <button id="retry" class="retry" style="display:none" type="button">重新验证</button>
+</div>
+<script>
+(function () {
+  'use strict';
+
+  var SITEKEY = {{ sitekey|tojson }};
+  var PROVIDER = {{ provider|tojson }};
+  var THEME = {{ theme|tojson }};
+  var LANG = {{ lang|tojson }};
+
+  var msg = document.getElementById('msg');
+  var retryBtn = document.getElementById('retry');
+  var widgetId = null;
+  var reported = false;
+
+  // 把事件回传宿主：Android(JS bridge) → Qt(注入对象) → document.title 兜底。
+  function hostReport(kind, payload) {
+    payload = payload || '';
+    try {
+      if (window.AndroidCaptcha && typeof window.AndroidCaptcha.onEvent === 'function') {
+        window.AndroidCaptcha.onEvent(kind, payload);
+        return;
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      if (window.qtCaptcha && typeof window.qtCaptcha.onEvent === 'function') {
+        window.qtCaptcha.onEvent(kind, payload);
+        return;
+      }
+    } catch (e) { /* ignore */ }
+    document.title = 'captcha:' + kind + ':' + payload;
+  }
+
+  function setMsg(text, cls) {
+    msg.textContent = text;
+    msg.className = 'msg ' + (cls || 'muted');
+  }
+
+  function fail(text) {
+    setMsg(text, 'err');
+    retryBtn.style.display = 'inline-block';
+    hostReport('error', text);
+  }
+
+  if (PROVIDER !== 'turnstile' || !SITEKEY) {
+    setMsg(PROVIDER === 'off' ? '人机验证已关闭' : '人机验证未配置第三方服务', 'err');
+    hostReport('error', PROVIDER === 'off' ? 'disabled' : 'unconfigured');
+    return;
+  }
+
+  var loaded = false;
+  var timer = setTimeout(function () {
+    if (!loaded) fail('验证组件加载超时，请检查网络后重试');
+  }, 20000);
+
+  function renderWidget() {
+    loaded = true;
+    clearTimeout(timer);
+    try {
+      widgetId = window.turnstile.render('#ts', {
+        sitekey: SITEKEY,
+        theme: THEME === 'dark' ? 'dark' : 'light',
+        language: LANG,
+        callback: function (token) {
+          setMsg('验证通过', 'ok');
+          retryBtn.style.display = 'none';
+          if (!reported) {
+            reported = true;
+            hostReport('token', token);
+          }
+        },
+        'error-callback': function (code) {
+          fail('验证组件出错（' + code + '），请重试');
+          return true;
+        },
+        'timeout-callback': function () {
+          fail('验证超时，请重试');
+        }
+      });
+      setMsg('请完成安全验证', 'muted');
+    } catch (e) {
+      fail('验证组件初始化失败，请重试');
+    }
+  }
+
+  retryBtn.addEventListener('click', function () {
+    reported = false;
+    retryBtn.style.display = 'none';
+    setMsg('正在重新验证…', 'muted');
+    try {
+      if (widgetId !== null && window.turnstile) window.turnstile.reset(widgetId);
+      else if (window.turnstile) renderWidget();
+    } catch (e) { /* ignore */ }
+  });
+
+  // render=explicit + onload 回调入口
+  window.__captchaEmbedRender = renderWidget;
+
+  var s = document.createElement('script');
+  s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=__captchaEmbedRender&lang=' + encodeURIComponent(LANG);
+  s.async = true;
+  s.defer = true;
+  s.onerror = function () { clearTimeout(timer); fail('无法加载验证组件，请检查网络'); };
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>

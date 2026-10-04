@@ -17,7 +17,7 @@ from .email import email_bp
 from .misc import misc_bp
 from .release import release_bp
 from .status import status_bp
-from .captcha import captcha_bp
+from .captcha import captcha_bp, captcha_embed_bp
 
 
 def register_blueprints(app: Flask) -> None:
@@ -34,8 +34,11 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(release_bp, url_prefix="/api/app")
     # 状态码日志查询：GET /api/status-log（2xx / 4xx / 5xx 发生时间）
     app.register_blueprint(status_bp, url_prefix="/api")
-    # 人机验证（滑块拼图）：POST /api/captcha/challenge、/api/captcha/verify
+    # 人机验证：POST /api/captcha/challenge（下发 provider 配置）
+    #          POST /api/captcha/verify（仅 slider 两步式）
     app.register_blueprint(captcha_bp, url_prefix="/api/captcha")
+    # WebView 承载页：GET /captcha-embed（Windows QWebEngineView / Android WebView）
+    app.register_blueprint(captcha_embed_bp)
 
     app.register_blueprint(pages_bp)
 
@@ -53,4 +56,5 @@ __all__ = [
     "release_bp",
     "status_bp",
     "captcha_bp",
+    "captcha_embed_bp",
 ]

@@ -206,30 +206,38 @@ def test_download_template_and_manifest_status():
 
 
 def test_android_release_entry():
-    """Android 最新版：清单字段与 GitHub Release 直链保持一致。"""
+    """Android 最新版：清单字段自洽，且 GitHub Release 直链与版本号一致。
+
+    注意：这里不硬编码具体版本号 —— 每次发布都会升版本，硬编码会让清单同步
+    （app_releases.json）反过来把测试打红。改为从清单自身取值并校验内部一致性。
+    """
     android = next(p for p in _load_manifest()["platforms"] if p.get("key") == "android")
     release = (android.get("releases") or [{}])[0]
-    assert release.get("version") == "1.0.11", "android 版本应为 1.0.11"
+    version = release.get("version")
+    assert isinstance(version, str) and re.fullmatch(r"\d+\.\d+\.\d+", version), \
+        f"android 版本号格式非法：{version}"
     assert release.get("channel") == "stable"
-    assert release.get("filename") == "forum-android-1.0.11.apk"
+    assert release.get("filename") == f"forum-android-{version}.apk"
     assert release.get("url") == (
         "https://github.com/crazying-dev/forum/releases/download/"
-        "Android-V1.0.11/forum-android-1.0.11.apk")
+        f"Android-V{version}/forum-android-{version}.apk")
     assert isinstance(release.get("size"), int) and release["size"] > 0
     assert re.fullmatch(r"[0-9a-f]{64}", str(release.get("sha256"))), "sha256 应为 64 位小写十六进制"
     assert release.get("mandatory") is False
 
 
 def test_windows_release_entry():
-    """Windows 最新版：清单字段与 GitHub Release 直链保持一致。"""
+    """Windows 最新版：清单字段自洽，且 GitHub Release 直链与版本号一致。"""
     windows = next(p for p in _load_manifest()["platforms"] if p.get("key") == "windows")
     release = (windows.get("releases") or [{}])[0]
-    assert release.get("version") == "1.3.14", "windows 版本应为 1.3.14"
+    version = release.get("version")
+    assert isinstance(version, str) and re.fullmatch(r"\d+\.\d+\.\d+", version), \
+        f"windows 版本号格式非法：{version}"
     assert release.get("channel") == "stable"
     assert release.get("filename") == "forum_setup.exe"
     assert release.get("url") == (
         "https://github.com/crazying-dev/forum/releases/download/"
-        "Windows-V1.3.14/forum_setup.exe")
+        f"Windows-V{version}/forum_setup.exe")
     assert isinstance(release.get("size"), int) and release["size"] > 0
     assert re.fullmatch(r"[0-9a-f]{64}", str(release.get("sha256"))), "sha256 应为 64 位小写十六进制"
     assert release.get("mandatory") is False
@@ -281,9 +289,17 @@ def test_download_page_links_use_site_mirror():
         assert "github.com" not in url, f"复制直链仍指向 GitHub：{url}"
         assert url.startswith("/api/app/mirror/"), f"复制直链未指向站内反代：{url}"
 
-    # 两个已发布平台都要有站内入口，并带 ?v= 版本号做缓存失效
-    assert "/api/app/mirror/windows/forum_setup.exe?v=1.3.14" in html
-    assert "/api/app/mirror/android/forum-android-1.0.11.apk?v=1.0.11" in html
+    # 已发布平台都要有站内入口，并带 ?v= 版本号做缓存失效（清单驱动，不硬编码版本）
+    for platform in _load_manifest()["platforms"]:
+        if platform.get("status") != "available":
+            continue
+        key = platform.get("key")
+        for release in (platform.get("releases") or []):
+            expect = "/api/app/mirror/%s/%s?v=%s" % (
+                key, release.get("filename"), release.get("version"))
+            assert expect in html, f"下载页缺少站内直链：{expect}"
+    # 至少覆盖 windows + android 两个平台
+    assert "/api/app/mirror/windows/" in html and "/api/app/mirror/android/" in html
 
 
 def test_mirror_cache_full_flow():

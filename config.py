@@ -285,7 +285,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "41"
+STATIC_VERSION = "42"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -395,13 +395,33 @@ AVATAR_MAX_BYTES = 5 * 1024 * 1024  # 5MB
 # ── 邮箱验证 token 有效期（分钟）──
 VERIFY_TOKEN_EXPIRES_MINUTES = 30
 
-# ── 人机验证（滑块拼图，自研，无第三方依赖 / 国内可用）──
-# 服务端内存字典存答案（IP 绑定 + 一次性 token + 默认 5 分钟过期），重启即丢。
-# CAPTCHA_ENABLED=0 可整体关闭（验证接口一律放行，等同不校验）。
+# ── 人机验证（provider 可切换）──
+# CAPTCHA_PROVIDER:
+#   turnstile（默认）= Cloudflare Turnstile（第三方；需 sitekey + secret，
+#                      缺任一则自动回退 slider，见 api/captcha/_provider()）
+#   slider           = 自研滑块拼图（无第三方依赖 / 国内可用，兜底方案）
+#   off              = 关闭（一律放行）
+# CAPTCHA_ENABLED=0 等价 off（保留旧开关，向后兼容）。
+CAPTCHA_PROVIDER = (os.getenv("CAPTCHA_PROVIDER", "turnstile") or "turnstile").strip().lower()
 CAPTCHA_ENABLED = os.getenv("CAPTCHA_ENABLED", "1") != "0"
+
+# ── Cloudflare Turnstile ──
+# 在 Cloudflare Dashboard → Turnstile 创建站点后获得；Secret 只在服务端使用。
+# 未配置（sitekey 或 secret 为空）时 provider 自动回退到 slider，避免部署事故。
+TURNSTILE_SITEKEY = (os.getenv("TURNSTILE_SITEKEY", "") or "").strip()
+TURNSTILE_SECRET = (os.getenv("TURNSTILE_SECRET", "") or "").strip()
+TURNSTILE_VERIFY_URL = (os.getenv("TURNSTILE_VERIFY_URL", "") or "").strip() or \
+    "https://challenges.cloudflare.com/turnstile/v0/siteverify"
+TURNSTILE_TIMEOUT = int(os.getenv("TURNSTILE_TIMEOUT", "10"))
+# 期望 hostname（留空则不校验）；填 www.yjlt.top 可进一步收紧
+TURNSTILE_EXPECTED_HOSTNAME = (os.getenv("TURNSTILE_EXPECTED_HOSTNAME", "") or "").strip()
+
+# ── 自研滑块参数（仅 provider=slider 生效）──
+# 服务端内存字典存答案（IP 绑定 + 一次性 token + 默认 5 分钟过期），重启即丢。
 CAPTCHA_TTL_SECONDS = int(os.getenv("CAPTCHA_TTL_SECONDS", "300"))
 CAPTCHA_WIDTH = 320
 CAPTCHA_HEIGHT = 180
 CAPTCHA_PIECE = 50
-CAPTCHA_TOLERANCE = 6
+# 水平容差：6px 对触屏过紧（安卓端实测一直过不去），放宽到 12px
+CAPTCHA_TOLERANCE = 12
 CAPTCHA_MAX_TOKENS = 5000
