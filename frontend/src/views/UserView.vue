@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import PostList from '../components/PostList.vue'
+import SliderCaptcha from '../components/SliderCaptcha.vue'
 import { apiFetch, avatarHtml, esc, fmtTime, getCurrentUser, initAuth, resolveAvatars, toast } from '../utils.js'
 
 const userId = computed(() => {
@@ -24,6 +25,8 @@ const commentsVisible = ref(false)
 const cmtCollapsed = ref(false)   // 我的评论折叠（与「我的收藏」一致）
 // 资料编辑弹窗
 const editOpen = ref(false)
+// 滑块人机验证组件（发码 / 注销前弹出）
+const captchaRef = ref(null)
 const editForm = ref({ name: '', gender: '0', intro: '' })
 // 出生日期选择器（沿用 V1 组件：年 ± 步进 / 月 / 日，存库格式 YYYYMMDD）
 const bpYear = ref(new Date().getFullYear())
@@ -287,11 +290,13 @@ function startPwCooldown() {
     if (pwCooldown.value <= 0) { clearInterval(pwTimer); pwTimer = null }
   }, 1000)
 }
-function sendPwCode() {
+async function sendPwCode() {
   if (pwCooldown.value > 0) return
   pwMsg.value = ''
   pwMsgColor.value = ''
-  apiFetch('/api/email/send-change-password-code', { method: 'POST', body: {} })
+  let cap
+  try { cap = await captchaRef.value.capture() } catch (e) { return }
+  apiFetch('/api/email/send-change-password-code', { method: 'POST', body: { captcha_token: cap.token } })
     .then((d) => {
       if (!d) return
       if (d.success) {
@@ -370,11 +375,13 @@ function openEmailPanel() {
   emMsgColor.value = ''
 }
 // 第1步：向「当前绑定邮箱」发送验证码，验证身份
-function sendOldEmailCode() {
+async function sendOldEmailCode() {
   if (emOldCooldown.value > 0) return
   emOldMsg.value = ''
   emOldMsgColor.value = ''
-  apiFetch('/api/email/send-change-email-old-code', { method: 'POST', body: {} })
+  let cap
+  try { cap = await captchaRef.value.capture() } catch (e) { return }
+  apiFetch('/api/email/send-change-email-old-code', { method: 'POST', body: { captcha_token: cap.token } })
     .then((d) => {
       if (!d) return
       if (d.success) {
@@ -394,13 +401,15 @@ function goEmailStep2() {
   emStep.value = 2
 }
 // 第2步：向「新邮箱」发送验证码
-function sendEmailCode() {
+async function sendEmailCode() {
   if (emCooldown.value > 0) return
   emMsg.value = ''
   emMsgColor.value = ''
   const addr = emNew.value.trim()
   if (!addr) { emMsg.value = '请先填写新邮箱'; return }
-  apiFetch('/api/email/send-change-email-code', { method: 'POST', body: { email: addr } })
+  let cap
+  try { cap = await captchaRef.value.capture() } catch (e) { return }
+  apiFetch('/api/email/send-change-email-code', { method: 'POST', body: { email: addr, captcha_token: cap.token } })
     .then((d) => {
       if (!d) return
       if (d.success) {
@@ -475,11 +484,13 @@ function startDelCooldown() {
     if (delCooldown.value <= 0) { clearInterval(delTimer); delTimer = null }
   }, 1000)
 }
-function sendDelCode() {
+async function sendDelCode() {
   if (delCooldown.value > 0) return
   delMsg.value = ''
   delMsgColor.value = ''
-  apiFetch('/api/email/send-delete-account-code', { method: 'POST', body: {} })
+  let cap
+  try { cap = await captchaRef.value.capture() } catch (e) { return }
+  apiFetch('/api/email/send-delete-account-code', { method: 'POST', body: { captcha_token: cap.token } })
     .then((d) => {
       if (!d) return
       if (d.success) {
@@ -493,7 +504,7 @@ function sendDelCode() {
     })
     .catch(() => { delMsg.value = '网络错误' })
 }
-function submitDelete() {
+async function submitDelete() {
   if (delSubmitting.value) return
   delMsg.value = ''
   delMsgColor.value = ''
@@ -514,6 +525,10 @@ function submitDelete() {
     ? '将彻底删除你的账号及全部帖子、评论、点赞、收藏、关注、举报记录。\n\n此操作不可恢复，确定继续吗？'
     : '将删除你的邮箱、密码等身份信息，用户名变为「已注销用户」，历史内容保留。\n\n确定继续吗？'
   if (!confirm(tip)) return
+  // 人机验证（一律必填）：先过滑块，再带上 captcha_token 提交注销
+  let cap
+  try { cap = await captchaRef.value.capture() } catch (e) { return }
+  body.captcha_token = cap.token
   delSubmitting.value = true
   apiFetch('/api/user/delete', { method: 'POST', body, noAuthRedirect: true })
     .then((d) => {
@@ -824,5 +839,6 @@ onMounted(async () => {
         </template>
       </div>
     </div>
+    <SliderCaptcha ref="captchaRef" />
   </div>
 </template>

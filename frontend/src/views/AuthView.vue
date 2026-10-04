@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { apiFetch } from '../utils.js'
+import SliderCaptcha from '../components/SliderCaptcha.vue'
 
 // 初始模式：URL ?mode= 优先，其次模板 data-mode（Flask 渲染）
 const mountEl = document.getElementById('app')
@@ -18,6 +19,8 @@ const errorColor = ref('')
 const submitting = ref(false)
 const codeCooldown = ref(0)
 let codeTimer = null
+// 滑块人机验证组件（登录 / 注册 / 找回密码前弹出）
+const captchaRef = ref(null)
 
 // 重置密码且携带 token（邮件链接）：进入设置新密码表单（不显示邮箱输入）
 const isResetWithToken = computed(() => mode.value === 'reset' && !!token)
@@ -59,7 +62,7 @@ function startCodeCooldown() {
   }, 1000)
 }
 
-function sendCode() {
+async function sendCode() {
   if (codeCooldown.value > 0) return
   error.value = ''
   errorColor.value = ''
@@ -69,7 +72,10 @@ function sendCode() {
   const url = mode.value === 'register'
     ? '/api/email/send-register-code'
     : '/api/email/send-code-reset-password'
-  apiFetch(url, { method: 'POST', body: { email: em } })
+  // 人机验证（一律必填）：先过滑块，再带上 captcha_token 发码
+  let cap
+  try { cap = await captchaRef.value.capture() } catch (e) { return }
+  apiFetch(url, { method: 'POST', body: { email: em, captcha_token: cap.token } })
     .then((d) => {
       if (!d) return
       if (d.success) { errorColor.value = '#2ecc71'; error.value = d.message || '验证码已发送'; startCodeCooldown() }
@@ -78,7 +84,7 @@ function sendCode() {
     .catch(() => { error.value = '网络错误' })
 }
 
-function submit() {
+async function submit() {
   error.value = ''
   errorColor.value = ''
   if (submitting.value) return
@@ -91,18 +97,26 @@ function submit() {
     error.value = '请填写邮箱验证码'
     return
   }
+  // 人机验证（一律必填）：登录 / 注册 / 验证码找回密码；邮件链接方式豁免
+  const needCaptcha = m === 'login' || m === 'register' || isCodeReset.value
+  let capToken = ''
+  if (needCaptcha) {
+    let cap
+    try { cap = await captchaRef.value.capture() } catch (e) { return }
+    capToken = cap.token
+  }
   submitting.value = true
   let p
   if (m === 'login') {
     // 用户名或邮箱二选一：含 @ 视作邮箱，否则视作用户名
-    const body = { password: password.value }
+    const body = { password: password.value, captcha_token: capToken }
     if (email.value.indexOf('@') >= 0) body.email = email.value
     else body.name = email.value
     p = apiFetch('/api/user/login', { method: 'POST', body })
   } else if (m === 'register') {
     p = apiFetch('/api/user/register', {
       method: 'POST',
-      body: { name: name.value, email: email.value, password: password.value, code: code.value.trim() },
+      body: { name: name.value, email: email.value, password: password.value, code: code.value.trim(), captcha_token: capToken },
     })
   } else if (isResetWithToken.value) {
     // 邮件链接方式：POST token + 新密码
@@ -114,7 +128,7 @@ function submit() {
     // 找回密码（单页表单）：邮箱 + 验证码 + 新密码 一次性提交
     p = apiFetch('/api/email/reset-password-by-code', {
       method: 'POST',
-      body: { email: email.value, code: code.value.trim(), password: password.value },
+      body: { email: email.value, code: code.value.trim(), password: password.value, captcha_token: capToken },
     })
   }
   p.then((d) => {
@@ -175,5 +189,6 @@ function submit() {
         </button>
       </form>
     </div>
+    <SliderCaptcha ref="captchaRef" />
   </div>
 </template>

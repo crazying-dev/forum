@@ -243,6 +243,85 @@ def test_all_target_routes_are_decorated():
         assert "@captcha_required" in tail, f"{marker} 未挂 @captcha_required"
 
 
+# ──────────────────────────
+# Web 前端接入（源码 + 构建产物）
+# ──────────────────────────
+WEB_SRC = os.path.join(PROJECT_ROOT, "frontend", "src")
+AUTH_VIEW = os.path.join(WEB_SRC, "views", "AuthView.vue")
+USER_VIEW = os.path.join(WEB_SRC, "views", "UserView.vue")
+SLIDER = os.path.join(WEB_SRC, "components", "SliderCaptcha.vue")
+BUILD_AUTH = os.path.join(PROJECT_ROOT, "static", "vue", "auth.js")
+BUILD_USERS = os.path.join(PROJECT_ROOT, "static", "vue", "users.js")
+
+
+def _text(path):
+    with open(path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def test_web_slider_component_calls_captcha_api():
+    """滑块组件存在，且调 /challenge 与 /verify，并对外暴露 capture()。"""
+    src = _text(SLIDER)
+    assert "/api/captcha/challenge" in src, "组件未请求 /api/captcha/challenge"
+    assert "/api/captcha/verify" in src, "组件未请求 /api/captcha/verify"
+    assert "defineExpose" in src and "capture" in src, "组件未对外暴露 capture()"
+
+
+def test_web_auth_view_wires_captcha():
+    """登录/注册/找回密码授权：引入组件 + 提交带 captcha_token。"""
+    src = _text(AUTH_VIEW)
+    assert "SliderCaptcha" in src, "AuthView 未引入滑块组件"
+    assert "captchaRef.value.capture()" in src, "AuthView 未调用 capture()"
+    # 登录 / 注册 / 验证码重置三个受保护分支都要带 captcha_token
+    body_src = src[src.find("async function submit()"):]
+    assert body_src.count("captcha_token") >= 3, "登录/注册/重置未全部携带 captcha_token"
+    # 发码接口（注册 / 找回密码）也要带
+    code_src = src[src.find("async function sendCode()"):src.find("async function submit()")]
+    assert "captcha_token" in code_src, "发码接口未携带 captcha_token"
+
+
+def test_web_user_view_wires_captcha():
+    """个人资料：发码与注销均带 captcha_token。"""
+    src = _text(USER_VIEW)
+    assert "SliderCaptcha" in src, "UserView 未引入滑块组件"
+    assert "captchaRef.value.capture()" in src, "UserView 未调用 capture()"
+    for endpoint in ("/api/email/send-change-password-code",
+                     "/api/email/send-change-email-old-code",
+                     "/api/email/send-change-email-code",
+                     "/api/email/send-delete-account-code"):
+        idx = src.find(endpoint)
+        assert idx != -1, f"缺少调用：{endpoint}"
+        assert "captcha_token" in src[idx:idx + 160], f"{endpoint} 未携带 captcha_token"
+    didx = src.find("/api/user/delete")
+    assert "captcha_token" in src[:didx], "注销提交未携带 captcha_token"
+
+
+def test_web_bundle_contains_captcha_calls():
+    """构建产物（static/vue）必须已含 captcha 调用（前端已重建）。"""
+    root = os.path.join(PROJECT_ROOT, "static", "vue")
+    found = False
+    for dirpath, _dirs, files in os.walk(root):
+        for name in files:
+            if name.endswith(".js") and "/api/captcha/challenge" in _text(os.path.join(dirpath, name)):
+                found = True
+                break
+        if found:
+            break
+    assert found, "构建产物未包含人机验证调用（需重建 Vue 产物）"
+    # auth.js / users.js 必须已打包并引用滑块组件
+    for path in (BUILD_AUTH, BUILD_USERS):
+        assert os.path.isfile(path), f"构建产物缺失：{path}"
+        assert "SliderCaptcha" in _text(path), f"{os.path.basename(path)} 未引用滑块组件"
+
+
+def test_static_version_covers_captcha_build():
+    """前端资源已变更，STATIC_VERSION 必须 >= 41。"""
+    import config
+
+    assert int(str(config.STATIC_VERSION)) >= 41, \
+        "STATIC_VERSION 应 >= 41（Vue 产物已变更）"
+
+
 if __name__ == "__main__":
     tests = [
         ("test_challenge_payload_shape", test_challenge_payload_shape),
@@ -258,6 +337,11 @@ if __name__ == "__main__":
         ("test_config_defaults", test_config_defaults),
         ("test_store_pruned_after_expiry", test_store_pruned_after_expiry),
         ("test_target_route_count_is_eleven", test_target_route_count_is_eleven),
+        ("test_web_slider_component_calls_captcha_api", test_web_slider_component_calls_captcha_api),
+        ("test_web_auth_view_wires_captcha", test_web_auth_view_wires_captcha),
+        ("test_web_user_view_wires_captcha", test_web_user_view_wires_captcha),
+        ("test_web_bundle_contains_captcha_calls", test_web_bundle_contains_captcha_calls),
+        ("test_static_version_covers_captcha_build", test_static_version_covers_captcha_build),
         ("test_all_target_routes_are_decorated", test_all_target_routes_are_decorated),
     ]
     failed = 0
