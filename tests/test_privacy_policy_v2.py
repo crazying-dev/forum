@@ -70,6 +70,7 @@ def test_privacy_lists_third_party_domains():
         "github.com",
         "ghproxy.net",
         "dns.alidns.com",
+        "challenges.cloudflare.com",
         "smtp.163.com",
     ]
     missing = [d for d in domains if d not in PRIVACY]

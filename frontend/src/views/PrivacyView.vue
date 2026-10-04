@@ -24,8 +24,8 @@ const TOC = [
       <div class="policy">
         <div class="policy-meta">
           <span>生效日期：2026 年 10 月 1 日</span>
-          <span>最近更新：2026 年 10 月 1 日</span>
-          <span>版本：2.0</span>
+          <span>最近更新：2026 年 10 月 4 日</span>
+          <span>版本：2.1</span>
           <span>适用：网页端 / Windows 客户端 / Android 客户端</span>
         </div>
 
@@ -227,6 +227,7 @@ const TOC = [
                 <tr><td>github.com / *.githubusercontent.com / *.githubassets.com</td><td>检查更新、下载新版安装包、查看项目主页</td><td>三端</td></tr>
                 <tr><td>ghproxy.net / gh-proxy.com / ghfast.top</td><td>第三方 GitHub 加速镜像，直连 GitHub 失败时下载更新包</td><td>三端</td></tr>
                 <tr><td>dns.alidns.com / doh.pub / cloudflare-dns.com / dns.google</td><td>仅用于解析 github.com 等域名（应对 DNS 污染）</td><td>Windows</td></tr>
+                <tr><td>challenges.cloudflare.com（Cloudflare Turnstile）</td><td>提供人机验证（登录 / 注册 / 改密等操作前校验）；本论坛仅接收一次性验证令牌，不接收该服务的原始采集数据</td><td>三端</td></tr>
                 <tr><td>smtp.163.com（网易 163 邮箱）</td><td>发送注册、改密、换绑、注销等验证码邮件</td><td>服务端</td></tr>
                 <tr><td>localhost（本机回环）</td><td>GitHub OAuth 授权回调</td><td>Windows</td></tr>
               </tbody>
@@ -247,6 +248,12 @@ const TOC = [
           <p>
             存储位置：本论坛的服务器位于中华人民共和国境内。除服务器所在云服务商外，
             我们不向境外提供你的个人信息。
+          </p>
+          <p>
+            <strong>境外传输提示：</strong>人机验证由 Cloudflare, Inc.（美国）提供。在你触发人机验证时，
+            你的设备会直接向 challenges.cloudflare.com 发起请求，该请求可能包含你的
+            IP 地址与浏览器环境信息，但不包含你的账号信息；验证完成后 Cloudflare 即时
+            作废本次令牌，本论坛仅接收「通过 / 不通过」的结果。
           </p>
           <p>我们遵循最短必要原则，保存期限如下：</p>
           <div class="policy-table-wrap">
@@ -274,6 +281,7 @@ const TOC = [
             <li>传输过程尽可能使用 HTTPS；</li>
             <li>敏感操作（修改密码、换绑邮箱、注销账号）均需邮箱验证码或密码二次验证；</li>
             <li>接口设有频率限制，防止暴力破解与滥用；</li>
+            <li>登录 / 注册 / 改密 / 换绑邮箱 / 注销等敏感操作启用 Cloudflare Turnstile 人机验证，验证令牌一次性有效；</li>
             <li>服务端数据库不对外开放。</li>
           </ul>
           <p>尽管我们已采取上述合理措施，但互联网环境并非绝对安全。请你妥善保管账号密码，不要与他人共享。</p>
