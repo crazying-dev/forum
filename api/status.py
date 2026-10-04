@@ -25,7 +25,7 @@ _TRACKED = ("2xx", "4xx", "5xx")
 
 _LOCK = threading.Lock()
 
-_DEFAULT_MAX = 1000
+_DEFAULT_MAX = 10000
 
 
 def _max_entries() -> int:

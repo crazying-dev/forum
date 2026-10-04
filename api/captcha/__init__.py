@@ -82,13 +82,20 @@ def _client_ip() -> str:
     return request.remote_addr or "0.0.0.0"
 
 
-def _provider() -> str:
-    """当前生效的人机验证 provider：turnstile / slider / off。"""
+def _provider(force: str = "") -> str:
+    """当前生效的人机验证 provider：turnstile / slider / off。
+
+    ``force="slider"`` 时强制走自研滑块——这是客户端在 Turnstile 解不出来
+    （组件报错 / 加载超时）时的回退通道；服务端已关闭验证（off）时 force
+    无效，仍返回 off（不会把已关掉的验证又打开）。
+    """
     if not getattr(config, "CAPTCHA_ENABLED", True):
         return "off"
     raw = str(getattr(config, "CAPTCHA_PROVIDER", "turnstile") or "").strip().lower()
     if raw in ("off", "none", "disable", "disabled", "0", "false"):
         return "off"
+    if str(force or "").strip().lower() == "slider":
+        return "slider"
     if raw == "slider":
         return "slider"
     # 其余（含默认 turnstile）：密钥不齐则回退自研滑块，绝不让线上裸奔
@@ -292,26 +299,8 @@ def verify_slider(token: str, x) -> tuple[bool, str]:
     return True, ""
 
 
-def verify_captcha(payload) -> tuple[bool, str]:
-    """业务请求接入点：按 provider 校验并消费一次性凭据。
-
-    * provider=turnstile：把 captcha_token 当 Turnstile token 交给 siteverify；
-    * provider=slider：支持两种形态 —— {captcha_token, captcha_x}（一步式）
-      或 {captcha_token}（两步式，需先经 /api/captcha/verify 标记 solved）；
-    * provider=off：直接放行。
-    """
-    provider = _provider()
-    if provider == "off":
-        return True, ""
-    data = payload if isinstance(payload, dict) else {}
-    token = str(data.get(TOKEN_FIELD) or "").strip()
-    if provider == "turnstile":
-        if not token:
-            return False, "请先完成人机验证"
-        return turnstile_verify(token, _client_ip())
-    raw_x = data.get("captcha_x")
-    if not token:
-        return False, "请先完成人机验证"
+def _consume_slider(token: str, raw_x) -> tuple[bool, str]:
+    """一次性消费滑块凭据（校验过期 / IP / 坐标）。"""
     now = time.time()
     with _lock:
         record = _store.pop(token, None)
@@ -332,6 +321,31 @@ def verify_captcha(payload) -> tuple[bool, str]:
     if record.get("solved"):
         return True, ""
     return False, "请先完成人机验证"
+
+
+def verify_captcha(payload) -> tuple[bool, str]:
+    """业务请求接入点：按凭据形态校验并消费一次性凭据。
+
+    判定顺序（与全局 provider 解耦，兼容客户端回退）：
+
+    1. token 命中服务端内存里的滑块凭据 → 按 slider 校验（支持
+       ``{captcha_token, captcha_x}`` 一步式，或已 ``solved`` 的两步式）；
+    2. 否则按全局 provider：turnstile → 交 siteverify；slider → 已过期。
+    """
+    if not getattr(config, "CAPTCHA_ENABLED", True):
+        return True, ""
+    data = payload if isinstance(payload, dict) else {}
+    token = str(data.get(TOKEN_FIELD) or "").strip()
+    if not token:
+        return False, "请先完成人机验证"
+    provider = _provider()
+    if provider == "off":
+        return True, ""
+    with _lock:
+        is_slider = token in _store
+    if is_slider or provider == "slider":
+        return _consume_slider(token, data.get("captcha_x"))
+    return turnstile_verify(token, _client_ip())
 
 
 def captcha_required(fn):
@@ -357,8 +371,12 @@ def captcha_required(fn):
 # ──────────────────────────────────────────────
 @captcha_bp.route("/challenge", methods=["POST"])
 def api_captcha_challenge():
-    """生成人机验证挑战（无需登录）；provider=slider 时才真正画图。"""
-    provider = _provider()
+    """生成人机验证挑战（无需登录）；provider=slider 时才真正画图。
+
+    ``?provider=slider`` 可强制下发自研滑块挑战——供客户端在 Turnstile
+    解不出来时回退使用（不能覆盖服务端已关闭验证的状态）。
+    """
+    provider = _provider(request.args.get("provider"))
     if provider == "off":
         return jsonify({"success": True, "enabled": False, "token": ""}), 200
     if rate_limit("captcha", 60, 300):
@@ -390,11 +408,13 @@ def api_captcha_verify():
         return jsonify({"success": True, "enabled": False}), 200
     data = request.get_json(silent=True) or {}
     token = str(data.get(TOKEN_FIELD) or "").strip()
-    if provider == "turnstile":
+    if not token:
+        return jsonify({"success": False, "code": CAPTCHA_REQUIRED_CODE,
+                        "message": "请先完成人机验证"}), 400
+    with _lock:
+        is_slider = token in _store
+    if provider == "turnstile" and not is_slider:
         # Turnstile token 一次性：这里不能消费，必须留给业务请求去校验
-        if not token:
-            return jsonify({"success": False, "code": CAPTCHA_REQUIRED_CODE,
-                            "message": "请先完成人机验证"}), 400
         return jsonify({"success": True, "provider": "turnstile", "token": token,
                         "message": "请随业务请求提交该 token"}), 200
     ok, msg = verify_slider(token, data.get("captcha_x"))

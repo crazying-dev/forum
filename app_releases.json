@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-10-04T15:13:00+08:00",
+  "updated_at": "2026-10-04T16:55:00+08:00",
   "min_versions": {
     "windows": "1.3.13",
     "android": "1.0.10",
@@ -15,19 +15,18 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.16",
+          "version": "1.3.17",
           "channel": "stable",
           "date": "2026-10-04",
-          "size": 158184750,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.16/forum_setup.exe",
+          "size": 158128404,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.17/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "7ca8c0d2e2c6762f4d565cdca4fe8450f3645992fb7edfd4199bcd0fd7c63984",
+          "sha256": "3cf18632e5af14af7b8012d43954de298b073ee43a7f7e44117d23026a1d7d28",
           "notes": [
-            "人机验证改为 Cloudflare Turnstile：弹窗内嵌浏览器组件加载官方验证控件，无需跳转外部浏览器",
-            "服务端 provider 开关自动适配：未配置密钥或本机缺少 WebEngine 时自动回退自研滑块，功能不会失效",
-            "Turnstile 令牌一次性有效（300 秒），拿到即提交，不再走两步式 verify",
-            "隐私政策升级 v2.1：新增 Cloudflare 第三方披露与境外传输提示",
-            "安装包因内嵌浏览器组件增大至约 151 MB，版本号升至 1.3.16"
+            "新增：Turnstile 加载失败 / 超时 / 缺少 sitekey 时自动回退自研滑块，人机验证不再失效",
+            "回退请求带 provider=slider，服务端直接下发滑块图片挑战，不走 Turnstile 校验通道",
+            "服务端 provider 开关（slider / turnstile / off）逻辑不变，未配置密钥时依旧自动走滑块",
+            "版本号升至 1.3.17"
           ],
           "mandatory": false
         }
@@ -41,19 +40,18 @@
       "requirement": "Android 7.0 及以上",
       "releases": [
         {
-          "version": "1.0.13",
+          "version": "1.0.14",
           "channel": "stable",
           "date": "2026-10-04",
           "size": 8152504,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.13/forum-android-1.0.13.apk",
-          "filename": "forum-android-1.0.13.apk",
-          "sha256": "f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385",
+          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.14/forum-android-1.0.14.apk",
+          "filename": "forum-android-1.0.14.apk",
+          "sha256": "0f525d22ea662261c367584f98679ff41654b3d8545a31fdd988cf367a029e05",
           "notes": [
-            "人机验证改为 Cloudflare Turnstile：弹窗 WebView 内嵌官方验证控件，令牌一次性有效",
-            "服务端未配置密钥时自动回退自研滑块；关闭验证时直接跳过、不打扰用户",
-            "修复：失败提示写入后被立即重置，导致「拖到正确位置后没有任何提示就直接重新开始」",
-            "隐私政策升级 v2.1：新增 Cloudflare 第三方披露与境外传输提示（需重新同意）",
-            "版本号 versionCode 14 / versionName 1.0.13"
+            "修复：自研滑块拼图被挤压变形导致验证永远失败（拼图按可用宽度等比缩放）",
+            "新增：Turnstile 加载失败 / 超时自动回退自研滑块",
+            "回退请求带 provider=slider，服务端直接下发滑块图片挑战",
+            "版本号 versionCode 15 / versionName 1.0.14"
           ],
           "mandatory": false
         }

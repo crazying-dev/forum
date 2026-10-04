@@ -135,6 +135,8 @@ def test_should_block_request_exemptions():
     assert rel.should_block_request("GET", "/api/app/releases", old, "") is None
     assert rel.should_block_request("GET", "/api/app/check", old, "") is None
     assert rel.should_block_request("GET", "/api/app/mirror/windows/forum_setup.exe", old, "") is None
+    # /api/status-log 豁免（运维观测接口，不应被最低版本闸门挡住）
+    assert rel.should_block_request("GET", "/api/status-log", old, "") is None
     # OPTIONS 预检不拦
     assert rel.should_block_request("OPTIONS", "/api/posts", old, "") is None
     # 未知客户端放行（fail-open）

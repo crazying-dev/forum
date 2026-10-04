@@ -105,6 +105,26 @@ def test_api_empty_without_file(tmp_path, monkeypatch):
     assert data["count"] == 0
 
 
+def test_status_log_max_default_is_10000():
+    """默认上限 10000 条：config.py 源码默认与 api/status.py 兜底常量必须一致。"""
+    import api.status as st
+
+    cfg = (ROOT / "config.py").read_text(encoding="utf-8")
+    assert 'os.getenv("STATUS_LOG_MAX", "10000")' in cfg, "config.py 的默认上限应改为 10000"
+    assert st._DEFAULT_MAX == 10000, "api/status.py 的兜底常量应为 10000"
+
+
+def test_max_entries_falls_back_to_default(tmp_path, monkeypatch):
+    """config 值非法（0 / 负数）时回退到默认上限 10000，而不是裁到 0 条。"""
+    import config
+    import api.status as st
+
+    monkeypatch.setattr(config, "STATUS_LOG_MAX", 0)
+    assert st._max_entries() == 10000
+    monkeypatch.setattr(config, "STATUS_LOG_MAX", -5)
+    assert st._max_entries() == 10000
+
+
 def test_blueprint_and_hook_wired():
     api_init = (ROOT / "api" / "__init__.py").read_text(encoding="utf-8")
     assert "status_bp" in api_init, "api/__init__.py 未注册 status_bp"

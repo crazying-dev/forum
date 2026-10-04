@@ -215,6 +215,11 @@ def compare_versions(a, b) -> int:
 # 自身提供，不存在版本落后问题）。
 CLIENT_PLATFORM_HEADER = "X-Client-Platform"
 CLIENT_VERSION_HEADER = "X-Client-Version"
+
+# 免闸门的路径前缀：
+#   /api/app/     —— 发布清单 / 检查更新 / 反代下载，客户端必须能自助更新；
+#   /api/status-log —— 状态码日志（运维观测），不应被最低版本闸门挡住。
+GATE_EXEMPT_PREFIXES = ("/api/app/", "/api/status-log")
 VERSION_TOO_LOW_CODE = "VERSION_TOO_LOW"
 WEB_PLATFORM = "web"
 
@@ -301,13 +306,13 @@ def version_gate_violation(platform, version):
 def should_block_request(method, path, headers, user_agent=""):
     """通用闸门判定：需要拦截时返回 426 响应体，否则返回 None。
 
-    豁免：OPTIONS 预检；非 /api/ 路径（页面与静态资源）；/api/app/*
-    （清单 / 检查 / 反代下载，保证客户端能自助更新）；web 平台；
-    无法判断平台时放行（fail-open）。
+    豁免：OPTIONS 预检；非 /api/ 路径（页面与静态资源）；``GATE_EXEMPT_PREFIXES``
+    （/api/app/* 清单 / 检查 / 反代下载，保证客户端能自助更新；/api/status-log
+    状态码日志，运维观测用）；web 平台；无法判断平台时放行（fail-open）。
     """
     if (method or "").upper() == "OPTIONS":
         return None
-    if not path or not path.startswith("/api/") or path.startswith("/api/app/"):
+    if not path or not path.startswith("/api/") or path.startswith(GATE_EXEMPT_PREFIXES):
         return None
     platform, version = resolve_client(headers, user_agent)
     return version_gate_violation(platform, version)

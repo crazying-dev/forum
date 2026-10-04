@@ -398,6 +398,113 @@ def test_embed_blueprint_registered_in_api():
     assert "app.register_blueprint(captcha_embed_bp)" in src
 
 
+# ──────────────────────────
+# provider 强制回退（Turnstile 解不出来时的兜底通道）
+# ──────────────────────────
+def test_provider_force_slider_overrides_turnstile():
+    """force="slider" 必须压过已配置好的 turnstile —— 这是抓不到 Turnstile token 时的兜底。"""
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        assert captcha._provider() == "turnstile"
+        assert captcha._provider("slider") == "slider"
+        assert captcha._provider("SLIDER") == "slider", "大小写不敏感"
+        assert captcha._provider("  slider  ") == "slider", "两侧空白应忽略"
+        assert captcha._provider("turnstile") == "turnstile", "非 slider 的 force 值应被忽略"
+
+
+def test_provider_force_cannot_revive_disabled():
+    """服务端已关闭验证时 force 无效（不能把关掉的验证又打开）。"""
+    with _Ctx(CAPTCHA_ENABLED=False, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        assert captcha._provider("slider") == "off"
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="off"):
+        assert captcha._provider("slider") == "off"
+
+
+def test_challenge_forced_slider_returns_image_payload():
+    """全局是 turnstile，但 ?provider=slider 应下发图片挑战（而非 turnstile 配置）。"""
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        body = _client().post("/api/captcha/challenge?provider=slider").get_json()
+    assert body["success"] is True
+    assert body["provider"] == "slider"
+    assert body["bg"].startswith("data:image/png;base64,")
+    assert body["piece"].startswith("data:image/png;base64,")
+    assert "sitekey" not in body, "强制滑块时不应下发 turnstile sitekey"
+
+
+def test_slider_token_verified_even_when_global_provider_is_turnstile():
+    """客户端回退拿到滑块 token 后，业务接口必须按滑块校验（不得送 siteverify）。"""
+    calls = []
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        client = _client()
+        ch = client.post("/api/captcha/challenge?provider=slider").get_json()
+        answer = captcha._store[ch["token"]]["answer_x"]
+        original = turnstile._post_siteverify
+        turnstile._post_siteverify = _fake_siteverify({"success": False}, calls=calls)
+        try:
+            resp = client.post("/api/probe",
+                               json={"captcha_token": ch["token"], "captcha_x": answer})
+        finally:
+            turnstile._post_siteverify = original
+    assert resp.status_code == 200, "滑块 token 应通过校验"
+    assert resp.get_json()["probe"] is True
+    assert calls == [], "滑块凭据不得被送往 siteverify"
+
+
+def test_slider_token_still_rejected_on_wrong_x():
+    """回退通道不能降低安全性：坐标偏差超容差仍须拒绝。"""
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        client = _client()
+        ch = client.post("/api/captcha/challenge?provider=slider").get_json()
+        answer = captcha._store[ch["token"]]["answer_x"]
+        bad = client.post("/api/probe",
+                          json={"captcha_token": ch["token"], "captcha_x": answer + 999})
+    assert bad.status_code == 400
+    assert bad.get_json()["code"] == "CAPTCHA_REQUIRED"
+
+
+def test_verify_endpoint_routes_slider_token_under_turnstile():
+    """/api/captcha/verify 遇到滑块 token（即便全局 turnstile）也必须走滑块通道。"""
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        client = _client()
+        ch = client.post("/api/captcha/challenge?provider=slider").get_json()
+        answer = captcha._store[ch["token"]]["answer_x"]
+        ok = client.post("/api/captcha/verify",
+                         json={"captcha_token": ch["token"], "captcha_x": answer})
+        assert ok.status_code == 200
+        body = ok.get_json()
+        assert body["success"] is True
+        assert "provider" not in body, "滑块通道不应回传 turnstile 透传标记"
+        assert body.get("message") == "验证通过"
+        # 坐标错误仍须被拒（用新 token，避免复用已消费凭据）
+        ch2 = client.post("/api/captcha/challenge?provider=slider").get_json()
+        a2 = captcha._store[ch2["token"]]["answer_x"]
+        bad = client.post("/api/captcha/verify",
+                          json={"captcha_token": ch2["token"], "captcha_x": a2 + 999})
+        assert bad.status_code == 400
+
+
+def test_turnstile_token_still_goes_to_siteverify():
+    """非滑块 token 在 turnstile 全局下仍按原路送 siteverify（回退逻辑不误伤主通道）。"""
+    calls = []
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        original = turnstile._post_siteverify
+        turnstile._post_siteverify = _fake_siteverify(
+            {"success": True, "hostname": "www.yjlt.top"}, calls=calls)
+        try:
+            resp = _client().post("/api/probe", json={"captcha_token": "turnstile-token"})
+        finally:
+            turnstile._post_siteverify = original
+    assert resp.status_code == 200
+    assert resp.get_json()["probe"] is True
+    assert calls and calls[0]["response"] == "turnstile-token"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("test_") and callable(fn)]

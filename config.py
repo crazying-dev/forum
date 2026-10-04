@@ -285,7 +285,7 @@ COOKIE_SAMESITE = "Lax"
 # 每次更新静态资源（AfterBody.js / main.css 等）后，把此版本号 +1，
 # 模板中 ?v= 自动变化即可让浏览器重新拉取，避免用户拿到旧文件。
 # ──────────────────────────────────────────────────────────────
-STATIC_VERSION = "43"
+STATIC_VERSION = "44"
 
 # ──────────────────────────────────────────────────────────────
 # 用户注册默认值
@@ -354,14 +354,14 @@ except OSError:
 ALLOWED_CATEGORIES = ["general", "talk", "question", "share", "creative"]
 
 # ── 状态码日志（2xx / 4xx / 5xx 的发生时间）──
-# 追加式文本日志，每行一个 JSON（{"time": ..., "status": ..., "class": ...}）。
+# 追加式文本日志，每行一个 JSON（{"time": ..., "status": ...}）。
 # 仅保留最近 STATUS_LOG_MAX 条（超出即裁剪最旧的）；查询接口 GET /api/status-log。
 # 环境变量 STATUS_LOG=0 可整体关闭记录（见 app.py）。
 STATUS_LOG_PATH = os.getenv(
     "STATUS_LOG_PATH",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "status.log"),
 )
-STATUS_LOG_MAX = int(os.getenv("STATUS_LOG_MAX", "1000") or "1000")
+STATUS_LOG_MAX = int(os.getenv("STATUS_LOG_MAX", "10000") or "10000")
 try:
     # 目录不存在时自动创建；权限不足等异常不阻塞启动
     os.makedirs(os.path.dirname(STATUS_LOG_PATH), exist_ok=True)

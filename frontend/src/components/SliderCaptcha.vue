@@ -24,6 +24,9 @@ const meta = ref({ y: 0, width: 320, height: 180, pieceSize: 50 })
 const dragX = ref(0)
 const sitekey = ref('')
 const tsHost = ref(null)
+// Turnstile 解不出来时的回退：一旦置位，后续挑战一律强制 ?provider=slider
+const sliderOnly = ref(false)
+let triedFallback = false
 
 let token = ''
 let resolver = null
@@ -57,10 +60,15 @@ async function _renderTurnstile() {
     await _loadTurnstileScript()
   } catch (e) {
     errMsg.value = (e && e.message) || '验证服务加载失败'
+    _fallbackToSlider()
     return
   }
   const host = tsHost.value
-  if (!host || !window.turnstile) { errMsg.value = '验证服务不可用，请重试'; return }
+  if (!host || !window.turnstile) {
+    errMsg.value = '验证服务不可用，请重试'
+    _fallbackToSlider()
+    return
+  }
   _cleanupWidget()
   host.innerHTML = ''
   try {
@@ -69,13 +77,33 @@ async function _renderTurnstile() {
       theme: _theme(),
       language: 'zh-cn',
       callback: function (tok) { if (tok) _resolve({ token: tok }) },
-      'error-callback': function () { errMsg.value = '人机验证失败，请重试'; return true },
-      'timeout-callback': function () { errMsg.value = '验证超时，请重试'; return true },
+      'error-callback': function () {
+        errMsg.value = '人机验证失败，请重试'
+        _fallbackToSlider()
+        return true
+      },
+      'timeout-callback': function () {
+        errMsg.value = '验证超时，请重试'
+        _fallbackToSlider()
+        return true
+      },
       'expired-callback': function () { errMsg.value = '验证已过期，请重新验证' },
     })
   } catch (e) {
     errMsg.value = '组件初始化失败，请刷新重试'
+    _fallbackToSlider()
   }
+}
+
+// Turnstile 出错 / 加载失败 / 超时 → 自动改用自研滑块（只回退一次，避免来回抖动）。
+// 服务端 ?provider=slider 会强制下发拼图挑战，即使全局 provider 仍是 turnstile。
+function _fallbackToSlider() {
+  if (triedFallback) return false
+  triedFallback = true
+  sliderOnly.value = true
+  _cleanupWidget()
+  fetchChallenge()
+  return true
 }
 
 function _cleanupWidget() {
@@ -94,14 +122,21 @@ async function fetchChallenge() {
   errMsg.value = ''
   dragX.value = 0
   try {
-    const d = await apiFetch('/api/captcha/challenge', { method: 'POST', body: {} })
+    const url = sliderOnly.value
+      ? '/api/captcha/challenge?provider=slider'
+      : '/api/captcha/challenge'
+    const d = await apiFetch(url, { method: 'POST', body: {} })
     if (!d || !d.success) throw new Error((d && d.message) || '加载失败')
     // 服务端已关闭人机验证：直接放行（captcha_token 留空）
     if (d.enabled === false) { _resolve({ token: '' }); return }
     provider.value = d.provider || 'slider'
     if (provider.value === 'turnstile') {
       sitekey.value = d.sitekey || ''
-      if (!sitekey.value) throw new Error('验证服务未配置')
+      if (!sitekey.value) {
+        // 服务端没给 sitekey（理论上不会发生）→ 改走自研滑块，不能白屏
+        if (!_fallbackToSlider()) throw new Error('验证服务未配置')
+        return
+      }
       await nextTick()
       loading.value = false
       await _renderTurnstile()
