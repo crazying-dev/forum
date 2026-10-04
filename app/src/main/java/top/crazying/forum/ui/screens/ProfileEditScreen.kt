@@ -26,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import top.crazying.forum.core.App
+import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
@@ -173,7 +174,10 @@ fun ProfileEditScreen(nav: Navigator) {
         pwdError = ""
         pwdSending = true
         scope.launch {
-            val r = App.api.sendChangePasswordCode()
+            // 发送邮箱验证码前先过人机验证；用户取消则中止。
+            val captchaToken = askCaptcha()
+            if (captchaToken == null) { pwdSending = false; return@launch }
+            val r = App.api.sendChangePasswordCode(captchaToken)
             pwdSending = false
             if (r.ok) { pwdCountdown = 60; toast(context, r.message.ifBlank { "验证码已发送至当前绑定邮箱" }) }
             else pwdError = r.message
@@ -204,7 +208,10 @@ fun ProfileEditScreen(nav: Navigator) {
         emailError = ""
         oldSending = true
         scope.launch {
-            val r = App.api.sendChangeEmailOldCode()
+            // 发送邮箱验证码前先过人机验证；用户取消则中止。
+            val captchaToken = askCaptcha()
+            if (captchaToken == null) { oldSending = false; return@launch }
+            val r = App.api.sendChangeEmailOldCode(captchaToken)
             oldSending = false
             if (r.ok) { oldCountdown = 60; toast(context, r.message.ifBlank { "验证码已发送至当前邮箱" }) }
             else emailError = r.message
@@ -218,7 +225,10 @@ fun ProfileEditScreen(nav: Navigator) {
         if (!EMAIL_RE.matches(target)) { emailError = "请输入有效的新邮箱地址"; return }
         newSending = true
         scope.launch {
-            val r = App.api.sendChangeEmailCode(target)
+            // 发送邮箱验证码前先过人机验证；用户取消则中止。
+            val captchaToken = askCaptcha()
+            if (captchaToken == null) { newSending = false; return@launch }
+            val r = App.api.sendChangeEmailCode(target, captchaToken)
             newSending = false
             if (r.ok) { newCountdown = 60; toast(context, r.message.ifBlank { "验证码已发送至新邮箱" }) }
             else emailError = r.message

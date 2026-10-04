@@ -233,12 +233,17 @@ class Api(private val prefs: Prefs) {
 
     // ────────────────── 认证 ──────────────────
 
-    suspend fun login(name: String = "", email: String = "", password: String): ApiResult {
+    suspend fun login(
+        name: String = "",
+        email: String = "",
+        password: String,
+        captchaToken: String = "",
+    ): ApiResult {
         val body = JSONObject()
         if (name.isNotBlank()) body.put("name", name.trim())
         if (email.isNotBlank()) body.put("email", email.trim())
         body.put("password", password)
-        val result = post("/api/user/login", body)
+        val result = post("/api/user/login", Captcha.withToken(body, captchaToken))
         if (result.ok) {
             adoptUser(result)
             val who = name.ifBlank { email }.trim()
@@ -253,12 +258,17 @@ class Api(private val prefs: Prefs) {
         return result
     }
 
-    suspend fun register(name: String, email: String, password: String): ApiResult {
+    suspend fun register(
+        name: String,
+        email: String,
+        password: String,
+        captchaToken: String = "",
+    ): ApiResult {
         val body = JSONObject()
             .put("name", name.trim())
             .put("email", email.trim())
             .put("password", password)
-        val result = post("/api/user/register", body)
+        val result = post("/api/user/register", Captcha.withToken(body, captchaToken))
         if (result.ok) {
             adoptUser(result)
             if (App.user.value == null) runCatching { me() }
@@ -267,12 +277,15 @@ class Api(private val prefs: Prefs) {
         return result
     }
 
-    suspend fun sendRegisterCode(email: String): ApiResult =
-        post("/api/email/send-register-code", JSONObject().put("email", email.trim()))
+    suspend fun sendRegisterCode(email: String, captchaToken: String = ""): ApiResult =
+        post(
+            "/api/email/send-register-code",
+            Captcha.withToken(JSONObject().put("email", email.trim()), captchaToken),
+        )
 
     /** 注销账号验证码：发到当前绑定邮箱（需登录；未绑定有效邮箱服务端返回 400）。 */
-    suspend fun sendDeleteAccountCode(): ApiResult =
-        post("/api/email/send-delete-account-code")
+    suspend fun sendDeleteAccountCode(captchaToken: String = ""): ApiResult =
+        post("/api/email/send-delete-account-code", Captcha.withToken(JSONObject(), captchaToken))
 
     /**
      * 自助注销账号。
@@ -281,13 +294,18 @@ class Api(private val prefs: Prefs) {
      * @param password 账号密码（与 [code] 二选一，可为 null）
      * @param code     邮箱验证码（与 [password] 二选一，可为 null）
      */
-    suspend fun deleteAccount(mode: String, password: String?, code: String?): ApiResult {
+    suspend fun deleteAccount(
+        mode: String,
+        password: String?,
+        code: String?,
+        captchaToken: String = "",
+    ): ApiResult {
         val body = JSONObject()
             .put("mode", mode)
             .put("confirm", "注销账号")
         if (!password.isNullOrBlank()) body.put("password", password)
         if (!code.isNullOrBlank()) body.put("code", code.trim())
-        return post("/api/user/delete", body)
+        return post("/api/user/delete", Captcha.withToken(body, captchaToken))
     }
 
     suspend fun me(): ApiResult {
@@ -342,7 +360,8 @@ class Api(private val prefs: Prefs) {
     // ────────────────── 账号安全（修改密码 / 更换邮箱） ──────────────────
 
     /** 修改密码第 1 步：发送 6 位验证码到当前绑定邮箱。 */
-    suspend fun sendChangePasswordCode(): ApiResult = post("/api/email/send-change-password-code")
+    suspend fun sendChangePasswordCode(captchaToken: String = ""): ApiResult =
+        post("/api/email/send-change-password-code", Captcha.withToken(JSONObject(), captchaToken))
 
     /** 修改密码第 2 步：凭邮箱验证码设置新密码（成功后服务端会清 cookie，需重新登录）。 */
     suspend fun changePassword(code: String, newPassword: String): ApiResult =
@@ -352,11 +371,15 @@ class Api(private val prefs: Prefs) {
         )
 
     /** 更换邮箱第 1 步：发送验证码到「当前绑定邮箱」（身份确认）。 */
-    suspend fun sendChangeEmailOldCode(): ApiResult = post("/api/email/send-change-email-old-code")
+    suspend fun sendChangeEmailOldCode(captchaToken: String = ""): ApiResult =
+        post("/api/email/send-change-email-old-code", Captcha.withToken(JSONObject(), captchaToken))
 
     /** 更换邮箱第 2 步：发送验证码到「新邮箱」（可达性验证）。 */
-    suspend fun sendChangeEmailCode(email: String): ApiResult =
-        post("/api/email/send-change-email-code", JSONObject().put("email", email.trim()))
+    suspend fun sendChangeEmailCode(email: String, captchaToken: String = ""): ApiResult =
+        post(
+            "/api/email/send-change-email-code",
+            Captcha.withToken(JSONObject().put("email", email.trim()), captchaToken),
+        )
 
     /** 更换邮箱第 3 步：凭两枚验证码完成换绑。 */
     suspend fun changeEmail(email: String, oldCode: String, code: String): ApiResult {
@@ -368,6 +391,25 @@ class Api(private val prefs: Prefs) {
         if (result.ok) adoptUser(result)
         return result
     }
+
+    // ────────────────── 人机验证（滑块拼图） ──────────────────
+
+    /**
+     * 申请一次滑块拼图挑战。
+     *
+     * 返回 `{success, token, bg, piece, y, width, height, piece_size}`（`bg` / `piece`
+     * 是 data URL PNG）；服务端未启用人机验证时返回 `{success: true, enabled: false}`。
+     */
+    suspend fun captchaChallenge(): ApiResult = post(Captcha.CHALLENGE_PATH)
+
+    /** 提交滑块 x 坐标；成功返回原 token，失败返回 400 + 可读文案。 */
+    suspend fun captchaVerify(captchaToken: String, captchaX: Int): ApiResult =
+        post(
+            Captcha.VERIFY_PATH,
+            JSONObject()
+                .put(Captcha.FIELD_TOKEN, captchaToken)
+                .put(Captcha.FIELD_X, captchaX),
+        )
 
     // ────────────────── 帖子 ──────────────────
 

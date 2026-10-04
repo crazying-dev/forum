@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
+import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.components.ForumTextField
@@ -71,12 +72,21 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
 
         busy = true
         scope.launch {
+            // 人机验证（服务端未启用时返回空串，直接继续）。用户取消则中断本次登录/注册。
+            val captchaToken = askCaptcha()
+            if (captchaToken == null) {
+                busy = false
+                return@launch
+            }
             val result = if (register) {
-                App.api.register(account.trim(), email.trim(), password)
+                App.api.register(account.trim(), email.trim(), password, captchaToken)
             } else {
                 val key = account.trim()
-                if (key.contains("@")) App.api.login(email = key, password = password)
-                else App.api.login(name = key, password = password)
+                if (key.contains("@")) {
+                    App.api.login(email = key, password = password, captchaToken = captchaToken)
+                } else {
+                    App.api.login(name = key, password = password, captchaToken = captchaToken)
+                }
             }
             busy = false
             if (result.ok) {

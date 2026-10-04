@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
+import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
@@ -84,7 +85,10 @@ fun DeleteAccountScreen(nav: Navigator) {
         error = ""
         sendingCode = true
         scope.launch {
-            val r = App.api.sendDeleteAccountCode()
+            // 发送注销验证码前先过人机验证；用户取消则中止。
+            val captchaToken = askCaptcha()
+            if (captchaToken == null) { sendingCode = false; return@launch }
+            val r = App.api.sendDeleteAccountCode(captchaToken)
             sendingCode = false
             if (r.ok) {
                 countdown = 60
@@ -117,10 +121,17 @@ fun DeleteAccountScreen(nav: Navigator) {
         if (busy) return
         scope.launch {
             busy = true
+            // 服务端把 `/api/user/delete` 一并纳入人机验证（与发码步骤各自独立）。
+            val captchaToken = askCaptcha()
+            if (captchaToken == null) {
+                busy = false
+                return@launch
+            }
             val r = App.api.deleteAccount(
                 mode = mode,
                 password = if (method == METHOD_PASSWORD) password else null,
                 code = if (method == METHOD_CODE) code.trim() else null,
+                captchaToken = captchaToken,
             )
             busy = false
             showConfirm = false

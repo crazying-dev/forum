@@ -149,6 +149,10 @@ fun ForumRoot() {
 
                 // 发现新版本时由 App.updateInfo 驱动弹出（冷启动自动检查 / 设置页手动检查）
                 UpdateDialogHost()
+
+                // 人机验证（滑块拼图）：业务流程调用 `askCaptcha()` 时由 CaptchaPrompt 驱动。
+                // 放在最后，保证叠在页面自带的 AlertDialog（如注销二次确认）之上。
+                CaptchaHost()
             }
         }
     }
