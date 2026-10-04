@@ -80,7 +80,8 @@ def test_privacy_blocks_cover_chapters_and_contacts():
     assert "https://github.com/crazying-dev" in body
     assert "https://crazying-dev.top" in body
     assert "2026 年 10 月 1 日" in body
-    assert "版本：2.0" in body
+    assert "版本：2.1" in body
+    assert "challenges.cloudflare.com" in body
     # 端标记已剥净，Markdown 表格语法不残留
     for marker in ("[通用]", "[WIN]", "[WEB]", "[ANDROID]"):
         assert marker not in body, marker
