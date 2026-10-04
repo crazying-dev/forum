@@ -139,7 +139,7 @@ object Constants {
      * 用户同意后把该值写入 `Prefs.privacyAgreedVersion`；政策版本升号时
      * 会在下次启动重新弹窗征得同意（合规要求）。
      */
-    const val PRIVACY_POLICY_VERSION = "2.0"
+    const val PRIVACY_POLICY_VERSION = "2.1"
 
     // ────────────────── 国庆假期 ──────────────────
     // 本地时间 10-01 00:00 ~ 10-07 24:00（等价于 10-08 00:00 开区间，因此只判 1..7 日）

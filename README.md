@@ -200,7 +200,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **支持作者**：我的页常驻赞赏码区块（远端图床图，由 Coil 落盘缓存，不重复下载）
 * **应用自更新**：冷启动静默检查（每 24 小时最多一次；也可在「我的 › 关于」手动检查）；下载回退链「直连 GitHub → 公共加速（ghproxy.net / gh-proxy.com / ghfast.top）→ 站内反代」，下载后校验体积 + sha256，再经 FileProvider 调起系统安装器（首次会引导「安装未知应用」授权）
 * **彩蛋**：底部第 6 个「彩蛋」标签（对齐网页手机端），每次随机奉上一条 `/Easter-Egg` 彩蛋或「每日一言」
-* **隐私政策与服务协议**：我的页二级入口「隐私政策」（v2.0 全文，仅取 Android 可见段）、「注销账号」（彻底删除 / 匿名化保留，密码或邮箱验证码验证 + 输入「注销账号」四字 + 二次确认）
+* **隐私政策与服务协议**：我的页二级入口「隐私政策」（v2.1 全文，仅取 Android 可见段）、「注销账号」（彻底删除 / 匿名化保留，密码或邮箱验证码验证 + 输入「注销账号」四字 + 二次确认）
 * **首启隐私政策同意门**：首次安装启动（或政策版本升级后）弹出**不可绕过**的同意弹窗，须手动勾选「我已阅读并同意《隐私政策》」后「同意并继续」才可用；「不同意」直接退出应用；同意前**不发起任何网络请求**（冷启动的会话刷新与自动检查更新均延后到同意之后）
 * **主题**：4 套色板 + 国庆假期强制叠加（与 Web / Windows 三端同语义）
 * **编辑资料**：「我的 › 编辑资料」（资料卡按钮 + 快捷入口双入口）——头像上传（相册选图，≤5MB，随选随传）、昵称 / 性别 / 出生日期（年-月-日三下拉 + 「不展示出生日期」）/ 简介，保存走 `PUT /api/user/info`
@@ -225,6 +225,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * 接入点（`captchaToken` 参数为空时不往请求体里加字段，保持老流程不变）：登录 / 注册 / 注销账号验证码 / 注销账号 / 修改密码验证码 / 更换邮箱-当前邮箱验证码 / 更换邮箱-新邮箱验证码，共 7 处；`/api/user/password`、`/api/user/email` 两个终步服务端未设闸门，客户端同样不带。
   * `core/Captcha.kt` 新增纯函数：`providerOf()`（未知 / 空值一律回退 slider）、`embedUrl()`（拼承载页 URL，含 theme / lang / size 归一化）、`eventOf()` / `tokenFromEvent()`（解析承载页回传事件）。
   * `app/src/test/java/top/crazying/forum/core/CaptchaTest.kt` 扩到 24 例（含「弹窗确实接了 Turnstile 桥」「`CaptchaHost` 只声明一次」的源码扫描）。
+* **隐私政策 v2.1（V1.0.13）**：新增 Cloudflare Turnstile 第三方披露（`challenges.cloudflare.com` — 人机验证；触达端：三端）与「境外传输提示」（验证请求由设备直连 Cloudflare，可能含 IP 与浏览器环境信息，不含账号信息）；`Constants.PRIVACY_POLICY_VERSION` 由 `2.0` 升至 `2.1`，首启同意门据此重新征得同意。
 
 ### 未实现（后续多轮持续补齐）
 
@@ -269,7 +270,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | 命令 | `.\gradlew.bat testDebugUnitTest --console=plain` |
 | 结果 | **BUILD SUCCESSFUL**（47 例全部通过：CaptchaTest 24 / VersionGateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6） |
 | 产物 | `app\build\outputs\apk\debug\app-debug.apk`，**11 623 321 字节**，sha256 `07dbf7ba7e7409f7dffe556d918c12e41eaf09753745570b94ab5725a9fdd4ac` |
-| Release 产物（V1.0.13） | `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `86dee342000910b39ceeac56fac30b7a77437bc8d35ba0081450a04dcee81022`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| Release 产物（V1.0.13） | `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
 
 编译过程中定位并修正的 3 类真实问题（供后续参考）：
 

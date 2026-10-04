@@ -81,7 +81,7 @@ fun PrivacyPolicyPage(onBack: () -> Unit) {
 /** 隐私政策正文（仅 [通用] + [ANDROID] 段，章节号一~十连续，Android 小节重编号为 3.1）。 */
 private val PRIVACY: List<PBlock> = listOf(
     PBlock.Heading("妖精论坛 隐私政策"),
-    PBlock.Paragraph("生效日期：2026 年 10 月 1 日　|　最近更新：2026 年 10 月 1 日　|　版本：2.0"),
+    PBlock.Paragraph("生效日期：2026 年 10 月 1 日　|　最近更新：2026 年 10 月 4 日　|　版本：2.1"),
 
     // —— 引言与适用范围 ——
     PBlock.Heading("引言与适用范围"),
@@ -138,6 +138,7 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Bullet("· github.com / *.githubusercontent.com / *.githubassets.com — 检查更新、下载新版安装包、查看项目主页（触达端：三端）"),
     PBlock.Bullet("· ghproxy.net / gh-proxy.com / ghfast.top — 第三方 GitHub 加速镜像，直连 GitHub 失败时下载更新包（触达端：三端）"),
     PBlock.Bullet("· dns.alidns.com / doh.pub / cloudflare-dns.com / dns.google — 仅用于解析 github.com 等域名（应对 DNS 污染）（触达端：Windows）"),
+    PBlock.Bullet("· challenges.cloudflare.com（Cloudflare Turnstile） — 提供人机验证（登录 / 注册 / 改密等操作前校验）；本论坛仅接收一次性验证令牌（触达端：三端）"),
     PBlock.Bullet("· smtp.163.com（网易 163 邮箱） — 发送注册、改密、换绑、注销等验证码邮件（触达端：服务端）"),
     PBlock.Bullet("· localhost（本机回环） — GitHub OAuth 授权回调（触达端：Windows）"),
     PBlock.Paragraph("我们不会向上述第三方提供你的账号信息；上述请求仅携带实现该功能所必需的参数（如文件名、帖子 ID）。"),
@@ -146,6 +147,7 @@ private val PRIVACY: List<PBlock> = listOf(
     // —— 五 ——
     PBlock.Heading("五、信息的存储与保存期限"),
     PBlock.Paragraph("存储位置：本论坛的服务器位于中华人民共和国境内。除服务器所在云服务商外，我们不向境外提供你的个人信息。"),
+    PBlock.Paragraph("境外传输提示：人机验证由 Cloudflare, Inc.（美国）提供。触发验证时你的设备会直接向 challenges.cloudflare.com 发起请求，可能包含 IP 地址与浏览器环境信息，但不包含你的账号信息；验证完成后 Cloudflare 即时作废本次令牌，本论坛仅接收「通过 / 不通过」的结果。"),
     PBlock.Paragraph("我们遵循最短必要原则，保存期限如下："),
     PBlock.Bullet("· 账号信息（用户名、邮箱、密码哈希） — 自注销之日起删除；选择「匿名化保留」则仅保留无法识别到你本人的脱敏记录"),
     PBlock.Bullet("· 帖子与评论 — 你主动删除或注销账号时删除；「匿名化保留」模式下保留正文但去除可识别身份"),
@@ -162,6 +164,7 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Bullet("· 传输过程尽可能使用 HTTPS；"),
     PBlock.Bullet("· 敏感操作（修改密码、换绑邮箱、注销账号）均需邮箱验证码或密码二次验证；"),
     PBlock.Bullet("· 接口设有频率限制，防止暴力破解与滥用；"),
+    PBlock.Bullet("· 登录 / 注册 / 改密 / 换绑邮箱 / 注销等敏感操作启用 Cloudflare Turnstile 人机验证，验证令牌一次性有效；"),
     PBlock.Bullet("· 服务端数据库不对外开放。"),
     PBlock.Paragraph("尽管我们已采取上述合理措施，但互联网环境并非绝对安全。请你妥善保管账号密码，不要与他人共享。"),
     PBlock.Paragraph("请你特别注意：你在帖子、评论、世界频道或个性签名中主动公开的信息，可能被其他用户或第三方看到、保存、转发，请谨慎发布。"),
