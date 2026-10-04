@@ -96,6 +96,15 @@ class Page(QWidget):
     def bug_report(self) -> None:
         BugReportDialog(self.window(), page_url=self.route_url()).exec()
 
+    def ask_captcha(self, parent: QWidget | None = None) -> str | None:
+        """弹出滑块拼图人机验证；返回一次性 token；用户取消返回 ``None``。
+
+        服务端关闭人机验证（``CAPTCHA_ENABLED=0``）时返回空串，
+        调用方照常请求、无需携带 ``captcha_token``。
+        """
+        from ..widgets.captcha import ask_captcha as _ask_captcha
+        return _ask_captcha(parent if parent is not None else self.window())
+
     def route_url(self) -> str:
         return constants.BASE_URL + "/"
 

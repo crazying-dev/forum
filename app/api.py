@@ -30,6 +30,41 @@ PARSE_ERROR_TEXT = "响应解析失败"
 # 服务端「最低版本闸门」拦截时返回的业务码（HTTP 426）
 VERSION_TOO_LOW_CODE = "VERSION_TOO_LOW"
 
+# 服务端「人机验证」拦截时返回的业务码（HTTP 400）
+CAPTCHA_REQUIRED_CODE = "CAPTCHA_REQUIRED"
+
+# 需要人机验证的业务接口（服务端 @captcha_required 装饰的 11 个端点中，
+# 客户端会用到的 10 个；/api/email/send-verify-email 客户端不调用）。
+# 每次调用都要先弹一次滑块，拿到一次性 token 后随请求体提交。
+CAPTCHA_PROTECTED_ENDPOINTS = (
+    "/api/user/login",
+    "/api/user/register",
+    "/api/user/delete",
+    "/api/email/send-register-code",
+    "/api/email/send-code-reset-password",
+    "/api/email/reset-password-by-code",
+    "/api/email/send-change-password-code",
+    "/api/email/send-change-email-code",
+    "/api/email/send-change-email-old-code",
+    "/api/email/send-delete-account-code",
+)
+
+
+def _with_captcha(payload: Any, captcha_token: str = "") -> Any:
+    """把一次性人机验证 token 并入请求体（空串表示无需携带）。
+
+    服务端 ``CAPTCHA_ENABLED=0`` 时调用方会传空串，此时不写入该字段，
+    保持请求体与服务端旧口径完全一致。
+    """
+    token = str(captcha_token or "").strip()
+    if not token:
+        return payload
+    if isinstance(payload, dict):
+        body = dict(payload)
+        body["captcha_token"] = token
+        return body
+    return payload
+
 
 # ────────────────────────── 响应包装 ──────────────────────────
 
@@ -382,13 +417,15 @@ class ForumApi:
         run_async(fn, on_success=on_success, on_error=on_error, label=label)
 
     # ─────────────── 认证 ───────────────
-    def login(self, password: str, name: str = "", email: str = "") -> Result:
+    def login(self, password: str, name: str = "", email: str = "",
+              captcha_token: str = "") -> Result:
         payload: dict[str, Any] = {"password": password}
         if name:
             payload["name"] = name
         if email:
             payload["email"] = email
-        result = self.post("/api/user/login", payload)
+        result = self.post("/api/user/login",
+                           _with_captcha(payload, captcha_token))
         if result.ok:
             user = result.get("user")
             self.set_user(user if isinstance(user, dict) else None,
@@ -407,9 +444,11 @@ class ForumApi:
         self.clear_login()
         return result
 
-    def register(self, name: str, email: str, password: str, code: str) -> Result:
-        result = self.post("/api/user/register", {
-            "name": name, "email": email, "password": password, "code": code})
+    def register(self, name: str, email: str, password: str, code: str,
+                 captcha_token: str = "") -> Result:
+        result = self.post("/api/user/register", _with_captcha({
+            "name": name, "email": email, "password": password,
+            "code": code}, captcha_token))
         if result.ok:
             user = result.get("user")
             if not isinstance(user, dict):
@@ -419,8 +458,9 @@ class ForumApi:
             self.store.save(None, self._user, last_name=name)
         return result
 
-    def send_register_code(self, email: str) -> Result:
-        return self.post("/api/email/send-register-code", {"email": email})
+    def send_register_code(self, email: str, captcha_token: str = "") -> Result:
+        return self.post("/api/email/send-register-code",
+                         _with_captcha({"email": email}, captcha_token))
 
     def send_verify_code(self) -> Result:
         return self.post("/api/email/send-verify-code", {})
@@ -431,15 +471,19 @@ class ForumApi:
             self.me()
         return result
 
-    def send_reset_code(self, email: str) -> Result:
-        return self.post("/api/email/send-code-reset-password", {"email": email})
+    def send_reset_code(self, email: str, captcha_token: str = "") -> Result:
+        return self.post("/api/email/send-code-reset-password",
+                         _with_captcha({"email": email}, captcha_token))
 
-    def reset_password_by_code(self, email: str, code: str, password: str) -> Result:
+    def reset_password_by_code(self, email: str, code: str, password: str,
+                               captcha_token: str = "") -> Result:
         return self.post("/api/email/reset-password-by-code",
-                         {"email": email, "code": code, "password": password})
+                         _with_captcha({"email": email, "code": code,
+                                        "password": password}, captcha_token))
 
-    def send_change_password_code(self) -> Result:
-        return self.post("/api/email/send-change-password-code", {})
+    def send_change_password_code(self, captcha_token: str = "") -> Result:
+        return self.post("/api/email/send-change-password-code",
+                         _with_captcha({}, captcha_token))
 
     def change_password(self, new_password: str, code: str = "",
                         old_password: str = "") -> Result:
@@ -454,11 +498,14 @@ class ForumApi:
             self.clear_login()
         return result
 
-    def send_change_email_old_code(self) -> Result:
-        return self.post("/api/email/send-change-email-old-code", {})
+    def send_change_email_old_code(self, captcha_token: str = "") -> Result:
+        return self.post("/api/email/send-change-email-old-code",
+                         _with_captcha({}, captcha_token))
 
-    def send_change_email_code(self, new_email: str) -> Result:
-        return self.post("/api/email/send-change-email-code", {"email": new_email})
+    def send_change_email_code(self, new_email: str,
+                               captcha_token: str = "") -> Result:
+        return self.post("/api/email/send-change-email-code",
+                         _with_captcha({"email": new_email}, captcha_token))
 
     def change_email(self, old_code: str, new_email: str, new_code: str) -> Result:
         result = self.post("/api/user/email", {
@@ -469,12 +516,14 @@ class ForumApi:
                 self.set_user(user)
         return result
 
-    def send_delete_account_code(self) -> Result:
+    def send_delete_account_code(self, captcha_token: str = "") -> Result:
         """发送「注销账号」邮箱验证码（需登录，发往当前绑定邮箱）。"""
-        return self.post("/api/email/send-delete-account-code", {})
+        return self.post("/api/email/send-delete-account-code",
+                         _with_captcha({}, captcha_token))
 
     def delete_account(self, mode: str, password: str | None = None,
-                       code: str | None = None) -> Result:
+                       code: str | None = None,
+                       captcha_token: str = "") -> Result:
         """自助注销账号。
 
         ``mode`` ∈ ``{"purge", "anonymize"}``（彻底删除 / 匿名化保留）；
@@ -489,7 +538,8 @@ class ForumApi:
             payload["password"] = password
         if code:
             payload["code"] = code
-        result = self.post("/api/user/delete", payload)
+        result = self.post("/api/user/delete",
+                           _with_captcha(payload, captcha_token))
         if result.ok:
             self.clear_login()
         return result
@@ -658,6 +708,21 @@ class ForumApi:
         """启动时的连通性探测（失败不打扰用户）。"""
         result = self.healthz()
         return bool(result.ok and (result.get("ok") or result.get("service")))
+
+    # ────────────── 人机验证（滑块拼图，与网页端 / 安卓端同源）──────────────
+    def captcha_challenge(self) -> Result:
+        """获取一次滑块拼图挑战（背景图 + 拼图块 + 缺口纵向位置）。"""
+        return self.post("/api/captcha/challenge", {}, retries=1)
+
+    def captcha_verify(self, captcha_token: str, captcha_x) -> Result:
+        """两步式第一步：校验滑块水平位置。
+
+        通过后服务端把**同一个** token 标记为已解答（不消费），
+        客户端再把它塞进真实业务请求体。
+        """
+        return self.post("/api/captcha/verify",
+                         {"captcha_token": captcha_token,
+                          "captcha_x": captcha_x}, retries=1)
 
     # ─────────────── 通用网络工具 ───────────────
     def fetch_text(self, url: str, timeout: tuple[int, int] = (5, 8)) -> str:

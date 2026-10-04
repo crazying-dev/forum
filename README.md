@@ -256,6 +256,20 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
       「退出应用」两个按钮，Esc / 标题栏关闭 / 外部点击均无效；
     * `app/shell.py` 通过 `version_blocked` 信号把工作线程的事件抛回主线程弹窗
       （服务端 `/api/app/*`、`/healthz` 与静态资源不在闸门范围内）。版本号升至 1.3.14。
+22. **V1.3.15：三端人机验证（滑块拼图）**：服务端自研滑块拼图验证，登录 / 注册 /
+    找回密码 / 注销账号 / 更换绑定邮箱 / 修改密码 / 邮箱验证邮件共 11 个接口加
+    `@captcha_required` 校验，客户端需先完成滑块验证再提交业务请求：
+    * 新增 `app/widgets/captcha.py`：`SliderCaptchaDialog` / `SliderStage`
+      （纯 `QPainter` 绘制背景 + 可拖动拼图块 + 滑块轨道，无第三方 SDK），
+      `ask_captcha(parent)` 返回一次性 token（用户取消返回 `None`，服务端关闭
+      人机验证时返回空串）；
+    * `app/api.py` 新增人机验证两个接口 `captcha_challenge()` /
+      `captcha_verify()`，并为 10 个受保护业务方法加 `captcha_token` 参数
+      （空串不写入请求体，保持旧口径）；
+    * `app/pages/base.py` 新增 `Page.ask_captcha()`；登录 / 注册 / 找回密码 /
+      修改密码 / 更换邮箱 / 注销账号共 10 处调用点均先弹滑块再发请求；
+    * 服务端不可用时 `CAPTCHA_ENABLED=0` 一刀切关闭，客户端自动跳过弹窗。
+      版本号升至 1.3.15。
 
 ---
 
@@ -264,7 +278,8 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
 客户端只访问 `https://www.yjlt.top`，不修改服务端任何数据。以下端点被使用：
 
 * 认证与用户：`/api/user/{login,logout,register,info,password,email,avatar/upload,<id>,<id>/follow,<id>/{posts,favorites,following,followers,comments}}`
-* 邮箱验证码：`/api/email/{send-register-code,send-verify-code,verify-code-email,send-code-reset-password,reset-password-by-code,send-change-password-code,send-change-email-code,send-change-email-old-code}`
+* 邮箱验证码：`/api/email/{send-register-code,send-verify-code,verify-code-email,send-code-reset-password,reset-password-by-code,send-change-password-code,send-change-email-code,send-change-email-old-code,send-delete-account-code}`
+* 人机验证（滑块拼图）：`/api/captcha/{challenge,verify}`
 * 帖子与评论：`/api/posts*`、`/api/comments/*`、`/api/users/me/replies`
 * 其他：`/api/world/{ALL,Send}`、`/api/search`、`/api/huiguan`、`/api/report-bug`、`/Easter-Egg`、`/healthz`
 * 更新包反代（客户端四级回退的最后一级）：`/api/app/mirror/windows/<文件名>`——服务端实时拉取

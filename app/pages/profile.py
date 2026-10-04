@@ -24,7 +24,8 @@ from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
 from .. import constants, yearmode
 from ..widgets import (BaseDialog, Card, Chip, DeleteAccountDialog, EmptyHint,
                        Muted, PlainLabel, PostCard, ScrollPage, UserLink,
-                       UserListDialog, button, hbox, toast, vbox, with_author)
+                       UserListDialog, ask_captcha, button, hbox, toast, vbox,
+                       with_author)
 from ..widgets.images import Avatar
 from .base import Page
 
@@ -900,10 +901,14 @@ class ChangePasswordDialog(BaseDialog):
     def _send_code(self) -> None:
         if not self._cool.ready():
             return
+        token = ask_captcha(self.window())
+        if token is None:
+            return
         self.clear_error()
         self.send_btn.setEnabled(False)
-        self._page.run(lambda: self._page.api.send_change_password_code(),
-                       self._on_code_sent, self._on_code_failed, label="验证码")
+        self._page.run(
+            lambda: self._page.api.send_change_password_code(captcha_token=token),
+            self._on_code_sent, self._on_code_failed, label="验证码")
 
     def _on_code_sent(self, result) -> None:
         if not result.ok:
@@ -1035,10 +1040,14 @@ class ChangeEmailDialog(BaseDialog):
     def _send_old_code(self) -> None:
         if not self._old_cool.ready():
             return
+        token = ask_captcha(self.window())
+        if token is None:
+            return
         self.clear_error()
         self.old_send_btn.setEnabled(False)
-        self._page.run(lambda: self._page.api.send_change_email_old_code(),
-                       self._on_old_sent, self._on_old_failed, label="验证码")
+        self._page.run(
+            lambda: self._page.api.send_change_email_old_code(captcha_token=token),
+            self._on_old_sent, self._on_old_failed, label="验证码")
 
     def _on_old_sent(self, result) -> None:
         if not result.ok:
@@ -1060,9 +1069,14 @@ class ChangeEmailDialog(BaseDialog):
         if not email:
             self.show_error("请先填写新邮箱")
             return
+        token = ask_captcha(self.window())
+        if token is None:
+            return
         self.new_send_btn.setEnabled(False)
-        self._page.run(lambda: self._page.api.send_change_email_code(email),
-                       self._on_new_sent, self._on_new_failed, label="验证码")
+        self._page.run(
+            lambda: self._page.api.send_change_email_code(email,
+                                                          captcha_token=token),
+            self._on_new_sent, self._on_new_failed, label="验证码")
 
     def _on_new_sent(self, result) -> None:
         if not result.ok:

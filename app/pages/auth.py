@@ -217,6 +217,9 @@ class AuthPage(Page):
             self._set_message("邮箱格式不正确")
             return
         self._set_message("")
+        token = self.ask_captcha()
+        if token is None:
+            return
         self._set_busy(True)
         sender = self.api.send_register_code if kind == "register" else self.api.send_reset_code
 
@@ -228,7 +231,8 @@ class AuthPage(Page):
             else:
                 self._set_message(result.message)
 
-        self.run(lambda: sender(email), _done, self._fail, "发送验证码")
+        self.run(lambda: sender(email, captcha_token=token), _done, self._fail,
+                 "发送验证码")
 
     def _start_cooldown(self) -> None:
         self._cooldown = _CODE_COOLDOWN
@@ -272,6 +276,9 @@ class AuthPage(Page):
             self._set_message("请输入密码")
             return
         self._set_message("")
+        token = self.ask_captcha()
+        if token is None:
+            return
         fields = {"email": account} if "@" in account else {"name": account}
         self._set_busy(True)
 
@@ -284,7 +291,9 @@ class AuthPage(Page):
                 self.shell.refresh_user()
             self.go("home")
 
-        self.run(lambda: self.api.login(password=password, **fields), _done, self._fail, "登录")
+        self.run(lambda: self.api.login(password=password,
+                                        captcha_token=token, **fields),
+                 _done, self._fail, "登录")
 
     def _register(self) -> None:
         name = self.name_input.text().strip()
@@ -304,6 +313,9 @@ class AuthPage(Page):
             self._set_message("密码至少 %d 位，且需同时包含字母和数字" % constants.PASSWORD_MIN)
             return
         self._set_message("")
+        token = self.ask_captcha()
+        if token is None:
+            return
         self._set_busy(True)
 
         def _done(result):
@@ -315,7 +327,9 @@ class AuthPage(Page):
                 self.shell.refresh_user()
             self.go("home")
 
-        self.run(lambda: self.api.register(name, email, password, code), _done, self._fail, "注册")
+        self.run(lambda: self.api.register(name, email, password, code,
+                                          captcha_token=token),
+                 _done, self._fail, "注册")
 
     def _to_reset_step2(self) -> None:
         email = self.email_input.text().strip()
@@ -345,6 +359,9 @@ class AuthPage(Page):
             self._set_message("密码至少 %d 位，且需同时包含字母和数字" % constants.PASSWORD_MIN)
             return
         self._set_message("")
+        token = self.ask_captcha()
+        if token is None:
+            return
         self._set_busy(True)
 
         def _done(result):
@@ -356,7 +373,8 @@ class AuthPage(Page):
             self._set_message(result.message or "密码已重置，请使用新密码登录", ok=True)
 
         self.run(
-            lambda: self.api.reset_password_by_code(email, code, password),
+            lambda: self.api.reset_password_by_code(email, code, password,
+                                                    captcha_token=token),
             _done,
             self._fail,
             "重置密码",

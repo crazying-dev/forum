@@ -584,10 +584,15 @@ class DeleteAccountDialog(BaseDialog):
     def _send_code(self) -> None:
         if not self._cool.ready():
             return
+        from .captcha import ask_captcha
+        token = ask_captcha(self.window())
+        if token is None:
+            return
         self.clear_error()
         self.send_btn.setEnabled(False)
-        self._page.run(lambda: self._page.api.send_delete_account_code(),
-                       self._on_code_sent, self._on_code_failed, label="验证码")
+        self._page.run(
+            lambda: self._page.api.send_delete_account_code(captcha_token=token),
+            self._on_code_sent, self._on_code_failed, label="验证码")
 
     def _on_code_sent(self, result) -> None:
         if not result.ok:
@@ -626,10 +631,14 @@ class DeleteAccountDialog(BaseDialog):
         if answer != QMessageBox.StandardButton.Yes:
             return
         mode = self._mode()
+        from .captcha import ask_captcha
+        token = ask_captcha(self.window())
+        if token is None:
+            return
         self.submit_btn.setEnabled(False)
         self._page.run(
             lambda: self._page.api.delete_account(
-                mode, password=password, code=code),
+                mode, password=password, code=code, captcha_token=token),
             self._on_submitted, self._on_submit_failed, label="注销账号")
 
     def _on_submitted(self, result) -> None:
