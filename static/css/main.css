@@ -1822,3 +1822,66 @@ body.side-nav-expanded .side-nav-user .user-chip { flex-wrap: wrap; row-gap: 4px
 .mode-opt-desc { display: block; margin-top: 2px; font-size: 12px; line-height: 1.7; color: var(--color-text-tertiary); }
 .auth-methods { display: flex; gap: 8px; margin: 4px 0 10px; flex-wrap: wrap; }
 .auth-methods .btn.active { border-color: var(--color-primary); color: var(--color-primary); }
+
+/* ── 人机验证弹窗（滑块拼图 / Cloudflare Turnstile 共用外壳）────────────────
+   必须放在这里（全局 main.css）而非 SFC 的 <style> 中：
+   Vite 以 JS 为入口构建（vite.config.js 的 rollupOptions.input 全是 .js），
+   SFC 里的样式会被抽成 static/vue/assets/*.css 但没有任何 HTML 去 <link> 它，
+   导致弹窗样式全部丢失（曾经出现：拖不动、图片错位、挤压页面）。── */
+.captcha-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.captcha-box {
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text-primary, #222);
+  border: 1px solid var(--color-border, transparent);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 40px var(--color-shadow, rgba(0, 0, 0, 0.3));
+  max-width: 96vw;
+}
+.captcha-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.captcha-tip { font-size: 13px; color: var(--color-text-tertiary, #888); margin-bottom: 10px; }
+.captcha-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  user-select: none;
+  touch-action: none;
+}
+.captcha-bg { display: block; }
+.captcha-piece { position: absolute; left: 0; pointer-events: none; }
+.captcha-loading {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #fff; background: rgba(0, 0, 0, 0.35);
+}
+.captcha-track {
+  position: relative;
+  height: 40px;
+  margin-top: 12px;
+  border-radius: 20px;
+  background: var(--color-bg-secondary, #eee);
+  border: 1px solid var(--color-border, #ddd);
+  user-select: none;
+  touch-action: none;
+}
+.captcha-fill { position: absolute; top: 0; left: 0; bottom: 0; background: rgba(106, 140, 137, 0.25); border-radius: 20px; }
+.captcha-handle {
+  position: absolute; top: 0; left: 0;
+  width: 40px; height: 40px; line-height: 40px; text-align: center;
+  border-radius: 20px;
+  background: #6a8c89; color: #fff; font-weight: 700;
+  cursor: grab; touch-action: none;
+}
+.captcha-handle:active { cursor: grabbing; }
+.captcha-err { min-height: 18px; margin: 8px 0 0; font-size: 13px; color: #e74c3c; }
+.captcha-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+/* Turnstile 挂载点：官方组件固定约 300x65 */
+.captcha-ts { display: flex; align-items: center; justify-content: center; min-height: 65px; min-width: 300px; }

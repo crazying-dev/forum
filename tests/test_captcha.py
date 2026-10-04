@@ -6,7 +6,7 @@
   * 一步式：业务请求直接带 {captcha_token, captcha_x}；
   * 两步式：先 POST /api/captcha/verify 校验，再用同一 token 提交业务请求；
   * 服务端内存字典：IP 绑定 + 一次性（校验时 pop）+ 默认 5 分钟过期；
-  * 容差默认 ±6px；CAPTCHA_ENABLED=0 时整体放行。
+  * 容差默认 ±12px（provider=slider 时生效）；CAPTCHA_ENABLED=0 时整体放行。
 """
 from __future__ import annotations
 
@@ -18,10 +18,17 @@ sys.path.insert(0, PROJECT_ROOT)
 
 
 def _client(extra_routes=True):
-    """最小 Flask app：只挂 captcha 蓝图 + 一个受保护探针接口。"""
+    """最小 Flask app：只挂 captcha 蓝图 + 一个受保护探针接口。
+
+    本文件专测**自研滑块（slider）**分支，所以显式钉住 provider —— 避免本机
+    .env 里配了真实 Turnstile 密钥时用例受环境影响（Turnstile 见 test_turnstile.py）。
+    """
     from flask import Flask, jsonify
 
+    import config
     import api.captcha as captcha
+
+    config.CAPTCHA_PROVIDER = "slider"
 
     app = Flask(__name__)
     app.register_blueprint(captcha.captcha_bp, url_prefix="/api/captcha")
@@ -184,11 +191,11 @@ def test_disabled_bypasses():
 
 
 def test_config_defaults():
-    """默认参数：TTL 300s、容差 6px、尺寸 320x180、拼图块 50px。"""
+    """默认参数：TTL 300s、容差 12px、尺寸 320x180、拼图块 50px。"""
     import config
 
     assert config.CAPTCHA_TTL_SECONDS == 300
-    assert config.CAPTCHA_TOLERANCE == 6
+    assert config.CAPTCHA_TOLERANCE == 12
     assert (config.CAPTCHA_WIDTH, config.CAPTCHA_HEIGHT) == (320, 180)
     assert config.CAPTCHA_PIECE == 50
 
@@ -250,6 +257,7 @@ WEB_SRC = os.path.join(PROJECT_ROOT, "frontend", "src")
 AUTH_VIEW = os.path.join(WEB_SRC, "views", "AuthView.vue")
 USER_VIEW = os.path.join(WEB_SRC, "views", "UserView.vue")
 SLIDER = os.path.join(WEB_SRC, "components", "SliderCaptcha.vue")
+MAIN_CSS = os.path.join(PROJECT_ROOT, "static", "css", "main.css")
 BUILD_AUTH = os.path.join(PROJECT_ROOT, "static", "vue", "auth.js")
 BUILD_USERS = os.path.join(PROJECT_ROOT, "static", "vue", "users.js")
 
@@ -260,11 +268,38 @@ def _text(path):
 
 
 def test_web_slider_component_calls_captcha_api():
-    """滑块组件存在，且调 /challenge 与 /verify，并对外暴露 capture()。"""
+    """验证弹窗组件存在，且调 /challenge 与 /verify，并对外暴露 capture()。"""
     src = _text(SLIDER)
     assert "/api/captcha/challenge" in src, "组件未请求 /api/captcha/challenge"
     assert "/api/captcha/verify" in src, "组件未请求 /api/captcha/verify"
     assert "defineExpose" in src and "capture" in src, "组件未对外暴露 capture()"
+
+
+def test_web_slider_component_supports_turnstile():
+    """组件必须兼容 Cloudflare Turnstile 分支（provider 由服务端指派）。"""
+    src = _text(SLIDER)
+    assert "turnstile" in src, "组件未按 provider 分流 Turnstile"
+    assert "challenges.cloudflare.com" in src, "组件未加载 Turnstile 官方脚本"
+    assert "sitekey" in src, "组件未使用服务端下发的 sitekey"
+    assert "provider" in src, "组件未读取服务端 provider"
+
+
+def test_web_captcha_styles_are_global_not_scoped():
+    """回归：验证弹窗样式必须在全局 main.css。
+
+    Vite 以 JS 为入口构建（SFC 里的 <style> 会被抽成 assets/*.css 却无 HTML
+    去 <link>），曾导致 .captcha-mask 不生效：弹窗变成文档流内块、拼图错位、
+    拖动手柄点不到。
+    """
+    comp = _text(SLIDER)
+    assert comp.rstrip().endswith("</template>"), \
+        "组件不得再自带 <style> 块（会被打包成无人引用的 CSS 资源）"
+    css = _text(MAIN_CSS)
+    for sel in (".captcha-mask", ".captcha-box", ".captcha-stage",
+                ".captcha-track", ".captcha-handle", ".captcha-ts"):
+        assert sel in css, f"全局 main.css 缺少样式：{sel}"
+    assert "position: fixed" in css[css.find(".captcha-mask"):css.find(".captcha-mask") + 200], \
+        ".captcha-mask 必须是 fixed 遮罩（否则会挤压页面内容）"
 
 
 def test_web_auth_view_wires_captcha():
@@ -315,11 +350,21 @@ def test_web_bundle_contains_captcha_calls():
 
 
 def test_static_version_covers_captcha_build():
-    """前端资源已变更，STATIC_VERSION 必须 >= 41。"""
+    """前端资源已变更，STATIC_VERSION 必须 >= 42。"""
     import config
 
-    assert int(str(config.STATIC_VERSION)) >= 41, \
-        "STATIC_VERSION 应 >= 41（Vue 产物已变更）"
+    assert int(str(config.STATIC_VERSION)) >= 42, \
+        "STATIC_VERSION 应 >= 42（Vue 产物与 main.css 均已变更）"
+
+
+def test_web_bundle_has_no_orphan_captcha_css():
+    """构建产物中不应再出现无人引用的 captcha CSS 资源。"""
+    assets = os.path.join(PROJECT_ROOT, "static", "vue", "assets")
+    if os.path.isdir(assets):
+        for dirpath, _dirs, files in os.walk(assets):
+            for name in files:
+                assert "SliderCaptcha" not in name, \
+                    f"仍存在孤儿 CSS 资源：{name}（样式应放在全局 main.css）"
 
 
 if __name__ == "__main__":
@@ -338,6 +383,9 @@ if __name__ == "__main__":
         ("test_store_pruned_after_expiry", test_store_pruned_after_expiry),
         ("test_target_route_count_is_eleven", test_target_route_count_is_eleven),
         ("test_web_slider_component_calls_captcha_api", test_web_slider_component_calls_captcha_api),
+        ("test_web_slider_component_supports_turnstile", test_web_slider_component_supports_turnstile),
+        ("test_web_captcha_styles_are_global_not_scoped", test_web_captcha_styles_are_global_not_scoped),
+        ("test_web_bundle_has_no_orphan_captcha_css", test_web_bundle_has_no_orphan_captcha_css),
         ("test_web_auth_view_wires_captcha", test_web_auth_view_wires_captcha),
         ("test_web_user_view_wires_captcha", test_web_user_view_wires_captcha),
         ("test_web_bundle_contains_captcha_calls", test_web_bundle_contains_captcha_calls),

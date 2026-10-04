@@ -1,11 +1,20 @@
 <script setup>
-// 滑块拼图人机验证：弹出式弹窗，capture() 返回 Promise<{ token }>
-// 打开时请求 /api/captcha/challenge，拖动拼图块后调 /api/captcha/verify，
-// 通过后把 token 交给调用方，由调用方塞进真实业务请求体的 captcha_token 字段。
-import { ref } from 'vue'
+// 人机验证弹窗：统一外壳，按服务端 /api/captcha/challenge 返回的 provider 分流。
+//   provider=slider    → 自研滑块拼图（拖动拼图块 → /api/captcha/verify）
+//   provider=turnstile → Cloudflare Turnstile 官方组件（回调直接给 token）
+//   enabled=false      → 服务端已关闭，直接放行
+// capture() 返回 Promise<{ token }>，token 由调用方塞进业务请求体的 captcha_token 字段。
+//
+// 注意：样式全部放在全局 main.css —— Vite 以 JS 为入口构建，SFC 内的 <style>
+// 只会被抽成独立 CSS 资源却没有 HTML 去 <link>，曾导致弹窗样式整体丢失。
+import { ref, nextTick } from 'vue'
 import { apiFetch } from '../utils.js'
 
+const TURNSTILE_SRC =
+  'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+
 const visible = ref(false)
+const provider = ref('slider')
 const loading = ref(false)
 const submitting = ref(false)
 const errMsg = ref('')
@@ -13,6 +22,8 @@ const bg = ref('')
 const piece = ref('')
 const meta = ref({ y: 0, width: 320, height: 180, pieceSize: 50 })
 const dragX = ref(0)
+const sitekey = ref('')
+const tsHost = ref(null)
 
 let token = ''
 let resolver = null
@@ -20,6 +31,59 @@ let rejecter = null
 let dragging = false
 let startPointerX = 0
 let startDragX = 0
+let widgetId = null
+let tsScriptLoading = null
+
+function _theme() {
+  return document.documentElement.classList.contains('night-mode') ? 'dark' : 'light'
+}
+
+function _loadTurnstileScript() {
+  if (window.turnstile) return Promise.resolve()
+  if (tsScriptLoading) return tsScriptLoading
+  tsScriptLoading = new Promise((resolve, reject) => {
+    window.__tsOnload = function () { resolve() }
+    const s = document.createElement('script')
+    s.src = TURNSTILE_SRC + '&onload=__tsOnload'
+    s.async = true
+    s.onerror = function () { tsScriptLoading = null; reject(new Error('验证服务加载失败，请检查网络')) }
+    document.head.appendChild(s)
+  })
+  return tsScriptLoading
+}
+
+async function _renderTurnstile() {
+  try {
+    await _loadTurnstileScript()
+  } catch (e) {
+    errMsg.value = (e && e.message) || '验证服务加载失败'
+    return
+  }
+  const host = tsHost.value
+  if (!host || !window.turnstile) { errMsg.value = '验证服务不可用，请重试'; return }
+  _cleanupWidget()
+  host.innerHTML = ''
+  try {
+    widgetId = window.turnstile.render(host, {
+      sitekey: sitekey.value,
+      theme: _theme(),
+      language: 'zh-cn',
+      callback: function (tok) { if (tok) _resolve({ token: tok }) },
+      'error-callback': function () { errMsg.value = '人机验证失败，请重试'; return true },
+      'timeout-callback': function () { errMsg.value = '验证超时，请重试'; return true },
+      'expired-callback': function () { errMsg.value = '验证已过期，请重新验证' },
+    })
+  } catch (e) {
+    errMsg.value = '组件初始化失败，请刷新重试'
+  }
+}
+
+function _cleanupWidget() {
+  try {
+    if (widgetId !== null && window.turnstile) window.turnstile.remove(widgetId)
+  } catch (e) { /* ignore */ }
+  widgetId = null
+}
 
 function _maxDrag() {
   return Math.max(0, meta.value.width - meta.value.pieceSize)
@@ -34,6 +98,15 @@ async function fetchChallenge() {
     if (!d || !d.success) throw new Error((d && d.message) || '加载失败')
     // 服务端已关闭人机验证：直接放行（captcha_token 留空）
     if (d.enabled === false) { _resolve({ token: '' }); return }
+    provider.value = d.provider || 'slider'
+    if (provider.value === 'turnstile') {
+      sitekey.value = d.sitekey || ''
+      if (!sitekey.value) throw new Error('验证服务未配置')
+      await nextTick()
+      loading.value = false
+      await _renderTurnstile()
+      return
+    }
     token = d.token
     bg.value = d.bg || ''
     piece.value = d.piece || ''
@@ -56,12 +129,27 @@ function capture() {
     resolver = resolve
     rejecter = reject
     visible.value = true
-    fetchChallenge()
+    // 等弹窗 DOM（含 Turnstile 挂载点）渲染完成后再取挑战
+    nextTick().then(fetchChallenge)
   })
+}
+
+// 重试：Turnstile走官方 reset，滑块重新取挑战
+async function retry() {
+  errMsg.value = ''
+  if (provider.value === 'turnstile') {
+    if (widgetId !== null && window.turnstile) {
+      try { window.turnstile.reset(widgetId); return } catch (e) { /* fallthrough */ }
+    }
+    await _renderTurnstile()
+    return
+  }
+  await fetchChallenge()
 }
 
 function _resolve(val) {
   visible.value = false
+  _cleanupWidget()
   const r = resolver
   resolver = null
   rejecter = null
@@ -70,6 +158,7 @@ function _resolve(val) {
 
 function cancel() {
   visible.value = false
+  _cleanupWidget()
   const rj = rejecter
   resolver = null
   rejecter = null
@@ -124,87 +213,44 @@ defineExpose({ capture })
   <div v-if="visible" class="captcha-mask" @click.self="cancel">
     <div class="captcha-box" role="dialog" aria-label="安全验证">
       <div class="captcha-title">安全验证</div>
-      <div class="captcha-tip">拖动下方滑块，把拼图块放入缺口</div>
-      <div class="captcha-stage" :style="{ width: meta.width + 'px', height: meta.height + 'px' }">
-        <img v-if="bg" class="captcha-bg" :src="bg" :width="meta.width" :height="meta.height" alt="">
-        <img
-          v-if="piece"
-          class="captcha-piece"
-          :src="piece"
-          :style="{ left: dragX + 'px', top: meta.y + 'px', width: meta.pieceSize + 'px', height: meta.pieceSize + 'px' }"
-          alt=""
-        >
-        <div v-if="loading" class="captcha-loading">加载中…</div>
-      </div>
-      <div class="captcha-track" :style="{ width: meta.width + 'px' }">
-        <div class="captcha-fill" :style="{ width: (dragX + meta.pieceSize / 2) + 'px' }"></div>
-        <div
-          class="captcha-handle"
-          :style="{ left: dragX + 'px' }"
-          @pointerdown.prevent="onPointerDown"
-        >»</div>
-      </div>
+
+      <!-- Turnstile：官方托管组件，回调即拿到 token -->
+      <template v-if="provider === 'turnstile'">
+        <div class="captcha-tip">请完成下方验证</div>
+        <div ref="tsHost" class="captcha-ts"></div>
+      </template>
+
+      <!-- 自研滑块拼图 -->
+      <template v-else>
+        <div class="captcha-tip">拖动下方滑块，把拼图块放入缺口</div>
+        <div class="captcha-stage" :style="{ width: meta.width + 'px', height: meta.height + 'px' }">
+          <img v-if="bg" class="captcha-bg" :src="bg" :width="meta.width" :height="meta.height" alt="">
+          <img
+            v-if="piece"
+            class="captcha-piece"
+            :src="piece"
+            :style="{ left: dragX + 'px', top: meta.y + 'px', width: meta.pieceSize + 'px', height: meta.pieceSize + 'px' }"
+            alt=""
+          >
+          <div v-if="loading" class="captcha-loading">加载中…</div>
+        </div>
+        <div class="captcha-track" :style="{ width: meta.width + 'px' }">
+          <div class="captcha-fill" :style="{ width: (dragX + meta.pieceSize / 2) + 'px' }"></div>
+          <div
+            class="captcha-handle"
+            :style="{ left: dragX + 'px' }"
+            @pointerdown.prevent="onPointerDown"
+          >»</div>
+        </div>
+      </template>
+
       <p class="captcha-err">{{ errMsg }}</p>
       <div class="captcha-actions">
-        <button type="button" class="btn btn-outline btn-sm" @click="fetchChallenge">刷新</button>
+        <button type="button" class="btn btn-outline btn-sm" @click="retry">刷新</button>
         <button type="button" class="btn btn-outline btn-sm" @click="cancel">取消</button>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped>
-.captcha-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.captcha-box {
-  background: var(--card-bg, #fff);
-  color: var(--text, #222);
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  max-width: 96vw;
-}
-.captcha-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-.captcha-tip { font-size: 13px; opacity: 0.75; margin-bottom: 10px; }
-.captcha-stage {
-  position: relative;
-  overflow: hidden;
-  border-radius: 8px;
-  user-select: none;
-  touch-action: none;
-}
-.captcha-bg { display: block; }
-.captcha-piece { position: absolute; left: 0; pointer-events: none; }
-.captcha-loading {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 14px; color: #fff; background: rgba(0, 0, 0, 0.35);
-}
-.captcha-track {
-  position: relative;
-  height: 40px;
-  margin-top: 12px;
-  border-radius: 20px;
-  background: #eee;
-  border: 1px solid #ddd;
-  user-select: none;
-  touch-action: none;
-}
-.captcha-fill { position: absolute; top: 0; left: 0; bottom: 0; background: rgba(106, 140, 137, 0.25); border-radius: 20px; }
-.captcha-handle {
-  position: absolute; top: 0; left: 0;
-  width: 40px; height: 40px; line-height: 40px; text-align: center;
-  border-radius: 20px;
-  background: #6a8c89; color: #fff; font-weight: 700;
-  cursor: grab; touch-action: none;
-}
-.captcha-err { min-height: 18px; margin: 8px 0 0; font-size: 13px; color: #e74c3c; }
-.captcha-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
-</style>
+
