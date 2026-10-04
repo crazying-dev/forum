@@ -351,6 +351,19 @@ def test_embed_page_honours_theme_and_lang():
     assert "'en'" in html or '"en"' in html
 
 
+def test_embed_page_honours_size_param():
+    """窄容器（Android 弹窗）可要求 size=flexible；非法值回退 normal。"""
+    with _Ctx(CAPTCHA_ENABLED=True, CAPTCHA_PROVIDER="turnstile",
+              TURNSTILE_SITEKEY=FAKE_SITEKEY, TURNSTILE_SECRET=FAKE_SECRET):
+        flexible = _client().get("/captcha-embed?size=flexible").get_data(as_text=True)
+        default = _client().get("/captcha-embed").get_data(as_text=True)
+        bogus = _client().get("/captcha-embed?size=huge").get_data(as_text=True)
+    assert '"flexible"' in flexible, "size=flexible 未被注入"
+    assert "size: SIZE" in flexible, "未把 size 传给 turnstile.render"
+    assert '"normal"' in default
+    assert '"normal"' in bogus, "非法 size 应回退 normal"
+
+
 def test_embed_page_when_provider_off():
     with _Ctx(CAPTCHA_ENABLED=False):
         resp = _client().get("/captcha-embed")

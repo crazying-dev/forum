@@ -411,10 +411,13 @@ def api_captcha_verify():
 def captcha_embed_page():
     """加载 Turnstile 组件，并通过 JS bridge / document.title 把 token 回传宿主。
 
-    query 参数：?theme=dark|light&lang=zh-cn
+    query 参数：?theme=dark|light&lang=zh-cn&size=flexible|normal|compact
     """
     theme = "dark" if (request.args.get("theme") or "").strip().lower() == "dark" else "light"
     lang = (request.args.get("lang") or "zh-cn").strip() or "zh-cn"
+    size = (request.args.get("size") or "normal").strip().lower()
+    if size not in ("normal", "compact", "flexible"):
+        size = "normal"
     provider = _provider()
     return render_template(
         "captcha_embed.html",
@@ -422,6 +425,7 @@ def captcha_embed_page():
         sitekey=turnstile_sitekey() if provider == "turnstile" else "",
         theme=theme,
         lang=lang,
+        size=size,
     )
 
 

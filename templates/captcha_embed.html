@@ -10,7 +10,7 @@
     font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
     display: flex; align-items: center; justify-content: center;
   }
-  .wrap { padding: 10px; text-align: center; }
+  .wrap { padding: 10px; text-align: center; width: 100%; box-sizing: border-box; }
   .msg { font-size: 13px; line-height: 1.5; margin-top: 8px; min-height: 18px; }
   .msg.err { color: #e74c3c; }
   .msg.ok { color: #2ecc71; }
@@ -38,6 +38,9 @@
   var PROVIDER = {{ provider|tojson }};
   var THEME = {{ theme|tojson }};
   var LANG = {{ lang|tojson }};
+  // normal = 官方固定 300x65；flexible = 撑满容器宽度（窄容器 / 移动端弹窗用）
+  var SIZE = {{ size|tojson }};
+  if (SIZE !== 'normal' && SIZE !== 'compact') SIZE = 'flexible';
 
   var msg = document.getElementById('msg');
   var retryBtn = document.getElementById('retry');
@@ -92,6 +95,7 @@
         sitekey: SITEKEY,
         theme: THEME === 'dark' ? 'dark' : 'light',
         language: LANG,
+        size: SIZE,
         callback: function (token) {
           setMsg('验证通过', 'ok');
           retryBtn.style.display = 'none';
