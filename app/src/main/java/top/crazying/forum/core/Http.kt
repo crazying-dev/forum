@@ -93,6 +93,19 @@ class PrefsCookieJar(private val prefs: Prefs) : CookieJar {
         }
     }
 
+    /**
+     * 直接写入一条 Cookie（不改动入参）。
+     *
+     * 用于「网页登录」：从 WebView 的 `CookieManager` 读到站点的 `token` / `ID`
+     * 后搬进本 jar，后续原生请求即自带登录态。
+     */
+    fun put(cookie: Cookie) {
+        synchronized(lock) {
+            store[keyOf(cookie)] = cookie
+            save()
+        }
+    }
+
     fun clear() {
         synchronized(lock) {
             store.clear()

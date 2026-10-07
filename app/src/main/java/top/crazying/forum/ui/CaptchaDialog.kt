@@ -12,6 +12,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,16 +21,20 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -71,8 +77,13 @@ private const val TRACK_HEIGHT = 40f
 private const val TRACK_GAP = 10f
 private const val HANDLE_WIDTH = 40f
 
-/** Turnstile 承载页的 WebView 高度（flexible 组件 65px + 提示行 + 留白）。 */
-private val EMBED_HEIGHT = 170.dp
+/**
+ * Turnstile 承载页的 WebView 高度。
+ *
+ * 比早期版本的 170dp 更宽裕：官方组件（flexible 65px）+ 错误文案 + 重试按钮
+ * 都能完整展示，不会被容器边缘裁掉一截。
+ */
+private val EMBED_HEIGHT = 260.dp
 
 /** 一次滑块挑战的本地形态（图像已解码为 Bitmap）。 */
 private data class SliderChallenge(
@@ -278,84 +289,111 @@ private fun CaptchaDialog(onFinished: (String?) -> Unit) {
 
     val retryLabel = if (provider == Captcha.PROVIDER_TURNSTILE) "刷新" else "换一张"
 
-    AlertDialog(
-        onDismissRequest = { if (!busy) finish(null) },
-        title = {
-            Text("安全验证", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = if (provider == Captcha.PROVIDER_TURNSTILE) {
-                        "为了确认你不是机器人，请完成下方验证。"
-                    } else {
-                        "为了确认你不是机器人，请拖动滑块把拼图块移到缺口位置。"
-                    },
-                    color = colors.textSecondary,
-                    fontSize = 13.sp,
-                    lineHeight = 19.sp,
-                )
+    BackHandler { if (!busy) finish(null) }
 
-                if (provider == Captcha.PROVIDER_TURNSTILE && embedUrl.isNotEmpty()) {
-                    TurnstileEmbed(
-                        url = embedUrl,
-                        reloadKey = embedKey,
-                        onEvent = { k, p -> onEmbedEvent(k, p) },
+    // 刻意**不用** AlertDialog / Dialog：
+    // WebView（AndroidView）放进独立 Dialog 窗口时，窗口层级与触摸命中区会不一致——
+    // 官方组件看着渲染出来了，点击却落在别处（表现为「靠上、被遮挡、点不到」）。
+    // 改为当前界面内的全屏遮罩层，与 App 内已验证可用的 Live2D WebView
+    // （`WikiScreen.WikiLive2DBody`）走同一条渲染路径。
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.62f))
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .imePadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(colors.bgCard)
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("安全验证", color = colors.textPrimary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+
+            Text(
+                text = if (provider == Captcha.PROVIDER_TURNSTILE) {
+                    "为了确认你不是机器人，请完成下方验证。"
+                } else {
+                    "为了确认你不是机器人，请拖动滑块把拼图块移到缺口位置。"
+                },
+                color = colors.textSecondary,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+            )
+
+            if (provider == Captcha.PROVIDER_TURNSTILE && embedUrl.isNotEmpty()) {
+                TurnstileEmbed(
+                    url = embedUrl,
+                    reloadKey = embedKey,
+                    onEvent = { k, p -> onEmbedEvent(k, p) },
+                )
+            } else {
+                val c = challenge
+                if (c != null) {
+                    SliderStageView(
+                        challenge = c,
+                        pieceX = pieceX,
+                        enabled = !busy,
+                        onPieceX = { pieceX = it },
+                        onRelease = { verify() },
                     )
                 } else {
-                    val c = challenge
-                    if (c != null) {
-                        SliderStageView(
-                            challenge = c,
-                            pieceX = pieceX,
-                            enabled = !busy,
-                            onPieceX = { pieceX = it },
-                            onRelease = { verify() },
-                        )
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(150.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(colors.bgInput),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            if (loading) {
-                                CircularProgressIndicator(color = colors.primary, strokeWidth = 3.dp)
-                            } else {
-                                Text(
-                                    text = error.ifBlank { "请点「刷新」重试" },
-                                    color = colors.danger,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                )
-                            }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(colors.bgInput),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (loading) {
+                            CircularProgressIndicator(color = colors.primary, strokeWidth = 3.dp)
+                        } else {
+                            Text(
+                                text = error.ifBlank { "请点「刷新」重试" },
+                                color = colors.danger,
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                            )
                         }
                     }
                 }
+            }
 
-                if (hint.isNotEmpty()) {
-                    Text(hint, color = colors.textMuted, fontSize = 12.sp)
+            if (hint.isNotEmpty()) {
+                Text(hint, color = colors.textMuted, fontSize = 12.sp)
+            }
+            if (error.isNotEmpty() && challenge != null) {
+                Text(error, color = colors.danger, fontSize = 12.sp)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Turnstile 点不动时的手动退路：不必等 12 秒超时，直接改走自研滑块。
+                if (provider == Captcha.PROVIDER_TURNSTILE) {
+                    TextButton(enabled = !busy && !loading, onClick = { load(forceSlider = true) }) {
+                        Text("改用滑块", color = colors.textAccent)
+                    }
                 }
-                if (error.isNotEmpty() && challenge != null) {
-                    Text(error, color = colors.danger, fontSize = 12.sp)
+                Spacer(Modifier.weight(1f))
+                TextButton(enabled = !busy && !loading, onClick = { load() }) {
+                    Text(retryLabel, color = colors.primary)
+                }
+                TextButton(enabled = !busy, onClick = { finish(null) }) {
+                    Text("取消", color = colors.textMuted)
                 }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = !busy, onClick = { finish(null) }) {
-                Text("取消", color = colors.textMuted)
-            }
-        },
-        dismissButton = {
-            TextButton(enabled = !busy && !loading, onClick = { load() }) {
-                Text(retryLabel, color = colors.primary)
-            }
-        },
-        containerColor = colors.bgCard,
-    )
+        }
+    }
 }
 
 /** data URL → Bitmap；失败返回 null。 */
@@ -391,6 +429,9 @@ private class CaptchaBridge(
  *
  * [url] / [reloadKey] 变化时会重建 WebView（旧实例在 [DisposableEffect] 里 destroy）。
  * 导航限制在站内与 Cloudflare 验证域内，避免用户点外链离开验证页。
+ *
+ * 渲染路径与 `WikiScreen` 的 Live2D WebView 一致（普通页面内组合），
+ * **不要**改回 Dialog 托管：独立窗口下 WebView 的层级与命中区会错位。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -418,6 +459,17 @@ private fun TurnstileEmbed(
                 settings.setSupportMultipleWindows(false)
                 CookieManager.getInstance().setAcceptCookie(true)
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                // 触摸加固：让 WebView 独占本区域手势。
+                // 否则外层容器（遮罩 / 滚动容器）可能把点击抢走，官方组件“看得见点不到”。
+                isClickable = true
+                isFocusable = true
+                isFocusableInTouchMode = true
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setOnTouchListener { v, _ ->
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                    false
+                }
 
                 addJavascriptInterface(CaptchaBridge(main, events), Captcha.JS_BRIDGE_NAME)
 

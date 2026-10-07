@@ -27,6 +27,9 @@ sealed interface Screen {
     data class Search(val keyword: String = "") : Screen
     data class UserProfile(val userId: String) : Screen
     data class Auth(val register: Boolean = false) : Screen
+
+    /** 通过内置 WebView 走站点真实登录页（Cloudflare 官方组件在网页里渲染）。 */
+    data object WebLogin : Screen
 }
 
 /** 底部导航项。 */

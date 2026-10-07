@@ -19,6 +19,7 @@ import top.crazying.forum.core.App
 import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
+import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.ForumTextField
 import top.crazying.forum.ui.components.GhostButton
 import top.crazying.forum.ui.components.PrimaryButton
@@ -198,6 +199,22 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
                     Text(text = tip, color = colors.primary, fontSize = 13.sp)
                 }
             }
+
+            Spacer(Modifier.height(6.dp))
+
+            // 网页端登录：服务端是 Cookie 会话，走站点真实登录页拿 Cookie 再搬进 App。
+            // 官方 Turnstile 在真实网页里渲染，不受 App 内嵌承载页的层级/命中区问题影响。
+            GhostButton(
+                text = "使用网页端登录",
+                onClick = { nav.push(Screen.WebLogin) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "在网页里登录后会自动回到 App，适合人机验证加载异常时使用。",
+                color = colors.textMuted,
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+            )
         }
     }
 }

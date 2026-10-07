@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.14**（`versionCode = 15`） |
+| 当前版本 | **V1.0.15**（`versionCode = 16`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -24,7 +24,7 @@
 | JSON | `org.json`（Android 内置） | 不引入 Gson / Moshi / kotlinx-serialization，减少依赖面 |
 | 图片 | Coil 3（`coil-compose` + `coil-network-okhttp`） | 头像加载 |
 | 正文渲染 | `AndroidView` + `TextView` + `HtmlCompat` | 服务端正文存的是 HTML |
-| WebView | **仅用于 WIKI › Live2D 子页** | 其余界面（含 WIKI 其他子页）均为 Compose 原生绘制 |
+| WebView | **仅两处**：WIKI › Live2D 子页、网页端登录页（`/auth?mode=login`） | 其余界面（含 WIKI 其他子页）均为 Compose 原生绘制；人机验证虽仍用 WebView，但已改写为**页面内全屏遮罩**而非 Dialog |
 | 应用更新 | 自写 `Updater`（`core/Updater.kt`） | 版本检查 → 三级回退下载 → sha256 校验 → FileProvider 调起系统安装器 |
 
 **版本基线**（已通过真实构建验证）：
@@ -229,6 +229,12 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **Turnstile 失败自动回退 + 滑块窄屏修复（V1.0.14）**：
   * **自动回退**：Turnstile 组件报错 / 承载页加载失败（`onReceivedError` 主文档）/ 12 秒内页面未加载完成 → 自动改要一帧自研滑块挑战（服务端 `?provider=slider` 强制下发），只回退一次；回退后「刷新」也不再回到 Turnstile。`core/Captcha.kt` 新增纯函数 `challengePath(provider)`，`Api.captchaChallenge(provider)` 支持强制 provider。
   * **修复（现象：图片挤压变形、验证永远失败）**：`ui/CaptchaDialog.kt` 的 `SliderStageView` 原以固定 `320dp` 宽渲染 320px 图片，窄屏被 Compose 压缩后 `ContentScale.FillBounds` 把图拉扁，且滑块行程按**逻辑宽度**计算 → 上报 `captcha_x` 与实际对齐的缺口位置不符。现改用 `BoxWithConstraints` 取**实际可用宽度**等比缩放（背景 / 拼图块 / 行程 / 手感全部同尺），`captcha_x` 仍是服务端图像像素，服务端容差判定不变。
+* **验证弹窗可见性修复 + 网页端登录 + 世界频道顺序（V1.0.15）**：
+  * **修复（现象：验证组件靠上、被遮挡、点不到）**：此前把承载页 WebView 挂在 `AlertDialog` 的 `text` 槽里——WebView 处于**独立 Dialog 窗口**时，窗口层级与触摸命中区会错位，表现为官方组件看着渲染出来了却点不动。现改为**当前界面内的全屏遮罩层**（`Box` + 居中卡片，附 `BackHandler`），与 App 内已验证可用的 Live2D WebView（`WikiScreen.WikiLive2DBody`）走同一条渲染路径；同时 WebView 高度由 170dp 放宽至 260dp，并在 `setOnTouchListener` 里 `requestDisallowInterceptTouchEvent(true)` 让 WebView 独占手势。
+  * **手动退路**：Turnstile 分支新增「改用滑块」按钮（不必再等 12 秒超时），点一下即以 `?provider=slider` 重新要一帧自研滑块挑战。
+  * **新增网页端登录**：`ui/screens/WebLoginScreen.kt` 用内置 WebView 打开站点真实登录页 `/auth?mode=login`——官方 Turnstile 在真实网页里渲染，绕开内嵌承载页的一切兼容问题；登录成功后从 `CookieManager` 取出 `token` / `ID` 两个 HttpOnly Cookie，经 `Api.importWebCookies()` 搬进 App 的 OkHttp `PrefsCookieJar`，会话即迁移完成。入口在登录页「使用网页端登录」。因为站点登录走 `fetch()` **不触发页面跳转**，判定成功靠**定时读 Cookie**（1.2 秒一次）+ 顶部「我已完成」手动重试。
+  * **修复（现象：世界频道最新消息跑到最上面）**：服务端 `get_world_messages()` 是 `ORDER BY created_at DESC`（最新在前），客户端此前原样渲染。现经 `core/WorldFeed.newestLast()` 转为「早的在上、最新在下」，与聊天窗口一致，并在首次加载与发送成功后自动滚到底部。顺带修正截断口径：原来用 `takeLast(100)`，在倒序列表上取到的是**最旧**的 100 条，现改为 `take(100)`。
+  * 新增 `core/WebAuth.kt` / `core/WorldFeed.kt` 两个纯逻辑对象与对应 JVM 单测（`WebAuthTest` 8 例 / `WorldFeedTest` 6 例）。
 
 ### 未实现（后续多轮持续补齐）
 
@@ -249,6 +255,8 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 ## 七、已知限制与注意事项
 
 * **WIKI 已全面原生化**：首页 / 官方 / 个人 / 鼠标 / Linux 版均为 Compose；仅 **Live2D 交互模型** 子页保留 WebView（网页 canvas + Live2D 运行时，无法用 Compose 复刻），并在 `onPageFinished` 注入样式隐藏网页外壳、改写 CSS 变量为当前 App 配色。
+* **网页端登录的会话来源**：走内置 WebView 登录后，App 的登录态就是网页下发的 Cookie（`token` / `ID`，有效期 7 天）。若在网页侧退出登录，App 侧会因 Cookie 失效而被服务端 401 → 自动清理本地会话。
+* **WebView 不要放进 Dialog**：Android 上 `AndroidView` 承载的 WebView 位于独立 Dialog 窗口时，层级与触摸命中区会错位（要么看不见，要么看得见点不到）。本工程的人机验证与网页登录都因此改为**页面内组合**渲染，后续新增 WebView 界面请沿用同一做法。
 * **正文内联图片不显示**：`HtmlBody` 主动剥离 `<img>` / `<script>`，只保留文字、段落、粗体、链接、代码块等常用标签。
 * **`auto` 主题语义**：Android 取「跟随系统深色模式」，与 Web / Windows 的「小时切换」不同（有意为之）。
 * **Coil 3 的网络加载器**：依赖 `coil-network-okhttp` 的 ServiceLoader 自动注册；若自定义 `ImageLoader` 需手动装配 `OkHttpNetworkFetcherFactory`。
@@ -270,10 +278,10 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | JDK | Microsoft OpenJDK **17.0.20.1**（JAVA_HOME / Gradle Daemon JVM 均为它） |
 | Android SDK | `cmdline-tools 16111833`、`platform-tools r37.0.1`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
-| 命令 | `.\gradlew.bat testDebugUnitTest --console=plain` |
-| 结果 | **BUILD SUCCESSFUL**（47 例全部通过：CaptchaTest 24 / VersionGateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6） |
-| 产物 | `app\build\outputs\apk\debug\app-debug.apk`，**11 623 321 字节**，sha256 `07dbf7ba7e7409f7dffe556d918c12e41eaf09753745570b94ab5725a9fdd4ac` |
-| Release 产物（V1.0.13） | `.\gradlew.bat assembleRelease` → `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| 命令 | `.\gradlew.bat testDebugUnitTest assembleRelease --console=plain` |
+| 结果 | **BUILD SUCCESSFUL**（63 例全部通过：CaptchaTest 26 / VersionGateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6 / WebAuthTest 8 / WorldFeedTest 6） |
+| Release 产物（V1.0.15） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1ca33a725c381683843956797caa206a5d7ff0d20efc7900cb110e9b78d36960`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| 历史 Release 产物（V1.0.13） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385` |
 
 编译过程中定位并修正的 3 类真实问题（供后续参考）：
 

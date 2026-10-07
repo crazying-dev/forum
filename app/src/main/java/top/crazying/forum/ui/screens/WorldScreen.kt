@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
 import top.crazying.forum.core.Constants
 import top.crazying.forum.core.TimeFmt
+import top.crazying.forum.core.WorldFeed
 import top.crazying.forum.data.WorldMessage
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
@@ -51,8 +52,18 @@ fun WorldScreen(nav: Navigator) {
     var error by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
     var sending by remember { mutableStateOf(false) }
+    /** 需要在下一帧把列表滚到底（首次加载 / 刚发完消息）。 */
+    var pendingScrollToBottom by remember { mutableStateOf(false) }
 
-    suspend fun load(silent: Boolean = false) {
+    // 列表更新后再滚动：此时 LazyColumn 已经拿到新数据，scrollToItem 才生效。
+    LaunchedEffect(messages) {
+        if (pendingScrollToBottom && messages.isNotEmpty()) {
+            pendingScrollToBottom = false
+            runCatching { listState.scrollToItem(messages.lastIndex) }
+        }
+    }
+
+    suspend fun load(silent: Boolean = false, toBottom: Boolean = false) {
         if (!silent) loading = true
         val result = App.api.worldAll()
         if (!silent) loading = false
@@ -62,10 +73,13 @@ fun WorldScreen(nav: Navigator) {
         }
         error = ""
         val list = WorldMessage.list(result.rows(null))
-        messages = list.takeLast(Constants.WORLD_LIMIT)
+        // 服务端按时间**倒序**返回（最新在前）；这里转成聊天顺序（最新在下），
+        // 并保留最新的 WORLD_LIMIT 条。口径集中在 WorldFeed，便于单测。
+        messages = WorldFeed.newestLast(list, Constants.WORLD_LIMIT)
+        if (toBottom) pendingScrollToBottom = true
     }
 
-    LaunchedEffect(Unit) { load() }
+    LaunchedEffect(Unit) { load(toBottom = true) }
 
     // 自动轮询（服务端有 2 秒/人 的发送限流，20 秒足够温和）
     LaunchedEffect(Unit) {
@@ -89,8 +103,7 @@ fun WorldScreen(nav: Navigator) {
             sending = false
             if (result.ok) {
                 input = ""
-                load(silent = true)
-                runCatching { listState.animateScrollToItem(maxOf(messages.size - 1, 0)) }
+                load(silent = true, toBottom = true)
             } else {
                 toast(context, result.message)
             }

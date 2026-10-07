@@ -2,6 +2,7 @@ package top.crazying.forum.core
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.Cookie
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -137,6 +138,28 @@ class Api(private val prefs: Prefs) {
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
 
     fun clearCookies() = jar.clear()
+
+    /**
+     * 把 WebView（网页登录）的 Cookie 头搬进本 App 的会话。
+     *
+     * 只接纳 `token` / `ID` 两个服务端登录态 Cookie，其余一律忽略——
+     * 网页里可能还有统计类 Cookie，不该跟着进原生请求。
+     *
+     * 非 suspend：只改本地 SharedPreferences，不发网。
+     *
+     * @return 实际导入的 Cookie 条数（0 表示没拿到会话）
+     */
+    fun importWebCookies(cookieHeader: String): Int {
+        val url = Constants.BASE_URL.toHttpUrlOrNull() ?: return 0
+        var n = 0
+        for ((name, value) in WebAuth.cookiePairs(cookieHeader)) {
+            if (name != WebAuth.TOKEN_COOKIE && name != WebAuth.ID_COOKIE) continue
+            val cookie = runCatching { Cookie.parse(url, "$name=$value") }.getOrNull() ?: continue
+            jar.put(cookie)
+            n++
+        }
+        return n
+    }
 
     /** 是否有本地凭证（粗略判断，真正有效性由服务端决定）。 */
     val hasCredentials: Boolean

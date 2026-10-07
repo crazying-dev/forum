@@ -42,6 +42,7 @@ import top.crazying.forum.ui.screens.PrivacyScreen
 import top.crazying.forum.ui.screens.ProfileEditScreen
 import top.crazying.forum.ui.screens.SearchScreen
 import top.crazying.forum.ui.screens.UserScreen
+import top.crazying.forum.ui.screens.WebLoginScreen
 import top.crazying.forum.ui.screens.WikiScreen
 import top.crazying.forum.ui.screens.WorldScreen
 
@@ -145,6 +146,7 @@ fun ForumRoot() {
                     is Screen.Search -> SearchScreen(nav, s.keyword)
                     is Screen.UserProfile -> UserScreen(nav, s.userId)
                     is Screen.Auth -> AuthScreen(nav, s.register)
+                    Screen.WebLogin -> WebLoginScreen(nav)
                 }
 
                 // 发现新版本时由 App.updateInfo 驱动弹出（冷启动自动检查 / 设置页手动检查）
