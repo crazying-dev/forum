@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -17,10 +19,13 @@ import top.crazying.forum.ui.components.LoadingBox
 import top.crazying.forum.ui.components.PostCardView
 
 /**
- * 帖子信息流列表（首页 / 论坛 / 搜索 / 个人主页共用）。
+ * 帖子信息流列表（首页 / 论坛共用）。
  *
  * 分页采用「尾部按钮 + 手动加载更多」而不是自动触发，
  * 避免滚动到底反复触发请求把服务端打爆。
+ *
+ * [state] 由调用方从 [FeedStateStore] 取（跨页面保留），
+ * 这样从帖子详情返回时仍停在原来的滚动位置。
  */
 @Composable
 fun PostFeedList(
@@ -35,6 +40,7 @@ fun PostFeedList(
     modifier: Modifier = Modifier,
     emptyText: String = "暂无帖子",
     contentPadding: PaddingValues = PaddingValues(12.dp),
+    state: LazyListState = rememberLazyListState(),
 ) {
     if (loading && posts.isEmpty()) {
         LoadingBox(modifier = modifier)
@@ -50,6 +56,7 @@ fun PostFeedList(
     }
 
     LazyColumn(
+        state = state,
         modifier = modifier.fillMaxWidth(),
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(10.dp),

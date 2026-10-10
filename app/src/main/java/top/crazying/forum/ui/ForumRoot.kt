@@ -33,6 +33,7 @@ import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.screens.AuthScreen
 import top.crazying.forum.ui.screens.DeleteAccountScreen
 import top.crazying.forum.ui.screens.EasterEggScreen
+import top.crazying.forum.ui.screens.FeedStateStore
 import top.crazying.forum.ui.screens.ForumScreen
 import top.crazying.forum.ui.screens.HomeScreen
 import top.crazying.forum.ui.screens.MeScreen
@@ -78,6 +79,10 @@ fun ForumRoot() {
         }
 
         val nav = remember { Navigator() }
+
+        // 跨页面保留的列表状态（位于 `when` 之外）：从帖子详情返回时，
+        // 列表页复用同一实例，已加载内容与滚动位置都不丢。
+        val feedStore = remember { FeedStateStore() }
 
         // 本地用户缓存「最多 24 小时」（V1.0.10，见 CachePolicy）：
         // `App.init` 已先用旧数据渲染头部；这里静默刷新一次覆盖缓存（过期时必定刷新）。
@@ -132,8 +137,8 @@ fun ForumRoot() {
                     .padding(padding),
             ) {
                 when (val s = nav.current) {
-                    Screen.Home -> HomeScreen(nav)
-                    Screen.Forum -> ForumScreen(nav)
+                    Screen.Home -> HomeScreen(nav, feedStore)
+                    Screen.Forum -> ForumScreen(nav, feedStore)
                     Screen.World -> WorldScreen(nav)
                     Screen.Wiki -> WikiScreen()
                     Screen.EasterEgg -> EasterEggScreen(nav)
@@ -143,8 +148,8 @@ fun ForumRoot() {
                     Screen.ProfileEdit -> ProfileEditScreen(nav)
                     is Screen.PostDetail -> PostDetailScreen(nav, s.postId)
                     is Screen.PostCreate -> PostCreateScreen(nav, s.category)
-                    is Screen.Search -> SearchScreen(nav, s.keyword)
-                    is Screen.UserProfile -> UserScreen(nav, s.userId)
+                    is Screen.Search -> SearchScreen(nav, feedStore, s.keyword)
+                    is Screen.UserProfile -> UserScreen(nav, feedStore, s.userId)
                     is Screen.Auth -> AuthScreen(nav, s.register)
                     Screen.WebLogin -> WebLoginScreen(nav)
                 }

@@ -31,89 +31,86 @@ import top.crazying.forum.ui.components.*
 
 /** 其他用户的主页：资料卡 + 关注 + 帖子/收藏/评论 三个列表。 */
 @Composable
-fun UserScreen(nav: Navigator, userId: String) {
+fun UserScreen(nav: Navigator, store: FeedStateStore, userId: String) {
     val colors = ForumTheme.colors
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var user by remember { mutableStateOf<UserItem?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf("posts") }
-    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
-    var comments by remember { mutableStateOf<List<CommentItem>>(emptyList()) }
-    var listLoading by remember { mutableStateOf(false) }
-    var listError by remember { mutableStateOf("") }
+    // 状态由根节点持有：从帖子详情返回时复用资料与列表，滚动位置不丢
+    val st = remember(userId) { store.user(userId) }
 
     suspend fun loadProfile() {
-        loading = true
+        st.profileLoading = true
         val result = App.api.userInfo(userId)
-        loading = false
+        st.profileLoading = false
         if (!result.ok) {
-            error = result.message
+            st.profileError = result.message
             return
         }
-        error = ""
-        user = result.jsonObj("user")?.let { UserItem.from(it) }
+        st.profileError = ""
+        st.user = result.jsonObj("user")?.let { UserItem.from(it) }
     }
 
     suspend fun loadList() {
-        listLoading = true
-        listError = ""
-        when (tab) {
+        st.loading = true
+        st.error = ""
+        when (st.tab) {
             "comments" -> {
                 val r = App.api.userComments(userId)
-                if (r.ok) comments = CommentItem.list(r.rowsAny("comments", "replies"))
-                else listError = r.message
+                if (r.ok) st.comments = CommentItem.list(r.rowsAny("comments", "replies"))
+                else st.error = r.message
             }
             "favorites" -> {
                 val r = App.api.userFavorites(userId)
-                if (r.ok) posts = Post.list(r.rows("posts"))
-                else listError = r.message
+                if (r.ok) st.posts = Post.list(r.rows("posts"))
+                else st.error = r.message
             }
             else -> {
                 val r = App.api.userPosts(userId)
                 if (r.ok) {
-                    val owner = user
-                    posts = Post.list(r.rows("posts")).map {
+                    val owner = st.user
+                    st.posts = Post.list(r.rows("posts")).map {
                         if (owner != null) it.withAuthor(owner.id, owner.name, owner.avatar) else it
                     }
-                } else listError = r.message
+                } else st.error = r.message
             }
         }
-        listLoading = false
+        st.loading = false
     }
 
+    // 首次进入（或切换用户）时加载资料；返回时 profileLoaded 已为 true，直接复用
     LaunchedEffect(userId) {
-        loadProfile()
-        tab = "posts"
-        posts = emptyList()
-        comments = emptyList()
-        loadList()
+        if (!st.profileLoaded) {
+            st.profileLoaded = true
+            loadProfile()
+        }
     }
 
-    LaunchedEffect(tab) {
-        if (user != null) {
-            posts = emptyList()
-            comments = emptyList()
+    // tab 切换时才重建列表；从帖子详情返回时 loadedTab 未变 → 不重载，保留滚动位置
+    LaunchedEffect(st.tab, st.user != null) {
+        if (st.user != null && needReload(st.loadedTab, st.tab)) {
+            st.posts = emptyList()
+            st.comments = emptyList()
+            st.loadedTab = st.tab
             loadList()
         }
     }
 
     val isSelf = App.isLoggedIn && App.userId == userId
 
-    PageScaffold(title = user?.name ?: "用户主页", onBack = { nav.pop() }) { padding ->
+    PageScaffold(title = st.user?.name ?: "用户主页", onBack = { nav.pop() }) { padding ->
         when {
-            loading && user == null -> Box(Modifier.fillMaxSize().padding(padding)) { LoadingBox() }
-            user == null -> Box(Modifier.fillMaxSize().padding(padding)) {
-                ErrorBox(error.ifBlank { "用户不存在" }, onRetry = { scope.launch { loadProfile() } })
+            st.profileLoading && st.user == null -> Box(Modifier.fillMaxSize().padding(padding)) { LoadingBox() }
+            st.user == null -> Box(Modifier.fillMaxSize().padding(padding)) {
+                ErrorBox(st.profileError.ifBlank { "用户不存在" }, onRetry = { scope.launch { loadProfile() } })
             }
             else -> LazyColumn(
+                state = st.listState,
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val u = user!!
+                val u = st.user!!
                 item(key = "card") {
                     Column(
                         modifier = Modifier
@@ -184,22 +181,22 @@ fun UserScreen(nav: Navigator, userId: String) {
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Pill("帖子", active = tab == "posts") { tab = "posts" }
-                        Pill("收藏", active = tab == "favorites") { tab = "favorites" }
-                        Pill("评论", active = tab == "comments") { tab = "comments" }
+                        Pill("帖子", active = st.tab == "posts") { st.tab = "posts" }
+                        Pill("收藏", active = st.tab == "favorites") { st.tab = "favorites" }
+                        Pill("评论", active = st.tab == "comments") { st.tab = "comments" }
                     }
                 }
 
                 when {
-                    listLoading -> item(key = "ll") { LoadingBox() }
-                    listError.isNotBlank() -> item(key = "le") {
-                        ErrorBox(listError, onRetry = { scope.launch { loadList() } })
+                    st.loading -> item(key = "ll") { LoadingBox() }
+                    st.error.isNotBlank() -> item(key = "le") {
+                        ErrorBox(st.error, onRetry = { scope.launch { loadList() } })
                     }
-                    tab == "comments" -> {
-                        if (comments.isEmpty()) {
+                    st.tab == "comments" -> {
+                        if (st.comments.isEmpty()) {
                             item(key = "ce") { EmptyBox("暂无评论") }
                         }
-                        items(items = comments, key = { "c" + it.id }) { c ->
+                        items(items = st.comments, key = { "c" + it.id }) { c ->
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -229,8 +226,8 @@ fun UserScreen(nav: Navigator, userId: String) {
                             }
                         }
                     }
-                    posts.isEmpty() -> item(key = "pe") { EmptyBox("暂无内容") }
-                    else -> items(items = posts, key = { "p" + it.id }) { p ->
+                    st.posts.isEmpty() -> item(key = "pe") { EmptyBox("暂无内容") }
+                    else -> items(items = st.posts, key = { "p" + it.id }) { p ->
                         PostCardView(
                             post = p,
                             onClick = { nav.push(Screen.PostDetail(p.id)) },

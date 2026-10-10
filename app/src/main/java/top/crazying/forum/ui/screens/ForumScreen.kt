@@ -27,44 +27,44 @@ import top.crazying.forum.ui.components.Pill
 
 /** 论坛页：按分类（综合/闲聊/求助/分享/创作）浏览帖子，支持分页。 */
 @Composable
-fun ForumScreen(nav: Navigator) {
+fun ForumScreen(nav: Navigator, store: FeedStateStore) {
     val colors = ForumTheme.colors
     val scope = rememberCoroutineScope()
 
-    // "" 代表「全部」
-    var category by remember { mutableStateOf("") }
-    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
-    var page by remember { mutableStateOf(1) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf("") }
-    var hasMore by remember { mutableStateOf(false) }
+    // 状态由根节点持有：从帖子详情返回时复用，列表内容与滚动位置都不丢
+    // filter 空串代表「全部」
+    val st = remember { store.feed("forum") }
 
     suspend fun load(targetPage: Int, replace: Boolean) {
-        loading = true
-        if (replace) error = ""
-        val cat = category
+        st.loading = true
+        if (replace) st.error = ""
+        val cat = st.filter
         val result = App.api.posts(
             page = targetPage,
             pageSize = Constants.PAGE_SIZE,
             category = cat.ifBlank { null },
         )
-        if (cat != category) return
-        loading = false
+        if (cat != st.filter) return
+        st.loading = false
         if (!result.ok) {
-            error = result.message
+            st.error = result.message
             return
         }
         val list = Post.list(result.rows("posts"))
-        posts = if (replace) list else posts + list
-        page = targetPage
-        hasMore = list.size >= Constants.PAGE_SIZE
+        st.posts = if (replace) list else st.posts + list
+        st.page = targetPage
+        st.hasMore = list.size >= Constants.PAGE_SIZE
     }
 
-    LaunchedEffect(category) {
-        posts = emptyList()
-        page = 1
-        hasMore = false
-        load(1, true)
+    // 分类不变时不重载：从帖子详情返回时直接复用已加载数据与滚动位置
+    LaunchedEffect(st.filter) {
+        if (needReload(st.loadedKey, st.filter)) {
+            st.posts = emptyList()
+            st.page = 1
+            st.hasMore = false
+            st.loadedKey = st.filter
+            load(1, true)
+        }
     }
 
     Column(
@@ -93,7 +93,7 @@ fun ForumScreen(nav: Navigator) {
             IconButton(onClick = { nav.push(Screen.Search()) }) {
                 Icon(Icons.Default.Search, contentDescription = "搜索", tint = colors.textPrimary)
             }
-            IconButton(onClick = { nav.push(Screen.PostCreate(category.ifBlank { "general" })) }) {
+            IconButton(onClick = { nav.push(Screen.PostCreate(st.filter.ifBlank { "general" })) }) {
                 Icon(Icons.Default.Add, contentDescription = "发帖", tint = colors.textPrimary)
             }
         }
@@ -105,25 +105,26 @@ fun ForumScreen(nav: Navigator) {
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Pill(text = "全部", active = category.isBlank()) { category = "" }
+            Pill(text = "全部", active = st.filter.isBlank()) { st.filter = "" }
             for (key in Constants.CATEGORY_ORDER) {
                 Pill(
                     text = Constants.categoryLabel(key),
-                    active = category == key,
-                    onClick = { category = key },
+                    active = st.filter == key,
+                    onClick = { st.filter = key },
                 )
             }
         }
 
         PostFeedList(
-            posts = posts,
-            loading = loading,
-            error = error,
-            hasMore = hasMore,
+            posts = st.posts,
+            loading = st.loading,
+            error = st.error,
+            hasMore = st.hasMore,
             onRetry = { scope.launch { load(1, true) } },
-            onLoadMore = { scope.launch { load(page + 1, false) } },
+            onLoadMore = { scope.launch { load(st.page + 1, false) } },
             onClickPost = { id -> if (id.isNotBlank()) nav.push(Screen.PostDetail(id)) },
             onClickUser = { uid -> if (uid.isNotBlank()) nav.push(Screen.UserProfile(uid)) },
+            state = st.listState,
         )
     }
 }

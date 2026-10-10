@@ -29,24 +29,21 @@ import top.crazying.forum.ui.components.Pill
 
 /** 首页：欢迎语 + 多个信息流（最新发布 / 综合排序 / 随机推荐 / 我的收藏）。 */
 @Composable
-fun HomeScreen(nav: Navigator) {
+fun HomeScreen(nav: Navigator, store: FeedStateStore) {
     val colors = ForumTheme.colors
     val scope = rememberCoroutineScope()
     val me = App.user.value
     val name = me?.optString("name", "") ?: ""
     val avatar = me?.optString("avatar", "") ?: ""
+    val meId = me?.optString("id", "") ?: ""
 
-    var feed by remember { mutableStateOf("latest") }
-    var posts by remember { mutableStateOf<List<Post>>(emptyList()) }
-    var page by remember { mutableStateOf(1) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf("") }
-    var hasMore by remember { mutableStateOf(false) }
+    // 状态由根节点持有：从帖子详情返回时复用，列表内容与滚动位置都不丢
+    val st = remember { store.feed("home", "latest") }
 
     suspend fun load(targetPage: Int, replace: Boolean) {
-        loading = true
-        if (replace) error = ""
-        val kind = feed
+        st.loading = true
+        if (replace) st.error = ""
+        val kind = st.filter
         val result = when (kind) {
             "random" -> App.api.randomPosts(Constants.RANDOM_LIMIT)
             "comprehensive" -> App.api.posts(
@@ -65,23 +62,29 @@ fun HomeScreen(nav: Navigator) {
                 sort = "time",
             )
         }
-        if (feed != kind) return
-        loading = false
+        if (st.filter != kind) return
+        st.loading = false
         if (!result.ok) {
-            error = result.message
+            st.error = result.message
             return
         }
         val list = Post.list(result.rows("posts"))
-        posts = if (replace) list else posts + list
-        page = targetPage
-        hasMore = kind == "latest" && list.size >= Constants.PAGE_SIZE
+        st.posts = if (replace) list else st.posts + list
+        st.page = targetPage
+        st.hasMore = kind == "latest" && list.size >= Constants.PAGE_SIZE
     }
 
-    LaunchedEffect(feed, me?.optString("id", "")) {
-        posts = emptyList()
-        page = 1
-        hasMore = false
-        load(1, true)
+    // 内容标识（信息流 + 登录用户）不变时不重载：
+    // 从帖子详情返回时标识照旧，直接复用已加载数据与滚动位置
+    val contentKey = st.filter + "|" + meId
+    LaunchedEffect(contentKey) {
+        if (needReload(st.loadedKey, contentKey)) {
+            st.posts = emptyList()
+            st.page = 1
+            st.hasMore = false
+            st.loadedKey = contentKey
+            load(1, true)
+        }
     }
 
     Column(
@@ -130,32 +133,33 @@ fun HomeScreen(nav: Navigator) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            FeedChip("最新发布", feed == "latest") {
-                if (feed != "latest") feed = "latest" else scope.launch { load(1, true) }
+            FeedChip("最新发布", st.filter == "latest") {
+                if (st.filter != "latest") st.filter = "latest" else scope.launch { load(1, true) }
             }
-            FeedChip("综合排序", feed == "comprehensive") { feed = "comprehensive" }
-            FeedChip("随机推荐", feed == "random") { feed = "random" }
+            FeedChip("综合排序", st.filter == "comprehensive") { st.filter = "comprehensive" }
+            FeedChip("随机推荐", st.filter == "random") { st.filter = "random" }
             if (name.isNotBlank()) {
-                FeedChip("我的收藏", feed == "favorites") { feed = "favorites" }
+                FeedChip("我的收藏", st.filter == "favorites") { st.filter = "favorites" }
             }
         }
 
         PostFeedList(
-            posts = posts,
-            loading = loading,
-            error = error,
-            hasMore = hasMore,
+            posts = st.posts,
+            loading = st.loading,
+            error = st.error,
+            hasMore = st.hasMore,
             onRetry = { scope.launch { load(1, true) } },
-            onLoadMore = { scope.launch { load(page + 1, false) } },
+            onLoadMore = { scope.launch { load(st.page + 1, false) } },
             onClickPost = { id -> if (id.isNotBlank()) nav.push(Screen.PostDetail(id)) },
             onClickUser = { uid -> if (uid.isNotBlank()) nav.push(Screen.UserProfile(uid)) },
-            emptyText = if (feed == "favorites") "还没有收藏的帖子" else "暂无帖子",
+            emptyText = if (st.filter == "favorites") "还没有收藏的帖子" else "暂无帖子",
+            state = st.listState,
         )
     }
 
     // 收藏流需要登录态，掉线时自动退回最新发布
     LaunchedEffect(me) {
-        if (me == null && feed == "favorites") feed = "latest"
+        if (me == null && st.filter == "favorites") st.filter = "latest"
     }
 }
 

@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.15**（`versionCode = 16`） |
+| 当前版本 | **V1.0.16**（`versionCode = 17`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -235,6 +235,11 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * **新增网页端登录**：`ui/screens/WebLoginScreen.kt` 用内置 WebView 打开站点真实登录页 `/auth?mode=login`——官方 Turnstile 在真实网页里渲染，绕开内嵌承载页的一切兼容问题；登录成功后从 `CookieManager` 取出 `token` / `ID` 两个 HttpOnly Cookie，经 `Api.importWebCookies()` 搬进 App 的 OkHttp `PrefsCookieJar`，会话即迁移完成。入口在登录页「使用网页端登录」。因为站点登录走 `fetch()` **不触发页面跳转**，判定成功靠**定时读 Cookie**（1.2 秒一次）+ 顶部「我已完成」手动重试。
   * **修复（现象：世界频道最新消息跑到最上面）**：服务端 `get_world_messages()` 是 `ORDER BY created_at DESC`（最新在前），客户端此前原样渲染。现经 `core/WorldFeed.newestLast()` 转为「早的在上、最新在下」，与聊天窗口一致，并在首次加载与发送成功后自动滚到底部。顺带修正截断口径：原来用 `takeLast(100)`，在倒序列表上取到的是**最旧**的 100 条，现改为 `take(100)`。
   * 新增 `core/WebAuth.kt` / `core/WorldFeed.kt` 两个纯逻辑对象与对应 JVM 单测（`WebAuthTest` 8 例 / `WorldFeedTest` 6 例）。
+* **列表页返回保留浏览位置（V1.0.16）**：
+  * **修复（现象：从帖子详情退出后，列表跳回最顶端）**：本工程有意不用 `navigation-compose`，根节点用 `when (nav.current)` 只渲染当前页 —— 页面一旦被压栈（进入帖子详情）就离开组合，页内 `remember` 的列表数据与 `LazyListState` 一并被丢弃，返回时列表被清空重载、滚动位置归零。现新增 `ui/screens/FeedState.kt`：`FeedState` / `UserFeedState` / `SearchState` 分别承载首页 / 论坛 / 搜索 / 用户主页的已加载内容、分页游标与 `LazyListState`，由 `ForumRoot` 用 `remember { FeedStateStore() }` 持有（位于 `when` 之外，随根节点存活）；返回列表页时 `store.feed(...)` 仍返回同一实例，列表内容与滚动位置都还在。
+  * 配合纯函数 `needReload(loadedKey, currentKey)`：只在内容标识（信息流 / 分类 / 搜索词 / 用户 tab）变化时才重新加载，从帖子详情返回不再触发重载。
+  * `FeedParts.PostFeedList` 新增 `state: LazyListState` 参数（默认 `rememberLazyListState()`）；首页 / 论坛把保留的滚动状态传进去，搜索页与用户主页的 `LazyColumn` 同样接入。
+  * 新增 `FeedStateTest`（10 例）覆盖 `needReload` 判定与 `FeedStateStore` 的「同 key 同实例」语义。
 
 ### 未实现（后续多轮持续补齐）
 
@@ -279,8 +284,9 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | Android SDK | `cmdline-tools 16111833`、`platform-tools r37.0.1`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
 | 命令 | `.\gradlew.bat testDebugUnitTest assembleRelease --console=plain` |
-| 结果 | **BUILD SUCCESSFUL**（63 例全部通过：CaptchaTest 26 / VersionGateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6 / WebAuthTest 8 / WorldFeedTest 6） |
-| Release 产物（V1.0.15） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1ca33a725c381683843956797caa206a5d7ff0d20efc7900cb110e9b78d36960`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| 结果 | **BUILD SUCCESSFUL**（73 例全部通过：CaptchaTest 26 / VersionGateTest 10 / FeedStateTest 10 / CachePolicyTest 7 / WebAuthTest 8 / MarkdownBodyTest 6 / WorldFeedTest 6） |
+| Release 产物（V1.0.16） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| 历史 Release 产物（V1.0.15） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1ca33a725c381683843956797caa206a5d7ff0d20efc7900cb110e9b78d36960` |
 | 历史 Release 产物（V1.0.13） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385` |
 
 编译过程中定位并修正的 3 类真实问题（供后续参考）：
