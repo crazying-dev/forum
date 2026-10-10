@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_at": "2026-10-07T11:45:00+08:00",
+  "updated_at": "2026-10-10T21:05:00+08:00",
   "min_versions": {
     "windows": "1.3.13",
     "android": "1.0.10",
@@ -15,18 +15,18 @@
       "requirement": "Windows 10 / 11（64 位）",
       "releases": [
         {
-          "version": "1.3.17",
+          "version": "1.3.18",
           "channel": "stable",
-          "date": "2026-10-04",
-          "size": 158128404,
-          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.17/forum_setup.exe",
+          "date": "2026-10-10",
+          "size": 158186366,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.18/forum_setup.exe",
           "filename": "forum_setup.exe",
-          "sha256": "3cf18632e5af14af7b8012d43954de298b073ee43a7f7e44117d23026a1d7d28",
+          "sha256": "1a78cd3930a7ebe7f3f28bb48689131a33e4762a7a304a159b67af2710e6e672",
           "notes": [
-            "新增：Turnstile 加载失败 / 超时 / 缺少 sitekey 时自动回退自研滑块，人机验证不再失效",
-            "回退请求带 provider=slider，服务端直接下发滑块图片挑战，不走 Turnstile 校验通道",
-            "服务端 provider 开关（slider / turnstile / off）逻辑不变，未配置密钥时依旧自动走滑块",
-            "版本号升至 1.3.17"
+            "修复：无限历纪年改为 1 起算——无限元年 = 公元 1604 年（无限 N 年 = 公元 1603 + N 年），此前会错显为「无限 0 年」",
+            "公元 1604 年以前显示「无限前 N 年」（无限前 1 年 = 公元 1603 年），不存在无限 0 年",
+            "设置页「年制换算」：输入 1 显示「无限元年」，输入 0 提示不存在无限 0 年",
+            "与网页端纪年口径完全统一；版本号升至 1.3.18"
           ],
           "mandatory": false
         }
