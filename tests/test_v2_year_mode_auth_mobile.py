@@ -298,15 +298,32 @@ def test_legacy_css_tokens_are_defined():
         assert re.search(rf"{re.escape(token)}\s*:", night), f".night-mode 未定义 {token}"
 
 
-def test_part2_has_cross_iife_year_aliases():
-    """Part 2（页面渲染 IIFE）必须从 __yoyoApp 取 Part 1 的年制函数，
+PART2_FROM_APP = [
+    "apiFetch", "esc", "el", "toast", "fmtTime", "avatarHtml", "resolveAvatarDeferred",
+    "getYearMode", "yearText", "wuxianToCE", "wuxianYearLabel", "wuxianYearName",
+    "stripMarkdown",
+]
 
-    否则换算弹窗里的年制提示会抛 ReferenceError（跨 IIFE 未声明）。
+
+def test_part2_has_cross_iife_year_aliases():
+    """Part 2（页面渲染 IIFE）必须从 __yoyoApp 解构 Part 1 的函数，
+
+    AfterBody.js 是两个独立 IIFE：Part 1 的函数不是全局，Part 2 裸引用即
+    ReferenceError。换算弹窗 run() 里若漏解构 wuxianYearName，异常会让整段
+    输出区不刷新（无限年→公元年完全不显示，公元年→无限年时好时坏）。
     """
     js = _read(AFTERBODY)
+    assert "window.__yoyoApp" in js
+    export_block = re.search(r"window\.__yoyoApp\s*=\s*\{(.*?)\n  \};", js, re.DOTALL)
+    assert export_block, "找不到 window.__yoyoApp 导出块"
+    exported = export_block.group(1)
+    part2 = js.split("var app = window.__yoyoApp;", 1)[1]
+    for name in PART2_FROM_APP:
+        assert re.search(rf"\b{re.escape(name)}\s*:", exported), f"__yoyoApp 未导出 {name}"
+        assert re.search(rf"\b{re.escape(name)}\s*=\s*app\.{re.escape(name)}\b", part2), \
+            f"Part 2 未从 app 解构 {name}（跨 IIFE 裸引用会报 ReferenceError）"
     assert "var getYearMode = app.getYearMode" in js, \
         "Part 2 未取 Part 1 的 getYearMode（跨 IIFE 引用会报 ReferenceError）"
-    assert "window.__yoyoApp" in js
 
 
 def test_static_version_bumped_for_new_assets():

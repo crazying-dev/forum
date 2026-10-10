@@ -761,7 +761,7 @@
   var app = window.__yoyoApp;
   var apiFetch = app.apiFetch, esc = app.esc, el = app.el, toast = app.toast, fmtTime = app.fmtTime, avatarHtml = app.avatarHtml, resolveAvatarDeferred = app.resolveAvatarDeferred;
   // Part 1 定义、Part 2 需要使用（经 __yoyoApp 传递，否则未定义）
-  var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, stripMarkdown = app.stripMarkdown;
+  var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, wuxianYearName = app.wuxianYearName, stripMarkdown = app.stripMarkdown;
   var getYearMode = app.getYearMode, yearText = app.yearText;
 
   // ── 帖子分类汉化映射（口径对照 V1，与论坛分区 tab / 发帖选项一一对应）──
