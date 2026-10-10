@@ -156,7 +156,9 @@
     if (isNaN(ce)) return '';
     if (getYearMode() === 'ce') return String(ce);
     var wy = wuxianYear(ce);
-    return wy !== null ? '无限' + wy : '无限前' + (1604 - ce);
+    // 无限历 1 起算：元年 = 公元 1604；公元 1603 则为「无限前 1 年」（不存在无限 0 年）
+    if (wy !== null) return wy === 1 ? '无限元年' : '无限' + wy;
+    return '无限前' + (1604 - ce);
   }
   function fmtTime(t) {
     if (!t) return '';
@@ -170,26 +172,35 @@
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
     return yearText(d.getFullYear()) + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
-  // ── 无限年：无限年 = 公元年 − 1604（无限元年 = 公元 1604）──
-  // 公元年 ≥ 1604 时返回无限年；否则返回 null（尚未进入无限年）。
+  // ── 无限年：无限年 N = 公元年 − 1603（无限元年 = 公元 1604）──
+  // 1 起算（不存在「无限 0 年」）；公元 1604 年之前返回 null，属于「无限前」。
   function wuxianYear(ce) {
     ce = parseInt(ce, 10);
     if (isNaN(ce) || ce < 1604) return null;
-    return ce - 1604;
+    return ce - 1603;
   }
-  // 无限年 → 公元年：返回公元年份字符串；输入非法时返回空串。
-  // 允许负数（表示「无限前」：公元年 = 无限年 + 1604）。
+  // 无限年 → 公元年：返回公元年份字符串；输入非法或 0（不存在）时返回空串。
+  // 正数 = 无限年（公元 = 无限年 + 1603）；负数 = 「无限前」（公元 = 1604 + 无限年）。
   function wuxianToCE(wy) {
     wy = parseInt(wy, 10);
-    if (isNaN(wy)) return '';
-    return String(wy + 1604);
+    if (isNaN(wy) || wy === 0) return '';
+    return String(wy > 0 ? wy + 1603 : 1604 + wy);
   }
-  // 公元年 → 无限年展示：≥1604 显示「无限xxx年」，<1604 显示「无限前xxx年」。
+  // 公元年 → 无限年展示：≥1604 显示「无限N年」（1 为「无限元年」），<1604 显示「无限前N年」。
   function wuxianYearLabel(ce) {
     ce = parseInt(ce, 10);
     if (isNaN(ce)) return null;
-    if (ce >= 1604) return '无限' + (ce - 1604) + '年';
+    if (ce >= 1604) {
+      var n = ce - 1603;
+      return n === 1 ? '无限元年' : '无限' + n + '年';
+    }
     return '无限前' + (1604 - ce) + '年';
+  }
+  // 无限年年份名：1 → 「无限元年」；负数 → 「无限前N年」；0 不存在 → 空串。
+  function wuxianYearName(wy) {
+    wy = parseInt(wy, 10);
+    if (isNaN(wy) || wy === 0) return '';
+    return wy > 0 ? (wy === 1 ? '无限元年' : '无限' + wy + '年') : '无限前' + (-wy) + '年';
   }
   // ── 剥离 Markdown 标记 → 纯文本（用于卡片摘要预览）──
   function stripMarkdown(s) {
@@ -517,6 +528,8 @@
   var worldMessages = [];
   var myUserId = null;
   var worldPollTimer = null;
+  // 自己刚发完消息：下一次渲染强制落到底部（否则用户上滚时看不到自己那条）
+  var worldForceBottom = false;
 
   function worldStatus(text, cls) {
     var s = el('worldStatus');
@@ -528,12 +541,18 @@
   function renderWorldMessages() {
     var dom = el('worldMessages');
     if (!dom) return;
+    // 吸附判定必须在重排 DOM 之前：此刻读到的仍是上一次渲染的滚动位置。
+    // 用户手动上滚翻历史后，轮询刷新不再把他拽回底部（粘性滚动）。
+    var atBottom = (dom.scrollHeight - dom.scrollTop - dom.clientHeight) < 32;
+    var forceBottom = worldForceBottom;
+    worldForceBottom = false;
     if (!worldMessages.length) {
       dom.innerHTML = '<div class="world-empty">暂无消息，快来抢沙发~</div>';
       return;
     }
     var html = '';
-    for (var i = 0; i < worldMessages.length; i++) {
+    // 服务端按时间倒序返回（最新在前）；倒序渲染 → 最新在下（与 Windows / Android 一致）
+    for (var i = worldMessages.length - 1; i >= 0; i--) {
       var m = worldMessages[i];
       var mine = myUserId && m.sender_id === myUserId;
       html +=
@@ -547,7 +566,7 @@
     }
     dom.innerHTML = html;
     resolveAvatarDeferred(dom);
-    dom.scrollTop = dom.scrollHeight;
+    if (forceBottom || atBottom) dom.scrollTop = dom.scrollHeight;
   }
 
   function connectWorld() {
@@ -574,6 +593,8 @@
     }
 
     function poll() {
+      // 去重：外部（发言成功 / 切回前台）主动触发的刷新不应叠加出第二条轮询链
+      if (worldPollTimer) { clearTimeout(worldPollTimer); worldPollTimer = null; }
       // —— 需求 2：不显示时不请求 ——
       if (!isPanelShown()) {
         worldPollTimer = setTimeout(poll, 1500);   // 收起状态下仍低频探测（1.5s）等用户展开
@@ -648,6 +669,8 @@
       connectWorld._toggleBound = true;
     }
 
+    // 供发言成功后立刻刷新用（见 sendWorldMessage）
+    connectWorld.refresh = poll;
     poll();
   }
 
@@ -655,7 +678,15 @@
     if (!content) return;
     if (!currentUser) { location.href = '/auth'; return; }
     apiFetch('/api/world/Send', { method: 'POST', body: { content: content } })
-      .then(function (d) { if (d && !d.success && d.message) toast(d.message); })
+      .then(function (d) {
+        if (d && d.success) {
+          // 自己发的消息必须看得见：强制落底 + 立刻抓一次（不必等下一次轮询）
+          worldForceBottom = true;
+          if (connectWorld.refresh) connectWorld.refresh();
+        } else if (d && d.message) {
+          toast(d.message);
+        }
+      })
       .catch(function () {});
   }
 
@@ -719,6 +750,7 @@
     wuxianYear: wuxianYear,
     wuxianToCE: wuxianToCE,
     wuxianYearLabel: wuxianYearLabel,
+    wuxianYearName: wuxianYearName,
     stripMarkdown: stripMarkdown
   };
 })();
@@ -1770,10 +1802,10 @@
       if (wy === '') { if (ceOut) ceOut.textContent = ''; }
       else {
         var c = wuxianToCE(wy);
-        var _wy = parseInt(wy, 10);
-        if (ceOut) ceOut.textContent = (isNaN(_wy) || _wy >= 0)
-          ? (wy + ' 无限年 = ' + c + ' 年（公元）')
-          : ('无限前' + (-_wy) + '年 = ' + c + ' 年（公元）');
+        var nm = wuxianYearName(wy);
+        if (ceOut) ceOut.textContent = (nm && c)
+          ? (nm + ' = ' + c + ' 年（公元）')
+          : '无限历没有 0 年（元年即公元 1604 年）';
       }
       if (ce === '') { if (wyOut) wyOut.textContent = ''; }
       else {

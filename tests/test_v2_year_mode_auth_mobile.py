@@ -69,15 +69,22 @@ def test_year_mode_setting_buttons():
 
 
 def test_wuxian_epoch_is_1604():
-    """基准：无限元年 = 公元 1604 年；示例 323 → 1927、1947 → 无限343年。"""
+    """基准：无限元年 = 公元 1604 年，且无限历 **1 起算**（不存在「无限 0 年」）。
+
+    1604 → 无限元年；1603 → 无限前 1 年；1947 → 无限 344 年。
+    """
     js = _read(AFTERBODY)
-    assert "wy + 1604" in js, "无限年→公元年公式（+1604）缺失"
-    assert "ce - 1604" in js, "公元年→无限年公式（−1604）缺失"
+    assert "wy + 1603" in js, "无限年→公元年公式（+1603，1 起算）缺失"
+    assert "ce - 1603" in js, "公元年→无限年公式（−1603）缺失"
     assert "'无限前'" in js, "缺少「无限前」处理（公元 1604 年之前）"
+    assert "无限元年" in js, "缺少「无限元年」显示（1 起算）"
+    assert "wy === 0" in js, "无限历没有 0 年：换算函数应显式拒绝 0"
     # 同一公式的算术校验（JS 侧的常量若被改动，公式断言会先失败）
-    assert str(323 + 1604) == "1927"
-    assert 1947 - 1604 == 343
-    assert f"无限{1947 - 1604}年" == "无限343年"
+    assert str(1 + 1603) == "1604", "无限元年应对应公元 1604 年"
+    assert 1604 - 1603 == 1, "公元 1604 年应为无限 1 年（元年），不是 0 年"
+    assert 1604 - 1603 == 1, "公元 1603 年应为「无限前 1 年」（不能与元年重号）"
+    assert 1947 - 1603 == 344
+    assert f"无限{1947 - 1603}年" == "无限344年"
 
 
 def test_wuxian_converter_live_update():
@@ -253,6 +260,24 @@ def test_world_page_view_uses_shared_time_and_css_tokens():
     assert ".world-page-container" in css and "100dvh" in css, "世界频道独立页缺少手机端高度适配"
 
 
+def test_world_newest_bottom_and_sticky_scroll():
+    """世界频道：最新消息在下（与 Windows / Android 口径一致），
+    且轮询刷新不再把正在翻看历史的用户拽回底部（粘性滚动）。"""
+    vue = _read(WORLD_VIEW)
+    assert "data.slice(0, 200).reverse()" in vue, \
+        "世界频道独立页未把倒序列表转成聊天顺序（最新应在下）"
+    assert "function isAtBottom" in vue, "世界频道独立页缺少「是否贴底」判定"
+    assert "function scrollBottom(force" in vue, "世界频道独立页滚动未支持强制落底"
+    assert "scrollBottom(forceBottom)" in vue, "轮询刷新未把「是否强制」传给滚动"
+    assert "poll(true)" in vue, "发送成功后未强制落底"
+    js = _read(AFTERBODY)
+    assert "worldForceBottom" in js, "首页世界面板缺少「自己发言后强制落底」标记"
+    assert "for (var i = worldMessages.length - 1; i >= 0; i--)" in js, \
+        "首页世界面板未倒序渲染（最新应在下）"
+    assert "if (forceBottom || atBottom) dom.scrollTop = dom.scrollHeight;" in js, \
+        "首页世界面板刷新时无条件滚到底（应只在贴底 / 强制时跟随）"
+
+
 def test_legacy_css_tokens_are_defined():
     """V1 移植样式引用的设计令牌必须已定义，否则背景透明/分隔线消失。"""
     css = _read(CSS)
@@ -296,10 +321,11 @@ if __name__ == "__main__":
     test_wuxian_converter_live_update()
     test_change_password_requires_email_code_backend()
     test_profile_change_password_ui()
-    test_forgot_password_two_step_code_flow()
+    test_forgot_password_single_page_code_flow()
     test_mobile_bottom_tab_bar_replaces_left_rail()
     test_mobile_nav_tabs_markup_and_world_page_entry()
     test_world_page_view_uses_shared_time_and_css_tokens()
+    test_world_newest_bottom_and_sticky_scroll()
     test_legacy_css_tokens_are_defined()
     test_part2_has_cross_iife_year_aliases()
     test_static_version_bumped_for_new_assets()

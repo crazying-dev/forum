@@ -23,20 +23,41 @@ function setStatus(text, cls) {
   statusCls.value = cls || ''
 }
 
-function scrollBottom() {
+// 距底部多少像素以内算「已经贴在底部」——吸附判定的容差
+const BOTTOM_SLACK = 32
+function isAtBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_SLACK
+}
+
+/**
+ * 滚动到底部。
+ *
+ * 默认只在用户**本来就贴底**时跟随（聊天窗口的粘性滚动）——
+ * 否则轮询刷新会把正在翻看历史消息的用户一次次拽回底部。
+ * 自己发完消息时传 `force = true`，确保能立刻看到自己那条。
+ *
+ * 注意：是否贴底必须在 **DOM 更新前** 判断（此刻读到的仍是上一次渲染的滚动位置）。
+ */
+function scrollBottom(force = false) {
+  const el = listEl.value
+  if (!el) return
+  if (!force && !isAtBottom(el)) return
   nextTick(() => { if (listEl.value) listEl.value.scrollTop = listEl.value.scrollHeight })
 }
 
-function poll() {
+function poll(forceBottom = false) {
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
   if (document.hidden) { pollTimer = null; return }
   fetch('/api/world/ALL', { credentials: 'same-origin' })
     .then((r) => r.json())
     .then((data) => {
       if (Array.isArray(data)) {
-        messages.value = data.slice(0, 200)
+        // 服务端按时间倒序返回（最新在前）；这里转成聊天顺序（最新在下），
+        // 与 Windows / Android 客户端口径一致（先截最新 200 条再反转）。
+        messages.value = data.slice(0, 200).reverse()
         setStatus('在线', 'online')
         retry = 0
-        scrollBottom()
+        scrollBottom(forceBottom)
         pollTimer = setTimeout(poll, 3000)
       } else { setStatus('加载失败', 'offline'); scheduleRetry() }
     })
@@ -65,7 +86,7 @@ async function send() {
     body: JSON.stringify({ content }),
   }).then((r) => r.json()).catch(() => null)
   if (!d) { setStatus('发送失败', 'offline'); return }
-  if (d.success) { input.value = ''; loggedIn.value = true; poll() }
+  if (d.success) { input.value = ''; loggedIn.value = true; poll(true) }
   else if (d.message) {
     setStatus(d.message, 'offline')
     // 未登录：给出明确指引，避免只报“发送失败”却无路可走
