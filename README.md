@@ -26,7 +26,7 @@
 | 彩蛋 | 每日一言与 `/Easter-Egg` 随机展示 |
 | 其他 | 会馆列表、隐私政策、Bug 反馈、外链安全确认、人机验证（Cloudflare Turnstile 内嵌 / 自研滑块） |
 | 外观 | 日间 / 夜间 / 跟随时间，对齐网页端配色 |
-| 年制 | 无限年 ⇄ 公元年（无限元年 = 公元 1604 年），全站时间显示随之切换 |
+| 年制 | 无限年 ⇄ 公元年（无限元年 = 公元 1604 年，从 1 起算），全站时间显示随之切换 |
 | 鼠标指针 | 内置三套「罗小黑」指针包（普通 / 放大·动态 / 放大·静态），可在主窗口内启用，也可一键安装为 Windows 系统鼠标 |
 | Live2D 桌宠 | 无边框、透明、置顶的桌面小窗，**原生渲染**（非网页）；可拖动、鼠标穿透、点击触发动作、视线跟随；模型只从网络下载一次并缓存 |
 | 托盘 | 显示/隐藏主窗口、世界频道、桌宠开关、主题、年制、打开数据目录、检查更新、关于、退出 |
@@ -158,7 +158,8 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
 3. **服务端已知问题必须容忍**：`/INFO` 返回 500、更新端点当前 404，客户端全部优雅降级
    （设置页显示「更新服务暂不可用」而不是弹错误框）。
 4. **时间口径照搬网页**：后端时间字符串不带时区时按 **UTC** 解析再换算本地显示；
-   无限年 = 公元年 − 1604。
+   无限元年 = 公元 1604 年（无限年从 1 起算：无限 N 年 = 公元 1603 + N 年）；公元 1604 年
+   以前显示「无限前 N 年」= 公元 (1604 − N) 年，不存在无限 0 年。
 5. **`.ani` 自己做**：Qt 不支持 Windows 动画光标格式，也没有热区 API，因此指针包在入库时
    就被解析成 PNG 帧 + `manifest.json`（热区/帧序/每帧延时），运行时用 `QTimer` 逐帧重设 `QCursor`。
 6. **Live2D 一律原生**（不用网页渲染）：`live2d-py` + `QOpenGLWidget`。
@@ -295,6 +296,16 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
     * `app/api.py` 的 `captcha_challenge(provider="")` 支持强制 provider；
     * `app/widgets/captcha.py` 新增 `_fallback_to_slider()`，并把 `QWebEngineView.loadFinished`
       接入（主文档加载失败即回退），`refresh()` 接受 `force_slider`；版本号升至 1.3.17。
+25. **V1.3.18：无限历纪年改为 1 起算**：与网页端统一「无限元年 = 公元 1604 年」的口径
+   （此前的 `ce − 1604` 会把元年错显为「无限 0 年」）。现在：
+   * `app/yearmode.py`：`wuxian_year(ce) = ce − 1603`；`wuxian_to_ce` 拒绝 0 年
+     （正数 `+ 1603`、负数 `+ 1604`）；新增 `wuxian_year_name(wy)` 生成「无限元年 /
+     无限 N 年 / 无限前 N 年」，`wuxian_year_label` / `year_text` 复用同一命名，
+     公元 1604 年显示为「无限元年」；
+   * 设置页「年制换算」改用 `wuxian_year_name`，输入 1 正确显示为「无限元年」，「0」
+     提示不存在无限 0 年；
+   * 单测 `tests/test_core.py` 同步更新（1604→1、1947→344、2012→无限 409 等）；
+     版本号升至 1.3.18。
 
 ---
 

@@ -4,7 +4,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Exe,
     [Parameter(Mandatory = $true)][string]$AppDir,
-    [string]$Version = '1.3.17',
+    [string]$Version = '1.3.18',
     [switch]$NoStartMenu,
     [switch]$DesktopShortcut
 )

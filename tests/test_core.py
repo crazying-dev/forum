@@ -143,19 +143,32 @@ def test_config_deep_merge_keeps_new_keys():
 
 
 def test_wuxian_conversion():
-    assert yearmode.wuxian_year(1604) == 0
-    assert yearmode.wuxian_year(1947) == 343
-    assert yearmode.wuxian_year(1927) == 323
+    assert yearmode.wuxian_year(1604) == 1
+    assert yearmode.wuxian_year(1605) == 2
+    assert yearmode.wuxian_year(1947) == 344
+    assert yearmode.wuxian_year(1927) == 324
     assert yearmode.wuxian_year(1603) is None
-    assert yearmode.wuxian_to_ce(343) == "1947"
-    assert yearmode.wuxian_to_ce(-323) == "1281"
+    assert yearmode.wuxian_to_ce(1) == "1604"
+    assert yearmode.wuxian_to_ce(344) == "1947"
+    assert yearmode.wuxian_to_ce(-324) == "1280"
+    assert yearmode.wuxian_to_ce(0) == ""
     assert yearmode.wuxian_to_ce("x") == ""
-    assert yearmode.wuxian_year_label(1927) == "无限323年"
+    assert yearmode.wuxian_year_name(1) == "无限元年"
+    assert yearmode.wuxian_year_name(2) == "无限2年"
+    assert yearmode.wuxian_year_name(-1) == "无限前1年"
+    assert yearmode.wuxian_year_name(0) == ""
+    assert yearmode.wuxian_year_label(1927) == "无限324年"
+    assert yearmode.wuxian_year_label(1604) == "无限元年"
+    assert yearmode.wuxian_year_label(1603) == "无限前1年"
     assert yearmode.wuxian_year_label(1590) == "无限前14年"
 
 
 def test_year_text_by_mode():
-    assert yearmode.year_text(1947, "wuxian") == "无限343"
+    # 无限元年 = 公元 1604 年，从 1 起算（不存在无限 0 年）
+    assert yearmode.year_text(1604, "wuxian") == "无限元年"
+    assert yearmode.year_text(1605, "wuxian") == "无限2"
+    assert yearmode.year_text(1947, "wuxian") == "无限344"
+    assert yearmode.year_text(1603, "wuxian") == "无限前1"
     assert yearmode.year_text(1947, "ce") == "1947"
     assert yearmode.year_text(1500, "wuxian") == "无限前104"
 
@@ -198,7 +211,7 @@ def test_birthday_helpers():
     assert yearmode.from_date_value("2012-06-15") == 20120615
     assert yearmode.from_date_value("2012/6/5") == 20120605
     assert yearmode.from_date_value("") == 0
-    assert yearmode.fmt_birthday(20120615, "wuxian") == "无限408-06-15"
+    assert yearmode.fmt_birthday(20120615, "wuxian") == "无限409-06-15"
     assert yearmode.fmt_birthday(20120615, "ce") == "2012-06-15"
 
 

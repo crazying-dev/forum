@@ -3,8 +3,8 @@
 
 口径完全对齐 Web 端（static/js/AfterBody.js）：
 
-* 无限年 = 公元年 − 1604（无限元年 = 公元 1604 年）
-* 公元年 < 1604 时显示「无限前xxx」
+* 无限元年 = 公元 1604 年，无限年从 1 起算：无限 N 年 = 公元 (1603 + N) 年
+* 公元年 < 1604 时显示「无限前xxx」：无限前 N 年 = 公元 (1604 − N) 年（不存在无限 0 年）
 * 后端时间字符串无时区信息时按 **UTC** 解析，再换算到本地时区显示
 """
 
@@ -44,23 +44,40 @@ def set_mode(mode: str) -> str:
 
 
 def wuxian_year(ce) -> int | None:
-    """公元年 → 无限年；公元年 < 1604 时返回 None。"""
+    """公元年 → 无限年（从 1 起算）；公元年 < 1604 时返回 None。"""
     try:
         ce = int(ce)
     except (TypeError, ValueError):
         return None
     if ce < constants.WUXIAN_EPOCH_CE:
         return None
-    return ce - constants.WUXIAN_EPOCH_CE
+    return ce - constants.WUXIAN_EPOCH_CE + 1
 
 
 def wuxian_to_ce(wy) -> str:
-    """无限年 → 公元年（允许负数，表示无限前）。非法输入返回空串。"""
+    """无限年 → 公元年（允许负数，表示无限前）。不存在无限 0 年，非法输入返回空串。"""
     try:
         wy = int(wy)
     except (TypeError, ValueError):
         return ""
-    return str(wy + constants.WUXIAN_EPOCH_CE)
+    if wy == 0:
+        return ""
+    if wy > 0:
+        return str(wy + constants.WUXIAN_EPOCH_CE - 1)
+    return str(constants.WUXIAN_EPOCH_CE + wy)
+
+
+def wuxian_year_name(wy) -> str:
+    """无限年（数字，可负）→ 中文名称；不存在无限 0 年，非法输入返回空串。"""
+    try:
+        wy = int(wy)
+    except (TypeError, ValueError):
+        return ""
+    if wy == 0:
+        return ""
+    if wy > 0:
+        return "无限元年" if wy == 1 else "无限%d年" % wy
+    return "无限前%d年" % (-wy)
 
 
 def wuxian_year_label(ce) -> str | None:
@@ -69,7 +86,7 @@ def wuxian_year_label(ce) -> str | None:
     except (TypeError, ValueError):
         return None
     if ce >= constants.WUXIAN_EPOCH_CE:
-        return "无限%d年" % (ce - constants.WUXIAN_EPOCH_CE)
+        return wuxian_year_name(ce - constants.WUXIAN_EPOCH_CE + 1)
     return "无限前%d年" % (constants.WUXIAN_EPOCH_CE - ce)
 
 
@@ -84,7 +101,7 @@ def year_text(ce, mode: str | None = None) -> str:
         return str(ce)
     wy = wuxian_year(ce)
     if wy is not None:
-        return "无限%d" % wy
+        return "无限元年" if wy == 1 else "无限%d" % wy
     return "无限前%d" % (constants.WUXIAN_EPOCH_CE - ce)
 
 

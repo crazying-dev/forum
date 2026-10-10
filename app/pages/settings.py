@@ -218,9 +218,10 @@ class SettingsPage(Page):
         if wuxian_text:
             ce = yearmode.wuxian_to_ce(wuxian_text)
             if not ce:
-                self._year_result.setText("请输入整数（无限年可以为负）")
+                self._year_result.setText("请输入整数（无限年可以为负，不存在无限 0 年）")
                 return
-            self._year_result.setText("无限%s年 = 公元 %s 年" % (wuxian_text, ce))
+            name = yearmode.wuxian_year_name(wuxian_text) or ("无限%s年" % wuxian_text)
+            self._year_result.setText("%s = 公元 %s 年" % (name, ce))
             return
         if ce_text:
             label = yearmode.wuxian_year_label(ce_text)
