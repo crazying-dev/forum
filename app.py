@@ -102,16 +102,29 @@ def create_app() -> Flask:
         return {"static_version": getattr(config, "STATIC_VERSION", "1")}
 
     # ── 模板全局变量：全站公告横幅（公告组件②）──
-    # 文案为空或 SITE_ANNOUNCEMENT_ENABLED=0 时模板不渲染，因此关公告只需改配置。
+    # 公告内容只从数据库 site_settings 表读取（由管理端维护），不再读取环境变量；
+    # 数据库无值时回退到 config 中的内置默认。文案为空或开关为 0 时模板不渲染。
     @app.context_processor
     def _inject_announcement():
+        stored = db.get_site_settings(getattr(config, "SITE_ANNOUNCEMENT_KEYS", ()))
+
+        raw_enabled = stored.get("SITE_ANNOUNCEMENT_ENABLED")
+        if raw_enabled is None:
+            enabled = bool(getattr(config, "SITE_ANNOUNCEMENT_ENABLED", False))
+        else:
+            enabled = str(raw_enabled) not in ("0", "", "false", "False")
+
+        text = stored.get("SITE_ANNOUNCEMENT_TEXT", config.SITE_ANNOUNCEMENT_TEXT)
+        link = stored.get("SITE_ANNOUNCEMENT_LINK", config.SITE_ANNOUNCEMENT_LINK)
         return {
             "announcement": {
-                "enabled": bool(getattr(config, "SITE_ANNOUNCEMENT_ENABLED", False)),
-                "tag": getattr(config, "SITE_ANNOUNCEMENT_TAG", ""),
-                "text": (getattr(config, "SITE_ANNOUNCEMENT_TEXT", "") or "").strip(),
-                "link": (getattr(config, "SITE_ANNOUNCEMENT_LINK", "") or "").strip(),
-                "link_text": getattr(config, "SITE_ANNOUNCEMENT_LINK_TEXT", "查看详情"),
+                "enabled": enabled,
+                "tag": stored.get("SITE_ANNOUNCEMENT_TAG", config.SITE_ANNOUNCEMENT_TAG),
+                "text": (text or "").strip(),
+                "link": (link or "").strip(),
+                "link_text": stored.get(
+                    "SITE_ANNOUNCEMENT_LINK_TEXT", config.SITE_ANNOUNCEMENT_LINK_TEXT
+                ),
             }
         }
 

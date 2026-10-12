@@ -132,6 +132,22 @@ def execute_insert(query: str, params: Iterable[Any] | None = None):
         return cur.rowcount
 
 
+def get_site_settings(keys: Iterable[str]) -> dict:
+    """批量读取 site_settings 键值表（管理端维护的站点设置）。
+
+    表不存在或读取异常时返回空 dict，交由调用方使用内置默认值兜底。
+    """
+    try:
+        rows = execute_query(
+            "SELECT key, value FROM site_settings WHERE key = ANY(%s)",
+            (list(keys),),
+            fetch_all=True,
+        )
+    except Exception:
+        return {}
+    return {r["key"]: r["value"] for r in rows if r.get("value") is not None}
+
+
 def init_database():
     """执行所有建表 SQL。"""
     if not config.database_url:
@@ -155,6 +171,7 @@ from . import bug  # noqa: E402  F401
 __all__ = [
     "execute_query",
     "execute_insert",
+    "get_site_settings",
     "init_database",
     "close_pool",
     "safe_html",

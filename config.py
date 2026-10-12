@@ -369,15 +369,24 @@ except OSError:
     pass
 
 # ── 全站公告横幅（公告组件②）──
-# 文案留空或 SITE_ANNOUNCEMENT_ENABLED=0 时整个横幅不渲染；
+# 公告内容改为从数据库 site_settings 表读取（由管理端维护），不再读取环境变量；
+# 下列取值仅作为数据库无值时的内置兜底默认。
+# 文案留空或启用开关为 0 时整个横幅不渲染；
 # 用户点关闭后按「标签+文案」记入 localStorage，改文案即视为新公告重新展示。
-SITE_ANNOUNCEMENT_ENABLED = os.getenv("SITE_ANNOUNCEMENT_ENABLED", "1") != "0"
-SITE_ANNOUNCEMENT_TAG = os.getenv("SITE_ANNOUNCEMENT_TAG", "公告")
-SITE_ANNOUNCEMENT_TEXT = os.getenv(
-    "SITE_ANNOUNCEMENT_TEXT", "妖精论坛 V2 已正式上架，欢迎体验并反馈 Bug！"
+SITE_ANNOUNCEMENT_ENABLED = True
+SITE_ANNOUNCEMENT_TAG = "公告"
+SITE_ANNOUNCEMENT_TEXT = "妖精论坛 V2 已正式上架，欢迎体验并反馈 Bug！"
+SITE_ANNOUNCEMENT_LINK = ""
+SITE_ANNOUNCEMENT_LINK_TEXT = "查看详情"
+
+# 公告在 site_settings 表中的键名（与管理端写入的键名保持一致）
+SITE_ANNOUNCEMENT_KEYS = (
+    "SITE_ANNOUNCEMENT_ENABLED",
+    "SITE_ANNOUNCEMENT_TAG",
+    "SITE_ANNOUNCEMENT_TEXT",
+    "SITE_ANNOUNCEMENT_LINK",
+    "SITE_ANNOUNCEMENT_LINK_TEXT",
 )
-SITE_ANNOUNCEMENT_LINK = os.getenv("SITE_ANNOUNCEMENT_LINK", "")
-SITE_ANNOUNCEMENT_LINK_TEXT = os.getenv("SITE_ANNOUNCEMENT_LINK_TEXT", "查看详情")
 
 # ── 自助注销账号（隐私政策「你的权利 → 注销账号」）──
 # 两种模式：purge = 彻底删除账号与全部内容；anonymize = 匿名化保留内容。
