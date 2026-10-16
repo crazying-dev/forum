@@ -1,0 +1,6 @@
+{
+  "usingComponents": {
+    "captcha": "/components/captcha/index"
+  },
+  "navigationBarTitleText": "注册"
+}

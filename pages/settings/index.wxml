@@ -1,0 +1,78 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="container">
+    <!-- 外观 -->
+    <view class="card">
+      <view class="card-title">外观主题</view>
+      <view class="seg">
+        <view class="seg-item {{themeMode === '' ? 'seg-on' : ''}}" data-mode="auto" bindtap="onTheme">跟随系统</view>
+        <view class="seg-item {{themeMode === 'day' ? 'seg-on' : ''}}" data-mode="day" bindtap="onTheme">亮色</view>
+        <view class="seg-item {{themeMode === 'night' ? 'seg-on' : ''}}" data-mode="night" bindtap="onTheme">暗色</view>
+      </view>
+      <view class="tip" wx:if="{{national}}">国庆限定主题生效中（10-01 ~ 10-07 不可手动切换）。</view>
+      <view class="tip" wx:else>跟随系统：18:00 ~ 次日 06:00 自动使用暗色。</view>
+    </view>
+
+    <!-- 纪年 -->
+    <view class="card">
+      <view class="card-title">纪年方式</view>
+      <view class="seg">
+        <view class="seg-item {{yearMode === 'wuxian' ? 'seg-on' : ''}}" data-mode="wuxian" bindtap="onYear">无限纪年</view>
+        <view class="seg-item {{yearMode === 'ce' ? 'seg-on' : ''}}" data-mode="ce" bindtap="onYear">公历纪年</view>
+      </view>
+    </view>
+
+    <!-- 资料 -->
+    <block wx:if="{{isLogin}}">
+      <view class="card">
+        <view class="card-title">个人资料</view>
+        <view class="field">
+          <view class="field-label">用户名</view>
+          <input class="input" value="{{name}}" maxlength="20" bindinput="onName" />
+        </view>
+        <view class="field">
+          <view class="field-label">性别</view>
+          <picker range="{{genders}}" value="{{genderIndex}}" bindchange="onGender">
+            <view class="picker-box"><text>{{genders[genderIndex]}}</text><text class="chev">▾</text></view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">年龄 / 生日</view>
+          <input class="input" value="{{age}}" placeholder="如 20 或 2000-01-01" bindinput="onAge" />
+        </view>
+        <view class="field">
+          <view class="field-label">个人简介</view>
+          <textarea class="textarea" value="{{intro}}" placeholder="介绍一下自己…"
+                    bindinput="onIntro" auto-height show-confirm-bar="{{false}}"></textarea>
+        </view>
+        <view class="btn btn-primary" bindtap="onSaveProfile">{{savingProfile ? '保存中…' : '保存资料'}}</view>
+      </view>
+
+      <view class="card">
+        <view class="card-title">修改密码</view>
+        <view class="field">
+          <view class="field-label">原密码</view>
+          <input class="input" value="{{oldPwd}}" password bindinput="onOldPwd" />
+        </view>
+        <view class="field">
+          <view class="field-label">新密码（≥8 位，含字母与数字）</view>
+          <input class="input" value="{{newPwd}}" password bindinput="onNewPwd" />
+        </view>
+        <view class="btn btn-ghost" bindtap="onChangePwd">{{changingPwd ? '提交中…' : '修改密码'}}</view>
+      </view>
+    </block>
+
+    <view class="card" wx:else>
+      <view class="tip">登录后可编辑资料与修改密码。</view>
+      <view class="btn btn-primary" bindtap="onLogin">去登录</view>
+    </view>
+
+    <!-- 关于 -->
+    <view class="card">
+      <view class="menu-item" bindtap="onPrivacy"><text>隐私政策</text><text class="chev">›</text></view>
+      <view class="menu-item"><text>客户端版本</text><text class="muted">微信小程序 1.0.0</text></view>
+      <view class="menu-item"><text>服务端</text><text class="muted">www.yjlt.top</text></view>
+    </view>
+
+    <view class="btn btn-ghost logout" wx:if="{{isLogin}}" bindtap="onLogout">退出登录</view>
+  </view>
+</view>

@@ -1,0 +1,93 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="loading-tip" wx:if="{{loading}}">加载中…</view>
+  <view class="empty" wx:elif="{{error}}">{{error}}</view>
+
+  <block wx:elif="{{post}}">
+    <view class="post card">
+      <view class="post-title">{{post.title}}</view>
+      <view class="post-meta">
+        <image class="pm-avatar" wx:if="{{post.user_avatar}}" src="{{post.user_avatar}}"
+               mode="aspectFill" data-uid="{{post.user_id}}" bindtap="onTapUser"></image>
+        <view class="pm-avatar pm-avatar-ph" wx:else>
+          <text class="ph-txt">{{post.user_name ? post.user_name[0] : '妖'}}</text>
+        </view>
+        <view class="pm-right">
+          <view class="pm-name" data-uid="{{post.user_id}}" bindtap="onTapUser">{{post.user_name || '匿名'}}</view>
+          <view class="pm-sub">
+            <text class="cat-chip">{{post.catLabel}}</text>
+            <text class="muted pm-time">{{post.timeText}}</text>
+          </view>
+        </view>
+        <view class="pm-more" wx:if="{{isAuthor}}" bindtap="onDeletePost">删除</view>
+        <view class="pm-more" wx:elif="{{isLogin}}" bindtap="onReport">举报</view>
+      </view>
+
+      <view class="post-content">
+        <rich-text nodes="{{post.content}}"></rich-text>
+      </view>
+
+      <view class="post-foot">
+        <text class="muted">阅读 {{post.views || 0}}</text>
+        <view class="foot-actions">
+          <view class="act {{liked ? 'act-on' : ''}}" bindtap="onLike">{{liked ? '已赞' : '点赞'}} {{post.likes || 0}}</view>
+          <view class="act {{favorited ? 'act-on' : ''}}" bindtap="onFavorite">{{favorited ? '已收藏' : '收藏'}}</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="comment-head">评论 {{comments.length}}</view>
+
+    <view class="comment-list">
+      <view class="cmt-item" wx:for="{{comments}}" wx:key="id">
+        <image class="cmt-avatar" wx:if="{{item.user_avatar}}" src="{{item.user_avatar}}"
+               mode="aspectFill" data-uid="{{item.user_id}}" bindtap="onTapUser"></image>
+        <view class="cmt-avatar cmt-avatar-ph" wx:else>
+          <text class="ph-txt">{{item.user_name ? item.user_name[0] : '妖'}}</text>
+        </view>
+        <view class="cmt-body">
+          <view class="cmt-head">
+            <text class="cmt-name">{{item.user_name || '匿名'}}</text>
+            <text class="cmt-time">{{item.timeText}}</text>
+          </view>
+          <view class="cmt-content">{{item.content}}</view>
+          <view class="cmt-actions">
+            <text class="cmt-act" data-cid="{{item.id}}" data-cname="{{item.user_name}}" bindtap="onReply">回复</text>
+            <text class="cmt-act" data-cid="{{item.id}}" bindtap="onLikeComment">{{item.liked ? '已赞' : '赞'}} {{item.likes || 0}}</text>
+            <text class="cmt-act" wx:if="{{item.user_id === myId}}" data-cid="{{item.id}}" bindtap="onDeleteComment">删除</text>
+          </view>
+
+          <view class="cmt-replies" wx:if="{{item.replies.length > 0}}">
+            <view class="cmt-reply" wx:for="{{item.replies}}" wx:for-item="rep" wx:for-index="ri" wx:key="id">
+              <text class="rep-name">{{rep.user_name || '匿名'}}</text>
+              <text class="rep-to" wx:if="{{rep.reply_to_name}}"> 回复 {{rep.reply_to_name}}</text>
+              <text class="rep-colon">：</text>
+              <text class="rep-content">{{rep.content}}</text>
+              <view class="cmt-actions">
+                <text class="cmt-time">{{rep.timeText}}</text>
+                <text class="cmt-act" data-cid="{{rep.id}}" data-cname="{{rep.user_name}}" bindtap="onReply">回复</text>
+                <text class="cmt-act" wx:if="{{rep.user_id === myId}}" data-cid="{{rep.id}}" bindtap="onDeleteComment">删除</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view class="empty" wx:if="{{comments.length === 0}}">还没有评论，快来抢沙发</view>
+    </view>
+
+    <view class="composer-space"></view>
+
+    <view class="composer">
+      <view class="reply-bar" wx:if="{{replyTo}}">
+        <text>回复 @{{replyTo.name}}</text>
+        <text class="reply-cancel" bindtap="onCancelReply">取消</text>
+      </view>
+      <view class="composer-row">
+        <input class="composer-input" value="{{commentInput}}"
+               placeholder="{{replyTo ? '回复 ' + replyTo.name : '写下你的评论…'}}"
+               confirm-type="send" bindinput="onCommentInput" bindconfirm="onSubmitComment" />
+        <view class="composer-btn" bindtap="onSubmitComment">{{submitting ? '…' : '发送'}}</view>
+      </view>
+    </view>
+  </block>
+</view>

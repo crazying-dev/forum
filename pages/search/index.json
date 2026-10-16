@@ -1,0 +1,6 @@
+{
+  "usingComponents": {
+    "post-card": "/components/post-card/index"
+  },
+  "navigationBarTitleText": "搜索"
+}

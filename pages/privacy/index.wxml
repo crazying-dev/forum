@@ -1,0 +1,67 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="container">
+    <view class="card">
+      <view class="title">妖精论坛 · 隐私政策</view>
+      <view class="meta">版本 {{version}} · 更新于 {{updated}}</view>
+
+      <view class="sec">
+        <view class="h"><text class="num">0</text>引言与适用范围</view>
+        <view class="p">本政策适用于妖精论坛（含网页端 https://www.yjlt.top 与微信小程序等客户端）。我们仅处理为提供社区服务所必需的信息，并尽力保护你的个人隐私。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">1</text>我们收集哪些个人信息</view>
+        <view class="p">· 账号信息：用户名、邮箱、密码（加盐哈希存储）、头像、性别、年龄/生日、个人简介。</view>
+        <view class="p">· 内容信息：你发布的帖子、评论、世界频道消息、点赞/收藏/关注关系、举报与反馈。</view>
+        <view class="p">· 技术信息：登录时的客户端 IP（用于安全验证与限流）、客户端平台与版本。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">2</text>我们如何使用你的个人信息</view>
+        <view class="p">用于账号注册与登录、展示与存储你的公开内容、发送你主动请求的邮箱验证码/通知邮件、展开发帖管理、反垃圾与安全风控。我们不会将你的个人信息用于任何与社区服务无关的目的。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">3</text>Cookie 与本地存储</view>
+        <view class="p">登录成功后服务端会写入两个 HttpOnly Cookie（token / ID，有效期 7 天）用于身份识别；客户端本地会缓存登录态与主题偏好（亮/暗、纪年方式）以提升体验。你可以在设置中退出登录或清理缓存。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">4</text>第三方服务与信息共享</view>
+        <view class="p">我们不向第三方出售你的个人信息。仅在必要范围内使用基础设施服务（如邮件发送、图片存储、人机验证），这些服务仅接触完成其功能所需的最小数据。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">5</text>信息的存储与保存期限</view>
+        <view class="p">数据存储于服务端数据库。账号注销后（彻底删除），相关数据将被级联删除；选择匿名化保留时，历史内容将去除身份关联后保留。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">6</text>我们如何保护你的信息</view>
+        <view class="p">密码使用哈希存储且不可逆；登录凭证采用签名校验；关键接口具备频率限制与人机验证；传输层使用 HTTPS。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">7</text>未成年人保护</view>
+        <view class="p">若你是未成年人，请在监护人指导下使用本服务，并避免公开真实的个人身份信息。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">8</text>你的权利</view>
+        <view class="p">你可以在「设置 → 个人资料」中查看与更正你的账号信息，也可以修改密码或退出登录。如需注销账号，可在网页端「设置」发起注销（支持彻底删除或匿名化保留）。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">9</text>本政策的更新</view>
+        <view class="p">我们可能适时更新本政策，重大变更将在社区内以公告形式提示。</view>
+      </view>
+
+      <view class="sec">
+        <view class="h"><text class="num">10</text>联系我们</view>
+        <view class="p">如对本政策有任何疑问、意见或投诉，请通过站内反馈功能或邮箱与我们联系。</view>
+      </view>
+    </view>
+
+    <view class="foot">© 2026 妖精论坛 · 粉丝公益创作</view>
+  </view>
+</view>

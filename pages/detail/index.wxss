@@ -1,0 +1,266 @@
+.post {
+  margin: 24rpx;
+  padding: 28rpx;
+}
+
+.post-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--c-text);
+}
+
+.post-meta {
+  display: flex;
+  align-items: center;
+  margin-top: 24rpx;
+}
+
+.pm-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pm-avatar-ph {
+  background: linear-gradient(135deg, #84A8B9, #6A8C89);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ph-txt {
+  color: #fff;
+  font-size: 28rpx;
+}
+
+.pm-right {
+  margin-left: 18rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.pm-name {
+  font-size: 29rpx;
+  color: var(--c-text);
+  font-weight: 500;
+}
+
+.pm-sub {
+  margin-top: 8rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.pm-time {
+  font-size: 22rpx;
+}
+
+.pm-more {
+  font-size: 24rpx;
+  color: var(--c-text-3);
+  padding: 8rpx 16rpx;
+  border: 1rpx solid var(--c-border);
+  border-radius: 999rpx;
+}
+
+.post-content {
+  margin-top: 28rpx;
+  font-size: 30rpx;
+  line-height: 1.75;
+  color: var(--c-text);
+  word-break: break-all;
+  overflow: hidden;
+}
+
+.post-foot {
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid var(--c-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 24rpx;
+}
+
+.foot-actions {
+  display: flex;
+}
+
+.act {
+  margin-left: 20rpx;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: var(--c-text-2);
+  background: var(--c-icon);
+}
+
+.act-on {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.comment-head {
+  padding: 8rpx 32rpx 16rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.comment-list {
+  padding: 0 24rpx;
+}
+
+.cmt-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 20rpx 0;
+}
+
+.cmt-avatar {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cmt-avatar-ph {
+  background: linear-gradient(135deg, #84A8B9, #6A8C89);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cmt-avatar-ph .ph-txt {
+  font-size: 24rpx;
+}
+
+.cmt-body {
+  flex: 1;
+  margin-left: 18rpx;
+  min-width: 0;
+}
+
+.cmt-head {
+  display: flex;
+  align-items: baseline;
+}
+
+.cmt-name {
+  font-size: 26rpx;
+  color: var(--c-primary);
+  margin-right: 12rpx;
+}
+
+.cmt-time {
+  font-size: 22rpx;
+  color: var(--c-text-3);
+}
+
+.cmt-content {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  line-height: 1.55;
+  color: var(--c-text);
+  word-break: break-all;
+}
+
+.cmt-actions {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+  gap: 28rpx;
+  font-size: 22rpx;
+  color: var(--c-text-3);
+}
+
+.cmt-act {
+  color: var(--c-text-3);
+}
+
+.cmt-replies {
+  margin-top: 16rpx;
+  padding: 12rpx 20rpx;
+  border-radius: 14rpx;
+  background: var(--c-hover);
+}
+
+.cmt-reply {
+  padding: 10rpx 0;
+  font-size: 27rpx;
+  line-height: 1.5;
+  color: var(--c-text);
+  word-break: break-all;
+}
+
+.rep-name {
+  color: var(--c-primary);
+}
+
+.rep-to {
+  color: var(--c-text-3);
+  font-size: 25rpx;
+}
+
+.rep-content {
+  color: var(--c-text-2);
+}
+
+.composer-space {
+  height: 140rpx;
+}
+
+.composer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14rpx 24rpx;
+  padding-bottom: calc(14rpx + env(safe-area-inset-bottom));
+  background: var(--c-card);
+  border-top: 1rpx solid var(--c-border);
+}
+
+.reply-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 24rpx;
+  color: var(--c-text-3);
+  padding-bottom: 12rpx;
+}
+
+.reply-cancel {
+  color: var(--c-primary);
+}
+
+.composer-row {
+  display: flex;
+  align-items: center;
+}
+
+.composer-input {
+  flex: 1;
+  height: 76rpx;
+  padding: 0 24rpx;
+  border-radius: 38rpx;
+  background: var(--c-input);
+  border: 2rpx solid var(--c-border);
+  font-size: 28rpx;
+  color: var(--c-text);
+}
+
+.composer-btn {
+  margin-left: 16rpx;
+  padding: 0 34rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  border-radius: 38rpx;
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: 28rpx;
+  flex-shrink: 0;
+}

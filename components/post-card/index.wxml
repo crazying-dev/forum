@@ -1,0 +1,18 @@
+<view class="post-card" bindtap="onTap">
+  <view class="pc-title clamp-2">{{post.title}}</view>
+  <view class="pc-summary clamp-2" wx:if="{{post.summary}}">{{post.summary}}</view>
+  <view class="pc-meta">
+    <image class="pc-avatar" wx:if="{{post.user_avatar}}" src="{{post.user_avatar}}" mode="aspectFill"></image>
+    <view class="pc-avatar pc-avatar-ph" wx:else>
+      <text class="ph-txt">{{post.user_name ? post.user_name[0] : '妖'}}</text>
+    </view>
+    <text class="pc-name ellipsis">{{post.user_name || '匿名'}}</text>
+    <text class="pc-dot">·</text>
+    <text class="pc-time">{{timeText}}</text>
+    <view class="pc-right">
+      <text class="cat-chip" wx:if="{{showCategory}}">{{catLabel}}</text>
+      <text class="pc-stat">赞 {{post.likes || 0}}</text>
+      <text class="pc-stat">阅 {{post.views || 0}}</text>
+    </view>
+  </view>
+</view>

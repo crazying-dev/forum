@@ -1,0 +1,62 @@
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  background: var(--c-bg);
+  border-bottom: 1rpx solid var(--c-border);
+}
+
+.tab {
+  padding: 10rpx 24rpx;
+  margin-right: 12rpx;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  color: var(--c-text-2);
+}
+
+.tab-on {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-weight: 600;
+}
+
+.tab-search {
+  margin-left: auto;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: var(--c-primary);
+  background: var(--c-icon);
+}
+
+.feed {
+  padding: 24rpx;
+}
+
+.empty-btn {
+  display: inline-block;
+  margin-top: 24rpx;
+  padding: 14rpx 44rpx;
+  border-radius: 999rpx;
+  color: var(--c-on-primary);
+  background: var(--c-primary);
+  font-size: 28rpx;
+}
+
+.fab {
+  position: fixed;
+  right: 40rpx;
+  bottom: 60rpx;
+  width: 100rpx;
+  height: 100rpx;
+  line-height: 96rpx;
+  text-align: center;
+  border-radius: 50%;
+  font-size: 56rpx;
+  color: var(--c-on-primary);
+  background: var(--c-primary);
+  box-shadow: 0 8rpx 28rpx var(--c-shadow);
+}

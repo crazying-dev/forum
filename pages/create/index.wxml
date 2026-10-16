@@ -1,0 +1,29 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="container">
+    <view class="field">
+      <view class="field-label">标题（最多 100 字）</view>
+      <input class="input" value="{{title}}" maxlength="100"
+             placeholder="给帖子起个标题" bindinput="onTitle" />
+    </view>
+
+    <view class="field">
+      <view class="field-label">分类</view>
+      <picker range="{{cats}}" range-key="label" value="{{catIndex}}" bindchange="onCat">
+        <view class="picker-box">
+          <text>{{cats[catIndex].label}}</text>
+          <text class="chev">▾</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <view class="field-label">正文</view>
+      <textarea class="textarea" value="{{content}}" maxlength="20000"
+                placeholder="写下你想说的…" bindinput="onContent" auto-height
+                show-confirm-bar="{{false}}"></textarea>
+    </view>
+
+    <view class="btn btn-primary" bindtap="onSubmit">{{submitting ? '发布中…' : '发布'}}</view>
+    <view class="hint">发布后会邮件通知你的粉丝（如已开启）。</view>
+  </view>
+</view>

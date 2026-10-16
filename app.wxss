@@ -1,0 +1,206 @@
+/* 妖精论坛 · 微信小程序全局样式
+ * 主题令牌与 Web 端 static/css/main.css 对齐（青绿底色 + 亮/暗 + 国庆限定）
+ * 用法：页面根节点 class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}"
+ */
+
+page {
+  --c-text: #1A2423;
+  --c-text-2: #2E4659;
+  --c-text-3: #96A9A7;
+  --c-accent: #579491;
+  --c-bg: #D8E6E4;
+  --c-card: rgba(255, 255, 255, 0.95);
+  --c-input: rgba(255, 255, 255, 0.85);
+  --c-hover: rgba(106, 140, 137, 0.1);
+  --c-border: rgba(106, 140, 137, 0.2);
+  --c-primary: #6A8C89;
+  --c-primary-2: #579491;
+  --c-shadow: rgba(58, 95, 107, 0.15);
+  --c-icon: rgba(106, 140, 137, 0.15);
+  --c-on-primary: #ffffff;
+  font-size: 28rpx;
+  color: #1A2423;
+}
+
+/* 暗色主题 */
+.night {
+  --c-text: #E8EEED;
+  --c-text-2: #D8E6E4;
+  --c-text-3: #84A8B9;
+  --c-accent: #B4D2D8;
+  --c-bg: #325a64;
+  --c-card: rgba(26, 36, 35, 0.95);
+  --c-input: rgba(26, 36, 35, 0.8);
+  --c-hover: rgba(132, 168, 185, 0.15);
+  --c-border: rgba(132, 168, 185, 0.15);
+  --c-primary: #84A8B9;
+  --c-primary-2: #6A8C89;
+  --c-shadow: rgba(0, 0, 0, 0.3);
+  --c-icon: rgba(132, 168, 185, 0.2);
+}
+
+/* 国庆限定（浅色底色 + 红金点缀） */
+.national {
+  --c-primary: #C8102E;
+  --c-primary-2: #A50D25;
+  --c-accent: #C8102E;
+  --c-bg: #FBF3E6;
+  --c-text: #3A1D1D;
+  --c-border: rgba(200, 16, 46, 0.18);
+  --c-hover: rgba(200, 16, 46, 0.08);
+}
+
+/* 国庆限定（暗色） */
+.night.national {
+  --c-primary: #FFD24A;
+  --c-primary-2: #E6B93C;
+  --c-accent: #FFD24A;
+  --c-bg: #3A0D12;
+  --c-text: #FFE8C4;
+  --c-text-2: #FFE8C4;
+  --c-text-3: #D8A96A;
+  --c-border: rgba(255, 210, 74, 0.2);
+  --c-hover: rgba(255, 210, 74, 0.12);
+  --c-card: rgba(58, 13, 18, 0.9);
+  --c-input: rgba(58, 13, 18, 0.8);
+  --c-on-primary: #3A0D12;
+}
+
+.page-root {
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
+/* ── 通用容器 / 卡片 ───────────────────── */
+.container {
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background: var(--c-card);
+  border: 1rpx solid var(--c-border);
+  border-radius: 20rpx;
+  box-shadow: 0 6rpx 24rpx var(--c-shadow);
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-sizing: border-box;
+}
+
+/* ── 按钮 ─────────────────────────────── */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  line-height: 1;
+  box-sizing: border-box;
+  border: none;
+}
+.btn::after { border: none; }
+.btn-primary {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+.btn-primary:active { background: var(--c-primary-2); }
+.btn-ghost {
+  background: transparent;
+  color: var(--c-primary);
+  border: 2rpx solid var(--c-primary);
+}
+.btn-ghost:active { background: var(--c-hover); }
+.btn[disabled] { opacity: 0.55; }
+
+/* ── 表单 ─────────────────────────────── */
+.field {
+  margin-bottom: 24rpx;
+}
+.field-label {
+  font-size: 26rpx;
+  color: var(--c-text-2);
+  margin-bottom: 12rpx;
+}
+.input {
+  width: 100%;
+  height: 88rpx;
+  box-sizing: border-box;
+  padding: 0 24rpx;
+  border-radius: 14rpx;
+  background: var(--c-input);
+  border: 2rpx solid var(--c-border);
+  color: var(--c-text);
+  font-size: 30rpx;
+}
+.textarea {
+  width: 100%;
+  min-height: 240rpx;
+  box-sizing: border-box;
+  padding: 20rpx 24rpx;
+  border-radius: 14rpx;
+  background: var(--c-input);
+  border: 2rpx solid var(--c-border);
+  color: var(--c-text);
+  font-size: 30rpx;
+}
+
+/* ── 文本工具类 ────────────────────────── */
+.muted { color: var(--c-text-3); }
+.secondary { color: var(--c-text-2); }
+.accent { color: var(--c-accent); }
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+/* ── 头像 ─────────────────────────────── */
+.avatar {
+  border-radius: 50%;
+  background: linear-gradient(135deg, #84A8B9, #6A8C89);
+  flex-shrink: 0;
+}
+
+/* ── 状态提示 ──────────────────────────── */
+.empty {
+  padding: 120rpx 24rpx;
+  text-align: center;
+  color: var(--c-text-3);
+  font-size: 28rpx;
+}
+.loading-tip {
+  padding: 40rpx;
+  text-align: center;
+  color: var(--c-text-3);
+  font-size: 26rpx;
+}
+.divider {
+  height: 1rpx;
+  background: var(--c-border);
+  margin: 20rpx 0;
+}
+
+/* ── 分类标签 ──────────────────────────── */
+.cat-chip {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: var(--c-primary);
+  background: var(--c-icon);
+}

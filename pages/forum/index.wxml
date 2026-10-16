@@ -1,0 +1,18 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <scroll-view class="cats" scroll-x enable-flex>
+    <view wx:for="{{cats}}" wx:key="key"
+          class="cat {{cat === item.key ? 'cat-on' : ''}}"
+          data-key="{{item.key}}" bindtap="onCat">{{item.label}}</view>
+  </scroll-view>
+
+  <view class="list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onPostTap"></post-card>
+
+    <view class="empty" wx:if="{{!loading && posts.length === 0}}">{{error || '该分类下暂无帖子'}}</view>
+    <view class="loading-tip" wx:if="{{loading}}">加载中…</view>
+    <view class="loading-tip" wx:elif="{{hasMore && posts.length > 0}}">上拉加载更多</view>
+    <view class="loading-tip" wx:elif="{{posts.length > 0}}">没有更多了</view>
+  </view>
+
+  <view class="fab" bindtap="onCreate">＋</view>
+</view>

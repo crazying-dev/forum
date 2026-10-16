@@ -1,0 +1,52 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="profile card" wx:if="{{user}}">
+    <view class="head">
+      <image class="avatar-lg" wx:if="{{user.avatar}}" src="{{user.avatar}}" mode="aspectFill"></image>
+      <view class="avatar-lg avatar-ph" wx:else><text>{{user.name ? user.name[0] : '妖'}}</text></view>
+      <view class="head-main">
+        <view class="name">{{user.name}}</view>
+        <view class="sub">
+          <text class="cat-chip" wx:if="{{user.title}}">{{user.title}}</text>
+          <text class="muted" wx:if="{{user.age}}">年龄 {{user.age}}</text>
+        </view>
+      </view>
+      <view class="follow-btn {{isFollowing ? 'follow-on' : ''}}"
+            wx:if="{{!isSelf}}" bindtap="onFollow">
+        {{isFollowing ? '已关注' : '关注'}}
+      </view>
+    </view>
+
+    <view class="intro" wx:if="{{user.intro}}">{{user.intro}}</view>
+
+    <view class="stats" wx:if="{{user.stats}}">
+      <view class="stat">
+        <view class="stat-num">{{user.stats.post_count || 0}}</view><view class="stat-label">帖子</view>
+      </view>
+      <view class="stat">
+        <view class="stat-num">{{user.stats.total_likes || 0}}</view><view class="stat-label">获赞</view>
+      </view>
+      <view class="stat">
+        <view class="stat-num">{{user.stats.following_count || 0}}</view><view class="stat-label">关注</view>
+      </view>
+      <view class="stat">
+        <view class="stat-num">{{user.stats.follower_count || 0}}</view><view class="stat-label">粉丝</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="tabs">
+    <view class="tab {{tab === 'posts' ? 'tab-on' : ''}}" data-tab="posts" bindtap="onSwitchTab">帖子</view>
+    <view class="tab {{tab === 'fav' ? 'tab-on' : ''}}" wx:if="{{isSelf}}"
+          data-tab="fav" bindtap="onSwitchTab">收藏</view>
+  </view>
+
+  <view class="list">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onPostTap"></post-card>
+    <view class="empty" wx:if="{{!loading && posts.length === 0}}">
+      {{tab === 'fav' ? '暂无收藏' : 'TA 还没有发帖'}}
+    </view>
+    <view class="loading-tip" wx:if="{{loading}}">加载中…</view>
+    <view class="loading-tip" wx:elif="{{hasMore && posts.length > 0}}">上拉加载更多</view>
+    <view class="loading-tip" wx:elif="{{posts.length > 0}}">没有更多了</view>
+  </view>
+</view>

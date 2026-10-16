@@ -1,0 +1,25 @@
+.auth {
+  padding: 80rpx 48rpx;
+}
+
+.brand {
+  font-size: 52rpx;
+  font-weight: 700;
+  color: var(--c-primary);
+  text-align: center;
+}
+
+.brand-sub {
+  margin: 16rpx 0 60rpx;
+  font-size: 26rpx;
+  color: var(--c-text-3);
+  text-align: center;
+}
+
+.links {
+  margin-top: 36rpx;
+  display: flex;
+  justify-content: space-between;
+  font-size: 26rpx;
+  color: var(--c-primary);
+}

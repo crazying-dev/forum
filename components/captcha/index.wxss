@@ -1,0 +1,92 @@
+.cap-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cap-panel {
+  width: 640rpx;
+  max-width: 92vw;
+  background: #ffffff;
+  border-radius: 24rpx;
+  padding: 36rpx 28rpx 24rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cap-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1A2423;
+}
+
+.cap-tip {
+  font-size: 24rpx;
+  color: #6A8C89;
+  margin: 12rpx 0 24rpx;
+  min-height: 34rpx;
+  text-align: center;
+}
+
+.cap-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12rpx;
+  background: #e6ecec;
+  touch-action: none;
+}
+
+.cap-bg {
+  display: block;
+}
+
+.cap-piece {
+  position: absolute;
+  left: 0;
+}
+
+.cap-loading {
+  padding: 90rpx 0;
+  font-size: 26rpx;
+  color: #96A9A7;
+}
+
+.cap-actions {
+  margin-top: 24rpx;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.cap-btn {
+  width: 220rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  border-radius: 12rpx;
+  border: 2rpx solid #6A8C89;
+  color: #6A8C89;
+  font-size: 28rpx;
+}
+
+.cap-shake {
+  animation: cap-shake 0.4s ease;
+}
+
+@keyframes cap-shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-14rpx); }
+  40% { transform: translateX(14rpx); }
+  60% { transform: translateX(-10rpx); }
+  80% { transform: translateX(10rpx); }
+  100% { transform: translateX(0); }
+}

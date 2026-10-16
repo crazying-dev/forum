@@ -1,0 +1,102 @@
+.post-card {
+  background: var(--c-card);
+  border: 1rpx solid var(--c-border);
+  border-radius: 20rpx;
+  box-shadow: 0 6rpx 24rpx var(--c-shadow);
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  box-sizing: border-box;
+}
+
+.post-card:active {
+  background: var(--c-hover);
+}
+
+.pc-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: var(--c-text);
+  line-height: 1.4;
+}
+
+.pc-summary {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: var(--c-text-2);
+}
+
+.pc-meta {
+  margin-top: 20rpx;
+  display: flex;
+  align-items: center;
+  font-size: 24rpx;
+  color: var(--c-text-3);
+}
+
+.pc-avatar {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+}
+
+.pc-avatar-ph {
+  background: linear-gradient(135deg, #84A8B9, #6A8C89);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ph-txt {
+  color: #ffffff;
+  font-size: 22rpx;
+}
+
+.pc-name {
+  max-width: 200rpx;
+}
+
+.pc-dot {
+  margin: 0 8rpx;
+}
+
+.pc-time {
+  flex-shrink: 0;
+}
+
+.pc-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.pc-stat {
+  margin-left: 16rpx;
+  font-size: 22rpx;
+  color: var(--c-text-3);
+}
+
+.cat-chip {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  color: var(--c-primary);
+  background: var(--c-icon);
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

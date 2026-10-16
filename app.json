@@ -1,0 +1,41 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/forum/index",
+    "pages/world/index",
+    "pages/me/index",
+    "pages/detail/index",
+    "pages/create/index",
+    "pages/search/index",
+    "pages/user/index",
+    "pages/login/index",
+    "pages/register/index",
+    "pages/settings/index",
+    "pages/privacy/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#6A8C89",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "妖精论坛",
+    "backgroundColor": "#D8E6E4",
+    "backgroundTextStyle": "dark",
+    "enablePullDownRefresh": false
+  },
+  "tabBar": {
+    "color": "#96A9A7",
+    "selectedColor": "#6A8C89",
+    "backgroundColor": "#E8EEED",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/forum/index", "text": "论坛" },
+      { "pagePath": "pages/world/index", "text": "世界" },
+      { "pagePath": "pages/me/index", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
+  "sitemapLocation": "sitemap.json",
+  "permission": {},
+  "requiredPrivateInfos": []
+}

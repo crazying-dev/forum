@@ -1,0 +1,27 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}} world-root">
+  <scroll-view class="msg-scroll" scroll-y scroll-into-view="{{scrollInto}}" bindscroll="onScroll">
+    <view class="msg" wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}">
+      <image class="msg-avatar" wx:if="{{item.sender_avatar}}" src="{{item.sender_avatar}}"
+             mode="aspectFill" data-uid="{{item.sender_id}}" bindtap="onTapAvatar"></image>
+      <view class="msg-avatar msg-avatar-ph" wx:else>
+        <text class="ph-txt">{{item.sender_name ? item.sender_name[0] : '妖'}}</text>
+      </view>
+      <view class="msg-body">
+        <view class="msg-head">
+          <text class="msg-name">{{item.sender_name || '匿名'}}</text>
+          <text class="msg-time">{{item.timeText}}</text>
+        </view>
+        <view class="msg-content">{{item.content}}</view>
+      </view>
+    </view>
+    <view class="empty" wx:if="{{loaded && messages.length === 0}}">还没有消息，来说两句吧～</view>
+  </scroll-view>
+
+  <view class="composer">
+    <input class="composer-input" value="{{input}}" placeholder="说点什么…"
+           confirm-type="send" maxlength="500" bindinput="onInput" bindconfirm="onSend" />
+    <view class="composer-btn {{sending ? 'composer-btn-off' : ''}}" bindtap="onSend">
+      {{sending ? '…' : '发送'}}
+    </view>
+  </view>
+</view>

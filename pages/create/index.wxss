@@ -1,0 +1,27 @@
+.picker-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 88rpx;
+  padding: 0 24rpx;
+  border-radius: 14rpx;
+  background: var(--c-input);
+  border: 2rpx solid var(--c-border);
+  font-size: 30rpx;
+  color: var(--c-text);
+}
+
+.chev {
+  color: var(--c-text-3);
+}
+
+.textarea {
+  min-height: 420rpx;
+}
+
+.hint {
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: var(--c-text-3);
+  text-align: center;
+}

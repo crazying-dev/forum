@@ -1,0 +1,33 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="search-bar">
+    <input class="search-input" value="{{keyword}}" placeholder="搜索帖子 / 用户（至少2字）"
+           confirm-type="search" bindinput="onInput" bindconfirm="onSearch" />
+    <view class="search-btn" bindtap="onSearch">搜索</view>
+  </view>
+
+  <view class="result">
+    <block wx:if="{{users.length > 0}}">
+      <view class="section-title">用户</view>
+      <view class="user-row" wx:for="{{users}}" wx:key="id"
+            data-uid="{{item.id}}" bindtap="onUserTap">
+        <image class="u-avatar" wx:if="{{item.avatar}}" src="{{item.avatar}}" mode="aspectFill"></image>
+        <view class="u-avatar u-avatar-ph" wx:else><text>{{item.name ? item.name[0] : '妖'}}</text></view>
+        <view class="u-info">
+          <view class="u-name">{{item.name}}</view>
+          <view class="u-intro ellipsis">{{item.intro || '暂无简介'}}</view>
+        </view>
+      </view>
+    </block>
+
+    <block wx:if="{{posts.length > 0}}">
+      <view class="section-title">帖子</view>
+      <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onPostTap"></post-card>
+    </block>
+
+    <view class="empty" wx:if="{{searched && !loading && posts.length === 0 && users.length === 0}}">
+      {{error || '没有找到相关内容'}}
+    </view>
+    <view class="loading-tip" wx:if="{{loading}}">搜索中…</view>
+    <view class="loading-tip" wx:elif="{{hasMore && (posts.length > 0 || users.length > 0)}}">上拉加载更多</view>
+  </view>
+</view>

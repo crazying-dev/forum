@@ -1,0 +1,23 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="tabs">
+    <view wx:for="{{tabs}}" wx:key="key"
+          class="tab {{kind === item.key ? 'tab-on' : ''}}"
+          data-kind="{{item.key}}" bindtap="onTab">{{item.label}}</view>
+    <view class="tab-search" bindtap="onSearch">搜索</view>
+  </view>
+
+  <view class="feed">
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" bind:tap="onPostTap"></post-card>
+
+    <view class="empty" wx:if="{{!loading && posts.length === 0}}">
+      <view>{{error || '暂无内容'}}</view>
+      <view class="empty-btn" wx:if="{{error === '登录后可查看收藏'}}" bindtap="onGoLogin">去登录</view>
+    </view>
+
+    <view class="loading-tip" wx:if="{{loading}}">加载中…</view>
+    <view class="loading-tip" wx:elif="{{hasMore && posts.length > 0}}">上拉加载更多</view>
+    <view class="loading-tip" wx:elif="{{posts.length > 0}}">没有更多了</view>
+  </view>
+
+  <view class="fab" bindtap="onCreate">＋</view>
+</view>

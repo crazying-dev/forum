@@ -1,0 +1,49 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <!-- 未登录 -->
+  <view class="guest" wx:if="{{!isLogin}}">
+    <view class="guest-avatar">妖</view>
+    <view class="guest-tip">登录后体验完整功能</view>
+    <view class="btn btn-primary guest-btn" bindtap="onLogin">登录</view>
+    <view class="btn btn-ghost guest-btn" bindtap="onRegister">注册账号</view>
+  </view>
+
+  <!-- 已登录 -->
+  <block wx:else>
+    <view class="profile card" bindtap="onMyPage">
+      <image class="p-avatar" wx:if="{{user.avatar}}" src="{{user.avatar}}" mode="aspectFill"></image>
+      <view class="p-avatar p-avatar-ph" wx:else><text>{{user.name ? user.name[0] : '妖'}}</text></view>
+      <view class="p-info">
+        <view class="p-name">{{user.name}}</view>
+        <view class="p-sub">
+          <text class="cat-chip" wx:if="{{user.title}}">{{user.title}}</text>
+          <text class="muted">{{user.intro || '这个妖还没写简介…'}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="stats card" wx:if="{{stats}}">
+      <view class="stat" wx:if="{{stats.post_count !== undefined}}">
+        <view class="stat-num">{{stats.post_count}}</view><view class="stat-label">帖子</view>
+      </view>
+      <view class="stat" wx:if="{{stats.total_likes !== undefined}}">
+        <view class="stat-num">{{stats.total_likes}}</view><view class="stat-label">获赞</view>
+      </view>
+      <view class="stat" wx:if="{{stats.following_count !== undefined}}">
+        <view class="stat-num">{{stats.following_count}}</view><view class="stat-label">关注</view>
+      </view>
+      <view class="stat" wx:if="{{stats.follower_count !== undefined}}">
+        <view class="stat-num">{{stats.follower_count}}</view><view class="stat-label">粉丝</view>
+      </view>
+    </view>
+
+    <view class="menu card">
+      <view class="menu-item" bindtap="onFavorites"><text>我的收藏</text><text class="chev">›</text></view>
+      <view class="menu-item" bindtap="onPublish"><text>发布帖子</text><text class="chev">›</text></view>
+      <view class="menu-item" bindtap="onSearch"><text>搜索</text><text class="chev">›</text></view>
+      <view class="menu-item" bindtap="onSettings"><text>设置</text><text class="chev">›</text></view>
+      <view class="menu-item" bindtap="onPrivacy"><text>隐私政策</text><text class="chev">›</text></view>
+    </view>
+
+    <view class="btn btn-ghost logout" bindtap="onLogout">退出登录</view>
+  </block>
+</view>

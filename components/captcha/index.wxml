@@ -1,0 +1,25 @@
+<!-- 滑块验证码弹层 -->
+<view class="cap-mask" wx:if="{{visible}}" catchtouchmove="noop">
+  <view class="cap-panel {{error ? 'cap-shake' : ''}}">
+    <view class="cap-title">安全验证</view>
+    <view class="cap-tip">{{tip}}</view>
+
+    <view class="cap-stage" wx:if="{{ready}}"
+          style="width:{{stageW}}px;height:{{stageH}}px"
+          bindtouchstart="onTouchStart"
+          bindtouchmove="onTouchMove"
+          bindtouchend="onTouchEnd"
+          bindtouchcancel="onTouchEnd">
+      <image class="cap-bg" src="{{bg}}" mode="scaleToFill"
+             style="width:{{stageW}}px;height:{{stageH}}px"></image>
+      <image class="cap-piece" src="{{piece}}" mode="scaleToFill"
+             style="width:{{pieceW}}px;height:{{pieceW}}px;left:{{pieceLeft}}px;top:{{pieceTop}}px"></image>
+    </view>
+
+    <view class="cap-loading" wx:if="{{loading}}">加载中…</view>
+
+    <view class="cap-actions">
+      <view class="cap-btn" bindtap="onCancel">取消</view>
+    </view>
+  </view>
+</view>

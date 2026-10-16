@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "post-card": "/components/post-card/index"
+  },
+  "navigationBarTitleText": "妖精论坛",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

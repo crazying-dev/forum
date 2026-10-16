@@ -1,0 +1,26 @@
+<view class="page-root {{night ? 'night' : ''}} {{national ? 'national' : ''}}">
+  <view class="container auth">
+    <view class="brand">妖精论坛</view>
+    <view class="brand-sub">登录以参与讨论、发帖与聊天</view>
+
+    <view class="field">
+      <view class="field-label">用户名 / 邮箱</view>
+      <input class="input" value="{{identifier}}" placeholder="请输入用户名或邮箱"
+             bindinput="onId" />
+    </view>
+    <view class="field">
+      <view class="field-label">密码</view>
+      <input class="input" value="{{password}}" password placeholder="请输入密码"
+             bindinput="onPwd" />
+    </view>
+
+    <view class="btn btn-primary" bindtap="onSubmit">{{submitting ? '登录中…' : '登录'}}</view>
+
+    <view class="links">
+      <text bindtap="onRegister">注册账号</text>
+      <text bindtap="onForgot">忘记密码？</text>
+    </view>
+  </view>
+
+  <captcha id="captcha"></captcha>
+</view>
