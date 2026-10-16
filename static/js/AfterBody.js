@@ -179,12 +179,21 @@
     if (isNaN(ce) || ce < 1604) return null;
     return ce - 1603;
   }
-  // 无限年 → 公元年：返回公元年份字符串；输入非法或 0（不存在）时返回空串。
+  // 无限年 → 公元年：返回公元年份（数值字符串，展示前应过 ceText）；
+  // 输入非法或 0（不存在）时返回空串。
   // 正数 = 无限年（公元 = 无限年 + 1603）；负数 = 「无限前」（公元 = 1604 + 无限年）。
   function wuxianToCE(wy) {
     wy = parseInt(wy, 10);
     if (isNaN(wy) || wy === 0) return '';
     return String(wy > 0 ? wy + 1603 : 1604 + wy);
+  }
+  // 公元年展示：**公元纪年不存在 0 年**——「公元前 1 年」之后直接是「公元 1 年」。
+  // ≥1 显示「N 年（公元）」；≤0 换算为「公元前 (1 − N) 年」（公元 0 年 = 公元前 1 年，公元 −1 年 = 公元前 2 年）。
+  function ceText(ce) {
+    ce = parseInt(ce, 10);
+    if (isNaN(ce)) return '';
+    if (ce >= 1) return ce + ' 年（公元）';
+    return '公元前 ' + (1 - ce) + ' 年';
   }
   // 公元年 → 无限年展示：≥1604 显示「无限N年」（1 为「无限元年」），<1604 显示「无限前N年」。
   function wuxianYearLabel(ce) {
@@ -751,6 +760,8 @@
     wuxianToCE: wuxianToCE,
     wuxianYearLabel: wuxianYearLabel,
     wuxianYearName: wuxianYearName,
+    // 公元年展示（处理「公元纪年无 0 年」）
+    ceText: ceText,
     stripMarkdown: stripMarkdown
   };
 })();
@@ -761,7 +772,7 @@
   var app = window.__yoyoApp;
   var apiFetch = app.apiFetch, esc = app.esc, el = app.el, toast = app.toast, fmtTime = app.fmtTime, avatarHtml = app.avatarHtml, resolveAvatarDeferred = app.resolveAvatarDeferred;
   // Part 1 定义、Part 2 需要使用（经 __yoyoApp 传递，否则未定义）
-  var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, wuxianYearName = app.wuxianYearName, stripMarkdown = app.stripMarkdown;
+  var wuxianToCE = app.wuxianToCE, wuxianYearLabel = app.wuxianYearLabel, wuxianYearName = app.wuxianYearName, ceText = app.ceText, stripMarkdown = app.stripMarkdown;
   var getYearMode = app.getYearMode, yearText = app.yearText;
 
   // ── 帖子分类汉化映射（口径对照 V1，与论坛分区 tab / 发帖选项一一对应）──
@@ -1804,13 +1815,22 @@
         var c = wuxianToCE(wy);
         var nm = wuxianYearName(wy);
         if (ceOut) ceOut.textContent = (nm && c)
-          ? (nm + ' = ' + c + ' 年（公元）')
+          ? (nm + ' = ' + ceText(c))
           : '无限历没有 0 年（元年即公元 1604 年）';
       }
       if (ce === '') { if (wyOut) wyOut.textContent = ''; }
       else {
-        var lb = wuxianYearLabel(ce);
-        if (wyOut) wyOut.textContent = lb !== null ? (ce + ' 年（公元） = ' + lb) : '';
+        var ceNum = parseInt(ce, 10);
+        if (isNaN(ceNum)) { if (wyOut) wyOut.textContent = ''; }
+        // 公元纪年无 0 年：不得输出「0 年（公元） = 无限前1604年」
+        else if (ceNum === 0) {
+          if (wyOut) wyOut.textContent = '公元纪年没有 0 年（公元前 1 年之后即公元 1 年）';
+        } else if (ceNum < 0) {
+          if (wyOut) wyOut.textContent = '公元纪年不存在负数年份（公元前请以「公元前 N 年」表述）';
+        } else {
+          var lb = wuxianYearLabel(ceNum);
+          if (wyOut) wyOut.textContent = lb !== null ? (ceText(ceNum) + ' = ' + lb) : '';
+        }
       }
     }
     // 提示当前全站年制（设置中可切换）

@@ -97,6 +97,28 @@ def test_wuxian_converter_live_update():
     assert "wuxianModeHint" in js, "AfterBody.js 未填充当前年制提示"
 
 
+def test_ce_calendar_has_no_year_zero():
+    """公元纪年不存在 0 年：公元前 1 年之后直接是公元 1 年。
+
+    所以「无限前 1604 年」必须换算为「公元前 1 年」，绝不能出现「0 年（公元）」；
+    「无限前 1605 年」→ 「公元前 2 年」；公元输入框键入 0 要给出提示，
+    而不是「0 年（公元） = 无限前1604年」。
+    """
+    js = _read(AFTERBODY)
+    assert "function ceText" in js, "缺少公元年展示函数 ceText（用于处理「公元无 0 年」）"
+    assert "公元前" in js, "缺少「公元前」展示：公元 0 年及更早必须换算为公元前 N 年"
+    assert "1 - ce" in js, "公元前换算公式（公元前 N 年 = 1 − 公元年）缺失"
+    assert "公元纪年没有 0 年" in js, "公元输入框未拦截不存在的 0 年"
+    assert "ceText(c)" in js, "无限年→公元年分支未经过 ceText（仍可能输出 0 年）"
+    # 算术自检：无限前 N 年 = 公元 (1604 − N) 年；当该值 ≤ 0 时改写为公元前 (N − 1603) 年
+    assert 1604 + (-1603) == 1, "无限前 1603 年应为公元 1 年"
+    assert 1 - (1604 + (-1604)) == 1, "无限前 1604 年应为公元前 1 年（而非不存在的公元 0 年）"
+    assert 1 - (1604 + (-1605)) == 2, "无限前 1605 年应为公元前 2 年"
+    # 跨 IIFE：Part 2 必须能取到 ceText
+    assert "ceText: ceText" in js, "__yoyoApp 未导出 ceText"
+    assert re.search(r"\bceText\s*=\s*app\.ceText", js), "Part 2 未从 app 解构 ceText"
+
+
 # ──────────────────────────────────────────────
 # 第 4 项：个人资料改密码（需邮箱验证码）
 # ──────────────────────────────────────────────
@@ -300,7 +322,7 @@ def test_legacy_css_tokens_are_defined():
 
 PART2_FROM_APP = [
     "apiFetch", "esc", "el", "toast", "fmtTime", "avatarHtml", "resolveAvatarDeferred",
-    "getYearMode", "yearText", "wuxianToCE", "wuxianYearLabel", "wuxianYearName",
+    "getYearMode", "yearText", "wuxianToCE", "wuxianYearLabel", "wuxianYearName", "ceText",
     "stripMarkdown",
 ]
 
@@ -336,6 +358,7 @@ if __name__ == "__main__":
     test_year_mode_setting_buttons()
     test_wuxian_epoch_is_1604()
     test_wuxian_converter_live_update()
+    test_ce_calendar_has_no_year_zero()
     test_change_password_requires_email_code_backend()
     test_profile_change_password_ui()
     test_forgot_password_single_page_code_flow()
