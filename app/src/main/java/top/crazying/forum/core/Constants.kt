@@ -148,7 +148,7 @@ object Constants {
     const val NATIONAL_DAY_TO_DAY = 7
 
     // ────────────────── 年制 ──────────────────
-    /** 无限元年 = 公元年 − 1604（无限元年 = 公元 1604 年）。 */
+    /** 无限元年 = 公元 1604 年；无限年 **1 起算**（无限 N 年 = 公元 (1603 + N) 年）。 */
     const val WUXIAN_EPOCH_CE = 1604
     const val YEAR_MODE_WUXIAN = "wuxian"
     const val YEAR_MODE_CE = "ce"

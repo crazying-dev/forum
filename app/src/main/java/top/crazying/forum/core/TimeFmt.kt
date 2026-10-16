@@ -10,8 +10,8 @@ import java.util.TimeZone
  * 时间与年制。
  *
  * 口径完全对齐 Web 端 `static/js/AfterBody.js` 与 Windows 端 `app/yearmode.py`：
- * * 无限年 = 公元年 − 1604（无限元年 = 公元 1604 年）
- * * 公元年 < 1604 时显示「无限前xxx年」
+ * * 无限年 1 起算：无限元年 = 公元 1604 年，无限 N 年 = 公元 (1603 + N) 年
+ * * 公元年 < 1604 时显示「无限前xxx年」（无限前 N 年 = 公元 (1604 − N) 年，不存在无限 0 年）
  * * 后端时间字符串无时区信息时按 **UTC** 解析，再换算到本机时区显示
  */
 object TimeFmt {
@@ -37,16 +37,26 @@ object TimeFmt {
 
     fun yearMode(): String = App.yearMode.value
 
+    /** 公元年 → 无限年（1 起算）；公元年 < 1604 时返回 null（属「无限前」）。 */
     fun wuxianYear(ce: Int): Int? =
-        if (ce < Constants.WUXIAN_EPOCH_CE) null else ce - Constants.WUXIAN_EPOCH_CE
+        if (ce < Constants.WUXIAN_EPOCH_CE) null else ce - Constants.WUXIAN_EPOCH_CE + 1
 
-    fun wuxianToCe(wy: Int): String = (wy + Constants.WUXIAN_EPOCH_CE).toString()
+    /** 无限年 → 公元年。正数 = 无限年（+1603）；负数 = 无限前（+1604）；0 不存在 → 空串。 */
+    fun wuxianToCe(wy: Int): String = when {
+        wy == 0 -> ""
+        wy > 0 -> (wy + Constants.WUXIAN_EPOCH_CE - 1).toString()
+        else -> (Constants.WUXIAN_EPOCH_CE + wy).toString()
+    }
 
-    /** 「年」部分（不带「年」字）。 */
+    /** 「年」部分（不额外加「年」字；唯「无限元年」含「年」，与 Web / Windows 端口径一致）。 */
     fun yearText(ce: Int, mode: String = yearMode()): String {
         if (mode == Constants.YEAR_MODE_CE) return ce.toString()
         val wy = wuxianYear(ce)
-        return if (wy != null) "无限$wy" else "无限前${Constants.WUXIAN_EPOCH_CE - ce}"
+        return if (wy != null) {
+            if (wy == 1) "无限元年" else "无限$wy"
+        } else {
+            "无限前${Constants.WUXIAN_EPOCH_CE - ce}"
+        }
     }
 
     // ────────────────── 解析 ──────────────────
