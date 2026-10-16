@@ -2,16 +2,26 @@
 from db import execute_query, execute_insert, safe_html
 
 
-def get_world_messages(limit=100):
-    """获取世界频道最近消息（按时间倒序）。"""
-    rows = execute_query(
+def get_world_messages(limit=100, since=None):
+    """获取世界频道消息（按时间倒序）。
+
+    ``since``（可选）为增量下界（时间字符串，如 ``2026-05-06 12:00:00.123456``）：
+    仅返回 ``created_at`` **严格晚于** since 的消息，供客户端增量轮询；
+    为空时返回最近 ``limit`` 条（保持原有全量行为）。
+    注意：``since`` 经参数绑定下发，不做字符串拼接，无注入风险。
+    """
+    sql = (
         "SELECT w.id, w.sender_id, w.sender_name, w.content, w.parent_id, w.created_at, "
         "u.avatar AS sender_avatar FROM world w "
         "LEFT JOIN users u ON w.sender_id = u.id "
-        "ORDER BY w.created_at DESC LIMIT %s",
-        (limit,),
-        fetch_all=True,
     )
+    params = []
+    if since:
+        sql += "WHERE w.created_at > %s "
+        params.append(since)
+    sql += "ORDER BY w.created_at DESC LIMIT %s"
+    params.append(limit)
+    rows = execute_query(sql, tuple(params), fetch_all=True)
     messages = []
     for r in rows:
         messages.append({

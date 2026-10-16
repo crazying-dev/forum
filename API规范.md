@@ -372,6 +372,9 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 ### 11.1 消息列表 —— GET /api/world/ALL
 
 - 无鉴权；成功 200 直接返回消息数组（最近 100 条，时间倒序）
+- 查询参数 `since`（可选）：客户端**已持有的最后一条消息时间**（如 `2026-05-06 12:00:00.123456`）。
+  传入时**仅返回严格晚于该时间的新消息**（增量轮询）；不传（或格式非法）则返回最近 100 条（全量）。
+  非法值被忽略而不报错（避免数据库类型转换 500）；时间串经参数绑定下发，无注入风险。
 - 响应头 `Cache-Control: max-age=2`
 
 ### 11.2 发送消息 —— POST /api/world/Send
@@ -509,7 +512,7 @@ full_token_str = f"token---{core}---{int(time.time())}"   # 写入 cookie 的 to
 | 评论 | GET | /api/posts/{post_id}/comments | 无 |
 | 评论 | POST | /api/posts/{post_id}/comments/create | 需登录 |
 | 评论 | POST | /api/comments/{comment_id}/delete | 需登录（作者） |
-| 世界 | GET | /api/world/ALL | 无 |
+| 世界 | GET | /api/world/ALL | 无（可选 since 增量） |
 | 世界 | POST | /api/world/Send | 需登录 |
 | 搜索 | GET | /api/search | 无 |
 | 邮箱 | POST | /api/email/send-verify-email | 需登录 |

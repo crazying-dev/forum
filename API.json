@@ -1789,6 +1789,17 @@
           "World"
         ],
         "summary": "获取世界频道最近消息（最多 100 条）",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "description": "增量下界：客户端已持有的最后一条消息时间（如 2026-05-06 12:00:00.123456）。传入时仅返回严格晚于该时间的新消息；不传返回最近 100 条",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "消息列表（数组）",
