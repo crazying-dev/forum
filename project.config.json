@@ -1,7 +1,7 @@
 {
   "description": "妖精论坛 · 微信小程序（forum 仓库 WeChat 分支）",
   "projectname": "forum-wechat",
-  "appid": "touristappid",
+  "appid": "wx3e98df00efbdff1b",
   "compileType": "miniprogram",
   "miniprogramRoot": "./",
   "libVersion": "latest",
@@ -23,11 +23,25 @@
       "ignore": [],
       "disablePlugins": [],
       "outputPath": ""
-    }
+    },
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "minifyWXML": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": false,
+    "condition": false
   },
   "condition": {
     "miniprogram": {
       "list": []
     }
-  }
+  },
+  "simulatorPluginLibVersion": {},
+  "editorSetting": {},
+  "isGameTourist": false
 }
