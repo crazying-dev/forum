@@ -1851,11 +1851,12 @@
         // 公元纪年无 0 年：不得输出「0 年（公元） = 无限前1604年」
         else if (ceNum === 0) {
           if (wyOut) wyOut.textContent = '公元纪年没有 0 年（公元前 1 年之后即公元 1 年）';
-        } else if (ceNum < 0) {
-          if (wyOut) wyOut.textContent = '公元纪年不存在负数年份（公元前请以「公元前 N 年」表述）';
         } else {
-          var lb = wuxianYearLabel(ceNum);
-          if (wyOut) wyOut.textContent = lb !== null ? (ceText(ceNum) + ' = ' + lb) : '';
+          // 负数 = 公元前 |N| 年（与「无限年」输入用负数表示「无限前」同口径）；
+          // 公元前 M 年按天文纪年记作 (1 - M)，故先归一再加换算，避免差一年。
+          var astro = ceNum < 0 ? ceNum + 1 : ceNum;
+          var lb = wuxianYearLabel(astro);
+          if (wyOut) wyOut.textContent = lb !== null ? (ceText(astro) + ' = ' + lb) : '';
         }
       }
     }
