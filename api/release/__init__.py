@@ -39,10 +39,10 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-17T19:35:00+08:00",
+    "updated_at": "2026-10-18T00:02:18+08:00",
     "min_versions": {
         "windows": "1.3.18",
-        "android": "1.0.16",
+        "android": "1.0.17",
         "web": "0",
     },
     "platforms": [
@@ -78,6 +78,23 @@ DEFAULT_MANIFEST: dict = {
             "status": "available",
             "requirement": "Android 7.0 及以上",
             "releases": [
+                {
+                    "version": "1.0.17",
+                    "channel": "stable",
+                    "date": "2026-10-18",
+                    "size": 8168888,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.17/forum-android-1.0.17.apk",
+                    "filename": "forum-android-1.0.17.apk",
+                    "sha256": "0d36a0626ed8e870eed4a1497c7178ae8e76fea9178cdcf5288b68b4ad399287",
+                    "notes": [
+                        "修复：无限历纪年改为 1 起算——无限元年 = 公元 1604 年（无限 N 年 = 公元 1603 + N 年），此前会错显为「无限 0 年」",
+                        "公元 1604 年以前显示「无限前 N 年」（无限前 1 年 = 公元 1603 年），不存在无限 0 年",
+                        "重构：TimeFmt.kt 新增 NewEraDate 结构化换算核心（gregorianToNewEra / newEraToGregorian / ceText），双向换算统一入口",
+                        "新增「我的 › 年制换算」页：无限年 ⇄ 公元年实时双向换算，输入 0 或负数给出明确提示",
+                        "与网页端、Windows 端纪年口径完全统一；版本号 versionCode 18 / versionName 1.0.17",
+                    ],
+                    "mandatory": False,
+                },
                 {
                     "version": "1.0.16",
                     "channel": "stable",
