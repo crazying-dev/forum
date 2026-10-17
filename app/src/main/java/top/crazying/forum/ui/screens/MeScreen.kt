@@ -263,6 +263,7 @@ fun MeScreen(nav: Navigator) {
         ) {
             SettingEntry("编辑资料") { nav.push(Screen.ProfileEdit) }
             SettingEntry("搜索帖子与用户") { nav.push(Screen.Search()) }
+            SettingEntry("年制换算") { nav.push(Screen.YearConvert) }
             SettingEntry("发布新帖子") { nav.push(Screen.PostCreate()) }
             SettingEntry("访问 WIKI") { nav.switchTab(Screen.Wiki) }
             SettingEntry("进入世界频道") { nav.switchTab(Screen.World) }

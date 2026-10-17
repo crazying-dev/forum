@@ -5,6 +5,26 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.math.abs
+
+/**
+ * 无限年日期（结构化表示）。
+ *
+ * [yearNum] 恒为正数（不存在 0 年）；[isBefore] 为 true 表示「无限前 N 年」。
+ * 对外文案由 [label] 统一产出，仍是「无限 N 年 / 无限前 N 年」。
+ */
+data class NewEraDate(val yearNum: Int, val isBefore: Boolean = false) {
+
+    val label: String
+        get() = when {
+            yearNum <= 0 -> ""
+            isBefore -> "无限前${yearNum}年"
+            yearNum == 1 -> "无限元年"
+            else -> "无限${yearNum}年"
+        }
+
+    override fun toString(): String = label
+}
 
 /**
  * 时间与年制。
@@ -37,27 +57,45 @@ object TimeFmt {
 
     fun yearMode(): String = App.yearMode.value
 
+    // ── 年制换算核心：公元年 ⇄ 无限年（结构化 NewEraDate，对外文案仍为「无限」）──
+
+    /** 公元年 → 无限年（无 0 年：1604 = 无限 1 年，1603 = 无限前 1 年）。 */
+    fun gregorianToNewEra(gregYear: Int): NewEraDate =
+        if (gregYear >= Constants.WUXIAN_EPOCH_CE) {
+            NewEraDate(gregYear - Constants.WUXIAN_EPOCH_CE + 1, isBefore = false)
+        } else {
+            NewEraDate(Constants.WUXIAN_EPOCH_CE - gregYear, isBefore = true)
+        }
+
+    /** 无限年 → 公元年；`yearNum` 必须 > 0（不存在 0 年），否则抛 [IllegalArgumentException]。 */
+    fun newEraToGregorian(yearNum: Int, isBefore: Boolean = false): Int {
+        require(yearNum > 0) { "年份数字必须大于 0，无限历不存在 0 年" }
+        return if (isBefore) Constants.WUXIAN_EPOCH_CE - yearNum
+        else yearNum + Constants.WUXIAN_EPOCH_CE - 1
+    }
+
     /** 公元年 → 无限年（1 起算）；公元年 < 1604 时返回 null（属「无限前」）。 */
-    fun wuxianYear(ce: Int): Int? =
-        if (ce < Constants.WUXIAN_EPOCH_CE) null else ce - Constants.WUXIAN_EPOCH_CE + 1
+    fun wuxianYear(ce: Int): Int? {
+        val d = gregorianToNewEra(ce)
+        return if (d.isBefore) null else d.yearNum
+    }
 
     /** 无限年 → 公元年。正数 = 无限年（+1603）；负数 = 无限前（+1604）；0 不存在 → 空串。 */
-    fun wuxianToCe(wy: Int): String = when {
-        wy == 0 -> ""
-        wy > 0 -> (wy + Constants.WUXIAN_EPOCH_CE - 1).toString()
-        else -> (Constants.WUXIAN_EPOCH_CE + wy).toString()
+    fun wuxianToCe(wy: Int): String {
+        if (wy == 0) return ""
+        return newEraToGregorian(abs(wy), isBefore = wy < 0).toString()
     }
 
     /** 「年」部分（不额外加「年」字；唯「无限元年」含「年」，与 Web / Windows 端口径一致）。 */
     fun yearText(ce: Int, mode: String = yearMode()): String {
         if (mode == Constants.YEAR_MODE_CE) return ce.toString()
-        val wy = wuxianYear(ce)
-        return if (wy != null) {
-            if (wy == 1) "无限元年" else "无限$wy"
-        } else {
-            "无限前${Constants.WUXIAN_EPOCH_CE - ce}"
-        }
+        val d = gregorianToNewEra(ce)
+        if (d.isBefore) return "无限前${d.yearNum}"
+        return if (d.yearNum == 1) "无限元年" else "无限${d.yearNum}"
     }
+
+    /** 公元年展示：**公元纪年不存在 0 年**（公元前 1 年之后直接是公元 1 年）。 */
+    fun ceText(ce: Int): String = if (ce >= 1) "公元 $ce 年" else "公元前 ${1 - ce} 年"
 
     // ────────────────── 解析 ──────────────────
 

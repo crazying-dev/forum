@@ -1,6 +1,7 @@
 package top.crazying.forum.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -69,5 +70,69 @@ class TimeFmtTest {
     fun fmtDateTimeCarriesCorrectYear() {
         val s = TimeFmt.fmtDateTime("2026-05-06T12:30:00Z", Constants.YEAR_MODE_WUXIAN)
         assertTrue("年部分应为「无限423」但实际为：$s", s.startsWith("无限423-"))
+    }
+
+    // ────────── 结构化双向换算（NewEraDate）──────────
+
+    @Test
+    fun gregorianToNewEraIsStructured() {
+        val epoch = TimeFmt.gregorianToNewEra(1604)
+        assertEquals(1, epoch.yearNum)
+        assertFalse(epoch.isBefore)
+        assertEquals("无限元年", epoch.label)
+        assertEquals("无限元年", epoch.toString())
+
+        val before = TimeFmt.gregorianToNewEra(1603)
+        assertEquals(1, before.yearNum)
+        assertTrue(before.isBefore)
+        assertEquals("无限前1年", before.label)
+
+        assertEquals("无限前104年", TimeFmt.gregorianToNewEra(1500).label)
+        assertEquals("无限423年", TimeFmt.gregorianToNewEra(2026).label)
+    }
+
+    @Test
+    fun newEraToGregorianIsInverse() {
+        assertEquals(1604, TimeFmt.newEraToGregorian(1, isBefore = false))
+        assertEquals(2026, TimeFmt.newEraToGregorian(423, isBefore = false))
+        assertEquals(1603, TimeFmt.newEraToGregorian(1, isBefore = true))
+        assertEquals(1500, TimeFmt.newEraToGregorian(104, isBefore = true))
+    }
+
+    @Test
+    fun newEraToGregorianRejectsZeroAndNegative() {
+        assertRejects(0)
+        assertRejects(-1)
+    }
+
+    @Test
+    fun roundTripPreservesGregorianYear() {
+        for (g in intArrayOf(1, 1063, 1603, 1604, 1605, 1700, 2026)) {
+            val era = TimeFmt.gregorianToNewEra(g)
+            assertEquals("公元 $g 年的往返换算不对称", g, TimeFmt.newEraToGregorian(era.yearNum, era.isBefore))
+            // 旧接口与新核心必须一致
+            if (era.isBefore) {
+                assertNull(TimeFmt.wuxianYear(g))
+            } else {
+                assertEquals(era.yearNum, TimeFmt.wuxianYear(g))
+            }
+        }
+    }
+
+    @Test
+    fun ceTextHasNoYearZero() {
+        assertEquals("公元 2026 年", TimeFmt.ceText(2026))
+        assertEquals("公元前 1 年", TimeFmt.ceText(0))
+        assertEquals("公元前 2 年", TimeFmt.ceText(-1))
+    }
+
+    private fun assertRejects(yearNum: Int) {
+        var thrown = false
+        try {
+            TimeFmt.newEraToGregorian(yearNum)
+        } catch (e: IllegalArgumentException) {
+            thrown = true
+        }
+        assertTrue("newEraToGregorian($yearNum) 应抛 IllegalArgumentException", thrown)
     }
 }

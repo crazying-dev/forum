@@ -46,6 +46,7 @@ import top.crazying.forum.ui.screens.UserScreen
 import top.crazying.forum.ui.screens.WebLoginScreen
 import top.crazying.forum.ui.screens.WikiScreen
 import top.crazying.forum.ui.screens.WorldScreen
+import top.crazying.forum.ui.screens.YearConvertScreen
 
 /**
  * 应用根节点：持有回退栈、渲染当前页，并在 tab 根页显示底部导航。
@@ -146,6 +147,7 @@ fun ForumRoot() {
                     Screen.Privacy -> PrivacyScreen(nav)
                     Screen.DeleteAccount -> DeleteAccountScreen(nav)
                     Screen.ProfileEdit -> ProfileEditScreen(nav)
+                    Screen.YearConvert -> YearConvertScreen(nav)
                     is Screen.PostDetail -> PostDetailScreen(nav, s.postId)
                     is Screen.PostCreate -> PostCreateScreen(nav, s.category)
                     is Screen.Search -> SearchScreen(nav, feedStore, s.keyword)

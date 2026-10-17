@@ -22,6 +22,9 @@ sealed interface Screen {
     data object DeleteAccount : Screen
     data object ProfileEdit : Screen
 
+    /** 「年制换算」页：无限年 ⇄ 公元年 双向换算（「我的 → 快捷入口」进入）。 */
+    data object YearConvert : Screen
+
     data class PostDetail(val postId: String) : Screen
     data class PostCreate(val category: String = "general") : Screen
     data class Search(val keyword: String = "") : Screen
