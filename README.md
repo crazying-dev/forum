@@ -290,8 +290,9 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | Android SDK | `cmdline-tools 16111833`、`platform-tools r37.0.1`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
 | 命令 | `.\gradlew.bat testDebugUnitTest assembleRelease --console=plain` |
-| 结果 | **BUILD SUCCESSFUL**（73 例全部通过：CaptchaTest 26 / VersionGateTest 10 / FeedStateTest 10 / CachePolicyTest 7 / WebAuthTest 8 / MarkdownBodyTest 6 / WorldFeedTest 6） |
-| Release 产物（V1.0.16） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668` |
+| 结果 | **BUILD SUCCESSFUL**（88 例全部通过：CaptchaTest 26 / TimeFmtTest 15 / VersionGateTest 10 / FeedStateTest 10 / CachePolicyTest 7 / WebAuthTest 8 / MarkdownBodyTest 6 / WorldFeedTest 6） |
+| Release 产物（V1.0.17） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `0d36a0626ed8e870eed4a1497c7178ae8e76fea9178cdcf5288b68b4ad399287`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`；发布包副本 `release\forum-android-1.0.17.apk` |
+| 历史 Release 产物（V1.0.16） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61` |
 | 历史 Release 产物（V1.0.15） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1ca33a725c381683843956797caa206a5d7ff0d20efc7900cb110e9b78d36960` |
 | 历史 Release 产物（V1.0.13） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `f9c201a574cfba4006b7b0442b41de4258781207ac884c97226d87e25dd10385` |
 
