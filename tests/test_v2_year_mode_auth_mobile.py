@@ -72,10 +72,18 @@ def test_wuxian_epoch_is_1604():
     """基准：无限元年 = 公元 1604 年，且无限历 **1 起算**（不存在「无限 0 年」）。
 
     1604 → 无限元年；1603 → 无限前 1 年；1947 → 无限 344 年。
+    换算核心为结构化 `gregorianToNewEra` / `newEraToGregorian`，基准常量 `WUXIAN_EPOCH = 1604`。
     """
     js = _read(AFTERBODY)
-    assert "wy + 1603" in js, "无限年→公元年公式（+1603，1 起算）缺失"
-    assert "ce - 1603" in js, "公元年→无限年公式（−1603）缺失"
+    assert "var WUXIAN_EPOCH = 1604" in js, "年制基准常量 WUXIAN_EPOCH = 1604 缺失"
+    for fn in ["function gregorianToNewEra", "function newEraToGregorian", "function newEraLabel"]:
+        assert fn in js, f"缺少年制换算核心 {fn}"
+    # 公元 → 无限：≥1604 为 g − 1604 + 1；<1604 为「无限前」(1604 − g)
+    assert "g - WUXIAN_EPOCH + 1" in js, "公元年→无限年公式（g − 1604 + 1，1 起算）缺失"
+    assert "WUXIAN_EPOCH - g" in js, "「无限前」公式（1604 − g）缺失"
+    # 无限 → 公元：正数 n + 1604 − 1；无限前 1604 − n
+    assert "n + WUXIAN_EPOCH - 1" in js, "无限年→公元年公式（n + 1603）缺失"
+    assert "WUXIAN_EPOCH - n" in js, "无限前→公元年公式（1604 − n）缺失"
     assert "'无限前'" in js, "缺少「无限前」处理（公元 1604 年之前）"
     assert "无限元年" in js, "缺少「无限元年」显示（1 起算）"
     assert "wy === 0" in js, "无限历没有 0 年：换算函数应显式拒绝 0"
@@ -85,6 +93,15 @@ def test_wuxian_epoch_is_1604():
     assert 1604 - 1603 == 1, "公元 1603 年应为「无限前 1 年」（不能与元年重号）"
     assert 1947 - 1603 == 344
     assert f"无限{1947 - 1603}年" == "无限344年"
+
+
+def test_new_era_core_exports():
+    """结构化换算核心必须跨 IIFE 导出（Part 2 / 设置页换算要能用）。"""
+    js = _read(AFTERBODY)
+    for key in ("gregorianToNewEra: gregorianToNewEra",
+                "newEraToGregorian: newEraToGregorian",
+                "newEraLabel: newEraLabel"):
+        assert key in js, f"__yoyoApp 未导出 {key}"
 
 
 def test_wuxian_converter_live_update():

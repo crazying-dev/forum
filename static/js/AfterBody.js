@@ -150,15 +150,43 @@
     // 全站时间戳口径随之改变：Vue 页面无法局部重渲染，整页刷新最稳
     location.reload();
   }
+  // ── 年制换算核心：公元年 ⇄ 无限年（结构化表示，对外文案仍为「无限」）──
+  // NewEraDate = { yearNum: 正数, isBefore: 布尔 }；不存在 0 年。
+  // 无限元年 = 公元 1604 年：无限 N 年 = 公元 (1603 + N) 年；公元 1603 = 无限前 1 年。
+  var WUXIAN_EPOCH = 1604;
+  function newEraDate(yearNum, isBefore) {
+    return { yearNum: yearNum, isBefore: !!isBefore };
+  }
+  // 结构化 → 中文文案（「无限前 N 年」/「无限元年」/「无限 N 年」）
+  function newEraLabel(d) {
+    if (!d || !(d.yearNum > 0)) return '';
+    if (d.isBefore) return '无限前' + d.yearNum + '年';
+    return d.yearNum === 1 ? '无限元年' : '无限' + d.yearNum + '年';
+  }
+  // 公元年 → 无限年（非法输入返回 null）
+  function gregorianToNewEra(gregYear) {
+    var g = parseInt(gregYear, 10);
+    if (isNaN(g)) return null;
+    return g >= WUXIAN_EPOCH
+      ? newEraDate(g - WUXIAN_EPOCH + 1, false)
+      : newEraDate(WUXIAN_EPOCH - g, true);
+  }
+  // 无限年 → 公元年（yearNum 必须 > 0，否则返回 null —— 不存在 0 年）
+  function newEraToGregorian(yearNum, isBefore) {
+    var n = parseInt(yearNum, 10);
+    if (isNaN(n) || n <= 0) return null;
+    return isBefore ? (WUXIAN_EPOCH - n) : (n + WUXIAN_EPOCH - 1);
+  }
   // 按当前年制格式化「年」部分（无限年 / 无限前 / 公元年）
   function yearText(ce) {
     ce = parseInt(ce, 10);
     if (isNaN(ce)) return '';
     if (getYearMode() === 'ce') return String(ce);
-    var wy = wuxianYear(ce);
+    var d = gregorianToNewEra(ce);
+    if (!d) return '';
     // 无限历 1 起算：元年 = 公元 1604；公元 1603 则为「无限前 1 年」（不存在无限 0 年）
-    if (wy !== null) return wy === 1 ? '无限元年' : '无限' + wy;
-    return '无限前' + (1604 - ce);
+    if (d.isBefore) return '无限前' + d.yearNum;
+    return d.yearNum === 1 ? '无限元年' : '无限' + d.yearNum;
   }
   function fmtTime(t) {
     if (!t) return '';
@@ -172,20 +200,19 @@
     var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
     return yearText(d.getFullYear()) + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
-  // ── 无限年：无限年 N = 公元年 − 1603（无限元年 = 公元 1604）──
-  // 1 起算（不存在「无限 0 年」）；公元 1604 年之前返回 null，属于「无限前」。
+  // ── 无限年：公元年 → 无限年（1 起算）；公元 1604 年之前返回 null（属「无限前」）──
   function wuxianYear(ce) {
-    ce = parseInt(ce, 10);
-    if (isNaN(ce) || ce < 1604) return null;
-    return ce - 1603;
+    var d = gregorianToNewEra(ce);
+    return (!d || d.isBefore) ? null : d.yearNum;
   }
   // 无限年 → 公元年：返回公元年份（数值字符串，展示前应过 ceText）；
   // 输入非法或 0（不存在）时返回空串。
-  // 正数 = 无限年（公元 = 无限年 + 1603）；负数 = 「无限前」（公元 = 1604 + 无限年）。
+  // 正数 = 无限年（公元 = 无限年 + 1603）；负数 = 「无限前」（-N 即「无限前 N 年」）。
   function wuxianToCE(wy) {
     wy = parseInt(wy, 10);
     if (isNaN(wy) || wy === 0) return '';
-    return String(wy > 0 ? wy + 1603 : 1604 + wy);
+    var g = newEraToGregorian(Math.abs(wy), wy < 0);
+    return g === null ? '' : String(g);
   }
   // 公元年展示：**公元纪年不存在 0 年**——「公元前 1 年」之后直接是「公元 1 年」。
   // ≥1 显示「N 年（公元）」；≤0 换算为「公元前 (1 − N) 年」（公元 0 年 = 公元前 1 年，公元 −1 年 = 公元前 2 年）。
@@ -197,19 +224,14 @@
   }
   // 公元年 → 无限年展示：≥1604 显示「无限N年」（1 为「无限元年」），<1604 显示「无限前N年」。
   function wuxianYearLabel(ce) {
-    ce = parseInt(ce, 10);
-    if (isNaN(ce)) return null;
-    if (ce >= 1604) {
-      var n = ce - 1603;
-      return n === 1 ? '无限元年' : '无限' + n + '年';
-    }
-    return '无限前' + (1604 - ce) + '年';
+    var d = gregorianToNewEra(ce);
+    return d ? newEraLabel(d) : null;
   }
   // 无限年年份名：1 → 「无限元年」；负数 → 「无限前N年」；0 不存在 → 空串。
   function wuxianYearName(wy) {
     wy = parseInt(wy, 10);
     if (isNaN(wy) || wy === 0) return '';
-    return wy > 0 ? (wy === 1 ? '无限元年' : '无限' + wy + '年') : '无限前' + (-wy) + '年';
+    return newEraLabel(newEraDate(Math.abs(wy), wy < 0));
   }
   // ── 剥离 Markdown 标记 → 纯文本（用于卡片摘要预览）──
   function stripMarkdown(s) {
@@ -760,6 +782,10 @@
     wuxianToCE: wuxianToCE,
     wuxianYearLabel: wuxianYearLabel,
     wuxianYearName: wuxianYearName,
+    // 年制换算核心（结构化）：公元年 ⇄ 无限年
+    gregorianToNewEra: gregorianToNewEra,
+    newEraToGregorian: newEraToGregorian,
+    newEraLabel: newEraLabel,
     // 公元年展示（处理「公元纪年无 0 年」）
     ceText: ceText,
     stripMarkdown: stripMarkdown
