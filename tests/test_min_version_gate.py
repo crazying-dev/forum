@@ -4,7 +4,7 @@
 规则：
   * 清单顶层 `min_versions` 给出各平台最低版本；`web` 键被忽略；
   * 客户端每个请求携带 `X-Client-Platform` / `X-Client-Version`（旧版从
-    `User-Agent: CrForum-Windows/1.3.13` 兼底解析）；
+    `User-Agent: CrForum-Windows/<版本>` 兼底解析）；
   * 版本号逐段比较（先 a，再 b，再 c，数值比较）；
   * 豁免：非 /api/ 路径、/api/app/*、OPTIONS、无法判断平台（fail-open）。
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +27,29 @@ def _load_manifest():
         return json.load(f)
 
 
+def _mins():
+    return _load_manifest().get("min_versions") or {}
+
+
+def _min(platform):
+    """取清单里该平台的最低版本。
+
+    测试不硬编码具体版本号 —— 每次发版上调 min_versions 时无需改测试，
+    只校验「清单自身」与「闸门行为」一致。
+    """
+    return _mins()[platform]
+
+
+def _lower(version):
+    """构造一个严格低于 version 的版本号（用于「应被拦截」的用例）。"""
+    a, b, c = (int(x) for x in version.split("."))
+    if c > 0:
+        return f"{a}.{b}.{c - 1}"
+    if b > 0:
+        return f"{a}.{b - 1}.99"
+    return f"{max(a - 1, 0)}.99.99"
+
+
 def test_manifest_has_min_versions():
     """app_releases.json 顶层必须有 min_versions，且含 windows/android/web。"""
     data = _load_manifest()
@@ -33,8 +57,10 @@ def test_manifest_has_min_versions():
     assert isinstance(mins, dict), "清单缺少 min_versions 字典"
     for key in ("windows", "android", "web"):
         assert key in mins, f"min_versions 缺少 {key}"
-    assert mins["windows"] == "1.3.13", "windows 最低版本应为 1.3.13"
-    assert mins["android"] == "1.0.10", "android 最低版本应为 1.0.10"
+    for key in ("windows", "android"):
+        assert re.fullmatch(r"\d+\.\d+\.\d+", str(mins[key])), \
+            f"{key} 最低版本格式非法：{mins[key]}"
+    assert mins["web"] == "0", "web 不参与闸门，固定为 0"
 
 
 def test_default_manifest_min_versions_matches_file():
@@ -45,12 +71,39 @@ def test_default_manifest_min_versions_matches_file():
         "DEFAULT_MANIFEST 与清单文件的 min_versions 不一致"
 
 
+def test_default_manifest_matches_file():
+    """内置回退清单必须与 app_releases.json 完全一致。
+
+    清单文件缺失/损坏时 `load_manifest()` 会回退到 `DEFAULT_MANIFEST`；
+    若两者脱节，用户会看到旧版本号与失效的下载直链。
+    """
+    import api.release as rel
+
+    assert rel.DEFAULT_MANIFEST == _load_manifest(), \
+        "DEFAULT_MANIFEST 与 app_releases.json 不一致（清单更新后需同步内置回退）"
+
+
+def test_min_versions_track_latest_releases():
+    """策略：min_versions 跟到各平台清单里最新的已发布版本（旧客户端一律强制升级）。"""
+    data = _load_manifest()
+    mins = data["min_versions"]
+    for platform in data["platforms"]:
+        key = platform.get("key")
+        if key not in ("windows", "android"):
+            continue
+        releases = platform.get("releases") or []
+        assert releases, f"{key} 有 min_versions 就必须有已发布版本"
+        latest = releases[0].get("version")
+        assert mins[key] == latest, \
+            f"{key} 的 min_versions 应等于最新发布版本 {latest}，实际 {mins[key]}"
+
+
 def test_min_version_for_skips_web_and_unknown():
     """web / 空 / 未配置平台不校验（返回 None）；windows/android 返回最低版本。"""
     import api.release as rel
 
-    assert rel.min_version_for("windows") == "1.3.13"
-    assert rel.min_version_for("ANDROID") == "1.0.10", "平台名应大小写不敏感"
+    assert rel.min_version_for("windows") == _min("windows")
+    assert rel.min_version_for("ANDROID") == _min("android"), "平台名应大小写不敏感"
     assert rel.min_version_for("web") is None, "web 必须被忽略"
     assert rel.min_version_for("") is None
     assert rel.min_version_for(None) is None
@@ -61,20 +114,22 @@ def test_semver_compares_a_then_b_then_c():
     """逐段数值比较：先 a，再 b，再 c（不是字典序）。"""
     import api.release as rel
 
-    # (版本, 是否应被拦截)，基准 windows 最低 1.3.13
+    # (版本, 是否应被拦截)；基准取清单里的 windows 最低版本，发版上调无需改测试
+    w = _min("windows")
+    a, b, c = (int(x) for x in w.split("."))
+    lower = _lower(w)
     cases = [
-        ("1.3.13", False),   # 等于最低
-        ("1.3.14", False),   # 补丁号更大
-        ("1.4.0", False),    # b 更大
-        ("2.0.0", False),    # a 更大
-        ("1.3.100", False),  # 数值比较：100 > 13
-        ("1.3.12", True),    # c 更小
-        ("1.3.9", True),     # 数值比较：9 < 13（非字典序）
-        ("1.2.99", True),    # b 更小（c 再大也没用）
-        ("0.9.9", True),     # a 更小
-        ("V1.3.12", True),   # 前缀 V 不影响解析
-        ("v1.3.12", True),   # 小写 v 同理
-        ("", True),          # 平台已知但版本缺失 → 视为 0
+        (w, False),                                  # 等于最低
+        (f"{a}.{b}.{c + 1}", False),                 # 补丁号更大
+        (f"{a}.{b + 1}.0", False),                   # b 更大
+        (f"{a + 1}.0.0", False),                     # a 更大
+        (f"{a}.{b}.{c}00", False),                   # 数值比较：{c}00 > {c}（非字典序）
+        (lower, True),                               # c 更小
+        (f"{a}.{b - 1}.99", True),                   # b 更小（c 再大也没用）
+        (f"{max(a - 1, 0)}.9.9", True),              # a 更小
+        ("V" + lower, True),                         # 前缀 V 不影响解析
+        ("v" + lower, True),                         # 小写 v 同理
+        ("", True),                                  # 平台已知但版本缺失 → 视为 0
     ]
     for version, expect_block in cases:
         got = rel.version_gate_violation("windows", version)
@@ -87,13 +142,14 @@ def test_violation_payload_shape():
     """426 响应体必须含 code / message / min_version / download_url。"""
     import api.release as rel
 
-    body = rel.version_gate_violation("windows", "1.3.12")
+    low = _lower(_min("windows"))
+    body = rel.version_gate_violation("windows", low)
     assert body is not None
     assert body["success"] is False
     assert body["code"] == "VERSION_TOO_LOW"
     assert body["message"] == "版本过低，请更新"
-    assert body["min_version"] == "1.3.13"
-    assert body["current"] == "1.3.12"
+    assert body["min_version"] == _min("windows")
+    assert body["current"] == low
     assert isinstance(body.get("download_url"), str) and body["download_url"], \
         "应给出最新安装包直链"
     assert body.get("download_page"), "应给出下载页地址"
@@ -104,11 +160,11 @@ def test_resolve_client_prefers_headers_over_user_agent():
     import api.release as rel
 
     platform, version = rel.resolve_client(
-        {"X-Client-Platform": "Android", "X-Client-Version": "1.0.10"},
-        "CrForum-Windows/1.3.12",
+        {"X-Client-Platform": "Android", "X-Client-Version": "9.9.9"},
+        "CrForum-Windows/9.9.8",
     )
     assert platform == "android", "平台名应归一为小写"
-    assert version == "1.0.10"
+    assert version == "9.9.9"
 
 
 def test_resolve_client_falls_back_to_user_agent():
@@ -185,8 +241,11 @@ def test_gate_end_to_end_426():
     """端到端：旧版客户端请求 /api/* → 426 + VERSION_TOO_LOW；新版/web/豁免路径放行。"""
     client = _gated_client()
 
+    w_low = _lower(_min("windows"))
+    a_low = _lower(_min("android"))
+
     resp = client.get("/api/posts", headers={"X-Client-Platform": "windows",
-                                             "X-Client-Version": "1.3.12"})
+                                             "X-Client-Version": w_low})
     assert resp.status_code == 426, f"旧版 Windows 应被拦，实际 {resp.status_code}"
     body = resp.get_json()
     assert body["code"] == "VERSION_TOO_LOW"
@@ -194,19 +253,19 @@ def test_gate_end_to_end_426():
 
     # 当前最低版本 → 放行
     ok = client.get("/api/posts", headers={"X-Client-Platform": "windows",
-                                           "X-Client-Version": "1.3.13"})
-    assert ok.status_code == 200, f"1.3.13 应放行，实际 {ok.status_code}"
+                                           "X-Client-Version": _min("windows")})
+    assert ok.status_code == 200, f"{_min('windows')} 应放行，实际 {ok.status_code}"
 
-    # Android 低于 1.0.10 → 拦；等于 → 放行
+    # Android 低于最低版本 → 拦；等于 → 放行
     low_a = client.get("/api/posts", headers={"X-Client-Platform": "android",
-                                              "X-Client-Version": "1.0.9"})
-    assert low_a.status_code == 426, "Android 1.0.9 应被拦"
+                                              "X-Client-Version": a_low})
+    assert low_a.status_code == 426, f"Android {a_low} 应被拦"
     ok_a = client.get("/api/posts", headers={"X-Client-Platform": "android",
-                                             "X-Client-Version": "1.0.10"})
-    assert ok_a.status_code == 200, "Android 1.0.10 应放行"
+                                             "X-Client-Version": _min("android")})
+    assert ok_a.status_code == 200, f"Android {_min('android')} 应放行"
 
     # User-Agent 兼底：旧版 Windows 无请求头也会被拦
-    ua = client.get("/api/posts", headers={"User-Agent": "CrForum-Windows/1.3.11"})
+    ua = client.get("/api/posts", headers={"User-Agent": "CrForum-Windows/" + w_low})
     assert ua.status_code == 426, "应能从 User-Agent 识别旧版"
 
     # 豁免路径：/api/app/* 与页面
@@ -234,13 +293,14 @@ def test_release_api_payloads_expose_min_versions():
     client = app.test_client()
 
     body = client.get("/api/app/releases").get_json()
-    assert body["min_versions"]["windows"] == "1.3.13"
+    assert body["min_versions"]["windows"] == _min("windows")
 
-    check = client.get("/api/app/check?platform=windows&version=1.3.12").get_json()
-    assert check["min_version"] == "1.3.13"
-    assert check["too_low"] is True, "1.3.12 低于最低版本，too_low 应为真"
+    w_low = _lower(_min("windows"))
+    check = client.get("/api/app/check?platform=windows&version=" + w_low).get_json()
+    assert check["min_version"] == _min("windows")
+    assert check["too_low"] is True, f"{w_low} 低于最低版本，too_low 应为真"
 
-    check2 = client.get("/api/app/check?platform=windows&version=1.3.13").get_json()
+    check2 = client.get("/api/app/check?platform=windows&version=" + _min("windows")).get_json()
     assert check2["too_low"] is False
 
 
@@ -268,6 +328,8 @@ if __name__ == "__main__":
         ("test_manifest_has_min_versions", test_manifest_has_min_versions),
         ("test_default_manifest_min_versions_matches_file",
          test_default_manifest_min_versions_matches_file),
+        ("test_default_manifest_matches_file", test_default_manifest_matches_file),
+        ("test_min_versions_track_latest_releases", test_min_versions_track_latest_releases),
         ("test_min_version_for_skips_web_and_unknown",
          test_min_version_for_skips_web_and_unknown),
         ("test_semver_compares_a_then_b_then_c", test_semver_compares_a_then_b_then_c),

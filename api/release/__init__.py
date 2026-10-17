@@ -39,10 +39,10 @@ SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # 内置回退清单，内容与 app_releases.json 等价（文件缺失/损坏时使用）
 DEFAULT_MANIFEST: dict = {
     "schema": 1,
-    "updated_at": "2026-10-03T23:25:00+08:00",
+    "updated_at": "2026-10-17T19:35:00+08:00",
     "min_versions": {
-        "windows": "1.3.13",
-        "android": "1.0.10",
+        "windows": "1.3.18",
+        "android": "1.0.16",
         "web": "0",
     },
     "platforms": [
@@ -54,17 +54,18 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Windows 10 / 11（64 位）",
             "releases": [
                 {
-                    "version": "1.3.14",
+                    "version": "1.3.18",
                     "channel": "stable",
-                    "date": "2026-10-03",
-                    "size": 48581713,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.14/forum_setup.exe",
+                    "date": "2026-10-10",
+                    "size": 158186366,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.18/forum_setup.exe",
                     "filename": "forum_setup.exe",
-                    "sha256": "d55ffcfcbaebdfa40a6776ef54afee084ce8c5c16104809ebfb491faef3dd3f1",
+                    "sha256": "1a78cd3930a7ebe7f3f28bb48689131a33e4762a7a304a159b67af2710e6e672",
                     "notes": [
-                        "每次请求携带 X-Client-Platform / X-Client-Version，服务端可据此判定客户端版本",
-                        "命中最低版本闸门（HTTP 426 / VERSION_TOO_LOW）时弹出不可关闭的强制更新窗，只能「去更新」或「退出应用」",
-                        "版本号升至 1.3.14",
+                        "修复：无限历纪年改为 1 起算——无限元年 = 公元 1604 年（无限 N 年 = 公元 1603 + N 年），此前会错显为「无限 0 年」",
+                        "公元 1604 年以前显示「无限前 N 年」（无限前 1 年 = 公元 1603 年），不存在无限 0 年",
+                        "设置页「年制换算」：输入 1 显示「无限元年」，输入 0 提示不存在无限 0 年",
+                        "与网页端纪年口径完全统一；版本号升至 1.3.18",
                     ],
                     "mandatory": False,
                 }
@@ -78,17 +79,18 @@ DEFAULT_MANIFEST: dict = {
             "requirement": "Android 7.0 及以上",
             "releases": [
                 {
-                    "version": "1.0.11",
+                    "version": "1.0.16",
                     "channel": "stable",
-                    "date": "2026-10-03",
-                    "size": 8119736,
-                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.11/forum-android-1.0.11.apk",
-                    "filename": "forum-android-1.0.11.apk",
-                    "sha256": "29511bed0828f0523123dc3a1d7e4203acd2463ff1a9e3ad61227a01ae23a0f1",
+                    "date": "2026-10-10",
+                    "size": 8152504,
+                    "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.16/forum-android-1.0.16.apk",
+                    "filename": "forum-android-1.0.16.apk",
+                    "sha256": "1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61",
                     "notes": [
-                        "每次请求携带 X-Client-Platform / X-Client-Version，服务端可据此判定客户端版本",
-                        "命中最低版本闸门（HTTP 426 / VERSION_TOO_LOW）时弹出不可绕过的「版本过低」窗，只能「去更新」或「退出应用」",
-                        "版本号 versionCode 12 / versionName 1.0.11",
+                        "修复：从帖子详情退出后列表跳回最顶端——新增跨页面保留的列表状态（FeedStateStore 由根节点持有），返回时复用同一实例，已加载内容与滚动位置都不丢",
+                        "配合 needReload 判定：仅在信息流/分类/搜索词/用户 tab 变化时重载，进入详情再返回不再重载",
+                        "首页/论坛/搜索/用户主页四个列表均接入保留的 LazyListState",
+                        "版本号 versionCode 17 / versionName 1.0.16",
                     ],
                     "mandatory": False,
                 }
@@ -209,8 +211,8 @@ def compare_versions(a, b) -> int:
 # ──────────────────────────────────────────────
 # 客户端应在每个请求上携带：
 #   X-Client-Platform: windows | android | web
-#   X-Client-Version:  1.3.13
-# 旧客户端没有这两个头，则从 User-Agent「CrForum-Windows/1.3.13」兜底解析。
+#   X-Client-Version:  1.3.18
+# 旧客户端没有这两个头，则从 User-Agent「CrForum-Windows/1.3.18」兜底解析。
 # 清单顶层 min_versions 字典给出各平台最低版本；「web」键被忽略（网页由服务端
 # 自身提供，不存在版本落后问题）。
 CLIENT_PLATFORM_HEADER = "X-Client-Platform"
@@ -223,7 +225,7 @@ GATE_EXEMPT_PREFIXES = ("/api/app/", "/api/status-log")
 VERSION_TOO_LOW_CODE = "VERSION_TOO_LOW"
 WEB_PLATFORM = "web"
 
-# User-Agent 兜底：CrForum-Windows/1.3.13、CrForum-Android/1.0.10
+# User-Agent 兜底：CrForum-Windows/1.3.18、CrForum-Android/1.0.16
 CLIENT_UA_RE = re.compile(r"CrForum-([A-Za-z0-9_.-]+)/([0-9][0-9A-Za-z._-]*)")
 
 

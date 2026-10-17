@@ -131,8 +131,8 @@ def create_app() -> Flask:
 
     # ── 最低版本闸门：客户端版本过低 → 426（客户端据此弹「版本过低，请更新」）──
     # 客户端应在每个请求携带 X-Client-Platform（windows/android/web）与
-    # X-Client-Version（如 1.3.13）；旧版客户端无此头，则从 User-Agent
-    # 「CrForum-Windows/1.3.13」兜底解析。清单顶层 min_versions 给出各平台最低
+    # X-Client-Version（如 1.3.18）；旧版客户端无此头，则从 User-Agent
+    # 「CrForum-Windows/1.3.18」兜底解析。清单顶层 min_versions 给出各平台最低
     # 版本，其中 web 键被忽略（网页由服务端自身提供，不存在版本落后）。
     # 豁免：非 /api/ 路径（页面与静态资源）、/api/app/*（清单 / 检查 / 反代下载，
     #       保证客户端能自助更新）、OPTIONS 预检。
