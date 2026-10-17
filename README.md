@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.16**（`versionCode = 17`） |
+| 当前版本 | **V1.0.17**（`versionCode = 18`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -240,6 +240,12 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * 配合纯函数 `needReload(loadedKey, currentKey)`：只在内容标识（信息流 / 分类 / 搜索词 / 用户 tab）变化时才重新加载，从帖子详情返回不再触发重载。
   * `FeedParts.PostFeedList` 新增 `state: LazyListState` 参数（默认 `rememberLazyListState()`）；首页 / 论坛把保留的滚动状态传进去，搜索页与用户主页的 `LazyColumn` 同样接入。
   * 新增 `FeedStateTest`（10 例）覆盖 `needReload` 判定与 `FeedStateStore` 的「同 key 同实例」语义。
+* **年制换算与「无限历」结构化重构（V1.0.17）**：
+  * **修复（现象：公元 1603 年显示成「无限 0 年」）**：无限历改为 1 起算 —— 无限元年 = 公元 1604 年（`wuxianYear(ce) = ce - 1603`）；公元 1604 年以前显示「无限前 N 年」（无限前 1 年 = 公元 1603 年），不存在无限 0 年。与 Web / Windows 三端口径统一。
+  * **重构**：`core/TimeFmt.kt` 新增顶层 `data class NewEraDate(yearNum, isBefore)` 与 `gregorianToNewEra()` / `newEraToGregorian()` / `ceText()`，把「公元年 ⇄ 无限年」双向换算收敛到一个结构化核心（`newEraToGregorian` 对 0 与负数直接拒绝）；`wuxianYear` / `wuxianToCe` / `yearText` 改为委托核心，对外文案仍为「无限 N 年 / 无限前 N 年」。
+  * **新增入口**：`ui/screens/YearConvertScreen.kt` 年制换算页（我的 → 快捷入口 → 年制换算），无限年 ⇄ 公元年实时双向换算，对 0 年与负数给出明确提示。
+  * `TimeFmtTest` 补充结构化换算 / 往返一致 / 非法输入共 6 例。
+  * 版本号 versionCode 18 / versionName 1.0.17。
 
 ### 未实现（后续多轮持续补齐）
 
