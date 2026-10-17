@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from . import config, constants
@@ -20,6 +21,61 @@ _TIME_RE = re.compile(r":\d{2}")
 
 
 # ────────────────────────── 年制 ──────────────────────────
+#
+# 核心是「公元年 ⇄ 无限年」的双向换算，统一用 NewEraDate 结构化表示：
+# * 无限元年 = 公元 1604 年，无限年从 1 起算（无限 N 年 = 公元 (1603 + N) 年）
+# * 公元 1603 年 = 「无限前 1 年」，不存在无限 0 年
+# * 对外文案仍为「无限 N 年 / 无限前 N 年」，统一由 NewEraDate.label 产出
+
+
+@dataclass(frozen=True)
+class NewEraDate:
+    """无限年日期（结构化表示）。
+
+    ``year_num`` 恒为正数（不存在 0 年）；``is_before=True`` 表示「无限前 N 年」。
+    """
+
+    year_num: int
+    is_before: bool = False
+
+    def label(self) -> str:
+        """中文文案：「无限前 N 年」/「无限元年」/「无限 N 年」。"""
+        if self.year_num <= 0:
+            return ""
+        if self.is_before:
+            return "无限前%d年" % self.year_num
+        return "无限元年" if self.year_num == 1 else "无限%d年" % self.year_num
+
+    def __str__(self) -> str:  # 默认按中文文案输出
+        return self.label()
+
+
+def gregorian_to_new_era(greg_year) -> NewEraDate:
+    """公元年份 → 无限年（无 0 年：1604 = 无限 1 年，1603 = 无限前 1 年）。"""
+    try:
+        g = int(greg_year)
+    except (TypeError, ValueError):
+        raise ValueError("公元年份必须是整数") from None
+    if g >= constants.WUXIAN_EPOCH_CE:
+        return NewEraDate(g - constants.WUXIAN_EPOCH_CE + 1, False)
+    return NewEraDate(constants.WUXIAN_EPOCH_CE - g, True)
+
+
+def new_era_to_gregorian(year_num, is_before: bool = False) -> int:
+    """无限年 → 公元年。
+
+    :param year_num: 年份数字，必须 > 0（不存在无限 0 年）
+    :param is_before: True 表示「无限前 N 年」
+    """
+    try:
+        n = int(year_num)
+    except (TypeError, ValueError):
+        raise ValueError("年份数字必须是整数") from None
+    if n <= 0:
+        raise ValueError("年份数字必须大于 0，无限历不存在 0 年")
+    if is_before:
+        return constants.WUXIAN_EPOCH_CE - n
+    return n + constants.WUXIAN_EPOCH_CE - 1
 
 
 def epoch() -> int:
@@ -46,52 +102,46 @@ def set_mode(mode: str) -> str:
 def wuxian_year(ce) -> int | None:
     """公元年 → 无限年（从 1 起算）；公元年 < 1604 时返回 None。"""
     try:
-        ce = int(ce)
-    except (TypeError, ValueError):
+        era = gregorian_to_new_era(ce)
+    except ValueError:
         return None
-    if ce < constants.WUXIAN_EPOCH_CE:
-        return None
-    return ce - constants.WUXIAN_EPOCH_CE + 1
+    return None if era.is_before else era.year_num
 
 
 def wuxian_to_ce(wy) -> str:
     """无限年 → 公元年（允许负数，表示无限前）。不存在无限 0 年，非法输入返回空串。"""
     try:
-        wy = int(wy)
+        n = int(wy)
     except (TypeError, ValueError):
         return ""
-    if wy == 0:
+    if n == 0:
         return ""
-    if wy > 0:
-        return str(wy + constants.WUXIAN_EPOCH_CE - 1)
-    return str(constants.WUXIAN_EPOCH_CE + wy)
+    try:
+        return str(new_era_to_gregorian(abs(n), n < 0))
+    except ValueError:
+        return ""
 
 
 def wuxian_year_name(wy) -> str:
     """无限年（数字，可负）→ 中文名称；不存在无限 0 年，非法输入返回空串。"""
     try:
-        wy = int(wy)
+        n = int(wy)
     except (TypeError, ValueError):
         return ""
-    if wy == 0:
+    if n == 0:
         return ""
-    if wy > 0:
-        return "无限元年" if wy == 1 else "无限%d年" % wy
-    return "无限前%d年" % (-wy)
+    return NewEraDate(abs(n), n < 0).label()
 
 
 def wuxian_year_label(ce) -> str | None:
     try:
-        ce = int(ce)
-    except (TypeError, ValueError):
+        return gregorian_to_new_era(ce).label()
+    except ValueError:
         return None
-    if ce >= constants.WUXIAN_EPOCH_CE:
-        return wuxian_year_name(ce - constants.WUXIAN_EPOCH_CE + 1)
-    return "无限前%d年" % (constants.WUXIAN_EPOCH_CE - ce)
 
 
 def year_text(ce, mode: str | None = None) -> str:
-    """按当前年制格式化「年」部分（不带“年”字）。"""
+    """按当前年制格式化「年」部分（不带“年”字；唯「无限元年」含「年」）。"""
     try:
         ce = int(ce)
     except (TypeError, ValueError):
@@ -99,10 +149,10 @@ def year_text(ce, mode: str | None = None) -> str:
     mode = mode or get_mode()
     if mode == constants.YEAR_MODE_CE:
         return str(ce)
-    wy = wuxian_year(ce)
-    if wy is not None:
-        return "无限元年" if wy == 1 else "无限%d" % wy
-    return "无限前%d" % (constants.WUXIAN_EPOCH_CE - ce)
+    era = gregorian_to_new_era(ce)
+    if era.is_before:
+        return "无限前%d" % era.year_num
+    return "无限元年" if era.year_num == 1 else "无限%d" % era.year_num
 
 
 # ────────────────────────── 时间 ──────────────────────────

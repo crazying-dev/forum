@@ -173,6 +173,54 @@ def test_year_text_by_mode():
     assert yearmode.year_text(1500, "wuxian") == "无限前104"
 
 
+def test_new_era_structured_conversion():
+    """NewEraDate 双向换算：公元 1604 = 无限 1 年，1603 = 无限前 1 年（无 0 年）。"""
+    era = yearmode.gregorian_to_new_era(1604)
+    assert (era.year_num, era.is_before) == (1, False)
+    assert era.label() == "无限元年"
+    assert str(era) == "无限元年"
+
+    assert yearmode.gregorian_to_new_era(2026).year_num == 423
+    before = yearmode.gregorian_to_new_era(1603)
+    assert (before.year_num, before.is_before) == (1, True)
+    assert before.label() == "无限前1年"
+    assert yearmode.gregorian_to_new_era(1500).label() == "无限前104年"
+
+    # 反向
+    assert yearmode.new_era_to_gregorian(1) == 1604
+    assert yearmode.new_era_to_gregorian(423) == 2026
+    assert yearmode.new_era_to_gregorian(104, True) == 1500
+    assert yearmode.new_era_to_gregorian(1, True) == 1603
+
+    # 无 0 年：非法入参必须报错，而不是静默返回
+    for bad in (0, -1, "x"):
+        try:
+            yearmode.new_era_to_gregorian(bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("new_era_to_gregorian(%r) 应该报 ValueError" % (bad,))
+    try:
+        yearmode.gregorian_to_new_era("x")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("gregorian_to_new_era('x') 应该报 ValueError")
+
+
+def test_new_era_round_trip():
+    """公元 → 无限 → 公元 必须回到原值（1604 前后都覆盖）。"""
+    for g in (1, 1063, 1603, 1604, 1605, 1700, 2026):
+        era = yearmode.gregorian_to_new_era(g)
+        assert yearmode.new_era_to_gregorian(era.year_num, era.is_before) == g
+        # 旧接口与新核心必须一致
+        if era.is_before:
+            assert yearmode.wuxian_year(g) is None
+            assert yearmode.wuxian_year_label(g) == era.label()
+        else:
+            assert yearmode.wuxian_year(g) == era.year_num
+
+
 def test_parse_time_treats_naive_as_utc():
     dt = yearmode.parse_time("2026-09-25 15:17:13.359183")
     assert dt is not None
