@@ -306,6 +306,16 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -Backend pyinstalle
      提示不存在无限 0 年；
    * 单测 `tests/test_core.py` 同步更新（1604→1、1947→344、2012→无限 409 等）；
      版本号升至 1.3.18。
+26. **V1.3.19：年制换算的公元年输入框支持公元前**（与 Web 端 `ceNum < 0 ? ceNum + 1 : ceNum` 对齐）：
+   * 此前公元年输入框把负数直接丢给 `gregorian_to_new_era`：输入 `-100` 会算出「无限前 1704 年」
+     并显示「公元 -100 年」，既差一年又没换成公元前文案；
+   * `app/yearmode.py` 新增 `ce_input_to_astronomical()`（公元前 M 年 = 天文纪年 `1 − M`，
+     先归一再加换算；输入 0 返回 `None`）、`ce_input_to_new_era()`、`ce_text()`
+     （≥1 →「公元 N 年」，≤0 →「公元前 (1 − N) 年」）；
+   * 设置页「年制换算」：公元输入框接受负数（`-1` = 公元前 1 年 = 无限前 1604 年），
+     占位提示与错误文案同步；无限年方向也改走 `ce_text`，不再出现「公元 -N 年」；
+   * `tests/test_core.py` 新增 3 例（公元前换算 / 公元 0 年 / 设置页归一调用），
+     版本号升至 1.3.19。
 
 ---
 

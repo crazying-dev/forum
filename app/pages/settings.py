@@ -172,10 +172,10 @@ class SettingsPage(Page):
         card.body.addWidget(self._muted(
             "无限年换算（无限元年 = 公元 %d 年）" % constants.WUXIAN_EPOCH_CE))
         wuxian_input = QLineEdit()
-        wuxian_input.setPlaceholderText("无限年，如 400")
+        wuxian_input.setPlaceholderText("无限年，如 400；无限前请填负数，如 -1")
         wuxian_input.setMaximumWidth(150)
         ce_input = QLineEdit()
-        ce_input.setPlaceholderText("公元年，如 2010")
+        ce_input.setPlaceholderText("公元年，如 2010；公元前请填负数，如 -1")
         ce_input.setMaximumWidth(150)
         self._year_inputs = {"wuxian": wuxian_input, "ce": ce_input}
 
@@ -221,14 +221,18 @@ class SettingsPage(Page):
                 self._year_result.setText("请输入整数（无限年可以为负，不存在无限 0 年）")
                 return
             name = yearmode.wuxian_year_name(wuxian_text) or ("无限%s年" % wuxian_text)
-            self._year_result.setText("%s = 公元 %s 年" % (name, ce))
+            # 无限前 N 年（N > 1604）落到公元前的也用「公元前 N 年」展示，不出现「公元 -N 年」
+            self._year_result.setText("%s = %s" % (name, yearmode.ce_text(ce)))
             return
         if ce_text:
-            label = yearmode.wuxian_year_label(ce_text)
-            if not label:
-                self._year_result.setText("请输入整数（公元年）")
+            # 负数 = 公元前 |n| 年；公元 M 年按天文纪年 (1 − M) 归一后再换算，避免差一年
+            astro = yearmode.ce_input_to_astronomical(ce_text)
+            if astro is None:
+                self._year_result.setText(
+                    "请输入非零整数（公元年可以为负，负数表示公元前；公元纪年没有 0 年）")
                 return
-            self._year_result.setText("公元 %s 年 = %s" % (ce_text, label))
+            label = yearmode.wuxian_year_label(astro) or ""
+            self._year_result.setText("%s = %s" % (yearmode.ce_text(astro), label))
             return
         self._year_result.setText("请先填写无限年或公元年")
 

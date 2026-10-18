@@ -208,6 +208,49 @@ def test_new_era_structured_conversion():
         raise AssertionError("gregorian_to_new_era('x') 应该报 ValueError")
 
 
+def test_ce_input_accepts_bc_years():
+    """公元年输入框允许负数（= 公元前）：与 Web / 安卓同口径。"""
+    # 输入 -1 = 公元前 1 年（天文纪年 0）→ 无限前 1604 年
+    assert yearmode.ce_input_to_astronomical(-1) == 0
+    bc1 = yearmode.ce_input_to_new_era(-1)
+    assert (bc1.year_num, bc1.is_before) == (1604, True)
+    assert bc1.label() == "无限前1604年"
+    assert yearmode.ce_input_to_new_era(-100).label() == "无限前1703年"
+
+    # 公元 0 年不存在（不允许静默当成别的年份）
+    assert yearmode.ce_input_to_astronomical(0) is None
+    assert yearmode.ce_input_to_new_era(0) is None
+    assert yearmode.ce_input_to_astronomical("x") is None
+
+    # 正数保持不变
+    assert yearmode.ce_input_to_astronomical(2026) == 2026
+    assert yearmode.ce_input_to_new_era(2026).label() == "无限423年"
+    assert yearmode.ce_input_to_new_era(1604).label() == "无限元年"
+
+    # 公元前 M 年 ⇔ 无限前 (1603 + M) 年（直接拿负数进公式会差一年，这里守住）
+    for m in (1, 100, 1603):
+        assert yearmode.ce_input_to_new_era(-m).year_num == 1603 + m
+
+
+def test_ce_text_has_no_year_zero():
+    """公元年展示：不存在公元 0 年，负数转「公元前 N 年」。"""
+    assert yearmode.ce_text(2026) == "公元 2026 年"
+    assert yearmode.ce_text(0) == "公元前 1 年"
+    assert yearmode.ce_text(-1) == "公元前 2 年"
+    # 无限前 N 年（N > 1604）落到公元前时，不得出现「公元 -N 年」
+    assert yearmode.ce_text(yearmode.wuxian_to_ce(-2000)) == "公元前 397 年"
+
+
+def test_settings_year_convert_uses_bc_normalization():
+    """设置页换算必须走 ce_input_to_astronomical，且提示支持公元前。"""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "app", "pages", "settings.py"), encoding="utf-8") as fh:
+        src = fh.read()
+    assert "ce_input_to_astronomical" in src, "设置页未使用公元前归一"
+    assert "公元前请填负数" in src, "公元输入框占位提示未说明支持公元前"
+    assert "公元纪年不存在负数年份" not in src, "仍保留「禁止负数」的旧文案"
+
+
 def test_new_era_round_trip():
     """公元 → 无限 → 公元 必须回到原值（1604 前后都覆盖）。"""
     for g in (1, 1063, 1603, 1604, 1605, 1700, 2026):

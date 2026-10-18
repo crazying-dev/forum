@@ -140,6 +140,45 @@ def wuxian_year_label(ce) -> str | None:
         return None
 
 
+def ce_input_to_astronomical(value) -> int | None:
+    """「公元年输入框」归一为**天文纪年**（可负）：负数表示「公元前 |n| 年」。
+
+    公元纪年不存在 0 年（公元前 1 年之后直接是公元 1 年）；天文纪年里
+    公元前 M 年记作 ``1 − M``，因此输入 ``-M`` 需 ``+1`` 才是公式可用的年份，
+    否则直接拿负数进公式会**差一年**。
+
+    :return: 天文纪年；输入 0（不存在）或非整数时返回 ``None``
+
+    与 Web ``static/js/AfterBody.js`` 的 ``ceNum < 0 ? ceNum + 1 : ceNum``、
+    安卓 ``TimeFmt.ceInputToAstronomical`` 同口径。
+    """
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return None
+    if n == 0:
+        return None
+    return n + 1 if n < 0 else n
+
+
+def ce_input_to_new_era(value) -> NewEraDate | None:
+    """公元年输入（负数 = 公元前）→ 无限年；输入 0（不存在）或非法返回 ``None``。"""
+    astro = ce_input_to_astronomical(value)
+    return None if astro is None else gregorian_to_new_era(astro)
+
+
+def ce_text(ce) -> str:
+    """公元年展示：**公元纪年不存在 0 年**（公元前 1 年之后直接是公元 1 年）。
+
+    ≥ 1 → 「公元 N 年」；≤ 0 → 「公元前 (1 − N) 年」（公元 0 年 = 公元前 1 年）。
+    """
+    try:
+        n = int(ce)
+    except (TypeError, ValueError):
+        return ""
+    return "公元 %d 年" % n if n >= 1 else "公元前 %d 年" % (1 - n)
+
+
 def year_text(ce, mode: str | None = None) -> str:
     """按当前年制格式化「年」部分（不带“年”字；唯「无限元年」含「年」）。"""
     try:
