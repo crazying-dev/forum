@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Modal from "./ui/Modal";
+import { UserAvatar } from "./ui/UserAvatar";
 import { userApi, User, ApiException } from "@/lib/api";
 import { useToast } from "./Toast";
 import { ageDisplay } from "@/lib/constants";
@@ -154,7 +155,12 @@ export default function UserProfileModal({
                 <label>头像</label>
                 <div className="profile-avatar-edit">
                   <div className="profile-avatar-preview">
-                    <img src={avatar || "/assets/img/favicon.png"} alt="头像预览" />
+                    <UserAvatar
+                      src={avatar || "/assets/img/favicon.png"}
+                      alt="头像预览"
+                      fallbackClassName=""
+                      loading="eager"
+                    />
                   </div>
                   <div className="profile-avatar-fields">
                     <input className="profile-edit-input" value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="输入头像图片URL" />

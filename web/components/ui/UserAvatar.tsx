@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { prefixBadgeColor } from "@/lib/constants";
 import { CornerPrefixBadge } from "./CornerBadge";
@@ -20,6 +20,10 @@ export function UserAvatar({
   fallbackClassName = "avatar-fallback",
   imgId,
   userId,
+  imgWidth,
+  imgHeight,
+  imgStyle,
+  loading = "lazy",
 }: {
   src?: string | null;
   alt?: string;
@@ -27,21 +31,33 @@ export function UserAvatar({
   fallbackClassName?: string;
   imgId?: string;
   userId?: string | null;
+  imgWidth?: number;
+  imgHeight?: number;
+  imgStyle?: CSSProperties;
+  loading?: "lazy" | "eager";
 }) {
-  // 旧头像文件可能已缺失：加载失败时回退到本地默认头像，避免页面出现裂图。
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const effectiveSrc = src ? (failedSrc === src ? DEFAULT_AVATAR : src) : null;
+  // 旧头像文件可能已缺失：先回退到本地默认头像；默认头像也失败时退化为 fa-user 图标。
+  const [failure, setFailure] = useState<{ src: string; stage: 1 | 2 } | null>(null);
+  const stage = src && failure?.src === src ? failure.stage : 0;
+  const effectiveSrc = src ? (stage === 2 ? null : stage === 1 ? DEFAULT_AVATAR : src) : null;
+
+  const handleError = () => {
+    if (!src) return;
+    if (stage === 0) setFailure({ src, stage: src === DEFAULT_AVATAR ? 2 : 1 });
+    else if (stage === 1) setFailure({ src, stage: 2 });
+  };
 
   const body = effectiveSrc ? (
     <img
       src={effectiveSrc}
       alt={alt}
-      loading="lazy"
+      loading={loading}
+      width={imgWidth}
+      height={imgHeight}
+      style={imgStyle}
       className={imgClassName || undefined}
       id={imgId}
-      onError={() => {
-        if (src && failedSrc !== src) setFailedSrc(src);
-      }}
+      onError={handleError}
     />
   ) : (
     <i className={`fa fa-user ${fallbackClassName}`}></i>

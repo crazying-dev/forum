@@ -10,6 +10,7 @@ import { getSiteConfig } from "@/lib/site-config";
 import { fetchDailyQuote, QUOTE_CHANCE } from "@/lib/daily-quote";
 import { useToast } from "./Toast";
 import Modal from "./ui/Modal";
+import { UserAvatar } from "./ui/UserAvatar";
 import ConsoleModal, { type MessageUnread } from "./ConsoleModal";
 import WorldChannelModal, { WorldChannelLauncher } from "./world/WorldChannelModal";
 
@@ -241,11 +242,14 @@ export default function Header() {
                 <>
                   <button id="UserInfo" onClick={() => setOpenMenu(openMenu === "user" ? "" : "user")}>
                     <div className="user-avatar" id="user-avatar">
-                      {user.avatar ? (
-                        <img src={user.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%" }} />
-                      ) : (
-                        <i className="fa fa-user"></i>
-                      )}
+                      <UserAvatar
+                        src={user.avatar}
+                        imgWidth={32}
+                        imgHeight={32}
+                        imgStyle={{ borderRadius: "50%" }}
+                        fallbackClassName=""
+                        loading="eager"
+                      />
                     </div>
                     <div id="user-name" className="Username">{user.name}</div>
                   </button>
@@ -294,7 +298,7 @@ export default function Header() {
               {user ? (
                 <Link className="mobile-menu-user-link" href={`/users/${userId}`} onClick={() => setShowMobileMenu(false)}>
                   <div className="mobile-menu-user-avatar">
-                    {user.avatar ? <img src={user.avatar} alt="" /> : <i className="fa fa-user"></i>}
+                    <UserAvatar src={user.avatar} fallbackClassName="" loading="eager" />
                   </div>
                   <span className="mobile-menu-user-name">{user.name}</span>
                 </Link>
