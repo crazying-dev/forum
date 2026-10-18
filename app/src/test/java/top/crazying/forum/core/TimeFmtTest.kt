@@ -126,6 +126,40 @@ class TimeFmtTest {
         assertEquals("公元前 2 年", TimeFmt.ceText(-1))
     }
 
+    // ────────── 公元年输入框：负数 = 公元前（对齐 Web 端口径）──────────
+
+    @Test
+    fun ceInputAcceptsBcYears() {
+        // 输入 -1 = 公元前 1 年（天文纪年 0）→ 无限前 1604 年
+        assertEquals(0, TimeFmt.ceInputToAstronomical(-1))
+        val bc1 = TimeFmt.ceInputToNewEra(-1)!!
+        assertTrue(bc1.isBefore)
+        assertEquals(1604, bc1.yearNum)
+        assertEquals("无限前1604年", bc1.label)
+        // 公元前 100 年 → 无限前 1703 年
+        assertEquals("无限前1703年", TimeFmt.ceInputToNewEra(-100)!!.label)
+        // 公元前 M 年 ⇔ 无限前 (1603 + M) 年
+        for (m in intArrayOf(1, 100, 1603)) {
+            assertEquals(1603 + m, TimeFmt.ceInputToNewEra(-m)!!.yearNum)
+        }
+    }
+
+    @Test
+    fun ceInputRejectsYearZero() {
+        assertNull(TimeFmt.ceInputToAstronomical(0))
+        assertNull(TimeFmt.ceInputToNewEra(0))
+    }
+
+    @Test
+    fun ceInputPositiveStaysGregorian() {
+        assertEquals(2026, TimeFmt.ceInputToAstronomical(2026))
+        assertEquals("无限423年", TimeFmt.ceInputToNewEra(2026)!!.label)
+        assertEquals("公元 2026 年", TimeFmt.ceText(TimeFmt.ceInputToAstronomical(2026)!!))
+        // 公元前 1604 年（天文纪年 -1603）→ 无限前 3207 年，展示仍为公元前
+        assertEquals("无限前3207年", TimeFmt.ceInputToNewEra(-1604)!!.label)
+        assertEquals("公元前 1604 年", TimeFmt.ceText(TimeFmt.ceInputToAstronomical(-1604)!!))
+    }
+
     private fun assertRejects(yearNum: Int) {
         var thrown = false
         try {

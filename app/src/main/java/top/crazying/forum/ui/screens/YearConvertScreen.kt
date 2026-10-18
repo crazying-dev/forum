@@ -64,8 +64,8 @@ fun YearConvertScreen(nav: Navigator) {
                     SectionTitle("年制基准")
                     Muted(
                         "无限元年 = 公元 1604 年，从 1 起算；公元 1603 年为「无限前 1 年」。" +
-                            "无限历与公元纪年都不存在 0 年。",
-                        maxLines = 3,
+                            "无限历与公元纪年都不存在 0 年。公元前的年份请在公元输入框里填负数（如 -1 = 公元前 1 年）。",
+                        maxLines = 4,
                     )
                     InfoRow(
                         "当前全站年制",
@@ -92,7 +92,7 @@ fun YearConvertScreen(nav: Navigator) {
                     ForumTextField(
                         value = ceText,
                         onValueChange = { ceText = it },
-                        placeholder = "公元年，如 2010",
+                        placeholder = "公元年，如 2010；公元前请填负数，如 -1",
                     )
                     ResultLine(fromCe, "填上方数字即可实时换算")
                 }
@@ -134,14 +134,16 @@ private fun convertWuxianToGregorian(raw: String): ConvResult {
     return ConvResult("${era.label} = ${TimeFmt.ceText(ce)}")
 }
 
-/** 公元年 → 无限年；公元 0 年 / 负数一律按「不存在」提示。 */
+/** 公元年 → 无限年；公元 0 年不存在，负数 = 公元前 |n| 年（与 Web 端口径一致）。 */
 private fun convertGregorianToWuxian(raw: String): ConvResult {
     val s = raw.trim()
     if (s.isEmpty()) return ConvResult()
     val n = s.toIntOrNull() ?: return ConvResult("请输入整数", error = true)
     // 公元纪年无 0 年：不得输出「公元 0 年 = 无限前 1604 年」
-    if (n == 0) return ConvResult("公元纪年没有 0 年（公元前 1 年之后即公元 1 年）", error = true)
-    if (n < 0) return ConvResult("公元纪年不存在负数年份（公元前请以「公元前 N 年」表述）", error = true)
-    val era = TimeFmt.gregorianToNewEra(n)
-    return ConvResult("${TimeFmt.ceText(n)} = ${era.label}")
+    // 负数 = 公元前 |n| 年（与「无限年」输入负数表示「无限前」同口径）；
+    // 公元前 M 年按天文纪年记作 (1 − M)，故先归一再加换算，避免差一年。
+    val astro = TimeFmt.ceInputToAstronomical(n)
+        ?: return ConvResult("公元纪年没有 0 年（公元前 1 年之后即公元 1 年）", error = true)
+    val era = TimeFmt.gregorianToNewEra(astro)
+    return ConvResult("${TimeFmt.ceText(astro)} = ${era.label}")
 }

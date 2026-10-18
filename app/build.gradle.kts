@@ -16,8 +16,8 @@ android {
         applicationId = "top.crazying.forum"
         minSdk = 24
         targetSdk = 36
-        versionCode = 18
-        versionName = "1.0.17"
+        versionCode = 19
+        versionName = "1.0.18"
         // 中文优先即可，服务端只返回中文文案
         resourceConfigurations += listOf("zh", "en")
     }

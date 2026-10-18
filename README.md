@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.0.17**（`versionCode = 18`） |
+| 当前版本 | **V1.0.18**（`versionCode = 19`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -240,6 +240,12 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * 配合纯函数 `needReload(loadedKey, currentKey)`：只在内容标识（信息流 / 分类 / 搜索词 / 用户 tab）变化时才重新加载，从帖子详情返回不再触发重载。
   * `FeedParts.PostFeedList` 新增 `state: LazyListState` 参数（默认 `rememberLazyListState()`）；首页 / 论坛把保留的滚动状态传进去，搜索页与用户主页的 `LazyColumn` 同样接入。
   * 新增 `FeedStateTest`（10 例）覆盖 `needReload` 判定与 `FeedStateStore` 的「同 key 同实例」语义。
+* **年制换算接受公元前（V1.0.18）**：
+  * 公元年输入框放开了负数 —— 输入 `-1` 即「公元前 1 年」，输出「公元前 1 年 = 无限前 1604 年」；与 Web 端口径一致（`ceNum < 0 ? ceNum + 1 : ceNum`）。
+  * `core/TimeFmt.kt` 新增 `ceInputToAstronomical()` / `ceInputToNewEra()`：把「公元前 M 年 = 天文纪年 `1 − M`」的归一收敛到核心，避免直接拿负数进公式差一年；输入 0 仍按「公元纪年无 0 年」拒绝。
+  * `TimeFmtTest` 新增 3 例（公元前换算 / 0 年拒绝 / 正数不变）。
+  * 版本号 versionCode 19 / versionName 1.0.18。
+
 * **年制换算与「无限历」结构化重构（V1.0.17）**：
   * **修复（现象：公元 1603 年显示成「无限 0 年」）**：无限历改为 1 起算 —— 无限元年 = 公元 1604 年（`wuxianYear(ce) = ce - 1603`）；公元 1604 年以前显示「无限前 N 年」（无限前 1 年 = 公元 1603 年），不存在无限 0 年。与 Web / Windows 三端口径统一。
   * **重构**：`core/TimeFmt.kt` 新增顶层 `data class NewEraDate(yearNum, isBefore)` 与 `gregorianToNewEra()` / `newEraToGregorian()` / `ceText()`，把「公元年 ⇄ 无限年」双向换算收敛到一个结构化核心（`newEraToGregorian` 对 0 与负数直接拒绝）；`wuxianYear` / `wuxianToCe` / `yearText` 改为委托核心，对外文案仍为「无限 N 年 / 无限前 N 年」。

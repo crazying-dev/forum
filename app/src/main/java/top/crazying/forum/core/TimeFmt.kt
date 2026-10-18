@@ -74,6 +74,25 @@ object TimeFmt {
         else yearNum + Constants.WUXIAN_EPOCH_CE - 1
     }
 
+    /**
+     * 「公元年输入框」归一为**天文纪年**（可负）：负数表示「公元前 |n| 年」。
+     *
+     * 公元纪年不存在 0 年（公元前 1 年之后直接是公元 1 年）；天文纪年里
+     * 公元前 M 年记作 `1 − M`，因此输入 `-M` 需 `+1` 才是公式可用的年份，
+     * 否则会差一年。输入 0（不存在）返回 null。
+     *
+     * 与 Web `static/js/AfterBody.js` 的 `ceNum < 0 ? ceNum + 1 : ceNum` 同口径。
+     */
+    fun ceInputToAstronomical(input: Int): Int? = when {
+        input == 0 -> null
+        input < 0 -> input + 1
+        else -> input
+    }
+
+    /** 公元年输入（负数 = 公元前）→ 无限年；输入 0（不存在）返回 null。 */
+    fun ceInputToNewEra(input: Int): NewEraDate? =
+        ceInputToAstronomical(input)?.let { gregorianToNewEra(it) }
+
     /** 公元年 → 无限年（1 起算）；公元年 < 1604 时返回 null（属「无限前」）。 */
     fun wuxianYear(ce: Int): Int? {
         val d = gregorianToNewEra(ce)
