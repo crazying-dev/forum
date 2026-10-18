@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
         destination: `${API_TARGET}/api/:path*`,
       },
       {
+        // 旧头像兼容：/avatar/<uuid>.webp → Go 后端（生产由 Nginx 分发）
+        source: "/avatar/:path*",
+        destination: `${API_TARGET}/avatar/:path*`,
+      },
+      {
         // 会馆图片代理：/guild-img/guilds/{uuid}/logo（logo）、/guild-img/guilds/{uuid}/leader-images/{fileId}（馆长介绍页图片）、/guild-img/guilds/{uuid}/intro-images/{fileId}（会馆介绍页封面/正文图片）→ 管理端 /api/*
         source: "/guild-img/:path*",
         destination: `${ADMIN_TARGET}/api/:path*`,

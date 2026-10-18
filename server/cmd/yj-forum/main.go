@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -37,6 +38,9 @@ func main() {
 	if cfg.AppEnv == "prod" && (cfg.SecretKey == "dev-secret-key" || cfg.SecretKey == "TestKeyFor1" || len(cfg.SecretKey) < 32) {
 		log.Fatalf("[FATAL] 生产环境 SECRET_KEY 过弱（需 32+ 字节且不能使用默认值）")
 	}
+
+	// 旧头像目录检查：仅告警，不阻塞启动；新头像走媒体服务，旧头像依赖该目录。
+	checkAvatarDir(cfg.AvatarDir)
 
 	// 1. 数据库
 	ctx := context.Background()
@@ -150,6 +154,34 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+}
+
+// checkAvatarDir 检查旧头像目录是否可读；缺失只告警，不影响新头像（媒体服务）启动。
+func checkAvatarDir(dir string) {
+	if dir == "" {
+		log.Println("[WARN] AVATAR_DIR 未配置，旧头像 /avatar/* 将返回 404")
+		return
+	}
+	info, err := os.Stat(dir)
+	if err != nil {
+		log.Printf("[WARN] AVATAR_DIR 不可访问: %s (%v)；旧头像 /avatar/* 将返回 404", dir, err)
+		return
+	}
+	if !info.IsDir() {
+		log.Printf("[WARN] AVATAR_DIR 不是目录: %s；旧头像 /avatar/* 将返回 404", dir)
+		return
+	}
+	f, err := os.Open(dir)
+	if err != nil {
+		log.Printf("[WARN] AVATAR_DIR 不可读: %s (%v)；旧头像 /avatar/* 将返回 404", dir, err)
+		return
+	}
+	defer f.Close()
+	if _, err := f.Readdirnames(1); err != nil && !errors.Is(err, io.EOF) {
+		log.Printf("[WARN] AVATAR_DIR 读取失败: %s (%v)；旧头像 /avatar/* 将返回 404", dir, err)
+		return
+	}
+	log.Printf("[AVATAR] 旧头像目录可读: %s", dir)
 }
 
 // cleanDeletedMediaFiles 清理已删除（status=0）且超过 7 天的媒体对象；

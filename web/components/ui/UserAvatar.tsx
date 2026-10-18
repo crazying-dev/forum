@@ -1,7 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
 import { prefixBadgeColor } from "@/lib/constants";
 import { CornerPrefixBadge } from "./CornerBadge";
+
+const DEFAULT_AVATAR = "/static/img/avatars/LuoXiaoHei1.png";
 
 /**
  * 用户头像(含 fa-user fallback)。
@@ -24,8 +28,21 @@ export function UserAvatar({
   imgId?: string;
   userId?: string | null;
 }) {
-  const body = src ? (
-    <img src={src} alt={alt} loading="lazy" className={imgClassName || undefined} id={imgId} />
+  // 旧头像文件可能已缺失：加载失败时回退到本地默认头像，避免页面出现裂图。
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const effectiveSrc = src ? (failedSrc === src ? DEFAULT_AVATAR : src) : null;
+
+  const body = effectiveSrc ? (
+    <img
+      src={effectiveSrc}
+      alt={alt}
+      loading="lazy"
+      className={imgClassName || undefined}
+      id={imgId}
+      onError={() => {
+        if (src && failedSrc !== src) setFailedSrc(src);
+      }}
+    />
   ) : (
     <i className={`fa fa-user ${fallbackClassName}`}></i>
   );
