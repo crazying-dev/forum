@@ -27,7 +27,11 @@
 | 注销账号 | `POST /api/email/send-delete-account-code`、`POST /api/user/delete` | 是 |
 | 用户评论列表 | `GET /api/user/{id}/comments`、`GET /api/users/{id}/comments` | 可选 |
 
-约束：验证码一次性、限流（发码 5 次/10 分钟、重置提交 10 次/10 分钟）；改密/注销后撤销全部会话；注销按配置执行 `PurgeUser` 或 `AnonymizeUser`；邮箱黑名单命中统一返回 400 `{"success":false,"message":"邮箱异样"}`。
+约束：
+
+- 验证码按「邮箱+用途」原子核销（并发只允许成功一次），同一用途下发新码即作废旧码；连续 5 次校验失败作废当前码。
+- 限流：发码按 IP 5 次/10 分钟且按邮箱 10 分钟 1 次；换绑新邮箱另限 3 次/10 分钟、间隔 60 秒、每用户 3 次/小时；重置/改密/换绑/注销提交均按 IP 限流。
+- 改密/注销后撤销全部会话；注销按配置执行 `PurgeUser` 或 `AnonymizeUser`；邮箱黑名单命中统一返回 400 `{"success":false,"message":"邮箱异样"}`。
 
 ## 内容
 

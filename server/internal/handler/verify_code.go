@@ -23,7 +23,8 @@ func verifyCodeWithLimit(ctx context.Context, db *database.DB, email, code, purp
 	if attempts >= verifyCodeMaxAttempts {
 		return false, nil
 	}
-	ok, err := db.GetVerifyCode(ctx, email, code, purpose)
+	// 原子核销：并发重复提交时只有一个请求能成功。
+	ok, err := db.ConsumeVerifyCode(ctx, email, code, purpose)
 	if err != nil {
 		return false, err
 	}
@@ -37,9 +38,6 @@ func verifyCodeWithLimit(ctx context.Context, db *database.DB, email, code, purp
 			}
 		}
 		return false, nil
-	}
-	if err := db.MarkVerifyCodeUsed(ctx, email, code, purpose); err != nil {
-		log.Printf("[CODE] 验证码核销失败 (%s/%s): %v", email, purpose, err)
 	}
 	return true, nil
 }

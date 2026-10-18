@@ -47,12 +47,16 @@ func (d *DB) DeleteVerifyToken(ctx context.Context, token string) error {
 
 // ---- 验证码（6 位，5 分钟）----
 
-// CreateVerifyCode 创建验证码。
+// CreateVerifyCode 创建验证码；同（邮箱,用途）的旧验证码在同一语句内作废，
+// 避免多码并存线性放大爆破命中率。
 func (d *DB) CreateVerifyCode(ctx context.Context, email, code, purpose string, expiresMinutes int) error {
 	if expiresMinutes <= 0 {
 		expiresMinutes = 5
 	}
-	_, err := d.Exec(ctx, `INSERT INTO verify_codes (email, code, purpose, expires_at)
+	_, err := d.Exec(ctx, `WITH invalidated AS (
+		UPDATE verify_codes SET used=1 WHERE email=$1 AND purpose=$3 AND used=0
+	)
+	INSERT INTO verify_codes (email, code, purpose, expires_at)
 		VALUES ($1,$2,$3, NOW() + $4 * INTERVAL '1 minute')`, email, code, purpose, expiresMinutes)
 	return err
 }
@@ -69,6 +73,22 @@ func (d *DB) GetVerifyCode(ctx context.Context, email, code, purpose string) (bo
 func (d *DB) MarkVerifyCodeUsed(ctx context.Context, email, code, purpose string) error {
 	_, err := d.Exec(ctx, `UPDATE verify_codes SET used=1 WHERE email=$1 AND code=$2 AND purpose=$3`, email, code, purpose)
 	return err
+}
+
+// ConsumeVerifyCode 原子核销验证码：仅当未使用、未过期时置 used=1 并返回 true。
+// 并发重复提交时只有一个请求能成功，避免“先查后改”的重放窗口。
+func (d *DB) ConsumeVerifyCode(ctx context.Context, email, code, purpose string) (bool, error) {
+	var id int
+	err := d.QueryRow(ctx, `UPDATE verify_codes SET used=1
+		WHERE email=$1 AND code=$2 AND purpose=$3 AND used=0 AND expires_at > NOW()
+		RETURNING id`, email, code, purpose).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // GetActiveVerifyCodeAttempts 当前有效验证码的累计失败次数（无有效码时为 0）。

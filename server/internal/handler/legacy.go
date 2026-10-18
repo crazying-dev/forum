@@ -77,17 +77,17 @@ func RegisterLegacyRoutes(r *gin.Engine, cfg *config.Config, db *database.DB, se
 	api.POST("/send-code-reset-password", middleware.RateLimit("legacy_reset_code", 5, 10*time.Minute), h.SendResetPasswordCode)
 	api.POST("/email/reset-password-by-code", middleware.RateLimit("legacy_reset_by_code", 10, 10*time.Minute), h.ResetPasswordByCode)
 	api.POST("/reset-password-by-code", middleware.RateLimit("legacy_reset_by_code", 10, 10*time.Minute), h.ResetPasswordByCode)
-	api.POST("/email/send-change-password-code", h.requireUser, h.SendChangePasswordCode)
-	api.POST("/user/password", h.requireUser, h.ChangePassword)
-	api.POST("/email/send-verify-code", h.requireUser, h.SendVerifyEmailCode)
-	api.POST("/email/verify-code-email", h.requireUser, h.VerifyCodeEmail)
-	api.POST("/email/send-verify-email", h.requireUser, h.SendVerifyEmailLink)
-	api.POST("/email/verify-email", h.VerifyEmailToken)
-	api.POST("/email/send-change-email-old-code", h.requireUser, h.SendChangeEmailOldCode)
-	api.POST("/email/send-change-email-code", h.requireUser, h.SendChangeEmailNewCode)
-	api.POST("/user/email", h.requireUser, h.ChangeEmail)
-	api.POST("/email/send-delete-account-code", h.requireUser, h.SendDeleteAccountCode)
-	api.POST("/user/delete", h.requireUser, h.DeleteAccount)
+	api.POST("/email/send-change-password-code", middleware.RateLimit("legacy_change_pw_code", 5, 10*time.Minute), h.requireUser, h.SendChangePasswordCode)
+	api.POST("/user/password", middleware.RateLimit("legacy_change_pw", 10, 10*time.Minute), h.requireUser, h.ChangePassword)
+	api.POST("/email/send-verify-code", middleware.RateLimit("legacy_verify_code", 5, 10*time.Minute), h.requireUser, h.SendVerifyEmailCode)
+	api.POST("/email/verify-code-email", middleware.RateLimit("legacy_verify_code_submit", 10, 10*time.Minute), h.requireUser, h.VerifyCodeEmail)
+	api.POST("/email/send-verify-email", middleware.RateLimit("legacy_verify_link", 3, 10*time.Minute), h.requireUser, h.SendVerifyEmailLink)
+	api.POST("/email/verify-email", middleware.RateLimit("legacy_verify_link_submit", 10, 10*time.Minute), h.VerifyEmailToken)
+	api.POST("/email/send-change-email-old-code", middleware.RateLimit("legacy_change_email_old", 5, 10*time.Minute), h.requireUser, h.SendChangeEmailOldCode)
+	api.POST("/email/send-change-email-code", middleware.RateLimit("legacy_change_email_new", 5, 10*time.Minute), h.requireUser, h.SendChangeEmailNewCode)
+	api.POST("/user/email", middleware.RateLimit("legacy_change_email", 10, 10*time.Minute), h.requireUser, h.ChangeEmail)
+	api.POST("/email/send-delete-account-code", middleware.RateLimit("legacy_delete_code", 3, 10*time.Minute), h.requireUser, h.SendDeleteAccountCode)
+	api.POST("/user/delete", middleware.RateLimit("legacy_delete", 5, 10*time.Minute), h.requireUser, h.DeleteAccount)
 
 	// ---- 用户（forum-new 单数 + 旧 V1 复数两代路径）----
 	api.GET("/user/:id", h.optionalUser, h.UserProfile)
@@ -451,7 +451,7 @@ func (h *legacyHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱异样"})
 		return
 	}
-	ok, err := h.db.GetVerifyCode(c.Request.Context(), email, code, "register")
+	ok, err := verifyCodeWithLimit(c.Request.Context(), h.db, email, code, "register")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
 		return
@@ -460,7 +460,6 @@ func (h *legacyHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码无效或已过期"})
 		return
 	}
-	verified := true
 	hash, err := auth.HashPassword(password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
@@ -484,9 +483,8 @@ func (h *legacyHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, payload)
 		return
 	}
-	if verified {
-		_ = h.db.UpdateUserEmailVerified(c.Request.Context(), uid)
-		_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), email, code, "register")
+	if err := h.db.UpdateUserEmailVerified(c.Request.Context(), uid); err != nil {
+		log.Printf("[LEGACY_REGISTER] 邮箱已验证标记失败 (%s): %v", uid, err)
 	}
 	u, err := h.svc.LoadUserForLegacy(c.Request.Context(), uid)
 	if err != nil {
@@ -530,6 +528,9 @@ func (h *legacyHandler) sendLegacyCode(c *gin.Context, toEmail, purpose, label s
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请输入有效的邮箱"})
 		return
 	}
+	if !h.allowLegacyCodeSend(c, toEmail, purpose) {
+		return
+	}
 	code := legacyRandCode()
 	if err := h.db.CreateVerifyCode(c.Request.Context(), toEmail, code, purpose, 10); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
@@ -542,6 +543,36 @@ func (h *legacyHandler) sendLegacyCode(c *gin.Context, toEmail, purpose, label s
 		_, _ = h.mailer.Send("【妖精论坛】"+label+"验证码", plain, []string{toEmail}, htmlBody)
 	}()
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "验证码已发送"})
+}
+
+// allowLegacyCodeSend 发码前的跨 IP 二次配额（按邮箱+用途）；拒绝时已写入响应。
+func (h *legacyHandler) allowLegacyCodeSend(c *gin.Context, email, purpose string) bool {
+	ctx := c.Request.Context()
+	action := "legacy_code_" + purpose
+	var allowed bool
+	var err error
+	switch purpose {
+	case "email_change_new":
+		// 与 ov2 保持一致：10 分钟至多 3 次、间隔至少 60 秒。
+		allowed, err = h.db.CheckActionLimit(ctx, action, email, 3, 600, 60)
+		if err == nil && allowed {
+			allowed, err = h.db.TryAcquireActionLimit(ctx, action, email, 60)
+		}
+	case "email_change_old":
+		allowed, err = h.db.TryAcquireActionLimit(ctx, action, email, 3600)
+	default:
+		allowed, err = h.db.TryAcquireActionLimit(ctx, action, email, 600)
+	}
+	if err != nil {
+		log.Printf("[LEGACY_CODE] 发码限流检查失败 (%s/%s): %v", email, purpose, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return false
+	}
+	if !allowed {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "message": "请求过于频繁，请稍后再试"})
+		return false
+	}
+	return true
 }
 
 // SendRegisterCode 旧 APP 注册验证码。
@@ -589,7 +620,7 @@ func (h *legacyHandler) ResetPasswordByCode(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码至少8位且需包含字母和数字"})
 		return
 	}
-	ok, err := h.db.GetVerifyCode(c.Request.Context(), email, strings.TrimSpace(req.Code), "reset_password")
+	ok, err := verifyCodeWithLimit(c.Request.Context(), h.db, email, strings.TrimSpace(req.Code), "reset_password")
 	if err != nil || !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码无效或已过期"})
 		return
@@ -608,7 +639,6 @@ func (h *legacyHandler) ResetPasswordByCode(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "重置失败"})
 		return
 	}
-	_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), email, strings.TrimSpace(req.Code), "reset_password")
 	_ = h.sessions.DeleteByUserID(c.Request.Context(), u.ID)
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "密码已重置"})
 }
@@ -644,12 +674,11 @@ func (h *legacyHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 	if strings.TrimSpace(req.Code) != "" {
-		ok, err := h.db.GetVerifyCode(c.Request.Context(), u.Email, strings.TrimSpace(req.Code), "change_password")
+		ok, err := verifyCodeWithLimit(c.Request.Context(), h.db, u.Email, strings.TrimSpace(req.Code), "change_password")
 		if err != nil || !ok {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码无效或已过期"})
 			return
 		}
-		_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), u.Email, strings.TrimSpace(req.Code), "change_password")
 	} else {
 		full, err := h.db.GetUserByIDWithPassword(c.Request.Context(), u.ID)
 		if err != nil || !auth.CheckPassword(full.Password, req.OldPassword) {
@@ -694,12 +723,11 @@ func (h *legacyHandler) VerifyCodeEmail(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
 		return
 	}
-	ok, err := h.db.GetVerifyCode(c.Request.Context(), u.Email, strings.TrimSpace(req.Code), "email_verify")
+	ok, err := verifyCodeWithLimit(c.Request.Context(), h.db, u.Email, strings.TrimSpace(req.Code), "email_verify")
 	if err != nil || !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码无效或已过期"})
 		return
 	}
-	_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), u.Email, strings.TrimSpace(req.Code), "email_verify")
 	_ = h.db.UpdateUserEmailVerified(c.Request.Context(), u.ID)
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "邮箱已验证"})
 }
@@ -709,6 +737,9 @@ func (h *legacyHandler) SendVerifyEmailLink(c *gin.Context) {
 	u := legacyUserFrom(c)
 	if u == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "请先登录"})
+		return
+	}
+	if !h.allowLegacyCodeSend(c, u.Email, "email_verify_link") {
 		return
 	}
 	token, err := h.db.CreateVerifyToken(c.Request.Context(), u.ID, "email_verify", 60)
@@ -759,14 +790,52 @@ func (h *legacyHandler) SendChangeEmailOldCode(c *gin.Context) {
 
 // SendChangeEmailNewCode 换绑第 2 步：新邮箱验证码。
 func (h *legacyHandler) SendChangeEmailNewCode(c *gin.Context) {
+	u := legacyUserFrom(c)
+	if u == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"success": false, "message": "请先登录"})
+		return
+	}
 	var req legacyEmailReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
+	if !legacyEmailRe.MatchString(email) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请输入有效的邮箱"})
+		return
+	}
+	if email == strings.ToLower(u.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "新邮箱与当前邮箱相同"})
+		return
+	}
 	if h.db.UserExistsByEmail(c.Request.Context(), email) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱已被注册"})
+		return
+	}
+	if blocked, err := h.db.IsEmailBlacklisted(c.Request.Context(), email); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	} else if blocked {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱异样"})
+		return
+	}
+	// 每用户配额：1 小时至多 3 次、间隔至少 60 秒（另由路由与邮箱维度双重限流）。
+	allowed, err := h.db.CheckActionLimit(c.Request.Context(), "legacy_email_change_new_user", u.Email, 3, 3600, 60)
+	if err != nil {
+		log.Printf("[LEGACY_CODE] 换绑新邮箱用户配额检查失败 (%s): %v", u.Email, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "message": "请求过于频繁，请稍后再试"})
+		return
+	}
+	if acquired, err := h.db.TryAcquireActionLimit(c.Request.Context(), "legacy_email_change_new_user", u.Email, 60); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	} else if !acquired {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "message": "请求过于频繁，请稍后再试"})
 		return
 	}
 	h.sendLegacyCode(c, email, "email_change_new", "更换绑定邮箱")
@@ -789,22 +858,29 @@ func (h *legacyHandler) ChangeEmail(c *gin.Context) {
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	ok, err := h.db.GetVerifyCode(c.Request.Context(), u.Email, strings.TrimSpace(req.OldCode), "email_change_old")
-	if err != nil || !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "旧邮箱验证码无效"})
+	if !legacyEmailRe.MatchString(email) || email == strings.ToLower(u.Email) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请输入有效的新邮箱"})
 		return
 	}
-	ok, err = h.db.GetVerifyCode(c.Request.Context(), email, strings.TrimSpace(req.Code), "email_change_new")
+	if h.db.UserExistsByEmail(c.Request.Context(), email) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱已被注册"})
+		return
+	}
+	// 先验证新邮箱码，避免旧邮箱码被消耗后新码失败还要再等一小时。
+	ok, err := verifyCodeWithLimit(c.Request.Context(), h.db, email, strings.TrimSpace(req.Code), "email_change_new")
 	if err != nil || !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "新邮箱验证码无效"})
+		return
+	}
+	ok, err = verifyCodeWithLimit(c.Request.Context(), h.db, u.Email, strings.TrimSpace(req.OldCode), "email_change_old")
+	if err != nil || !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "旧邮箱验证码无效"})
 		return
 	}
 	if err := h.db.UpdateUserProfile(c.Request.Context(), u.ID, map[string]any{"email": email}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "换绑失败"})
 		return
 	}
-	_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), u.Email, strings.TrimSpace(req.OldCode), "email_change_old")
-	_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), email, strings.TrimSpace(req.Code), "email_change_new")
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "邮箱已更换"})
 }
 
@@ -865,12 +941,11 @@ func (h *legacyHandler) DeleteAccount(c *gin.Context) {
 		return
 	}
 	if strings.TrimSpace(req.Code) != "" {
-		ok, err := h.db.GetVerifyCode(c.Request.Context(), u.Email, strings.TrimSpace(req.Code), "delete_account")
+		ok, err := verifyCodeWithLimit(c.Request.Context(), h.db, u.Email, strings.TrimSpace(req.Code), "delete_account")
 		if err != nil || !ok {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "验证码无效或已过期"})
 			return
 		}
-		_ = h.db.MarkVerifyCodeUsed(c.Request.Context(), u.Email, strings.TrimSpace(req.Code), "delete_account")
 	} else {
 		full, err := h.db.GetUserByIDWithPassword(c.Request.Context(), u.ID)
 		if err != nil || !auth.CheckPassword(full.Password, req.Password) {
