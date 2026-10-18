@@ -400,10 +400,12 @@ export interface GuideNodeDetail extends GuideNodeItem {
   content_format?: string;
 }
 
-const API_BASE = "/api/v1";
+import { API_BASE } from "./api-base";
+
+const API_BASE_PATH = API_BASE;
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = API_BASE + path;
+  const url = API_BASE_PATH + path;
   const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
   const res = await fetch(url, {
     credentials: "include",
@@ -422,22 +424,35 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ---- 认证 ----
 export const authApi = {
-  login: (name: string, password: string, remember = true) =>
-    request<{ id: string }>("/auth/login", { method: "POST", body: JSON.stringify({ name, password, remember }) }),
+  // altcha：ALTCHA v2 人机验证 payload（可选；服务端启用 ALTCHA 时必填）
+  login: (name: string, password: string, remember = true, altcha?: string) =>
+    request<{ id: string }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ name, password, remember, ...(altcha ? { altcha } : {}) }),
+    }),
   logout: () => request<{ success: boolean }>("/auth/logout", { method: "POST" }),
-  register: (name: string, email: string, password: string, code: string) =>
-    request<{ id: string }>("/auth/register", { method: "POST", body: JSON.stringify({ name, email, password, code }) }),
-  sendRegisterCode: (email: string) =>
-    request<{ message: string }>("/auth/register/code", { method: "POST", body: JSON.stringify({ email }) }),
+  register: (name: string, email: string, password: string, code: string, altcha?: string) =>
+    request<{ id: string }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ name, email, password, code, ...(altcha ? { altcha } : {}) }),
+    }),
+  sendRegisterCode: (email: string, altcha?: string) =>
+    request<{ message: string }>("/auth/register/code", {
+      method: "POST",
+      body: JSON.stringify({ email, ...(altcha ? { altcha } : {}) }),
+    }),
   // 发送重置链接（10 分钟内有效、最多可打开 3 次；邮箱不存在也返回成功提示，429 = 过于频繁）
-  sendResetLink: (email: string) =>
-    request<{ message: string }>("/auth/password/reset/link", { method: "POST", body: JSON.stringify({ email }) }),
+  sendResetLink: (email: string, altcha?: string) =>
+    request<{ message: string }>("/auth/password/reset/link", {
+      method: "POST",
+      body: JSON.stringify({ email, ...(altcha ? { altcha } : {}) }),
+    }),
   // 校验重置链接 token（返回掩码邮箱；400 = 无效/过期/次数用尽）
   validateResetToken: (token: string) =>
     request<{ data: { email: string } }>(`/auth/password/reset/validate?token=${encodeURIComponent(token)}`),
   // 使用重置链接设置新密码
-  confirmResetPassword: (token: string, password: string) =>
-    request<{ message: string }>("/auth/password/reset/confirm", { method: "POST", body: JSON.stringify({ token, password }) }),
+  confirmResetPassword: (token: string, password: string, altcha?: string) =>
+    request<{ message: string }>("/auth/password/reset/confirm", { method: "POST", body: JSON.stringify({ token, password, ...(altcha ? { altcha } : {}) }) }),
 };
 
 // ---- 用户 ----
@@ -607,8 +622,8 @@ export const mediaApi = {
 export const miscApi = {
   search: (k: string, type = "both", page = 1, pageSize = 20) =>
     request<SearchResult>(`/search?k=${encodeURIComponent(k)}&type=${type}&page=${page}&page_size=${pageSize}`),
-  reportBug: (data: { title: string; detail: string; steps?: string; contact?: string; page_url?: string }) =>
-    request<{ id: number }>("/reports/bug", { method: "POST", body: JSON.stringify(data) }),
+  reportBug: (data: { title: string; detail: string; steps?: string; contact?: string; page_url?: string }, altcha?: string) =>
+    request<{ id: number }>("/reports/bug", { method: "POST", body: JSON.stringify({ ...data, ...(altcha ? { altcha } : {}) }) }),
   easterEgg: () => request<{ ID: string; Name: string; Text: string }>("/easter-egg"),
 };
 

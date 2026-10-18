@@ -10,7 +10,7 @@ interface GuildMembersSeoResp {
 }
 
 const getGuild = cache(async (slug: string) => {
-  const r = await fetchApi<GuildMembersSeoResp>(`/api/v1/guilds/${encodeURIComponent(slug)}`);
+  const r = await fetchApi<GuildMembersSeoResp>(`/guilds/${encodeURIComponent(slug)}`);
   return { ok: r.ok, guild: r.data?.guild ?? null };
 });
 

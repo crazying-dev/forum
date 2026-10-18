@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthInput } from "@/components/ui/AuthInput";
+import { AltchaWidget, type AltchaWidgetHandle } from "@/components/AltchaWidget";
 import { useToast, ToastType } from "@/components/Toast";
 import { authApi, ApiException } from "@/lib/api";
 import { useStore } from "@/lib/store";
@@ -25,6 +26,7 @@ function LoginInner() {
   const [busy, setBusy] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [pwdMatch, setPwdMatch] = useState<"" | "ok" | "no">("");
+  const altchaRef = useRef<AltchaWidgetHandle>(null);
 
   // URL ?mode=reset&token= 兼容：带 token 的旧链接跳转到重置链接页；仅 mode=reset 时落到忘记密码
   const modeParam = params.get("mode");
@@ -47,60 +49,108 @@ function LoginInner() {
 
   const showMsg = (m: string, type: ToastType = "error") => toast(m, type);
 
+  // ALTCHA 未启用（或组件未渲染）返回 undefined，提交体不带 altcha；
+  // 启用但未完成验证返回 null 并提示；完成则返回 payload。
+  const prepareAltcha = async (): Promise<string | undefined | null> => {
+    const widget = altchaRef.current;
+    if (!widget || !widget.isEnabled()) return undefined;
+    const payload = await widget.ensurePayload();
+    if (!payload) {
+      showMsg("请先完成人机验证", "warning");
+      return null;
+    }
+    return payload;
+  };
+
+  const errorText = (e: unknown, fallback: string) => {
+    if (e instanceof ApiException) {
+      return e.message === "CAPTCHA_REQUIRED" ? "请先完成人机验证" : e.message;
+    }
+    return fallback;
+  };
+
   const login = async () => {
+    if (busy) return;
     if (!name || !password) return showMsg("请输入账号和密码", "warning");
     setBusy(true);
+    const altcha = await prepareAltcha();
+    if (altcha === null) {
+      setBusy(false);
+      return;
+    }
     try {
-      const r = await authApi.login(name, password, remember);
+      const r = await authApi.login(name, password, remember, altcha);
       await refreshUser();
       router.push(`/users/${r.id}`);
     } catch (e) {
-      showMsg(e instanceof ApiException ? e.message : "登录失败");
+      showMsg(errorText(e, "登录失败"));
     } finally {
       setBusy(false);
+      altchaRef.current?.reset();
     }
   };
 
   const sendRegisterCode = async () => {
+    if (busy) return;
     if (!email) return showMsg("请输入邮箱", "warning");
     setBusy(true);
+    const altcha = await prepareAltcha();
+    if (altcha === null) {
+      setBusy(false);
+      return;
+    }
     try {
-      await authApi.sendRegisterCode(email);
+      await authApi.sendRegisterCode(email, altcha);
       showMsg("验证码已发送，请查收邮箱", "success");
       setCountdown(60);
     } catch (e) {
-      showMsg(e instanceof ApiException ? e.message : "发送失败");
+      showMsg(errorText(e, "发送失败"));
     } finally {
       setBusy(false);
+      altchaRef.current?.reset();
     }
   };
 
   const register = async () => {
+    if (busy) return;
     if (!name || !email || !password || !code) return showMsg("请填写完整信息", "warning");
     if (password.length < 8) return showMsg("密码至少8位", "warning");
     if (password !== password2) return showMsg("两次密码不一致", "warning");
     setBusy(true);
+    const altcha = await prepareAltcha();
+    if (altcha === null) {
+      setBusy(false);
+      return;
+    }
     try {
-      await authApi.register(name, email, password, code);
+      await authApi.register(name, email, password, code, altcha);
       await refreshUser();
       router.push("/");
     } catch (e) {
-      showMsg(e instanceof ApiException ? e.message : "注册失败");
+      showMsg(errorText(e, "注册失败"));
     } finally {
       setBusy(false);
+      altchaRef.current?.reset();
     }
   };
 
   const sendResetLink = async () => {
+    if (busy) return;
     if (!email) return showMsg("请输入邮箱", "warning");
     setBusy(true);
+    const altcha = await prepareAltcha();
+    if (altcha === null) {
+      setBusy(false);
+      return;
+    }
     try {
-      await authApi.sendResetLink(email);
+      await authApi.sendResetLink(email, altcha);
       showMsg("重置链接已发送至邮箱（若邮箱存在），10 分钟内有效、最多可打开 3 次，请前往邮箱查收", "success");
     } catch (e) {
-      showMsg(e instanceof ApiException ? e.message : "发送失败");
+      showMsg(errorText(e, "发送失败"));
     } finally {
       setBusy(false);
+      altchaRef.current?.reset();
     }
   };
 
@@ -108,6 +158,11 @@ function LoginInner() {
     setMode(m);
     setPwdMatch("");
   };
+
+  // 登录 / 注册 / 发码 / 找回密码共用同一个 ALTCHA（仅当前模式挂载）。
+  const altchaWidget = (
+    <AltchaWidget ref={altchaRef} onError={(message) => showMsg(message, "warning")} />
+  );
 
   return (
     <div className="auth-container">
@@ -132,6 +187,7 @@ function LoginInner() {
               </label>
               <a href="#" className="forgot-password" onClick={(e) => { e.preventDefault(); switchMode("forgot"); }}>忘记密码？</a>
             </div>
+            {altchaWidget}
             <button className="auth-btn primary" disabled={busy} onClick={login}>{busy ? "登录中..." : "登录"}</button>
           </div>
         )}
@@ -165,6 +221,7 @@ function LoginInner() {
                 {countdown > 0 ? `${countdown}s` : "获取验证码"}
               </button>
             </div>
+            {altchaWidget}
             <button className="auth-btn primary" disabled={busy} onClick={register}>{busy ? "注册中..." : "注册"}</button>
             <div className="auth-error">{pwdMatch === "no" ? "❌ 两次密码不一致" : pwdMatch === "ok" ? "✅ 密码一致" : ""}</div>
           </div>
@@ -177,6 +234,7 @@ function LoginInner() {
               <p>输入注册邮箱，我们将发送重置链接</p>
             </div>
             <AuthInput icon="envelope" type="email" placeholder="注册邮箱" value={email} onChange={setEmail} onKeyDown={(e) => e.key === "Enter" && sendResetLink()} />
+            {altchaWidget}
             <button className="auth-btn primary" disabled={busy} onClick={sendResetLink}>{busy ? "发送中..." : "发送重置链接"}</button>
             <button className="auth-btn secondary" style={{ marginTop: 12, background: "var(--color-bg-icon)", color: "var(--color-text-secondary)" }} onClick={() => switchMode("login")}>返回登录</button>
           </div>

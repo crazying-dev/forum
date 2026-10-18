@@ -19,7 +19,7 @@ interface ArticleDetailResp {
 }
 
 const getArticle = cache(async (id: string) => {
-  const r = await fetchApi<ArticleDetailResp>(`/api/v1/articles/${encodeURIComponent(id)}`);
+  const r = await fetchApi<ArticleDetailResp>(`/articles/${encodeURIComponent(id)}`);
   return { ok: r.ok, status: r.status, article: r.data?.article ?? null };
 });
 

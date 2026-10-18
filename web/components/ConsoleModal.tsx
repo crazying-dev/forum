@@ -4,22 +4,35 @@ import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store";
 import Modal from "./ui/Modal";
 
+// 消息中心四类未读数（GET /messages/summary）
+export interface MessageUnread {
+  likes: number;
+  comments: number;
+  system: number;
+  chat: number;
+}
+
 /** 控制台弹窗：收纳桌面端次级功能入口与主题偏好（替代原「更多 / 主题」下拉） */
 export default function ConsoleModal({
   open,
   onClose,
   onDonate,
-  onInstall,
   onEasterEgg,
+  onOpenWorld,
+  unread,
 }: {
   open: boolean;
   onClose: () => void;
   onDonate: () => void;
-  onInstall: () => void;
   onEasterEgg: () => void;
+  onOpenWorld: () => void;
+  unread?: MessageUnread;
 }) {
   const router = useRouter();
   const { theme, setTheme } = useStore();
+
+  const unreadTotal = unread ? unread.likes + unread.comments + unread.system + unread.chat : 0;
+  const unreadBadge = unreadTotal > 99 ? "99+" : String(unreadTotal);
 
   // 导航类入口：先关闭弹窗再跳转（沿用原下拉逻辑）
   const go = (href: string) => {
@@ -28,7 +41,7 @@ export default function ConsoleModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} lockScroll cardStyle={{ maxWidth: 660 }}>
+    <Modal open={open} onClose={onClose} lockScroll cardClassName="donate-card console-card">
       <h3 className="console-title">
         <i className="fa fa-sliders"></i> 控制台
       </h3>
@@ -54,9 +67,32 @@ export default function ConsoleModal({
           <i className="fa fa-map-o"></i>
           <span>论坛指南</span>
         </button>
-        <button className="console-tile" type="button" onClick={() => { onClose(); onInstall(); }}>
+        <button className="console-tile" type="button" onClick={() => go("/download")}>
           <i className="fa fa-download"></i>
-          <span>安装论坛客户端</span>
+          <span>客户端下载</span>
+        </button>
+        <button className="console-tile" type="button" onClick={() => go("/messages")}>
+          <i className="fa fa-envelope-o"></i>
+          <span>消息中心</span>
+          {unreadTotal > 0 && <span className="console-tile-badge">{unreadBadge}</span>}
+        </button>
+        <button className="console-tile" type="button" onClick={() => go("/changelog")}>
+          <i className="fa fa-history"></i>
+          <span>更新日志</span>
+        </button>
+        <button className="console-tile" type="button" onClick={() => go("/tools/year-converter")}>
+          <i className="fa fa-hourglass-half"></i>
+          <span>无限年换算</span>
+        </button>
+        {/* 世界频道：关闭控制台后打开世界频道窗口 */}
+        <button className="console-tile" type="button" onClick={() => { onClose(); onOpenWorld(); }}>
+          <i className="fa fa-globe"></i>
+          <span>世界频道</span>
+        </button>
+        {/* 安装网页应用：跳转下载页，由下载页的 PWA 按钮完成安装 */}
+        <button className="console-tile" type="button" onClick={() => go("/download")}>
+          <i className="fa fa-mobile"></i>
+          <span>安装网页应用</span>
         </button>
         {/* 彩蛋：不关闭控制台，提示浮层叠加显示（可连续点击查看） */}
         <button className="console-tile" type="button" onClick={onEasterEgg}>

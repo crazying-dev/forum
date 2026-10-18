@@ -255,7 +255,7 @@ export default function RichTextEditor({
     try {
       const r = await mediaApi.upload(file);
       // 站内相对路径（论坛站直通）
-      editor.chain().focus().setImage({ src: r.url || `/api/v1/media/${r.id}` }).run();
+      editor.chain().focus().setImage({ src: r.url || `/ov2/api/media/${r.id}` }).run();
     } catch (err) {
       toast(err instanceof ApiException ? err.message : "图片上传失败", "error");
     } finally {

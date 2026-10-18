@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
+import AnnouncementBanner from "@/components/AnnouncementBanner";
 import PostCard from "@/components/PostCard";
 import { ListLoading, ListEmpty } from "@/components/ui/ListState";
 import { postApi, Post } from "@/lib/api";
@@ -29,6 +30,8 @@ export default function HomePage() {
 
   return (
     <>
+      {/* 首页公告：仅首页渲染，位于全局 Header 下方（跨页面布局不挂载） */}
+      <AnnouncementBanner />
       <div className="home-container">
         <section className="home-quick-top">
           <Link className="quick-top-entry" href="/huiguan">

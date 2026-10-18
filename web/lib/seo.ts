@@ -29,7 +29,7 @@ export function absoluteUrl(pathOrUrl: string): string {
 
 /** 后端 API 地址：与 next.config.ts rewrites 的 API_TARGET 同一约定（默认本地 8090） */
 function apiBase(): string {
-  return (process.env.API_TARGET || "http://127.0.0.1:8090").replace(/\/+$/, "");
+  return (process.env.API_TARGET || "http://127.0.0.1:8090").replace(/\/+$/, "") + "/ov2/api";
 }
 
 export interface ApiFetchResult<T> {

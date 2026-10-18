@@ -5,12 +5,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { useStore } from "@/lib/store";
 import { miscApi } from "@/lib/api";
+import { apiUrl } from "@/lib/api-base";
 import { getSiteConfig } from "@/lib/site-config";
 import { fetchDailyQuote, QUOTE_CHANCE } from "@/lib/daily-quote";
-import { useCenterCard } from "./CenterCard";
 import { useToast } from "./Toast";
 import Modal from "./ui/Modal";
-import ConsoleModal from "./ConsoleModal";
+import ConsoleModal, { type MessageUnread } from "./ConsoleModal";
+import WorldChannelModal, { WorldChannelLauncher } from "./world/WorldChannelModal";
 
 /** 彩蛋数据含少量 HTML（<br> 换行等）：转为单行纯文本，供胶囊提示展示 */
 function eggPlainText(s: string): string {
@@ -23,7 +24,6 @@ function eggPlainText(s: string): string {
 
 export default function Header() {
   const { setTheme, user, userId, logout } = useStore();
-  const { show } = useCenterCard();
   const { toast } = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -34,9 +34,11 @@ export default function Header() {
   const [showSearchLayer, setShowSearchLayer] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
+  const [showWorld, setShowWorld] = useState(false);
+  // 消息中心未读数（GET /messages/summary）：仅登录后拉取
+  const [unread, setUnread] = useState<MessageUnread>({ likes: 0, comments: 0, system: 0, chat: 0 });
   const menuRef = useRef<HTMLUListElement>(null);
   const searchLayerInputRef = useRef<HTMLInputElement>(null);
-  const deferredPromptRef = useRef<Event | null>(null);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -77,21 +79,44 @@ export default function Header() {
     if (showSearchLayer) searchLayerInputRef.current?.focus();
   }, [showSearchLayer]);
 
-  // PWA 安装：捕获 beforeinstallprompt（与 legacy base.html 一致）
+  // 消息中心未读：登录后拉取；路由切换 / 窗口重新可见时刷新（进入消息中心后徽标可及时清除）
   useEffect(() => {
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      deferredPromptRef.current = e;
+    if (!user) return;
+    let cancelled = false;
+    const loadUnread = async () => {
+      try {
+        const res = await fetch(apiUrl("/messages/summary"), { credentials: "include" });
+        const data = await res.json().catch(() => null);
+        if (cancelled || !data?.success) return;
+        setUnread({
+          likes: Number(data.likes) || 0,
+          comments: Number(data.comments) || 0,
+          system: Number(data.system) || 0,
+          chat: Number(data.chat) || 0,
+        });
+      } catch {
+        // 未读数失败不影响导航
+      }
     };
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-  }, []);
+    loadUnread();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadUnread();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [user, pathname]);
 
   // OAuth 授权等页不显示全局导航栏（Header 保持挂载，仅不渲染内容，避免导航时品牌图重载）
   if (pathname.startsWith("/oauth")) return null;
 
   // /search 页隐藏桌面搜索框（页内已有搜索入口）
   const isSearchPage = pathname.startsWith("/search");
+  // 未登录不展示未读徽标（登出会整页刷新，无需在副作用里重置状态）
+  const unreadTotal = user ? unread.likes + unread.comments + unread.system + unread.chat : 0;
+  const unreadBadge = unreadTotal > 99 ? "99+" : String(unreadTotal);
 
   const doSearch = () => {
     const k = search.trim();
@@ -118,36 +143,6 @@ export default function Header() {
       toast(name && text ? `${name}：${text}` : name || text || "彩蛋", "info");
     } catch {
       toast("彩蛋获取失败", "error");
-    }
-  };
-
-  const installPWA = () => {
-    const promptEvent = deferredPromptRef.current as any;
-    if (promptEvent && typeof promptEvent.prompt === "function") {
-      promptEvent.prompt();
-      promptEvent.userChoice
-        ?.then((result: { outcome: string }) => {
-          if (result && result.outcome === "accepted") {
-            try {
-              localStorage.setItem("pwa_installed", "1");
-            } catch {}
-          }
-          deferredPromptRef.current = null;
-        })
-        .catch(() => {
-          toast("当前浏览器不支持安装", "warning");
-        });
-    } else {
-      show(
-        <div style={{ textAlign: "center", padding: "6px 4px 2px" }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--color-text-primary)", marginBottom: 8 }}>
-            当前浏览器不支持安装
-          </div>
-          <div style={{ fontSize: 14, color: "var(--color-text-secondary)", lineHeight: 1.6 }}>
-            您的浏览器暂不支持安装论坛客户端 (PWA)。建议使用 Chrome / Edge / Safari 最新版本再次尝试。
-          </div>
-        </div>
-      );
     }
   };
 
@@ -191,6 +186,15 @@ export default function Header() {
           </div>
         )}
         <div className="header-right">
+          {/* 移动端世界频道按钮（仅 ≤700px 显示）：打开世界频道窗口 */}
+          <button
+            className="header-btn header-world-toggle"
+            type="button"
+            aria-label="世界频道"
+            onClick={() => setShowWorld(true)}
+          >
+            <i className="fa fa-globe"></i>
+          </button>
           {/* 移动端发帖按钮（仅 ≤700px 显示，样式见 header-responsive.css） */}
           <Link className="header-btn header-post-toggle" href="/post/create" aria-label="发帖">
             <i className="fa fa-pencil"></i>
@@ -212,16 +216,18 @@ export default function Header() {
                 <span>会馆</span>
               </Link>
             </li>
-            {/* 控制台：次级功能与偏好设置收纳（弹窗） */}
+            {/* 控制台：次级功能与偏好设置收纳（弹窗）；内有消息中心，未读时按钮显示总数徽标 */}
             <li className="header-collapsible">
               <button
-                className="header-btn"
+                className="header-btn header-console-btn"
                 aria-haspopup="dialog"
                 aria-expanded={showConsole}
+                title={unreadTotal > 0 ? `${unreadTotal} 条未读消息` : "控制台"}
                 onClick={() => setShowConsole(true)}
               >
                 <i className="fa fa-sliders"></i>
                 <span>控制台</span>
+                {unreadTotal > 0 && <span className="header-unread-badge">{unreadBadge}</span>}
               </button>
             </li>
             <li className="header-collapsible">
@@ -299,16 +305,32 @@ export default function Header() {
                 </Link>
               )}
             </div>
-            <Link className="mobile-menu-item" href="/WIKI" onClick={() => setShowMobileMenu(false)}><i className="fa fa-book"></i> WIKI</Link>
+            {/* 社区 */}
+            <div className="mobile-menu-title">社区</div>
+            <Link className="mobile-menu-item" href="/messages" onClick={() => setShowMobileMenu(false)}>
+              <i className="fa fa-envelope-o"></i> 消息中心
+              {unreadTotal > 0 && <span className="mobile-menu-badge">{unreadBadge}</span>}
+            </Link>
             <Link className="mobile-menu-item" href="/huiguan" onClick={() => setShowMobileMenu(false)}><i className="fa fa-home"></i> 会馆</Link>
-            <button className="mobile-menu-item" onClick={() => { setShowDonate(true); setShowMobileMenu(false); }}><i className="fa fa-heart"></i> 赞赏</button>
-            <button className="mobile-menu-item" onClick={() => { setShowMobileMenu(false); router.push("/feedback/submit"); }}><i className="fa fa-bug"></i> 提交反馈</button>
-            <Link className="mobile-menu-item" href="/feedback" onClick={() => setShowMobileMenu(false)}><i className="fa fa-comments-o"></i> 反馈中心</Link>
+            <Link className="mobile-menu-item" href="/WIKI" onClick={() => setShowMobileMenu(false)}><i className="fa fa-book"></i> WIKI</Link>
+            <button className="mobile-menu-item" onClick={() => { setShowMobileMenu(false); setShowWorld(true); }}><i className="fa fa-globe"></i> 世界频道</button>
+            <div className="mobile-menu-divider"></div>
+            {/* 工具与服务 */}
+            <div className="mobile-menu-title">工具与服务</div>
+            <Link className="mobile-menu-item" href="/download" onClick={() => setShowMobileMenu(false)}><i className="fa fa-download"></i> 客户端下载</Link>
+            <Link className="mobile-menu-item" href="/changelog" onClick={() => setShowMobileMenu(false)}><i className="fa fa-history"></i> 更新日志</Link>
+            <Link className="mobile-menu-item" href="/tools/year-converter" onClick={() => setShowMobileMenu(false)}><i className="fa fa-hourglass-half"></i> 无限年换算</Link>
+            <div className="mobile-menu-divider"></div>
+            {/* 帮助与支持 */}
+            <div className="mobile-menu-title">帮助与支持</div>
             <Link className="mobile-menu-item" href="/guide" onClick={() => setShowMobileMenu(false)}><i className="fa fa-map-o"></i> 论坛指南</Link>
-            <button className="mobile-menu-item" id="pwa-install-mobile" onClick={installPWA}><i className="fa fa-download"></i> 安装论坛客户端</button>
+            <Link className="mobile-menu-item" href="/feedback" onClick={() => setShowMobileMenu(false)}><i className="fa fa-comments-o"></i> 反馈中心</Link>
+            <button className="mobile-menu-item" onClick={() => { setShowMobileMenu(false); router.push("/feedback/submit"); }}><i className="fa fa-bug"></i> 提交反馈</button>
+            <button className="mobile-menu-item" onClick={() => { setShowDonate(true); setShowMobileMenu(false); }}><i className="fa fa-heart"></i> 赞赏</button>
             <button className="mobile-menu-item" onClick={showEasterEgg}><i className="fa fa-gift"></i> 彩蛋</button>
             <div className="mobile-menu-divider"></div>
-            <div className="mobile-menu-title">主题</div>
+            {/* 外观 */}
+            <div className="mobile-menu-title">外观</div>
             <button className="mobile-menu-item mobile-theme-btn" onClick={() => setTheme("day")}><i className="fa fa-sun-o"></i> 亮色</button>
             <button className="mobile-menu-item mobile-theme-btn" onClick={() => setTheme("night")}><i className="fa fa-moon-o"></i> 暗色</button>
             <button className="mobile-menu-item mobile-theme-btn" onClick={() => setTheme("default")}><i className="fa fa-desktop"></i> 默认</button>
@@ -350,13 +372,19 @@ export default function Header() {
         </div>
       )}
 
+      {/* 世界频道：桌面端右上角悬浮入口（组件内 CSS 在 ≤700px 自动隐藏，移动端走顶部栏图标/抽屉） */}
+      <WorldChannelLauncher onOpen={() => setShowWorld(true)} />
+      {/* 世界频道窗口（受控）：桌面拖拽窗口 / 移动端底部全屏 */}
+      <WorldChannelModal open={showWorld} onClose={() => setShowWorld(false)} />
+
       {/* 控制台弹窗（桌面端「控制台」按钮） */}
       <ConsoleModal
         open={showConsole}
         onClose={() => setShowConsole(false)}
         onDonate={() => setShowDonate(true)}
-        onInstall={installPWA}
         onEasterEgg={showEasterEgg}
+        onOpenWorld={() => setShowWorld(true)}
+        unread={unread}
       />
 
       {/* 赞赏弹窗 */}

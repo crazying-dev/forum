@@ -21,7 +21,7 @@ interface GuildDetailResp {
 }
 
 const getGuild = cache(async (slug: string) => {
-  const r = await fetchApi<GuildDetailResp>(`/api/v1/guilds/${encodeURIComponent(slug)}`);
+  const r = await fetchApi<GuildDetailResp>(`/guilds/${encodeURIComponent(slug)}`);
   return { ok: r.ok, status: r.status, guild: r.data?.guild ?? null };
 });
 

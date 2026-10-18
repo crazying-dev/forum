@@ -14,7 +14,7 @@ function VerifyInner() {
 
   useEffect(() => {
     if (!token) { setStatus("fail"); setMsg("缺少验证 token"); return; }
-    fetch("/api/v1/auth/verify-token?token=" + encodeURIComponent(token) + "&type=email_verify", { credentials: "include" })
+    fetch(`${process.env.NEXT_PUBLIC_API_BASE || ""}/ov2/api/auth/verify-token?token=${encodeURIComponent(token)}&type=email_verify`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
         if (d.success) { setStatus("ok"); setMsg("邮箱验证成功！"); }

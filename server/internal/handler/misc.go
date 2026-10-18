@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"yj-forum/server/internal/altcha"
 	"yj-forum/server/internal/auth"
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
@@ -28,6 +29,7 @@ type MiscHandler struct {
 	Cfg      *config.Config
 	Mailer   *email.Sender
 	Sessions *auth.SessionManager
+	Altcha   *altcha.Service // nil 安全：未注入时跳过 ALTCHA 校验
 }
 
 func (h *MiscHandler) userFromCookie(c *gin.Context) string {
@@ -52,13 +54,28 @@ func (h *MiscHandler) SendRegisterCode(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Email string `json:"email" binding:"required"`
+		Email  string `json:"email" binding:"required"`
+		Altcha string `json:"altcha"`
+		Grant  string `json:"grant"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
 		return
 	}
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "CAPTCHA_REQUIRED"})
+		return
+	}
 	emailAddr := strings.ToLower(strings.TrimSpace(req.Email))
+	blocked, err := h.DB.IsEmailBlacklisted(c.Request.Context(), database.NormalizeEmail(emailAddr))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱异样"})
+		return
+	}
 	if h.DB.UserExistsByEmail(c.Request.Context(), emailAddr) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱已被注册"})
 		return
@@ -94,10 +111,16 @@ func (h *MiscHandler) SendVerifyEmailCode(c *gin.Context) {
 // SendResetLink 发送密码重置链接（替代验证码流程；账号是否存在不对外区分）。
 func (h *MiscHandler) SendResetLink(c *gin.Context) {
 	var req struct {
-		Email string `json:"email" binding:"required"`
+		Email  string `json:"email" binding:"required"`
+		Altcha string `json:"altcha"`
+		Grant  string `json:"grant"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+		return
+	}
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "CAPTCHA_REQUIRED"})
 		return
 	}
 	emailAddr := strings.ToLower(strings.TrimSpace(req.Email))
@@ -153,9 +176,15 @@ func (h *MiscHandler) ResetPasswordByToken(c *gin.Context) {
 	var req struct {
 		Token    string `json:"token" binding:"required"`
 		Password string `json:"password" binding:"required"`
+		Altcha   string `json:"altcha"`
+		Grant    string `json:"grant"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+		return
+	}
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "CAPTCHA_REQUIRED"})
 		return
 	}
 	if len(req.Password) < 8 {
@@ -328,6 +357,8 @@ type bugReq struct {
 	Steps   string `json:"steps"`
 	Contact string `json:"contact"`
 	PageURL string `json:"page_url"`
+	Altcha  string `json:"altcha"`
+	Grant   string `json:"grant"`
 }
 
 // ReportBug 提交 Bug（游客也可）。
@@ -335,6 +366,10 @@ func (h *MiscHandler) ReportBug(c *gin.Context) {
 	var req bugReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+		return
+	}
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "CAPTCHA_REQUIRED"})
 		return
 	}
 	if len([]rune(req.Title)) > 200 || len([]rune(req.Detail)) > 5000 || len([]rune(req.Steps)) > 3000 || len([]rune(req.Contact)) > 200 {
@@ -356,7 +391,7 @@ func (h *MiscHandler) ReportBug(c *gin.Context) {
 	// 通知管理员（HTML 邮件中对用户可控片段转义，防注入）
 	go func() {
 		plain := "Bug 报告 #" + fmt.Sprintf("%d", id) + "\n标题: " + req.Title + "\n详情: " + req.Detail
-		htmlBody := email.BuildHTML("Bug 报告", "收到新的 Bug 报告", []string{"标题: " + html.EscapeString(req.Title), "详情: " + html.EscapeString(req.Detail), "提交人: " + reporterName}, "", "", "")
+		htmlBody := email.BuildHTML("Bug 报告", "收到新的 Bug 报告", []string{"标题: " + html.EscapeString(req.Title), "详情: " + html.EscapeString(req.Detail), "提交人: " + html.EscapeString(reporterName)}, "", "", "")
 		_, _ = h.Mailer.Send("【妖精论坛】Bug 报告 #"+fmt.Sprintf("%d", id), plain, []string{h.Cfg.ReceiverAll}, htmlBody)
 	}()
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Bug 提交成功", "id": id})

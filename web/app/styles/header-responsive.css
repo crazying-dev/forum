@@ -3,6 +3,11 @@
     display: none;
 }
 
+/* 移动端顶部栏世界频道按钮：仅 ≤700px 显示 */
+#header .header-world-toggle {
+    display: none;
+}
+
 /* 移动端发帖按钮：仅 ≤700px 显示（桌面使用 .header-btn 统一样式） */
 #header .header-post-toggle {
     display: none;
@@ -56,6 +61,9 @@
         display: flex;
     }
     #header .header-post-toggle {
+        display: flex;
+    }
+    #header .header-world-toggle {
         display: flex;
     }
     /* 隐藏顶部居中搜索框（改用右侧按钮 + 全屏弹层） */
@@ -180,6 +188,22 @@
     }
     .mobile-menu-item:hover {
         background: var(--color-bg-item-hover);
+    }
+    /* 消息中心未读徽标（移动抽屉） */
+    .mobile-menu-badge {
+        margin-left: auto;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 9px;
+        background: #ef4444;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 18px;
+        text-align: center;
+        flex-shrink: 0;
+        box-sizing: border-box;
     }
     .mobile-menu-divider {
         height: 1px;

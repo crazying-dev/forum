@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"yj-forum/server/internal/altcha"
 	"yj-forum/server/internal/auth"
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
@@ -21,6 +22,7 @@ type AuthHandler struct {
 	Cfg      *config.Config
 	Sessions *auth.SessionManager
 	Mailer   *email.Sender
+	Altcha   *altcha.Service // nil 安全：未注入时跳过 ALTCHA 校验
 }
 
 // cookieName 会话 cookie。
@@ -33,6 +35,8 @@ type registerReq struct {
 	Email    string `json:"email" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	Code     string `json:"code" binding:"required"`
+	Altcha   string `json:"altcha"`
+	Grant    string `json:"grant"`
 }
 
 // Register 注册 + 自动登录。
@@ -44,6 +48,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	var req registerReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+		return
+	}
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "CAPTCHA_REQUIRED"})
 		return
 	}
 	name := strings.TrimSpace(req.Name)
@@ -67,6 +75,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 	if !hasLetterAndDigit(password) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码需包含字母和数字"})
+		return
+	}
+	// 邮箱黑名单（精确 / @domain / *@domain）
+	blocked, err := h.DB.IsEmailBlacklisted(c.Request.Context(), database.NormalizeEmail(emailAddr))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
+		return
+	}
+	if blocked {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "邮箱异样"})
 		return
 	}
 	// 验证码校验（含失败次数限制）
@@ -111,6 +129,8 @@ type loginReq struct {
 	Name     string `json:"name" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	Remember bool   `json:"remember"`
+	Altcha   string `json:"altcha"`
+	Grant    string `json:"grant"`
 }
 
 // Login 登录。
@@ -122,6 +142,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请输入账号和密码"})
+		return
+	}
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "CAPTCHA_REQUIRED"})
 		return
 	}
 	nameOrEmail := strings.TrimSpace(req.Name)
@@ -186,6 +210,7 @@ func (h *AuthHandler) issueSession(c *gin.Context, userID string) {
 		return
 	}
 	secure := h.Cfg.AppEnv == "prod"
+	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie(cookieName, token, 86400, "/", "", secure, true) // HttpOnly
 	c.SetCookie("user_id", userID, 86400*30, "/", "", secure, false)
 }

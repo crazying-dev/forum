@@ -3,6 +3,8 @@ package database
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"regexp"
@@ -84,6 +86,16 @@ func (d *DB) Exec(ctx context.Context, sql string, args ...any) (int64, error) {
 var idMu sync.Mutex
 var idLastNano int64
 var idCounter int64
+
+// GenMediaID 生成不可枚举的媒体 ID（MD + 16 字节 crypto/rand hex）。
+// 媒体 ID 会出现在公开 URL 中，不能用时间戳（可枚举/可遍历）。
+func GenMediaID() (string, error) {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return "MD" + hex.EncodeToString(buf), nil
+}
 
 // GenID 生成带前缀唯一 ID（时间戳纳秒 + 计数器，防同纳秒碰撞）。
 // 对齐 legacy: 前缀 + int(time.time() * 1e10)（纳秒 10 位），此处扩展 11 位。

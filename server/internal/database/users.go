@@ -104,6 +104,13 @@ func (d *DB) SignInToday(ctx context.Context, userID string) (int, string, bool,
 	return spirit, lastSignIn.Format("2006-01-02"), true, nil
 }
 
+// GetUserPasswordHash 读取用户密码哈希（改密前校验当前密码用）。
+func (d *DB) GetUserPasswordHash(ctx context.Context, userID string) (string, error) {
+	var hash string
+	err := d.QueryRow(ctx, `SELECT password FROM users WHERE id=$1`, userID).Scan(&hash)
+	return hash, err
+}
+
 // UpdateUserProfile 更新资料（白名单字段）。
 func (d *DB) UpdateUserProfile(ctx context.Context, userID string, fields map[string]any) error {
 	if len(fields) == 0 {

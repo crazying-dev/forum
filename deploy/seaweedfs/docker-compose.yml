@@ -1,0 +1,21 @@
+# SeaweedFS 单容器（master + volume + filer + S3 gateway）
+# 仅监听 127.0.0.1:8333；前端不直连，统一经 ouo /ov2/api/media 代理。
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: ouo-seaweedfs
+    restart: unless-stopped
+    command: >
+      server -s3 -s3.port=8333
+      -s3.config=/etc/seaweedfs/s3.json
+      -dir=/data -ip.bind=0.0.0.0
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - ./data:/data
+      - ./s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/ || exit 0"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

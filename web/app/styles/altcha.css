@@ -1,0 +1,49 @@
+/* ===== ALTCHA v2 人机验证（登录/注册/发码/找回密码）=====
+   入口：OuoNavUI 在 app/globals.css 统一追加 @import "./styles/altcha.css";
+   widget 内部为 Shadow DOM，只能通过 ALTCHA 暴露的 CSS 变量定制（变量会穿透 Shadow DOM）。 */
+
+.altcha-slot {
+    width: 100%;
+    margin-bottom: 18px;
+    /* ALTCHA 内置变量：跟随站点主题 tokens（日间/夜间/节日主题自动适配） */
+    --altcha-max-width: 100%;
+    --altcha-border-width: 2px;
+    --altcha-border-radius: 12px;
+    --altcha-border-color: var(--color-border-primary);
+    --altcha-color-base: var(--color-bg-input);
+    --altcha-color-base-content: var(--color-text-primary);
+    --altcha-color-primary: var(--color-primary);
+    --altcha-color-primary-content: #ffffff;
+    --altcha-color-success: var(--color-primary);
+    --altcha-color-success-content: #ffffff;
+    --altcha-color-error: #e74c3c;
+    --altcha-color-error-content: #ffffff;
+    --altcha-color-neutral: var(--color-bg-secondary);
+    --altcha-color-neutral-content: var(--color-text-secondary);
+    --altcha-input-background-color: var(--color-bg-input);
+    --altcha-input-color: var(--color-text-primary);
+    --altcha-padding: 10px 12px;
+    --altcha-shadow: 0 2px 8px var(--color-shadow-primary);
+    --altcha-transition-duration: 0.2s;
+}
+
+.altcha-slot altcha-widget {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* 移动端：与登录表单输入框同宽（100%），避免 widget 固定最大宽度溢出 */
+@media (max-width: 480px) {
+    .altcha-slot {
+        width: 100%;
+        margin-bottom: 14px;
+        --altcha-max-width: 100%;
+        --altcha-padding: 8px 10px;
+    }
+
+    .altcha-slot altcha-widget {
+        width: 100%;
+        max-width: 100%;
+    }
+}

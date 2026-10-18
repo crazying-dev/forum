@@ -49,7 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // 会馆详情页
-  const guilds = await fetchApi<{ guilds: GuildLite[] }>("/api/v1/guilds", 3600);
+  const guilds = await fetchApi<{ guilds: GuildLite[] }>("/guilds", 3600);
   if (guilds.ok && Array.isArray(guilds.data?.guilds)) {
     for (const g of guilds.data.guilds) {
       if (!g?.slug) continue;
@@ -65,7 +65,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 帖子 / 文章（分页遍历至 has_more=false）
   for (let page = 1; page <= MAX_FEED_PAGES; page++) {
     const r = await fetchApi<{ items: FeedItemLite[]; has_more: boolean }>(
-      `/api/v1/feed?space=all&page=${page}&page_size=50`,
+      `/feed?space=all&page=${page}&page_size=50`,
       3600
     );
     if (!r.ok || !Array.isArray(r.data?.items)) {

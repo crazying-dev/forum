@@ -1,0 +1,98 @@
+/* ===== 首页公告条（components/AnnouncementBanner.tsx）===== */
+/* 仅首页渲染，位于 Header 与 .home-container 之间；宽度与首页容器对齐 */
+
+.announcement-wrap {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 16px 20px 0;
+    box-sizing: border-box;
+}
+
+.announcement-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-left: 4px solid var(--color-primary);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px var(--color-shadow-search);
+}
+
+.announcement-icon {
+    flex: 0 0 auto;
+    margin-top: 1px;
+    color: var(--color-primary);
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.announcement-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.announcement-close {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin: -2px -4px 0 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.announcement-close:hover,
+.announcement-close:focus-visible {
+    background: var(--color-bg-icon);
+    color: var(--color-text-primary);
+    outline: none;
+}
+
+@media (max-width: 768px) {
+    .announcement-wrap {
+        padding: 10px 12px 0;
+    }
+
+    .announcement-banner {
+        gap: 8px;
+        padding: 10px 12px;
+    }
+
+    .announcement-text {
+        font-size: 13px;
+        line-height: 1.6;
+    }
+}
+
+@media (max-width: 360px) {
+    .announcement-wrap {
+        padding: 8px 10px 0;
+    }
+
+    .announcement-banner {
+        padding: 9px 10px;
+    }
+
+    .announcement-close {
+        width: 24px;
+        height: 24px;
+    }
+}

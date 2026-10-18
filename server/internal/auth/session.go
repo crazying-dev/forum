@@ -38,7 +38,11 @@ func (m *SessionManager) Validate(ctx context.Context, token string) (string, er
 		return "", nil
 	}
 	var userID string
-	err := m.DB.QueryRow(ctx, `SELECT user_id FROM sessions WHERE token=$1 AND expires_at > NOW()`, token).Scan(&userID)
+	// 同一条查询内校验封禁/注销：封禁或注销后旧 session 立即失效（即使未删除行）
+	err := m.DB.QueryRow(ctx, `SELECT s.user_id FROM sessions s
+		JOIN users u ON u.id = s.user_id
+		WHERE s.token=$1 AND s.expires_at > NOW()
+		  AND COALESCE(u.is_banned, 0) = 0 AND u.deleted_at IS NULL`, token).Scan(&userID)
 	if err != nil {
 		return "", nil
 	}

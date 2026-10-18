@@ -357,6 +357,7 @@
 
 .user-profile-deleted {
     flex-direction: column;
+    align-items: center;
     justify-content: center;
     gap: 16px;
     padding: 48px 32px;
@@ -409,7 +410,9 @@
         width: 100%;
     }
 
+    /* 移动端资料卡左对齐：账号设置与资料信息同一起始线 */
     .user-account-settings {
-        justify-content: center;
+        justify-content: flex-start;
+        text-align: left;
     }
 }

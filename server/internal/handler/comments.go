@@ -3,11 +3,13 @@ package handler
 import (
 	"context"
 	"html"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
 
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/email"
@@ -115,19 +117,37 @@ func (h *PostsHandler) CreateComment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "评论失败"})
 		return
 	}
-	// 异步通知
+	// 评论/回复灵力 +3（source=commentID 幂等）
+	h.awardCommentSpirit(c.Request.Context(), uid, comment.ID)
+	// 异步通知（站内通知 + 邮件 outbox）
 	go h.notifyComment(comment)
 	h.Cache.Comments.DeletePrefix("comments:post:" + postID)
 	h.Cache.PostDetail.Delete("post:detail:" + postID)
 	c.JSON(http.StatusCreated, gin.H{"success": true, "comment": comment})
 }
 
+// awardCommentSpirit 评论/回复灵力奖励（comment +3，按 source=commentID 幂等）。
+func (h *PostsHandler) awardCommentSpirit(ctx context.Context, userID, commentID string) {
+	awarded, amount, err := h.DB.AwardSpirit(ctx, userID, "comment", commentID)
+	if err != nil {
+		log.Printf("[SPIRIT] 评论奖励失败 comment=%s: %v", commentID, err)
+		return
+	}
+	if awarded {
+		log.Printf("[SPIRIT] 评论奖励 +%d (user=%s comment=%s)", amount, userID, commentID)
+	}
+}
+
+// notifyComment 评论通知：给帖子作者/父评论作者写站内通知，并在同一事务内入队邮件 outbox。
+// 邮件 outbox 入队失败时回退到旧的直发逻辑（保证通知不丢）。
 func (h *PostsHandler) notifyComment(comment *models.Comment) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// 回复则通知父评论作者，否则通知帖子作者；跳过自己给自己评论/回复自己的情况
 	var targetUserID, targetEmail string
+	notifType := database.NotificationPostComment
 	if comment.ParentID != nil && *comment.ParentID != "" {
+		notifType = database.NotificationCommentReply
 		pc, err := h.DB.GetComment(ctx, *comment.ParentID)
 		if err == nil && pc != nil {
 			u, err2 := h.DB.GetUserByID(ctx, pc.UserID)
@@ -146,13 +166,88 @@ func (h *PostsHandler) notifyComment(comment *models.Comment) {
 			}
 		}
 	}
-	if targetEmail == "" || targetUserID == comment.UserID {
+	if targetUserID == "" || targetUserID == comment.UserID {
 		return
 	}
-	// 邮件正文取剥标签纯文本（HTML 邮件中转义）
-	plain := "你收到一条新回复：\n" + sanitize.StripTagsAndTrim(comment.Content)
-	htmlBody := email.BuildHTML("评论通知", "收到新回复", []string{"你收到一条新回复：", html.EscapeString(plain)}, "", "", "")
-	_, _ = h.Mailer.Send("【妖精论坛】收到新回复", plain, []string{targetEmail}, htmlBody)
+
+	postTitle := ""
+	if post, err := h.DB.GetPost(ctx, comment.PostID); err == nil && post != nil {
+		postTitle = post.Title
+	}
+	excerpt := truncateRunes(sanitize.StripTagsAndTrim(comment.Content), 200)
+	authorName := comment.UserName
+	if authorName == "" {
+		if u, err := h.DB.GetUserByID(ctx, comment.UserID); err == nil && u != nil {
+			authorName = u.Name
+		}
+	}
+	link := "https://" + h.Cfg.PublicBaseURL + "/post/" + comment.PostID
+	verb := "评论了你的帖子"
+	subject := "【妖精论坛】你的帖子收到新评论"
+	if notifType == database.NotificationCommentReply {
+		verb = "回复了你的评论"
+		subject = "【妖精论坛】收到新回复"
+	}
+	plain := authorName + " " + verb + "：\n" + excerpt + "\n" + link
+	htmlBody := email.BuildHTML("评论通知", authorName+" "+verb,
+		[]string{"<strong>" + html.EscapeString(authorName) + "</strong> " + verb + "：", html.EscapeString(excerpt), "点击查看详情"},
+		"查看帖子", link, "")
+
+	var notifID int64
+	created := false
+	err := h.DB.Tx(ctx, func(tx pgx.Tx) error {
+		id, ok, e := h.DB.CreateNotificationTx(ctx, tx, database.NotificationInput{
+			UserID: targetUserID, Type: notifType, ActorID: comment.UserID,
+			TargetType: "comment", TargetID: comment.ID,
+			ContextPostID: comment.PostID, ContextCommentID: comment.ID,
+			Payload: map[string]any{
+				"post_title": postTitle, "excerpt": excerpt, "actor_name": authorName,
+				"parent_id": parentIDString(comment.ParentID),
+			},
+			DedupeKey: "comment_notify:" + comment.ID,
+		})
+		if e != nil {
+			return e
+		}
+		notifID, created = id, ok
+		if !ok || targetEmail == "" {
+			return nil
+		}
+		if _, e = h.DB.EnqueueEmailTx(ctx, tx, database.EmailOutboxInput{
+			To:        []string{targetEmail},
+			Subject:   subject,
+			PlainBody: plain,
+			HTMLBody:  htmlBody,
+			DedupeKey: "comment_notify_mail:" + comment.ID,
+		}); e != nil {
+			return e
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("[COMMENT] 通知/outbox 写入失败 comment=%s: %v", comment.ID, err)
+		// 回退：直接发信（旧逻辑），避免邮件通知完全丢失
+		if targetEmail != "" {
+			_, _ = h.Mailer.Send(subject, plain, []string{targetEmail}, htmlBody)
+		}
+		return
+	}
+	if created {
+		PushNotificationEvent(targetUserID, notifID, gin.H{
+			"id": notifID, "type": notifType, "actor_id": comment.UserID, "actor_name": authorName,
+			"target_type": "comment", "target_id": comment.ID, "comment_id": comment.ID,
+			"post_id": comment.PostID, "post_title": postTitle, "excerpt": excerpt,
+			"parent_id": parentIDString(comment.ParentID),
+		})
+		PushUnreadEvent(ctx, h.DB, targetUserID)
+	}
+}
+
+func parentIDString(parent *string) string {
+	if parent == nil {
+		return ""
+	}
+	return *parent
 }
 
 // ---- DELETE /api/v1/comments/:id ----
@@ -199,10 +294,46 @@ func (h *PostsHandler) LikeComment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "操作失败"})
 		return
 	}
+	if liked {
+		h.notifyCommentLike(c.Request.Context(), comment, uid)
+	}
 	// 使评论列表与帖子详情缓存失效
 	h.Cache.Comments.DeletePrefix("comments:post:" + comment.PostID)
 	h.Cache.PostDetail.Delete("post:detail:" + comment.PostID)
 	c.JSON(http.StatusOK, gin.H{"success": true, "liked": liked, "likes": likes})
+}
+
+// notifyCommentLike 评论点赞后给评论作者写站内通知（跳过自赞；dedupe 防重复）。
+func (h *PostsHandler) notifyCommentLike(ctx context.Context, comment *models.Comment, actorID string) {
+	if comment == nil || comment.UserID == "" || comment.UserID == actorID {
+		return
+	}
+	title := ""
+	if post, err := h.DB.GetPost(ctx, comment.PostID); err == nil && post != nil {
+		title = post.Title
+	}
+	excerpt := truncateRunes(sanitize.StripTagsAndTrim(comment.Content), 120)
+	actorName, actorAvatar := actorID, ""
+	if u, err := h.DB.GetUserByID(ctx, actorID); err == nil && u != nil {
+		actorName, actorAvatar = u.Name, u.Avatar
+	}
+	in := database.NotificationInput{
+		UserID: comment.UserID, Type: database.NotificationCommentLike, ActorID: actorID,
+		TargetType: "comment", TargetID: comment.ID,
+		ContextPostID: comment.PostID, ContextCommentID: comment.ID,
+		Payload:   map[string]any{"post_title": title, "excerpt": excerpt, "actor_name": actorName},
+		DedupeKey: "comment_like:" + comment.ID + ":" + actorID,
+	}
+	notifID, created, err := h.DB.CreateNotification(ctx, in)
+	if err != nil || !created {
+		return
+	}
+	PushNotificationEvent(comment.UserID, notifID, gin.H{
+		"id": notifID, "type": in.Type, "actor_id": actorID, "actor_name": actorName, "actor_avatar": actorAvatar,
+		"target_type": "comment", "target_id": comment.ID, "comment_id": comment.ID,
+		"post_id": comment.PostID, "post_title": title, "comment_excerpt": excerpt,
+	})
+	PushUnreadEvent(ctx, h.DB, comment.UserID)
 }
 
 // markCommentLikedByMe 批量填充评论的 liked_by_me。

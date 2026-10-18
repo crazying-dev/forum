@@ -14,6 +14,7 @@ import (
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/email"
+	"yj-forum/server/internal/media"
 	"yj-forum/server/internal/sanitize"
 )
 
@@ -27,6 +28,7 @@ type PostsHandler struct {
 	Cache    *CacheSet
 	Mailer   *email.Sender
 	Sessions *auth.SessionManager
+	Media    *media.Service
 }
 
 // ---- GET /api/v1/posts ----
@@ -189,32 +191,60 @@ func (h *PostsHandler) Create(c *gin.Context) {
 		return
 	}
 	if publishedAt == nil {
-		// 立即帖异步通知粉丝；定时帖由 ProcessScheduledPublishes 到点补发
+		// 立即帖：灵力奖励同步完成（source 幂等），粉丝邮件异步交给 fanout worker；
+		// 定时帖由 ProcessScheduledPublishes 到点补发
+		h.awardPostSpirit(c.Request.Context(), uid, postID)
 		go h.notifyFollowers(uid, postID, title)
 	}
 	h.Cache.Posts.DeletePrefix("posts:list:")
 	c.JSON(http.StatusCreated, gin.H{"success": true, "id": postID})
 }
 
+// awardPostSpirit 发帖灵力奖励（post +5，按 source=postID 幂等；达到日上限时静默跳过）。
+func (h *PostsHandler) awardPostSpirit(ctx context.Context, userID, postID string) {
+	awarded, amount, err := h.DB.AwardSpirit(ctx, userID, "post", postID)
+	if err != nil {
+		log.Printf("[SPIRIT] 发帖奖励失败 post=%s: %v", postID, err)
+		return
+	}
+	if awarded {
+		log.Printf("[SPIRIT] 发帖奖励 +%d (user=%s post=%s)", amount, userID, postID)
+	}
+}
+
+// notifyFollowers 粉丝发帖通知：优先入队 fanout job（worker 为一行一收件人 outbox，支持退避重试）；
+// 入队失败时回退到旧的直发逻辑，保证通知不丢。
 func (h *PostsHandler) notifyFollowers(userID, postID, title string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	emails, err := h.DB.GetFollowerEmails(ctx, userID, 5000)
+	if _, err := h.DB.EnqueueFanout(ctx, postID, userID); err == nil {
+		log.Printf("[POST] 粉丝通知已入队 fanout post=%s", postID)
+		return
+	} else {
+		log.Printf("[POST] fanout 入队失败，回退直发 post=%s: %v", postID, err)
+	}
+	emails, err := h.DB.ListFollowerEmails(ctx, userID, 5000)
 	if err != nil || len(emails) == 0 {
 		return
 	}
-	plain := "你的关注者 " + userID + " 发布了新帖《" + title + "》\n" + "https://" + h.Cfg.PublicBaseURL + "/post/" + postID
-	// HTML 邮件中对帖子标题转义，防止用户构造的标题注入 HTML
-	htmlBody := email.BuildHTML("新帖通知", "关注的人发布了新帖",
-		[]string{"你的关注者发布了新帖", "<strong>" + html.EscapeString(title) + "</strong>", "点击查看详情"},
-		"查看帖子", "https://"+h.Cfg.PublicBaseURL+"/post/"+postID, "")
-	// 分批 100 封
+	author := userID
+	if u, uerr := h.DB.GetUserByID(ctx, userID); uerr == nil && u != nil && u.Name != "" {
+		author = u.Name
+	}
+	link := "https://" + h.Cfg.PublicBaseURL + "/post/" + postID
+	plain := author + " 发布了新帖《" + title + "》\n" + link
+	// HTML 邮件中对作者/标题转义，防止用户构造的名称或标题注入 HTML
+	htmlBody := email.BuildHTML("新帖通知", author+" 发布了新帖",
+		[]string{"你关注的 <strong>" + html.EscapeString(author) + "</strong> 发布了新帖：",
+			"《" + html.EscapeString(title) + "》", "点击查看详情"},
+		"查看帖子", link, "你收到这封邮件是因为关注了 TA")
+	// 分批 100 封（兼容回退路径）
 	for start := 0; start < len(emails); start += 100 {
 		end := start + 100
 		if end > len(emails) {
 			end = len(emails)
 		}
-		_, _ = h.Mailer.Send("【妖精论坛】你的关注者发布了新帖", plain, emails[start:end], htmlBody)
+		_, _ = h.Mailer.Send("【妖精论坛】你关注的 "+author+" 发布了新帖", plain, emails[start:end], htmlBody)
 	}
 	log.Printf("[POST] 发帖通知已发送 %d 位粉丝", len(emails))
 }
@@ -247,6 +277,8 @@ func (h *PostsHandler) ProcessScheduledPublishes(ctx context.Context) {
 		return
 	}
 	for _, p := range pending {
+		// 到点补发灵力奖励（与立即帖一致，source 幂等避免重复）
+		h.awardPostSpirit(ctx, p.UserID, p.ID)
 		// 逐帖异步通知（与立即帖策略一致）：邮件发送不阻塞定时任务主循环
 		go h.notifyFollowers(p.UserID, p.ID, p.Title)
 	}
@@ -344,9 +376,43 @@ func (h *PostsHandler) Like(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "操作失败"})
 		return
 	}
+	if liked {
+		h.notifyPostLike(c.Request.Context(), id, uid)
+	}
 	h.Cache.PostDetail.Delete("post:detail:" + id)
 	h.Cache.Posts.DeletePrefix("posts:list:")
 	c.JSON(http.StatusOK, gin.H{"success": true, "liked": liked, "likes": likes})
+}
+
+// notifyPostLike 点赞帖子后给作者写站内通知（跳过自赞；dedupe 防重复）。
+func (h *PostsHandler) notifyPostLike(ctx context.Context, postID, actorID string) {
+	authorID, _, _, exists, err := h.DB.GetPostPublishInfo(ctx, postID)
+	if err != nil || !exists || authorID == "" || authorID == actorID {
+		return
+	}
+	title := ""
+	if post, perr := h.DB.GetPost(ctx, postID); perr == nil && post != nil {
+		title = post.Title
+	}
+	actorName, actorAvatar := actorID, ""
+	if u, uerr := h.DB.GetUserByID(ctx, actorID); uerr == nil && u != nil {
+		actorName, actorAvatar = u.Name, u.Avatar
+	}
+	in := database.NotificationInput{
+		UserID: authorID, Type: database.NotificationPostLike, ActorID: actorID,
+		TargetType: "post", TargetID: postID, ContextPostID: postID,
+		Payload:   map[string]any{"post_id": postID, "post_title": title, "actor_name": actorName},
+		DedupeKey: "post_like:" + postID + ":" + actorID,
+	}
+	notifID, created, nerr := h.DB.CreateNotification(ctx, in)
+	if nerr != nil || !created {
+		return
+	}
+	PushNotificationEvent(authorID, notifID, gin.H{
+		"id": notifID, "type": in.Type, "actor_id": actorID, "actor_name": actorName, "actor_avatar": actorAvatar,
+		"target_type": "post", "target_id": postID, "post_id": postID, "post_title": title,
+	})
+	PushUnreadEvent(ctx, h.DB, authorID)
 }
 
 // ---- POST /api/v1/posts/:id/favorite ----

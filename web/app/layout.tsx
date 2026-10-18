@@ -68,7 +68,7 @@ const themeScript = `
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // 国庆主题：服务端按站点配置判定（60s 缓存），失败回退默认配置；
   // 客户端由 <FestivalThemeSync /> 在挂载 / 窗口聚焦时校正。
-  const siteRes = await fetchApi<{ data: SiteConfig }>("/api/v1/site/config", 60);
+  const siteRes = await fetchApi<{ data: SiteConfig }>("/site/config", 60);
   const rawConfig = siteRes.ok ? siteRes.data?.data : null;
   const festivalActive = isFestivalActive(rawConfig ?? DEFAULT_SITE_CONFIG);
 

@@ -196,3 +196,7 @@ admin/
 clear_db.py
 # Go build artifacts
 server/bin/
+
+# SeaweedFS 本地数据与密钥（s3.json 由 s3.json.example 生成，不入库）
+/deploy/seaweedfs/data/
+/deploy/seaweedfs/s3.json

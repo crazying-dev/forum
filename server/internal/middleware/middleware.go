@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -88,6 +89,13 @@ func CSRF(allowedOrigins []string) gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		// 旧 APP 兼容层 /api/*（不含 /api/v1 新 shape 别名）显式跳过 CSRF：
+		// 旧客户端不带 Origin/Referer；改由 legacy token + IP/UA/版本限流保护。
+		p := c.Request.URL.Path
+		if strings.HasPrefix(p, "/api/") && !strings.HasPrefix(p, "/api/v1/") {
+			c.Next()
+			return
+		}
 		origin := c.GetHeader("Origin")
 		referer := c.GetHeader("Referer")
 		if isAllowed(origin, allowedOrigins, c) || isAllowed(referer, allowedOrigins, c) {
@@ -98,20 +106,29 @@ func CSRF(allowedOrigins []string) gin.HandlerFunc {
 	}
 }
 
-func isAllowed(url string, allowedOrigins []string, c *gin.Context) bool {
-	if url == "" {
+func isAllowed(rawURL string, allowedOrigins []string, c *gin.Context) bool {
+	if rawURL == "" {
 		return false
 	}
-	// 同源：Origin 的 host 与请求 Host（或 X-Forwarded-Host，Next 代理时）比对
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	// 同源：Host 必须完全相等（不能用前缀比较，否则 https://yjlt.top.evil.com 会绕过）
 	host := c.Request.Host
 	if fwd := c.GetHeader("X-Forwarded-Host"); fwd != "" {
 		host = fwd
 	}
-	if strings.HasPrefix(url, "http://"+host) || strings.HasPrefix(url, "https://"+host) {
+	if strings.EqualFold(u.Host, host) {
 		return true
 	}
+	// 白名单：scheme + host 完全相等
 	for _, ao := range allowedOrigins {
-		if ao != "" && strings.HasPrefix(url, strings.TrimRight(ao, "/")) {
+		a, err := url.Parse(strings.TrimRight(ao, "/"))
+		if err != nil || a.Host == "" {
+			continue
+		}
+		if strings.EqualFold(u.Scheme, a.Scheme) && strings.EqualFold(u.Host, a.Host) {
 			return true
 		}
 	}
@@ -120,20 +137,22 @@ func isAllowed(url string, allowedOrigins []string, c *gin.Context) bool {
 
 // ---- CORS ----
 
-// CORS 白名单 CORS（默认镜像 legacy：origins 为空时允许全部）。
-func CORS(allowedOrigins []string) gin.HandlerFunc {
-	allowAll := len(allowedOrigins) == 0
+// CORS 白名单 CORS。allowAll 仅建议 dev 使用；生产必须显式配置 origins。
+func CORS(allowedOrigins []string, allowAll bool) gin.HandlerFunc {
 	originSet := map[string]bool{}
 	for _, o := range allowedOrigins {
-		originSet[o] = true
+		originSet[strings.TrimRight(o, "/")] = true
 	}
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		if origin != "" && (allowAll || originSet[origin]) {
+		if origin != "" {
+			c.Header("Vary", "Origin")
+		}
+		if origin != "" && (allowAll || originSet[strings.TrimRight(origin, "/")]) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, Last-Event-ID")
 			c.Header("Access-Control-Max-Age", "86400")
 		}
 		if c.Request.Method == http.MethodOptions {
@@ -177,11 +196,18 @@ func (g *gzipWriter) Write(data []byte) (int, error) {
 	return g.writer.Write(data)
 }
 
+// Flush 透传 flush，避免流式响应被 gzip 缓冲。
+func (g *gzipWriter) Flush() {
+	_ = g.writer.Flush()
+	g.ResponseWriter.Flush()
+}
+
 // Gzip 压缩中间件。
 func Gzip() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ct := c.Writer.Header().Get("Content-Type")
-		if strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") &&
+		if !strings.Contains(ct, "text/event-stream") &&
+			strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") &&
 			(strings.Contains(ct, "text/") || strings.Contains(ct, "application/json") || strings.Contains(ct, "application/javascript") || strings.Contains(ct, "image/svg+xml")) {
 			gz := gzip.NewWriter(c.Writer)
 			gw := &gzipWriter{ResponseWriter: c.Writer, writer: gz}

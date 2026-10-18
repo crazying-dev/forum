@@ -1,0 +1,3743 @@
+openapi: "3.1.0"
+info:
+  title: "妖精论坛 ov2 API"
+  version: "2.1.0"
+  description: "canonical base `/ov2/api`；`/api/v1` 为同 shape 别名；`/api/*` 为旧 APP 兼容层。SSE：`/ov2/api/world/stream`、`/ov2/api/messages/stream`。媒体统一经 `/ov2/api/media/<id>` 代理。"
+servers:
+  -
+    url: "http://localhost:8090"
+  -
+    url: "https://www.yjlt.top"
+tags:
+  -
+    name: "articles"
+  -
+    name: "auth"
+  -
+    name: "avatar"
+  -
+    name: "comments"
+  -
+    name: "compat"
+  -
+    name: "easter-egg"
+  -
+    name: "embeds"
+  -
+    name: "feed"
+  -
+    name: "guides"
+  -
+    name: "guilds"
+  -
+    name: "healthz"
+  -
+    name: "media"
+  -
+    name: "posts"
+  -
+    name: "reports"
+  -
+    name: "search"
+  -
+    name: "site"
+  -
+    name: "users"
+  -
+    name: "votes"
+paths:
+  /ov2/api/healthz:
+    get:
+      tags:
+        - "healthz"
+      summary: "GET /ov2/api/healthz"
+      operationId: "get_ov2_api_healthz"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/auth/register:
+    post:
+      tags:
+        - "auth"
+      summary: "POST /ov2/api/auth/register"
+      operationId: "post_ov2_api_auth_register"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/auth/login:
+    post:
+      tags:
+        - "auth"
+      summary: "POST /ov2/api/auth/login"
+      operationId: "post_ov2_api_auth_login"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/auth/logout:
+    post:
+      tags:
+        - "auth"
+      summary: "POST /ov2/api/auth/logout"
+      operationId: "post_ov2_api_auth_logout"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/auth/oauth/callback:
+    get:
+      tags:
+        - "auth"
+      summary: "GET /ov2/api/auth/oauth/callback"
+      operationId: "get_ov2_api_auth_oauth_callback"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/auth/register/code:
+    post:
+      tags:
+        - "auth"
+      summary: "POST /ov2/api/auth/register/code"
+      operationId: "post_ov2_api_auth_register_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/auth/password/reset/link:
+    post:
+      tags:
+        - "auth"
+      summary: "POST /ov2/api/auth/password/reset/link"
+      operationId: "post_ov2_api_auth_password_reset_link"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/auth/password/reset/validate:
+    get:
+      tags:
+        - "auth"
+      summary: "GET /ov2/api/auth/password/reset/validate"
+      operationId: "get_ov2_api_auth_password_reset_validate"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/auth/password/reset/confirm:
+    post:
+      tags:
+        - "auth"
+      summary: "POST /ov2/api/auth/password/reset/confirm"
+      operationId: "post_ov2_api_auth_password_reset_confirm"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/auth/verify-token:
+    get:
+      tags:
+        - "auth"
+      summary: "GET /ov2/api/auth/verify-token"
+      operationId: "get_ov2_api_auth_verify_token"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/users/me:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/me"
+      operationId: "get_ov2_api_users_me"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+    patch:
+      tags:
+        - "users"
+      summary: "PATCH /ov2/api/users/me"
+      operationId: "patch_ov2_api_users_me"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/sign-in:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/sign-in"
+      operationId: "post_ov2_api_users_me_sign_in"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/replies:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/me/replies"
+      operationId: "get_ov2_api_users_me_replies"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/users/me/verify-email:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/verify-email"
+      operationId: "post_ov2_api_users_me_verify_email"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/verify-email/confirm:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/verify-email/confirm"
+      operationId: "post_ov2_api_users_me_verify_email_confirm"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/delete:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/delete"
+      operationId: "post_ov2_api_users_me_delete"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/email-change/code:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/email-change/code"
+      operationId: "post_ov2_api_users_me_email_change_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/email-change/verify-old:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/email-change/verify-old"
+      operationId: "post_ov2_api_users_me_email_change_verify_old"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/email-change/new-code:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/email-change/new-code"
+      operationId: "post_ov2_api_users_me_email_change_new_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/me/email-change/confirm:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/email-change/confirm"
+      operationId: "post_ov2_api_users_me_email_change_confirm"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/{id}:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id"
+      operationId: "get_ov2_api_users_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/users/{id}/posts:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id/posts"
+      operationId: "get_ov2_api_users_id_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/users/{id}/comments:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id/comments"
+      operationId: "get_ov2_api_users_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/users/{id}/favorites:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id/favorites"
+      operationId: "get_ov2_api_users_id_favorites"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/users/{id}/follow:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/:id/follow"
+      operationId: "post_ov2_api_users_id_follow"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/users/{id}/following:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id/following"
+      operationId: "get_ov2_api_users_id_following"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/users/{id}/followers:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id/followers"
+      operationId: "get_ov2_api_users_id_followers"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/users/{id}/mutual:
+    get:
+      tags:
+        - "users"
+      summary: "GET /ov2/api/users/:id/mutual"
+      operationId: "get_ov2_api_users_id_mutual"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/posts:
+    get:
+      tags:
+        - "posts"
+      summary: "GET /ov2/api/posts"
+      operationId: "get_ov2_api_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+    post:
+      tags:
+        - "posts"
+      summary: "POST /ov2/api/posts"
+      operationId: "post_ov2_api_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/posts/random:
+    get:
+      tags:
+        - "posts"
+      summary: "GET /ov2/api/posts/random"
+      operationId: "get_ov2_api_posts_random"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/posts/picker-defaults:
+    get:
+      tags:
+        - "posts"
+      summary: "GET /ov2/api/posts/picker-defaults"
+      operationId: "get_ov2_api_posts_picker_defaults"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/posts/{id}:
+    get:
+      tags:
+        - "posts"
+      summary: "GET /ov2/api/posts/:id"
+      operationId: "get_ov2_api_posts_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/posts/{id}/like:
+    post:
+      tags:
+        - "posts"
+      summary: "POST /ov2/api/posts/:id/like"
+      operationId: "post_ov2_api_posts_id_like"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/posts/{id}/favorite:
+    post:
+      tags:
+        - "posts"
+      summary: "POST /ov2/api/posts/:id/favorite"
+      operationId: "post_ov2_api_posts_id_favorite"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/posts/{id}/delete:
+    post:
+      tags:
+        - "posts"
+      summary: "POST /ov2/api/posts/:id/delete"
+      operationId: "post_ov2_api_posts_id_delete"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/posts/{id}/report:
+    post:
+      tags:
+        - "posts"
+      summary: "POST /ov2/api/posts/:id/report"
+      operationId: "post_ov2_api_posts_id_report"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/posts/{id}/comments:
+    get:
+      tags:
+        - "posts"
+      summary: "GET /ov2/api/posts/:id/comments"
+      operationId: "get_ov2_api_posts_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+    post:
+      tags:
+        - "posts"
+      summary: "POST /ov2/api/posts/:id/comments"
+      operationId: "post_ov2_api_posts_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/comments/{id}:
+    delete:
+      tags:
+        - "comments"
+      summary: "DELETE /ov2/api/comments/:id"
+      operationId: "delete_ov2_api_comments_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/comments/{id}/like:
+    post:
+      tags:
+        - "comments"
+      summary: "POST /ov2/api/comments/:id/like"
+      operationId: "post_ov2_api_comments_id_like"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/guilds:
+    get:
+      tags:
+        - "guilds"
+      summary: "GET /ov2/api/guilds"
+      operationId: "get_ov2_api_guilds"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/guilds/{slug}:
+    get:
+      tags:
+        - "guilds"
+      summary: "GET /ov2/api/guilds/:slug"
+      operationId: "get_ov2_api_guilds_slug"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/guilds/{slug}/feed:
+    get:
+      tags:
+        - "guilds"
+      summary: "GET /ov2/api/guilds/:slug/feed"
+      operationId: "get_ov2_api_guilds_slug_feed"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/guilds/{slug}/members:
+    get:
+      tags:
+        - "guilds"
+      summary: "GET /ov2/api/guilds/:slug/members"
+      operationId: "get_ov2_api_guilds_slug_members"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/guilds/{slug}/leader:
+    get:
+      tags:
+        - "guilds"
+      summary: "GET /ov2/api/guilds/:slug/leader"
+      operationId: "get_ov2_api_guilds_slug_leader"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/guilds/{slug}/intro:
+    get:
+      tags:
+        - "guilds"
+      summary: "GET /ov2/api/guilds/:slug/intro"
+      operationId: "get_ov2_api_guilds_slug_intro"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/guilds/{slug}/join:
+    post:
+      tags:
+        - "guilds"
+      summary: "POST /ov2/api/guilds/:slug/join"
+      operationId: "post_ov2_api_guilds_slug_join"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/guilds/{slug}/join/cancel:
+    post:
+      tags:
+        - "guilds"
+      summary: "POST /ov2/api/guilds/:slug/join/cancel"
+      operationId: "post_ov2_api_guilds_slug_join_cancel"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/guilds/{slug}/leave:
+    post:
+      tags:
+        - "guilds"
+      summary: "POST /ov2/api/guilds/:slug/leave"
+      operationId: "post_ov2_api_guilds_slug_leave"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "slug"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/feed:
+    get:
+      tags:
+        - "feed"
+      summary: "GET /ov2/api/feed"
+      operationId: "get_ov2_api_feed"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/articles/search:
+    get:
+      tags:
+        - "articles"
+      summary: "GET /ov2/api/articles/search"
+      operationId: "get_ov2_api_articles_search"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/articles/{id}:
+    get:
+      tags:
+        - "articles"
+      summary: "GET /ov2/api/articles/:id"
+      operationId: "get_ov2_api_articles_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/search:
+    get:
+      tags:
+        - "search"
+      summary: "GET /ov2/api/search"
+      operationId: "get_ov2_api_search"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/guides:
+    get:
+      tags:
+        - "guides"
+      summary: "GET /ov2/api/guides"
+      operationId: "get_ov2_api_guides"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/guides/{id}:
+    get:
+      tags:
+        - "guides"
+      summary: "GET /ov2/api/guides/:id"
+      operationId: "get_ov2_api_guides_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/site/config:
+    get:
+      tags:
+        - "site"
+      summary: "GET /ov2/api/site/config"
+      operationId: "get_ov2_api_site_config"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/embeds:
+    get:
+      tags:
+        - "embeds"
+      summary: "GET /ov2/api/embeds"
+      operationId: "get_ov2_api_embeds"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/media/images:
+    post:
+      tags:
+        - "media"
+      summary: "POST /ov2/api/media/images"
+      operationId: "post_ov2_api_media_images"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/media/{id}:
+    get:
+      tags:
+        - "media"
+      summary: "GET /ov2/api/media/:id"
+      operationId: "get_ov2_api_media_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/votes/version:
+    post:
+      tags:
+        - "votes"
+      summary: "POST /ov2/api/votes/version"
+      operationId: "post_ov2_api_votes_version"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/votes/version/stats:
+    get:
+      tags:
+        - "votes"
+      summary: "GET /ov2/api/votes/version/stats"
+      operationId: "get_ov2_api_votes_version_stats"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/reports/bug:
+    post:
+      tags:
+        - "reports"
+      summary: "POST /ov2/api/reports/bug"
+      operationId: "post_ov2_api_reports_bug"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+    get:
+      tags:
+        - "reports"
+      summary: "GET /ov2/api/reports/bug"
+      operationId: "get_ov2_api_reports_bug"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/reports/bug/stats:
+    get:
+      tags:
+        - "reports"
+      summary: "GET /ov2/api/reports/bug/stats"
+      operationId: "get_ov2_api_reports_bug_stats"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/reports/bug/{id}:
+    get:
+      tags:
+        - "reports"
+      summary: "GET /ov2/api/reports/bug/:id"
+      operationId: "get_ov2_api_reports_bug_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /ov2/api/easter-egg:
+    get:
+      tags:
+        - "easter-egg"
+      summary: "GET /ov2/api/easter-egg"
+      operationId: "get_ov2_api_easter_egg"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+
+  /ov2/api/users/me/avatar:
+    post:
+      tags:
+        - "users"
+      summary: "POST /ov2/api/users/me/avatar"
+      operationId: "post_ov2_api_users_me_avatar"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          cookieAuth:
+
+  /ov2/api/avatar/{filename}:
+    get:
+      tags:
+        - "avatar"
+      summary: "GET /ov2/api/avatar/:filename"
+      operationId: "get_ov2_api_avatar_filename"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "filename"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+
+  /api/login:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/login"
+      operationId: "post_api_login"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/register:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/register"
+      operationId: "post_api_register"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/logout:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/logout"
+      operationId: "post_api_logout"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/login:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/login"
+      operationId: "post_api_user_login"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/register:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/register"
+      operationId: "post_api_user_register"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/logout:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/logout"
+      operationId: "post_api_user_logout"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/info:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/info"
+      operationId: "get_api_user_info"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+    put:
+      tags:
+        - "compat"
+      summary: "PUT /api/user/info"
+      operationId: "put_api_user_info"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/info"
+      operationId: "post_api_user_info"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/avatar/upload:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/avatar/upload"
+      operationId: "post_api_user_avatar_upload"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/:id"
+      operationId: "get_api_user_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}/posts:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/:id/posts"
+      operationId: "get_api_user_id_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}/favorites:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/:id/favorites"
+      operationId: "get_api_user_id_favorites"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}/following:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/:id/following"
+      operationId: "get_api_user_id_following"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}/followers:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/:id/followers"
+      operationId: "get_api_user_id_followers"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}/follow:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/:id/follow"
+      operationId: "post_api_user_id_follow"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/info:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/:id/info"
+      operationId: "get_api_users_id_info"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/posts:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/:id/posts"
+      operationId: "get_api_users_id_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/favorites:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/:id/favorites"
+      operationId: "get_api_users_id_favorites"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/following:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/:id/following"
+      operationId: "get_api_users_id_following"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/followers:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/:id/followers"
+      operationId: "get_api_users_id_followers"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/follow:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/users/:id/follow"
+      operationId: "post_api_users_id_follow"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/me/replies:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/me/replies"
+      operationId: "get_api_users_me_replies"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/posts"
+      operationId: "get_api_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts"
+      operationId: "post_api_posts"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/random:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/posts/random"
+      operationId: "get_api_posts_random"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/posts/:id"
+      operationId: "get_api_posts_id"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/create:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/create"
+      operationId: "post_api_posts_create"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}/like:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/:id/like"
+      operationId: "post_api_posts_id_like"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}/favorite:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/:id/favorite"
+      operationId: "post_api_posts_id_favorite"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}/report:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/:id/report"
+      operationId: "post_api_posts_id_report"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}/delete:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/:id/delete"
+      operationId: "post_api_posts_id_delete"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}/comments:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/posts/:id/comments"
+      operationId: "get_api_posts_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/:id/comments"
+      operationId: "post_api_posts_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/posts/{id}/comments/create:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/posts/:id/comments/create"
+      operationId: "post_api_posts_id_comments_create"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/comments/{id}/like:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/comments/:id/like"
+      operationId: "post_api_comments_id_like"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/comments/{id}/delete:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/comments/:id/delete"
+      operationId: "post_api_comments_id_delete"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/World/ALL:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/World/ALL"
+      operationId: "get_api_World_ALL"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/World/Send:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/World/Send"
+      operationId: "post_api_World_Send"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/world/ALL:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/world/ALL"
+      operationId: "get_api_world_ALL"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/world/Send:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/world/Send"
+      operationId: "post_api_world_Send"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/search:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/search"
+      operationId: "get_api_search"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/report-bug:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/report-bug"
+      operationId: "post_api_report_bug"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/huiguan:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/huiguan"
+      operationId: "get_api_huiguan"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/releases:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/releases"
+      operationId: "get_api_app_releases"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/releases/{platform}:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/releases/:platform"
+      operationId: "get_api_app_releases_platform"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "platform"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/check:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/check"
+      operationId: "get_api_app_check"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/download/{platform}/{filename}:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/download/:platform/:filename"
+      operationId: "get_api_app_download_platform_filename"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "platform"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "filename"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/mirror/{platform}/{filename}:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/mirror/:platform/:filename"
+      operationId: "get_api_app_mirror_platform_filename"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "platform"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "filename"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/cache:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/cache"
+      operationId: "get_api_app_cache"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/app/windows/forum.exe:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/app/windows/forum.exe"
+      operationId: "get_api_app_windows_forum_exe"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-register-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-register-code"
+      operationId: "post_api_email_send_register_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/send-register-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/send-register-code"
+      operationId: "post_api_send_register_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-code-reset-password:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-code-reset-password"
+      operationId: "post_api_email_send_code_reset_password"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/send-code-reset-password:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/send-code-reset-password"
+      operationId: "post_api_send_code_reset_password"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/reset-password-by-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/reset-password-by-code"
+      operationId: "post_api_email_reset_password_by_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/reset-password-by-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/reset-password-by-code"
+      operationId: "post_api_reset_password_by_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-change-password-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-change-password-code"
+      operationId: "post_api_email_send_change_password_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/password:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/password"
+      operationId: "post_api_user_password"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-verify-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-verify-code"
+      operationId: "post_api_email_send_verify_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/verify-code-email:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/verify-code-email"
+      operationId: "post_api_email_verify_code_email"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-verify-email:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-verify-email"
+      operationId: "post_api_email_send_verify_email"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/verify-email:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/verify-email"
+      operationId: "post_api_email_verify_email"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-change-email-old-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-change-email-old-code"
+      operationId: "post_api_email_send_change_email_old_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-change-email-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-change-email-code"
+      operationId: "post_api_email_send_change_email_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/email:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/email"
+      operationId: "post_api_user_email"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/email/send-delete-account-code:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/email/send-delete-account-code"
+      operationId: "post_api_email_send_delete_account_code"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/delete:
+    post:
+      tags:
+        - "compat"
+      summary: "POST /api/user/delete"
+      operationId: "post_api_user_delete"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      security:
+        -
+          legacyCookie:
+
+  /api/user/{id}/comments:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/user/:id/comments"
+      operationId: "get_api_user_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+  /api/users/{id}/comments:
+    get:
+      tags:
+        - "compat"
+      summary: "GET /api/users/:id/comments"
+      operationId: "get_api_users_id_comments"
+      responses:
+        200:
+          description: "OK"
+        400:
+          description: "Bad Request"
+        401:
+          description: "Unauthorized"
+        404:
+          description: "Not Found"
+        429:
+          description: "Too Many Requests"
+        500:
+          description: "Internal Server Error"
+      parameters:
+        -
+          name: "id"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+      security:
+        -
+          legacyCookie:
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: "apiKey"
+      in: "cookie"
+      name: "forum_session"
+    legacyCookie:
+      type: "apiKey"
+      in: "cookie"
+      name: "token"
+  schemas:
+    Error:
+      type: "object"
+      properties:
+        success:
+          type: "boolean"
+        message:
+          type: "string"
+    MediaAsset:
+      type: "object"
+      properties:
+        id:
+          type: "string"
+        url:
+          type: "string"
+        mime:
+          type: "string"
+        size:
+          type: "integer"
+        width:
+          type: "integer"
+        height:
+          type: "integer"
+        visibility:
+          type: "string"
+        owner_type:
+          type: "string"
+    WorldMessage:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        sender_id:
+          type: "string"
+        sender_name:
+          type: "string"
+        sender_avatar:
+          type: "string"
+        content:
+          type: "string"
+        content_format:
+          type: "string"
+        parent_id:
+          type: "integer"
+          nullable: true
+        guild_id:
+          type: "string"
+        guild_name:
+          type: "string"
+        is_leader:
+          type: "boolean"
+        is_admin:
+          type: "boolean"
+        created_at:
+          type: "string"
+          format: "date-time"
+    MessageSummary:
+      type: "object"
+      properties:
+        likes:
+          type: "integer"
+        comments:
+          type: "integer"
+        system:
+          type: "integer"
+        chat:
+          type: "integer"
+    ChatMessage:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        sender_type:
+          type: "string"
+          enum:
+            - "user"
+            - "admin"
+        sender_name:
+          type: "string"
+        sender_avatar:
+          type: "string"
+        admin_id:
+          type: "string"
+        content_html:
+          type: "string"
+        content_format:
+          type: "string"
+        created_at:
+          type: "string"
+          format: "date-time"
+    Changelog:
+      type: "object"
+      properties:
+        id:
+          type: "integer"
+        version:
+          type: "string"
+        title:
+          type: "string"
+        content_html:
+          type: "string"
+        published_at:
+          type: "string"
+          format: "date-time"
+    DownloadRelease:
+      type: "object"
+      properties:
+        platform:
+          type: "string"
+        version:
+          type: "string"
+        channel:
+          type: "string"
+        date:
+          type: "string"
+        size:
+          type: "integer"
+        url:
+          type: "string"
+        filename:
+          type: "string"
+        sha256:
+          type: "string"
+        notes:
+          type: "array"
+          items:
+            type: "string"
+        mandatory:
+          type: "boolean"
+    Announcement:
+      type: "object"
+      properties:
+        enabled:
+          type: "boolean"
+        text:
+          type: "string"
+        version:
+          type: "integer"
+        updated_at:
+          type: "string"

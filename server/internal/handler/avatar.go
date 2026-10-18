@@ -1,10 +1,6 @@
 package handler
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"image"
-	"image/jpeg"
 	"io"
 	"net/http"
 	"os"
@@ -12,12 +8,16 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+
+	"yj-forum/server/internal/media"
 )
 
-// ServeAvatar 提供头像文件（/avatar/:filename）。
+const maxAvatarBytes = 10 << 20
+
+// ServeAvatar 提供旧本地头像文件（/avatar/:filename）。
+// 新头像写 S3 并返回 /ov2/api/media/<id>，本路由只负责旧资源兼容。
 func (h *PostsHandler) ServeAvatar(c *gin.Context) {
 	filename := c.Param("filename")
-	// 路径穿越防护
 	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
 		c.Status(http.StatusBadRequest)
 		return
@@ -27,10 +27,11 @@ func (h *PostsHandler) ServeAvatar(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
+	c.Header("X-Content-Type-Options", "nosniff")
 	c.File(full)
 }
 
-// UploadAvatar 上传头像（multipart, 400x400 WebP）。
+// UploadAvatar 上传头像：统一走媒体服务（S3 或本地回退），写 users.avatar 为新媒体代理 URL。
 func (h *PostsHandler) UploadAvatar(c *gin.Context) {
 	uid := CurrentUser(c)
 	if uid == "" {
@@ -42,51 +43,42 @@ func (h *PostsHandler) UploadAvatar(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请选择图片文件"})
 		return
 	}
+	if file.Size > maxAvatarBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"success": false, "message": "头像不能超过10MB"})
+		return
+	}
 	src, err := file.Open()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "文件读取失败"})
 		return
 	}
 	defer src.Close()
-
-	// 解码并限制尺寸
-	img, format, err := image.Decode(io.LimitReader(src, 10<<20))
-	if err != nil || (format != "jpeg" && format != "png" && format != "webp") {
-		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "仅支持 JPG/PNG/WebP 图片"})
+	data, err := io.ReadAll(io.LimitReader(src, maxAvatarBytes+1))
+	if err != nil || len(data) > maxAvatarBytes {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"success": false, "message": "头像不能超过10MB"})
 		return
 	}
-	// 缩放到 400x400（保持比例居中裁切），输出 WebP
-	out := scaleToWebP(img, 400, 400)
-	_ = out
-
-	// 生成随机文件名
-	buf := make([]byte, 16)
-	_, _ = rand.Read(buf)
-	filename := hex.EncodeToString(buf) + ".webp"
-	if err := os.MkdirAll(h.Cfg.AvatarDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "存储目录创建失败"})
+	if h.Media == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "媒体服务未初始化"})
 		return
 	}
-	full := filepath.Join(h.Cfg.AvatarDir, filename)
-	if err := saveWebP(img, full); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "保存失败"})
-		return
-	}
-	avatarURL := "/avatar/" + filename
-	_ = h.DB.UpdateUserProfile(c.Request.Context(), uid, map[string]any{"avatar": avatarURL})
-	c.JSON(http.StatusOK, gin.H{"success": true, "avatar": avatarURL})
-}
-
-// 简易 WebP 保存（用 jpeg 替代：WebP 需 golang.org/x/image/webp 解码器支持）
-func saveWebP(img image.Image, path string) error {
-	f, err := os.Create(path)
+	asset, err := h.Media.Save(c.Request.Context(), media.SaveInput{
+		Data: data, OriginalName: file.Filename, Scene: "avatar",
+		OwnerType: "avatar", OwnerID: uid, UploaderUserID: uid,
+		Visibility: "public", MaxBytes: maxAvatarBytes,
+	})
 	if err != nil {
-		return err
+		msg := err.Error()
+		status := http.StatusInternalServerError
+		if strings.Contains(msg, "图片") || strings.Contains(msg, "文件") || strings.Contains(msg, "仅支持") || strings.Contains(msg, "超过") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"success": false, "message": msg})
+		return
 	}
-	defer f.Close()
-	return jpeg.Encode(f, img, &jpeg.Options{Quality: 85})
-}
-
-func scaleToWebP(img image.Image, w, h int) []byte {
-	return nil // 占位：由 saveWebP 直接编码
+	if err := h.DB.UpdateUserProfile(c.Request.Context(), uid, map[string]any{"avatar": asset.PublicURL}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "头像保存失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "avatar": asset.PublicURL})
 }

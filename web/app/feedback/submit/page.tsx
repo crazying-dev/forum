@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { ApiException, miscApi } from "@/lib/api";
+import { AltchaWidget, type AltchaWidgetHandle } from "@/components/AltchaWidget";
 
 /** 提交反馈：游客也可提交，成功后引导去反馈中心查看 */
 export default function FeedbackSubmitPage() {
@@ -14,6 +15,14 @@ export default function FeedbackSubmitPage() {
   const [contact, setContact] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const altchaRef = useRef<AltchaWidgetHandle>(null);
+
+  const prepareAltcha = async (): Promise<string | undefined | null> => {
+    const widget = altchaRef.current;
+    if (!widget || !widget.isEnabled()) return undefined;
+    const payload = await widget.ensurePayload();
+    return payload || null;
+  };
 
   const submit = async () => {
     if (!title.trim() || !detail.trim()) {
@@ -21,6 +30,12 @@ export default function FeedbackSubmitPage() {
       return;
     }
     setSubmitting(true);
+    const altcha = await prepareAltcha();
+    if (altcha === null) {
+      toast("请先完成人机验证", "warning");
+      setSubmitting(false);
+      return;
+    }
     try {
       await miscApi.reportBug({
         title: title.trim(),
@@ -28,7 +43,8 @@ export default function FeedbackSubmitPage() {
         steps: steps.trim(),
         contact: contact.trim(),
         page_url: window.location.href,
-      });
+      }, altcha || undefined);
+      altchaRef.current?.reset();
       setDone(true);
     } catch (e) {
       toast(e instanceof ApiException ? e.message : "提交失败，请稍后重试", "error");
@@ -123,6 +139,7 @@ export default function FeedbackSubmitPage() {
           onChange={(e) => setContact(e.target.value)}
         />
 
+        <AltchaWidget ref={altchaRef} onError={(message) => toast(message, "warning")} />
         <button className="feedback-submit-btn" type="button" disabled={submitting} onClick={submit}>
           {submitting ? "提交中..." : "提交反馈"}
         </button>

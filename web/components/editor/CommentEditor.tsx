@@ -1,9 +1,9 @@
 "use client";
 
 // 评论富文本编辑器（TipTap 3.31.3）：
-// - 工具条：加粗/斜体/删除线、链接、图片上传（scene=comment_image）、emoji 面板、插入引用（@，弹窗内三 Tab）
+// - 工具条：加粗/斜体/删除线、链接、图片上传（scene 可配，默认 comment_image）、emoji 面板、插入引用（@，弹窗内三 Tab）
 // - 选中图片：紧凑宽度条（25/50/75/100% + 自定义 40-2400px + 还原；宽度存 width 属性）
-// - Ctrl/Cmd+Enter 提交；纯文本 1-500 字（纯图片 / 纯引用卡片视为有效）
+// - Ctrl/Cmd+Enter 提交；纯文本上限默认 500（可通过 maxChars 覆盖；纯图片 / 纯引用卡片视为有效）
 // - 紧凑尺寸（.comment-editor-*），评论以 HTML 存储（服务端统一净化）
 
 import { useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -146,6 +146,10 @@ export default function CommentEditor({
   placeholder = "写下你的评论…",
   editorRef,
   submitting = false,
+  maxChars = MAX_COMMENT_CHARS,
+  maxImages = Number.POSITIVE_INFINITY,
+  uploadScene = "comment_image",
+  allowQuotePicker = true,
 }: {
   value: string;
   onChange: (html: string) => void;
@@ -154,6 +158,14 @@ export default function CommentEditor({
   editorRef?: React.RefObject<CommentEditorHandle | null>;
   /** 提交中：禁用发送按钮，防双击重复 */
   submitting?: boolean;
+  /** 纯文本字数上限（默认评论 500；世界频道 2000） */
+  maxChars?: number;
+  /** 单条消息图片上限（默认不限；世界频道 9） */
+  maxImages?: number;
+  /** 图片上传场景（默认 comment_image；世界频道 world_message） */
+  uploadScene?: string;
+  /** 是否显示「插入引用」按钮（世界频道不支持引用卡片） */
+  allowQuotePicker?: boolean;
 }) {
   const { toast } = useToast();
   const [showEmoji, setShowEmoji] = useState(false);
@@ -314,10 +326,17 @@ export default function CommentEditor({
       toast("图片大小不能超过 5MB", "error");
       return;
     }
+    if (Number.isFinite(maxImages)) {
+      const imageCount = (editor.getHTML().match(/<img\b/gi) ?? []).length;
+      if (imageCount >= maxImages) {
+        toast(`图片最多 ${maxImages} 张`, "warning");
+        return;
+      }
+    }
     setUploading(true);
     try {
-      const r = await mediaApi.upload(file, "comment_image");
-      editor.chain().focus().setImage({ src: r.url || `/api/v1/media/${r.id}` }).run();
+      const r = await mediaApi.upload(file, uploadScene);
+      editor.chain().focus().setImage({ src: r.url || `/ov2/api/media/${r.id}` }).run();
     } catch (err) {
       toast(err instanceof ApiException ? err.message : "图片上传失败", "error");
     } finally {
@@ -337,8 +356,8 @@ export default function CommentEditor({
     const html = editor?.getHTML() ?? value;
     const text = plainTextOf(html);
     const len = Array.from(text).length;
-    if (len > MAX_COMMENT_CHARS) {
-      toast(`评论内容最多 ${MAX_COMMENT_CHARS} 字`, "warning");
+    if (len > maxChars) {
+      toast(`内容最多 ${maxChars} 字`, "warning");
       return;
     }
     if (len === 0 && !hasRichMedia(html)) {
@@ -417,18 +436,22 @@ export default function CommentEditor({
               </div>
             )}
           </div>
-          <span className="editor-sep"></span>
-          <button
-            type="button"
-            className="editor-tool"
-            title="插入引用"
-            aria-label="插入引用"
-            onClick={() => setPickerKind("user")}
-          >
-            <i className="fa fa-at"></i>
-          </button>
+          {allowQuotePicker && (
+            <>
+              <span className="editor-sep"></span>
+              <button
+                type="button"
+                className="editor-tool"
+                title="插入引用"
+                aria-label="插入引用"
+                onClick={() => setPickerKind("user")}
+              >
+                <i className="fa fa-at"></i>
+              </button>
+            </>
+          )}
           <span className="comment-editor-count">
-            <span className={plainLen > MAX_COMMENT_CHARS ? "over" : ""}>{plainLen}</span>/{MAX_COMMENT_CHARS}
+            <span className={plainLen > maxChars ? "over" : ""}>{plainLen}</span>/{maxChars}
           </span>
         </div>
       )}
@@ -533,7 +556,9 @@ export default function CommentEditor({
         </Modal>
       )}
 
-      {pickerKind && <QuotePickerModal kind={pickerKind} onClose={() => setPickerKind(null)} onPick={insertEmbed} />}
+      {pickerKind && allowQuotePicker && (
+        <QuotePickerModal kind={pickerKind} onClose={() => setPickerKind(null)} onPick={insertEmbed} />
+      )}
     </div>
   );
 }

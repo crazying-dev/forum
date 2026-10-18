@@ -1,0 +1,17 @@
+DROP TABLE IF EXISTS media_references;
+
+ALTER TABLE media_assets
+  DROP COLUMN IF EXISTS storage_provider,
+  DROP COLUMN IF EXISTS bucket,
+  DROP COLUMN IF EXISTS object_key,
+  DROP COLUMN IF EXISTS public_url,
+  DROP COLUMN IF EXISTS owner_type,
+  DROP COLUMN IF EXISTS owner_id,
+  DROP COLUMN IF EXISTS guild_uuid,
+  DROP COLUMN IF EXISTS width,
+  DROP COLUMN IF EXISTS height,
+  DROP COLUMN IF EXISTS sha256,
+  DROP COLUMN IF EXISTS visibility,
+  DROP COLUMN IF EXISTS is_legacy,
+  DROP COLUMN IF EXISTS gc_state,
+  DROP COLUMN IF EXISTS uploader_admin_id;

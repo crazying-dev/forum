@@ -1,0 +1,18 @@
+{
+  "identities": [
+    {
+      "name": "yj-forum",
+      "credentials": [
+        { "accessKey": "yjforum", "secretKey": "yjforum-dev-secret" }
+      ],
+      "actions": ["Read:yj-forum", "Write:yj-forum", "List:yj-forum", "Tagging:yj-forum"]
+    },
+    {
+      "name": "yj-forum-admin",
+      "credentials": [
+        { "accessKey": "yjforumadmin", "secretKey": "yjforum-admin-dev-secret" }
+      ],
+      "actions": ["Read:yj-forum", "Write:yj-forum", "List:yj-forum", "Tagging:yj-forum"]
+    }
+  ]
+}

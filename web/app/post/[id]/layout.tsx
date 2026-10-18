@@ -29,7 +29,7 @@ const getPost = cache(async (id: string) => {
   // 无 Cookie（匿名/爬虫）：保持 revalidate 共享缓存；带 Cookie（作者本人视角）：no-store，
   // 避免 404/个性化数据被后续请求按 URL 复用
   const cookie = (await cookies()).toString();
-  const r = await fetchApi<PostDetailResp>(`/api/v1/posts/${encodeURIComponent(id)}?track=0`, 300, {
+  const r = await fetchApi<PostDetailResp>(`/posts/${encodeURIComponent(id)}?track=0`, 300, {
     headers: cookie ? { Cookie: cookie } : {},
     noStore: !!cookie,
   });

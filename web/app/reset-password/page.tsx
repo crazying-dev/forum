@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthInput } from "@/components/ui/AuthInput";
 import { authApi, ApiException } from "@/lib/api";
+import { AltchaWidget, type AltchaWidgetHandle } from "@/components/AltchaWidget";
 
 type Status = "validating" | "valid" | "submitting" | "success" | "invalid";
 
@@ -24,6 +25,14 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [err, setErr] = useState("");
+  const altchaRef = useRef<AltchaWidgetHandle>(null);
+
+  const prepareAltcha = async (): Promise<string | undefined | null> => {
+    const widget = altchaRef.current;
+    if (!widget || !widget.isEnabled()) return undefined;
+    const payload = await widget.ensurePayload();
+    return payload || null;
+  };
 
   // 挂载时校验 token（每次挂载只校验一次；异步函数内更新状态，避免 effect 同步级联渲染）
   useEffect(() => {
@@ -72,8 +81,15 @@ export default function ResetPasswordPage() {
     }
     setErr("");
     setStatus("submitting");
+    const altcha = await prepareAltcha();
+    if (altcha === null) {
+      setErr("请先完成人机验证");
+      setStatus("valid");
+      return;
+    }
     try {
-      await authApi.confirmResetPassword(token, password);
+      await authApi.confirmResetPassword(token, password, altcha || undefined);
+      altchaRef.current?.reset();
       setStatus("success");
     } catch (e) {
       setErr(e instanceof ApiException ? e.message : "重置失败，请稍后再试");
@@ -131,6 +147,7 @@ export default function ResetPasswordPage() {
               onChange={(v) => { setPassword2(v); if (err) setErr(""); }}
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
+            <AltchaWidget ref={altchaRef} onError={(message) => setErr(message)} />
             <div className="auth-error">{err}</div>
             <button className="auth-btn primary" disabled={status === "submitting"} onClick={submit}>
               {status === "submitting" ? "提交中..." : "确认重置"}

@@ -1,0 +1,99 @@
+[
+  {
+    "tag_name": "Windows-V1.4.0-beta",
+    "body": "- beta 修复 A\n- beta 修复 B",
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-10-12T09:30:00Z",
+    "assets": [
+      {
+        "name": "forum_setup.exe",
+        "size": 160000000,
+        "browser_download_url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.4.0-beta/forum_setup.exe",
+        "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ]
+  },
+  {
+    "tag_name": "Windows-V1.3.18",
+    "body": "## 修复\n- 无限历纪年改为 1 起算\n- 设置页「年制换算」支持无限元年\n\n",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-10-10T08:00:00Z",
+    "assets": [
+      {
+        "name": "forum_setup.exe",
+        "size": 158186366,
+        "browser_download_url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.18/forum_setup.exe",
+        "digest": "sha256:1a78cd3930a7ebe7f3f28bb48689131a33e4762a7a304a159b67af2710e6e672"
+      },
+      {
+        "name": "forum-windows-portable.zip",
+        "size": 90000000,
+        "browser_download_url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.18/forum-windows-portable.zip",
+        "digest": ""
+      }
+    ]
+  },
+  {
+    "tag_name": "Android-V1.0.16",
+    "body": "* 修复列表跳回顶部\n* 版本号 versionCode 17",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-10-09T12:00:00Z",
+    "assets": [
+      {
+        "name": "forum-android-1.0.16.apk",
+        "size": 8152504,
+        "browser_download_url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.16/forum-android-1.0.16.apk",
+        "digest": "sha256:1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61"
+      }
+    ]
+  },
+  {
+    "tag_name": "Linux-V1.0.0",
+    "body": "Linux 首个版本",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-01T00:00:00Z",
+    "assets": [
+      {
+        "name": "forum_1.0.0_amd64.deb",
+        "size": 52345678,
+        "browser_download_url": "https://github.com/crazying-dev/forum/releases/download/Linux-V1.0.0/forum_1.0.0_amd64.deb",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ]
+  },
+  {
+    "tag_name": "Windows-V9.9.9",
+    "body": "草稿不应出现",
+    "draft": true,
+    "prerelease": false,
+    "published_at": "2026-10-13T00:00:00Z",
+    "assets": [
+      {
+        "name": "forum_setup.exe",
+        "size": 1,
+        "browser_download_url": "https://github.com/crazying-dev/forum/releases/download/Windows-V9.9.9/forum_setup.exe",
+        "digest": ""
+      }
+    ]
+  },
+  {
+    "tag_name": "Docs-2026",
+    "body": "普通标签，不解析为平台发布",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-10-01T00:00:00Z",
+    "assets": []
+  },
+  {
+    "tag_name": "macOS-V2.0.0",
+    "body": "macOS 版本",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-10-11T00:00:00Z",
+    "assets": []
+  }
+]

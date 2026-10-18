@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strings"
 	"time"
 
 	"yj-forum/server/internal/cache"
@@ -28,6 +29,43 @@ func NewCacheSet() *CacheSet {
 		Comments:   cache.New(200, 60*time.Second),
 		ViewDedup:  cache.New(10000, 30*time.Minute),
 	}
+}
+
+// Invalidate 应用 cache_invalidations 消费者投递的失效指令。
+// scope 标识缓存域，key 支持 "*" 后缀（按前缀删除）；返回 false 表示 scope 未知。
+func (s *CacheSet) Invalidate(scope, key string) bool {
+	if s == nil {
+		return false
+	}
+	var c *cache.Cache
+	switch strings.ToLower(strings.TrimSpace(scope)) {
+	case "posts", "post_list", "post:list":
+		c = s.Posts
+	case "post_detail", "post", "post:detail":
+		c = s.PostDetail
+	case "comments", "comment":
+		c = s.Comments
+	case "users", "user", "user_info", "user:info":
+		c = s.UserInfo
+	case "guilds", "guild":
+		c = s.Guilds
+	case "search":
+		c = s.Search
+	case "view_dedup", "view:dedup":
+		c = s.ViewDedup
+	case "site_config", "announcement", "blacklist", "changelog":
+		// 这些配置/日志直接读 PG，没有进程内缓存；消费成功即可，避免队列重试至死信
+		return true
+	default:
+		return false
+	}
+	key = strings.TrimSpace(key)
+	if strings.HasSuffix(key, "*") {
+		c.DeletePrefix(strings.TrimSuffix(key, "*"))
+	} else {
+		c.Delete(key)
+	}
+	return true
 }
 
 func itoa(n int) string {

@@ -467,3 +467,9 @@ func nullIfEmpty(s string) any {
 	}
 	return s
 }
+
+// CleanExpiredAltchaUsed 清理已过期的 ALTCHA 一次性挑战记录。
+func (d *DB) CleanExpiredAltchaUsed(ctx context.Context) error {
+	_, err := d.Exec(ctx, `DELETE FROM altcha_used WHERE expires_at < NOW() - INTERVAL '1 hour'`)
+	return err
+}

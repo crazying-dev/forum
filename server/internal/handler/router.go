@@ -5,36 +5,98 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"yj-forum/server/internal/altcha"
 	"yj-forum/server/internal/auth"
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/email"
+	"yj-forum/server/internal/media"
 	"yj-forum/server/internal/middleware"
+	"yj-forum/server/internal/releases"
+	"yj-forum/server/internal/sse"
 )
 
-// Register 注册全部路由（RESTful /api/v1）；返回帖子处理器，供后台定时发布任务复用 DB/缓存句柄。
-func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth.SessionManager, mailer *email.Sender) *PostsHandler {
+type apiHandlers struct {
+	authH                  *AuthHandler
+	postsH                 *PostsHandler
+	miscH                  *MiscHandler
+	accountH               *AccountHandler
+	siteH                  *SiteHandler
+	guildsH                *GuildsHandler
+	mediaH                 *MediaHandler
+	embedsH                *EmbedsHandler
+	guidesH                *GuidesHandler
+	captchaH               *CaptchaHandler
+	siteFeatureH           *SiteFeatureHandlers
+	messagesH              *MessageHandler
+	worldH                 *WorldHandler
+	emailChangeVerifyLimit gin.HandlerFunc
+}
+
+// Register 注册全部路由：/ov2/api 为 canonical；/api/v1 为新 shape 别名（一个版本周期）。
+// 旧 APP 兼容层 /api/* 由 legacy.RegisterRoutes 单独挂载（Step 6）。
+func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth.SessionManager, mailer *email.Sender, mediaSvc *media.Service, cacheSet *CacheSet) *PostsHandler {
 	r.Use(middleware.Logger())
 	r.Use(middleware.SecurityHeaders())
-	r.Use(middleware.CORS(cfg.CORSOrigins))
+	r.Use(middleware.CORS(cfg.CORSOrigins, cfg.AppEnv != "prod"))
 	r.Use(middleware.Gzip())
 	r.Use(middleware.CSRF(cfg.CORSOrigins))
 
-	authH := &AuthHandler{DB: db, Cfg: cfg, Sessions: sessions, Mailer: mailer}
-	cacheSet := NewCacheSet()
-	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions}
-	miscH := &MiscHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions}
+	if cacheSet == nil {
+		cacheSet = NewCacheSet()
+	}
+	altchaSvc := altcha.New(db, altcha.Config{
+		Enabled: cfg.AltchaEnabled, HMACKey: cfg.AltchaHMACKey,
+		Algorithm: cfg.AltchaAlgorithm, Cost: cfg.AltchaCost, Expires: cfg.AltchaExpires,
+	})
+	authH := &AuthHandler{DB: db, Cfg: cfg, Sessions: sessions, Mailer: mailer, Altcha: altchaSvc}
+	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions, Media: mediaSvc}
+	miscH := &MiscHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions, Altcha: altchaSvc}
 	accountH := &AccountHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions, Cache: cacheSet}
 	siteH := &SiteHandler{DB: db}
 	guildsH := &GuildsHandler{DB: db, Cache: cacheSet, Sessions: sessions}
-	mediaH := &MediaHandler{DB: db, Cfg: cfg}
+	mediaH := &MediaHandler{DB: db, Cfg: cfg, Media: mediaSvc, Sessions: sessions}
 	embedsH := &EmbedsHandler{DB: db}
 	guidesH := &GuidesHandler{DB: db}
 
-	api := r.Group("/api/v1")
+	hub := sse.NewHub()
+	SetMessageHub(hub)
+	messagesH := &MessageHandler{DB: db, Sessions: sessions}
+	worldH := &WorldHandler{DB: db, Cfg: cfg, Hub: hub, Sessions: sessions}
+	captchaH := NewCaptchaHandler(altchaSvc)
+	siteFeatureH := NewSiteFeatureHandlers(db, releases.NewService(cfg.GitHubToken))
 
-	// 邮箱换绑两步验证共用同一 IP 频控桶（两侧使用同一实例才能共享计数）
-	emailChangeVerifyLimit := middleware.RateLimit("email_change_verify", 15, 5*time.Minute)
+	h := apiHandlers{
+		authH: authH, postsH: postsH, miscH: miscH, accountH: accountH,
+		siteH: siteH, guildsH: guildsH, mediaH: mediaH, embedsH: embedsH, guidesH: guidesH,
+		captchaH: captchaH, siteFeatureH: siteFeatureH, messagesH: messagesH, worldH: worldH,
+		// 邮箱换绑两步验证共用同一 IP 频控桶（两侧使用同一实例才能共享计数）
+		emailChangeVerifyLimit: middleware.RateLimit("email_change_verify", 15, 5*time.Minute),
+	}
+
+	apiV2 := r.Group("/ov2/api")
+	registerAPIRoutes(apiV2, h)
+
+	apiV1 := r.Group("/api/v1")
+	apiV1.Use(func(c *gin.Context) {
+		c.Header("Deprecation", "true")
+		c.Next()
+	})
+	registerAPIRoutes(apiV1, h)
+
+	// 旧 APP 兼容层：/api/*（不含 /api/v1），独立 handler，显式跳过 CSRF
+	RegisterLegacyRoutes(r, cfg, db, sessions, mailer)
+
+	return postsH
+}
+
+func registerAPIRoutes(api *gin.RouterGroup, h apiHandlers) {
+	authH, postsH, miscH, accountH := h.authH, h.postsH, h.miscH, h.accountH
+	siteH, guildsH, mediaH, embedsH, guidesH := h.siteH, h.guildsH, h.mediaH, h.embedsH, h.guidesH
+
+	api.GET("/healthz", func(c *gin.Context) {
+		c.JSON(200, gin.H{"ok": true, "service": "yj-forum"})
+	})
 
 	// ---- 认证 ----
 	api.POST("/auth/register", authH.Register)
@@ -58,9 +120,9 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.POST("/users/me/verify-email/confirm", middleware.RateLimit("verify_email", 10, 5*time.Minute), authH.AuthRequired(), miscH.VerifyCodeEmail)
 	api.POST("/users/me/delete", middleware.RateLimit("account_delete", 5, 300*time.Second), authH.AuthRequired(), accountH.DeleteAccount)
 	api.POST("/users/me/email-change/code", middleware.RateLimit("email_change_code", 10, 10*time.Minute), authH.AuthRequired(), accountH.SendEmailChangeOldCode)
-	api.POST("/users/me/email-change/verify-old", emailChangeVerifyLimit, authH.AuthRequired(), accountH.VerifyEmailChangeOld)
+	api.POST("/users/me/email-change/verify-old", h.emailChangeVerifyLimit, authH.AuthRequired(), accountH.VerifyEmailChangeOld)
 	api.POST("/users/me/email-change/new-code", middleware.RateLimit("email_change_new", 10, 10*time.Minute), authH.AuthRequired(), accountH.SendEmailChangeNewCode)
-	api.POST("/users/me/email-change/confirm", emailChangeVerifyLimit, authH.AuthRequired(), accountH.ConfirmEmailChange)
+	api.POST("/users/me/email-change/confirm", h.emailChangeVerifyLimit, authH.AuthRequired(), accountH.ConfirmEmailChange)
 	api.GET("/users/:id", authH.UserProfile)
 	api.GET("/users/:id/posts", authH.UserPosts)
 	api.GET("/users/:id/comments", authH.UserComments)
@@ -114,7 +176,7 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	// ---- 引用卡片 / 媒体 ----
 	api.GET("/embeds", embedsH.List)
 	api.POST("/media/images", middleware.RateLimit("media_image", 30, 600*time.Second), authH.AuthRequired(), mediaH.UploadImage)
-	api.GET("/media/:id", mediaH.ServeImage)
+	api.GET("/media/:id", authH.OptionalAuth(), mediaH.ServeImage)
 
 	// ---- 投票 / 举报 / 杂项 ----
 	api.POST("/votes/version", miscH.VoteVersion)
@@ -129,5 +191,9 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	api.POST("/users/me/avatar", authH.AuthRequired(), postsH.UploadAvatar)
 	api.GET("/avatar/:filename", postsH.ServeAvatar)
 
-	return postsH
+	// ---- 新增模块（Batch 2）----
+	RegisterCaptchaRoutes(api, h.captchaH)
+	RegisterSiteFeatureRoutes(api, h.siteFeatureH)
+	RegisterMessageRoutes(api, h.messagesH)
+	RegisterWorldRoutes(api, h.worldH)
 }

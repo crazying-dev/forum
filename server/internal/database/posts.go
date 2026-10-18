@@ -249,9 +249,15 @@ func (d *DB) SendPost(ctx context.Context, userID, title, content, category stri
 	}
 	postID := GenID("PS")
 	notified := publishedAt == nil // 立即帖创建即视为已通知；定时帖待补偿任务置 TRUE
-	_, err := d.Exec(ctx, `INSERT INTO posts (id, user_id, title, content, content_format, category, guild_id, published_at, publish_notified)
-		VALUES ($1,$2,$3,$4,'html',$5,$6,COALESCE($7, NOW()),$8)`,
-		postID, userID, title, sanitize.SanitizeRichContent(content), category, guildID, publishedAt, notified)
+	clean := sanitize.SanitizeRichContent(content)
+	err := d.Tx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO posts (id, user_id, title, content, content_format, category, guild_id, published_at, publish_notified)
+			VALUES ($1,$2,$3,$4,'html',$5,$6,COALESCE($7, NOW()),$8)`,
+			postID, userID, title, clean, category, guildID, publishedAt, notified); err != nil {
+			return err
+		}
+		return syncMediaReferencesTx(ctx, tx, "post", postID, clean)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -300,8 +306,27 @@ func (d *DB) IncrementPostViews(ctx context.Context, postID string) error {
 
 // DeletePost 删除（仅作者，软删 status=0）。
 func (d *DB) DeletePost(ctx context.Context, postID, userID string) (bool, error) {
-	tag, err := d.Exec(ctx, `UPDATE posts SET status = 0 WHERE id = $1 AND user_id = $2`, postID, userID)
-	return tag > 0, err
+	deleted := false
+	err := d.Tx(ctx, func(tx pgx.Tx) error {
+		var content string
+		err := tx.QueryRow(ctx, `SELECT content FROM posts WHERE id = $1 AND user_id = $2 AND status = 1`, postID, userID).Scan(&content)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `UPDATE posts SET status = 0 WHERE id = $1 AND user_id = $2`, postID, userID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+		deleted = true
+		return softDeleteUnreferencedMediaTx(ctx, tx, "post", postID)
+	})
+	return deleted, err
 }
 
 // itoa 简易 int -> string。

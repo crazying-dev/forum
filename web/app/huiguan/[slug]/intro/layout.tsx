@@ -11,7 +11,7 @@ interface GuildIntroSeoResp {
 }
 
 const getIntroPage = cache(async (slug: string) => {
-  const r = await fetchApi<GuildIntroSeoResp>(`/api/v1/guilds/${encodeURIComponent(slug)}/intro`);
+  const r = await fetchApi<GuildIntroSeoResp>(`/guilds/${encodeURIComponent(slug)}/intro`);
   return { ok: r.ok, data: r.data ?? null };
 });
 

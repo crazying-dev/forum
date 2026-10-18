@@ -26,6 +26,18 @@ func (h *AuthHandler) AuthRequired() gin.HandlerFunc {
 	}
 }
 
+// OptionalAuth 可选登录：有有效 session 时写入 userID，无 session 也继续（用于公开媒体 ACL）。
+func (h *AuthHandler) OptionalAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if token, err := c.Cookie(cookieName); err == nil && token != "" {
+			if uid, verr := h.Sessions.Validate(c.Request.Context(), token); verr == nil && uid != "" {
+				c.Set("userID", uid)
+			}
+		}
+		c.Next()
+	}
+}
+
 // CurrentUser 从 context 读取 userID（可为空）。
 func CurrentUser(c *gin.Context) string {
 	v, _ := c.Get("userID")

@@ -379,7 +379,9 @@ export default function UserPage() {
               disabled={signingIn || signedToday}
               onClick={doSignIn}
             >
-              <i className="fa fa-calendar-check-o"></i> {signedToday ? "今日已签到" : "今日签到 +10"}
+              <i className="fa fa-calendar-check-o"></i>
+              <span className="user-signin-label user-signin-label-desktop">{signedToday ? "今日已签到" : "今日签到 +10"}</span>
+              <span className="user-signin-label user-signin-label-mobile">{signedToday ? "已签到" : "签到"}</span>
             </button>
           )}
           {isSelf && !profile.deleted && (

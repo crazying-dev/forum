@@ -66,7 +66,6 @@ func (s *Sender) Send(subject, body string, receivers []string, htmlContent stri
 	}
 
 	from := fmt.Sprintf("%s <%s>", s.FromName, s.User)
-	msg := buildMIME(from, s.User, unique, subject, body, htmlContent)
 
 	addr := fmt.Sprintf("%s:%d", s.Host, s.Port)
 	auth := smtp.PlainAuth("", s.User, s.Password, s.Host)
@@ -86,25 +85,28 @@ func (s *Sender) Send(subject, body string, receivers []string, htmlContent stri
 	if err := client.Auth(auth); err != nil {
 		return false, err
 	}
-	if err := client.Mail(s.User); err != nil {
-		return false, err
-	}
+	// 逐收件人单独发送：避免 To: 头泄露其他收件人邮箱（隐私）
 	for _, r := range unique {
+		if err := client.Mail(s.User); err != nil {
+			return false, err
+		}
 		if err := client.Rcpt(r); err != nil {
 			return false, err
 		}
+		w, err := client.Data()
+		if err != nil {
+			return false, err
+		}
+		msg := buildMIME(from, r, []string{r}, subject, body, htmlContent)
+		if _, err := w.Write([]byte(msg)); err != nil {
+			return false, err
+		}
+		if err := w.Close(); err != nil {
+			return false, err
+		}
+		_ = client.Reset()
 	}
-	w, err := client.Data()
-	if err != nil {
-		return false, err
-	}
-	if _, err := w.Write([]byte(msg)); err != nil {
-		return false, err
-	}
-	if err := w.Close(); err != nil {
-		return false, err
-	}
-	log.Printf("[EMAIL] 已发送 %s -> %v", subject, unique)
+	log.Printf("[EMAIL] 已发送 %s -> %d 位收件人", subject, len(unique))
 	return true, nil
 }
 

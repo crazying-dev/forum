@@ -13,7 +13,7 @@ interface GuildLeaderSeoResp {
 }
 
 const getLeaderPage = cache(async (slug: string) => {
-  const r = await fetchApi<GuildLeaderSeoResp>(`/api/v1/guilds/${encodeURIComponent(slug)}/leader`);
+  const r = await fetchApi<GuildLeaderSeoResp>(`/guilds/${encodeURIComponent(slug)}/leader`);
   return { ok: r.ok, data: r.data ?? null };
 });
 

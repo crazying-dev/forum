@@ -17,7 +17,7 @@ interface UserProfileResp {
 }
 
 const getUser = cache(async (id: string) => {
-  const r = await fetchApi<UserProfileResp>(`/api/v1/users/${encodeURIComponent(id)}`);
+  const r = await fetchApi<UserProfileResp>(`/users/${encodeURIComponent(id)}`);
   return { ok: r.ok, status: r.status, user: r.data?.user ?? null };
 });
 

@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -111,12 +113,13 @@ func (h *AuthHandler) UserPosts(c *gin.Context) {
 // ---- PATCH /api/v1/users/me ----
 
 type updateProfileReq struct {
-	Name     *string `json:"Name"`
-	Gender   *int    `json:"gender"`
-	Age      *string `json:"age"`
-	Intro    *string `json:"intro"`
-	Avatar   *string `json:"avatar"`
-	Password *string `json:"password"`
+	Name            *string `json:"Name"`
+	Gender          *int    `json:"gender"`
+	Age             *string `json:"age"`
+	Intro           *string `json:"intro"`
+	Avatar          *string `json:"avatar"`
+	Password        *string `json:"password"`
+	CurrentPassword *string `json:"current_password"`
 }
 
 // UpdateMe 修改资料（白名单字段，灵力值 spirit / 签到日期 last_sign_in 不可由客户端修改）。
@@ -154,21 +157,79 @@ func (h *AuthHandler) UpdateMe(c *gin.Context) {
 		fields["intro"] = *req.Intro
 	}
 	if req.Avatar != nil && *req.Avatar != "" {
-		fields["avatar"] = *req.Avatar
+		avatar := strings.TrimSpace(*req.Avatar)
+		if !validAvatarURL(avatar) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "头像地址不合法"})
+			return
+		}
+		fields["avatar"] = avatar
 	}
+	passwordChanged := false
 	if req.Password != nil && *req.Password != "" {
+		// 改密必须提供当前密码：防止会话被劫持后直接接管账号
+		if req.CurrentPassword == nil || strings.TrimSpace(*req.CurrentPassword) == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请输入当前密码"})
+			return
+		}
+		if len(*req.Password) < 8 {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码至少8位"})
+			return
+		}
+		if !hasLetterAndDigit(*req.Password) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "密码需包含字母和数字"})
+			return
+		}
+		currentHash, err := h.DB.GetUserPasswordHash(c.Request.Context(), uid)
+		if err != nil || !auth.CheckPassword(currentHash, *req.CurrentPassword) {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "当前密码错误"})
+			return
+		}
 		hash, err := auth.HashPassword(*req.Password)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "服务器错误"})
 			return
 		}
 		fields["password"] = hash
+		fields["password_changed_at"] = time.Now()
+		passwordChanged = true
 	}
 	if err := h.DB.UpdateUserProfile(c.Request.Context(), uid, fields); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "更新失败"})
 		return
 	}
+	if passwordChanged {
+		// 改密后吊销全部旧会话，并为当前浏览器签发新会话（阻止其他设备继续使用旧会话）
+		_ = h.Sessions.DeleteByUserID(c.Request.Context(), uid)
+		h.issueSession(c, uid)
+	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// validAvatarURL 校验头像地址：允许站内相对路径或 http/https；拒绝 data/javascript/svg 等危险形态。
+func validAvatarURL(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || len(raw) > 2048 {
+		return false
+	}
+	lower := strings.ToLower(raw)
+	if strings.HasPrefix(lower, "data:") || strings.HasPrefix(lower, "javascript:") || strings.HasPrefix(lower, "vbscript:") {
+		return false
+	}
+	if strings.HasPrefix(raw, "/") {
+		return strings.HasPrefix(raw, "/avatar/") || strings.HasPrefix(raw, "/static/img/avatars/") ||
+			strings.HasPrefix(raw, "/ov2/api/media/") || strings.HasPrefix(raw, "/api/v1/media/")
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	if strings.HasSuffix(strings.ToLower(u.Path), ".svg") {
+		return false
+	}
+	return true
 }
 
 // ---- POST /api/v1/users/me/sign-in ----

@@ -7,11 +7,16 @@ Browser
   │ HTTPS
   ▼
 Nginx (宝塔管理 80/443)
-  ├── /api/*      → Go 后端  127.0.0.1:8090
-  ├── /avatar/*   → Go 后端  127.0.0.1:8090
-  ├── /guild-img/* → 管理端 admin 127.0.0.1:8080（会馆 logo / 馆长介绍页图片 / 会馆介绍页封面与正文图片）
-  └── 其余        → Next.js  127.0.0.1:3000
+  ├── /ov2/api/*      → Go 后端  127.0.0.1:8090（canonical；SSE 单独 location）
+  ├── /api/*          → Go 后端  127.0.0.1:8090（/api/v1 别名 + 旧 APP 兼容层）
+  ├── /avatar/*       → Go 后端  127.0.0.1:8090（旧头像兼容）
+  ├── /guild-img/*    → 管理端 admin 127.0.0.1:8080（旧会馆图片兼容）
+  ├── /guide-img/*    → 管理端 admin 127.0.0.1:8080（旧指南图片兼容）
+  ├── /static/*       → Next.js  127.0.0.1:3000（旧帖图/默认头像兼容）
+  └── 其余            → Next.js  127.0.0.1:3000
 ```
+
+> 新媒体统一经 ouo `/ov2/api/media/<id>` 代理；字节存 SeaweedFS（S3），元数据存 PG。ouo/admin 前端都经 ouo 取图。
 
 - **渲染层**：Next.js（standalone 产物，Node 直跑）
 - **服务层**：Go（编译二进制，systemd 管理）
@@ -36,6 +41,17 @@ docker exec ouo-postgres psql -U postgres -c "CREATE DATABASE yj_forum;"  # 若�
 
 **生产（外部 PGSQL）**：无需容器，将连接串写入 `server/.env` 的 `DATABASE_URL`。
 首次启动时 Go 自动执行 golang-migrate 创建全部表（共 20 张，含 sessions 与 7 张会馆系列表；旧 world 表已移除）。
+
+## 一·五、SeaweedFS（新媒体 S3）
+
+```bash
+make s3-up       # 单容器 weed server -s3，127.0.0.1:8333，bucket yj-forum
+make s3-status
+```
+
+- 配置见 `deploy/seaweedfs/README.md` 与 `deploy/seaweedfs/s3.json.example`。
+- ouo/admin 的 `.env` 设置同一组 `S3_*`；`S3_ENABLED=false` 时新媒体回退本地，旧资源始终可读。
+- 数据目录 `deploy/seaweedfs/data` 必须纳入备份；S3 端口不要对公网开放。
 
 ## 二、后端部署（Go）
 
@@ -89,8 +105,9 @@ systemctl enable --now yj-web
 1. 宝塔面板创建站点（域名绑定）。
 2. 将 `deploy/nginx/yj-forum.conf` 内容合并入站点配置（注意替换 `server_name` 为实际域名）。
 3. 按实际部署地址校对 `location /guild-img/` 的 `proxy_pass`（默认 `http://127.0.0.1:8080/api/` 指向本机管理端）。
-4. 媒体上传（`POST /api/v1/media/images`，图片 ≤5MB；头像 ≤10MB）需 Nginx/反代允许较大请求体：配置已在 `location /api/` 内置 `client_max_body_size 8m;`，若在 http 层统一配置请核对（不足会返回 413；如需完整放行 10MB 头像可调至 ≥10m）。
-5. 宝塔内申请 SSL 证书，开启 HTTPS（注释段提供 443 示范）。
+4. 媒体上传（`POST /ov2/api/media/images`，图片 ≤5MB；头像 ≤10MB）需 Nginx/反代允许较大请求体：配置已在 `location /ov2/api/` 与 `location /api/` 内置 `client_max_body_size 12m;`，若在 http 层统一配置请核对（不足会返回 413）。
+5. SSE 必须走 `location = /ov2/api/world/stream` 与 `location = /ov2/api/messages/stream` 的专用配置（`proxy_buffering off`、`proxy_read_timeout 3600s`、`gzip off`），否则会出现“连上但不流动”。
+6. 宝塔内申请 SSL 证书，开启 HTTPS（注释段提供 443 示范）。
 
 ## 五、验证
 
@@ -110,7 +127,11 @@ curl -I http://127.0.0.1:3000/
 | `SMTP_*` | server/.env | 邮件发送（注册验证码/重置密码/通知） |
 | `CORS_ORIGINS` | server/.env | CORS 白名单（生产建议配置域名） |
 | `AVATAR_DIR` | server/.env | 头像存储目录 |
-| `MEDIA_DIR` | server/.env | 用户上传媒体（发帖图片）存储目录；默认 `/var/yj-forum/media`，开发为 `server/data/media`；需可写（服务首次上传时自动创建） |
+| `MEDIA_DIR` | server/.env | 旧用户媒体存储目录（S3 未启用时新上传也落此）；默认 `/var/yj-forum/media`；需可写 |
+| `S3_ENABLED` / `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY` / `S3_SECRET_KEY` | server/.env（ouo + admin） | SeaweedFS S3；新上传写 S3；未启用回退本地/GridFS |
+| `ALTCHA_ENABLED` / `ALTCHA_HMAC_KEY` | server/.env | ALTCHA v2；启用时登录/注册/发码/重置/Bug 提交需要 challenge/grant |
+| `LEGACY_TOKEN_TTL_HOURS` / `LEGACY_APP_SUNSET` | server/.env | 旧 APP 兼容层的 token 窗口与下线日期 |
+| `GITHUB_TOKEN` | server/.env | 下载页 GitHub Releases 可选 token（提高限额） |
 | `PUBLIC_BASE_URL` | server/.env | 邮件中链接的站点地址 |
 | `API_TARGET` | web/.env | 开发时 Next 代理的 Go 地址（生产由 Nginx 分发） |
 | `ADMIN_TARGET` | web/.env | 会馆图片（logo / 馆长介绍页 / 会馆介绍页）代理的管理端地址（默认 `http://127.0.0.1:8080`，仅开发/未配 Nginx 时生效） |

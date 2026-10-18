@@ -363,6 +363,11 @@
     display: inline-flex;
 }
 
+/* 本人签到按钮文案：桌面显示「今日签到 +10」，移动端仅显示「签到/已签到」 */
+.user-signin-label-mobile {
+    display: none;
+}
+
 /* 本人「今日签到 +10」按钮（复用 .user-follow-btn 的定位/主色） */
 .user-signin-btn:disabled {
     cursor: default;
@@ -434,43 +439,56 @@
 @media (max-width: 768px) {
     .user-profile-page {
         margin: 20px auto;
-        padding: 0 12px;
+        padding: 0 10px;
     }
 
+    /* 移动端资料卡左对齐：头像 80px、信息与统计占满可用宽度，避免 320px 横向溢出 */
     .user-profile-card {
         flex-direction: column;
-        text-align: center;
-        padding: 20px;
+        align-items: flex-start;
+        text-align: left;
+        gap: 16px;
+        padding: 16px;
+        max-width: 100%;
+    }
+
+    .user-profile-avatar-wrapper,
+    .user-profile-avatar,
+    .user-profile-avatar img {
+        width: 80px;
+        height: 80px;
     }
 
     .user-profile-info {
         display: flex;
         flex-direction: column;
-        text-align: center;
+        align-items: flex-start;
+        text-align: left;
         width: 100%;
         min-width: 0;
     }
 
     .user-profile-info h2 {
-        justify-content: center;
+        justify-content: flex-start;
         font-size: 20px;
+        max-width: 100%;
     }
 
     .user-profile-info h2 button#user-profile-name,
     .user-profile-info h2 div#user-profile-name {
-        max-width: 240px;
+        max-width: 100%;
     }
 
     .user-profile-meta {
         order: 2;
-        justify-content: center;
+        justify-content: flex-start;
         margin-top: 12px;
     }
 
     /* 简介之后先展示会馆/馆长标签，性别年龄等 meta 置于其后 */
     .user-guild-row {
         order: 1;
-        justify-content: center;
+        justify-content: flex-start;
     }
 
     .profile-tab {
@@ -483,10 +501,39 @@
         padding: 7px 14px;
     }
 
+    /* 6 项统计改为 3×2 网格：每列等分，320px 下不溢出 */
     .user-profile-stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         width: 100%;
-        justify-content: center;
-        gap: 20px;
+        gap: 14px 8px;
+    }
+
+    .stat-item {
+        min-width: 0;
+    }
+
+    .stat-number {
+        font-size: 22px;
+        overflow-wrap: anywhere;
+    }
+
+    /* 移动端签到按钮文案：签到 / 已签到 */
+    .user-signin-label-desktop {
+        display: none;
+    }
+
+    .user-signin-label-mobile {
+        display: inline;
+    }
+
+    /* 标签栏允许换行，避免窄屏「帖子列表 / 评论列表 / 发布新帖」横向溢出 */
+    .user-profile-tabs {
+        flex-wrap: wrap;
+    }
+
+    .profile-tab-create {
+        margin-left: 0;
     }
 
     .post-item {
@@ -526,6 +573,27 @@
     /* 帖子详情页：定时发布标签独占一行（wrap 为 meta-top 直接子项） */
     .post-scheduled-tag-wrap {
         flex-basis: 100%;
+    }
+}
+
+/* 超窄屏（320px）兜底：进一步压缩内边距与按钮尺寸，保证资料卡不横向溢出 */
+@media (max-width: 360px) {
+    .user-profile-card {
+        padding: 14px;
+    }
+
+    .user-profile-info h2 {
+        font-size: 18px;
+    }
+
+    .user-profile-meta {
+        gap: 10px;
+    }
+
+    .user-profile-card > .user-follow-btn {
+        top: 12px;
+        right: 12px;
+        padding: 5px 12px;
     }
 }
 

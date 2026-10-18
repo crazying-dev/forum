@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -17,7 +18,8 @@ type Config struct {
 	SecretKey string // Session 签名密钥
 
 	// 数据库
-	DatabaseURL string
+	DatabaseURL    string
+	MigrateOnStart bool
 
 	// 邮件 SMTP
 	SMTPEnabled  bool
@@ -36,10 +38,34 @@ type Config struct {
 	DataDir   string // 黑名单等数据目录
 	MediaDir  string // 用户媒体（发帖图片）本地目录
 
+	// SeaweedFS S3（新媒体）
+	S3Enabled      bool
+	S3Endpoint     string
+	S3Region       string
+	S3Bucket       string
+	S3AccessKey    string
+	S3SecretKey    string
+	S3UsePathStyle bool
+
 	// 业务
 	ImageFatherURL string
 	PublicBaseURL  string // 站点对外地址（用于邮件链接）
 	EasterEggPath  string // 彩蛋 JSON 文件路径
+
+	// ALTCHA v2
+	AltchaEnabled   bool
+	AltchaHMACKey   string
+	AltchaAlgorithm string
+	AltchaCost      int
+	AltchaExpires   time.Duration
+
+	// 旧 APP 兼容层
+	LegacyTokenTTL       time.Duration
+	LegacyAppSunset      string
+	LegacyTokenNotBefore time.Time
+
+	// 下载页 GitHub Releases
+	GitHubToken string
 }
 
 // Load 从 .env + 环境变量读取配置，缺省值对齐 legacy api/config.py。
@@ -48,12 +74,13 @@ func Load() *Config {
 	_ = godotenv.Load(".env", "server/.env") // 不存在的文件与已导出的环境变量均被跳过
 
 	cfg := &Config{
-		AppEnv:    getEnv("APP_ENV", "dev"),
+		AppEnv:    getEnv("APP_ENV", "prod"),
 		Port:      getEnv("PORT", "8090"),
 		Host:      getEnv("HOST", "127.0.0.1"),
 		SecretKey: getEnv("SECRET_KEY", ""),
 
-		DatabaseURL: getEnv("DATABASE_URL", ""),
+		DatabaseURL:    getEnv("DATABASE_URL", ""),
+		MigrateOnStart: getEnvBool("MIGRATE_ON_START", true),
 
 		SMTPEnabled:    getEnvBool("SMTP_ENABLED", true),
 		SMTPHost:       getEnv("SMTP_HOST", "smtpdm.aliyun.com"),
@@ -65,9 +92,28 @@ func Load() *Config {
 		AvatarDir:      getEnv("AVATAR_DIR", "/var/yj-forum/avatar"),
 		DataDir:        getEnv("DATA_DIR", "/var/yj-forum/data"),
 		MediaDir:       getEnv("MEDIA_DIR", "/var/yj-forum/media"),
+		S3Enabled:      getEnvBool("S3_ENABLED", false),
+		S3Endpoint:     getEnv("S3_ENDPOINT", "http://127.0.0.1:8333"),
+		S3Region:       getEnv("S3_REGION", "us-east-1"),
+		S3Bucket:       getEnv("S3_BUCKET", "yj-forum"),
+		S3AccessKey:    getEnv("S3_ACCESS_KEY", ""),
+		S3SecretKey:    getEnv("S3_SECRET_KEY", ""),
+		S3UsePathStyle: getEnvBool("S3_USE_PATH_STYLE", true),
 		ImageFatherURL: getEnv("IMAGE_FATHER_URL", "https://img.crazying-dev.top/text/one"),
 		PublicBaseURL:  getEnv("PUBLIC_BASE_URL", "localhost:3000"),
 		EasterEggPath:  getEnv("EASTER_EGG_PATH", "main/EasterEgg/1.json"),
+
+		AltchaEnabled:   getEnvBool("ALTCHA_ENABLED", false),
+		AltchaHMACKey:   getEnv("ALTCHA_HMAC_KEY", ""),
+		AltchaAlgorithm: getEnv("ALTCHA_ALGORITHM", "PBKDF2/SHA-256"),
+		AltchaCost:      getEnvInt("ALTCHA_COST", 5000),
+		AltchaExpires:   time.Duration(getEnvInt("ALTCHA_EXPIRES_SECONDS", 600)) * time.Second,
+
+		LegacyTokenTTL:       time.Duration(getEnvInt("LEGACY_TOKEN_TTL_HOURS", 168)) * time.Hour,
+		LegacyAppSunset:      getEnv("LEGACY_APP_SUNSET", ""),
+		LegacyTokenNotBefore: parseTimeEnv("LEGACY_TOKEN_NOT_BEFORE"),
+
+		GitHubToken: getEnv("GITHUB_TOKEN", ""),
 	}
 
 	if cfg.ReceiverAll == "" {
@@ -105,6 +151,18 @@ func getEnvBool(key string, def bool) bool {
 		}
 	}
 	return def
+}
+
+func parseTimeEnv(key string) time.Time {
+	v := os.Getenv(key)
+	if v == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, v)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 func splitComma(s string) []string {

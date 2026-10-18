@@ -10,7 +10,8 @@
          post-comments forum-publish legacy-base-html legacy-inline toast user-comments user-popup
          loading article-cards huiguan article-detail publish-page filters huiguan-entry ui-fixes
          huiguan-members rich-editor quote-cards quote-picker night-adapt huiguan-intro
-         feedback guide account email-change ===== */
+         feedback guide account email-change message-center world-channel altcha
+         announcement changelog download year-converter ===== */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/header-nav.css";
@@ -54,3 +55,11 @@
 @import "./styles/guide.css";
 @import "./styles/account.css";
 @import "./styles/email-change.css";
+/* ===== 新增功能页/组件样式（顺序按入口批次）===== */
+@import "./styles/message-center.css";
+@import "./styles/world-channel.css";
+@import "./styles/altcha.css";
+@import "./styles/announcement.css";
+@import "./styles/changelog.css";
+@import "./styles/download.css";
+@import "./styles/year-converter.css";

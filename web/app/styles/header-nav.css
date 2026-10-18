@@ -199,6 +199,30 @@ header{
     transform: scale(1.08);
 }
 
+/* 消息中心未读徽标（桌面顶栏「控制台」入口，消息中心收纳在控制台内） */
+#header .header-console-btn {
+    position: relative;
+}
+
+#header .header-unread-badge {
+    position: absolute;
+    top: -4px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--color-bg-header);
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
 #header #UserInfo {
     display: flex;
     align-items: center;
@@ -392,6 +416,13 @@ header{
 }
 
 /* ===== 控制台弹窗（桌面端「控制台」按钮，挂载于 #header 外）===== */
+/* 控制台卡片：4×3 宫格 + 整行主题；内容超高时卡片内滚动（双类名以覆盖 .donate-card） */
+.donate-card.console-card {
+    max-width: 820px;
+    max-height: 86vh;
+    overflow-y: auto;
+}
+
 .console-title {
     margin: 0 0 8px 0;
     font-size: 22px;
@@ -414,12 +445,13 @@ header{
 
 .console-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
     text-align: left;
 }
 
 .console-tile {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -448,6 +480,24 @@ header{
     color: var(--color-primary);
 }
 
+/* 消息中心未读徽标（控制台格子右上角） */
+.console-tile-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 18px;
+    text-align: center;
+    box-sizing: border-box;
+}
+
 /* 控制台 WIKI 图标：显式重置（对抗全局 svg,img{all:inherit} 从按钮继承的 min-height/padding/背景），仅保留 28px 图标本体 */
 .console-tile img {
     all: unset;
@@ -458,7 +508,7 @@ header{
 }
 
 .console-theme {
-    grid-column: span 2;
+    grid-column: 1 / -1;
     display: flex;
     flex-direction: column;
     gap: 10px;

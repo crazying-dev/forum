@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,8 +13,13 @@ import (
 // AddComment 添加评论/回复（content 由调用方净化后传入；contentFormat 标记存储形态）。
 func (d *DB) AddComment(ctx context.Context, postID, userID, content, contentFormat string, parentID *string) (*models.Comment, error) {
 	id := GenID("CM")
-	_, err := d.Exec(ctx, `INSERT INTO comments (id, post_id, user_id, content, content_format, parent_id) VALUES ($1,$2,$3,$4,$5,$6)`,
-		id, postID, userID, content, contentFormat, parentID)
+	err := d.Tx(ctx, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO comments (id, post_id, user_id, content, content_format, parent_id) VALUES ($1,$2,$3,$4,$5,$6)`,
+			id, postID, userID, content, contentFormat, parentID); err != nil {
+			return err
+		}
+		return syncMediaReferencesTx(ctx, tx, "comment", id, content)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +170,27 @@ func (d *DB) GetLikedCommentIDs(ctx context.Context, userID string, commentIDs [
 
 // DeleteComment 软删（仅作者）。
 func (d *DB) DeleteComment(ctx context.Context, commentID, userID string) (bool, error) {
-	tag, err := d.Exec(ctx, `UPDATE comments SET status = 0 WHERE id = $1 AND user_id = $2`, commentID, userID)
-	return tag > 0, err
+	deleted := false
+	err := d.Tx(ctx, func(tx pgx.Tx) error {
+		var content string
+		err := tx.QueryRow(ctx, `SELECT content FROM comments WHERE id = $1 AND user_id = $2 AND status = 1`, commentID, userID).Scan(&content)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `UPDATE comments SET status = 0 WHERE id = $1 AND user_id = $2`, commentID, userID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return nil
+		}
+		deleted = true
+		return softDeleteUnreferencedMediaTx(ctx, tx, "comment", commentID)
+	})
+	return deleted, err
 }
 
 // GetRepliesToMyComments 我收到的回复。

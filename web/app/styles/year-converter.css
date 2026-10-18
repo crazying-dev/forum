@@ -1,0 +1,336 @@
+/* ===== 无限年换算（/tools/year-converter：无限历 ⇄ 公元历 双向）===== */
+
+.year-converter-page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 20px 56px;
+    box-sizing: border-box;
+}
+
+.yc-header {
+    margin-bottom: 24px;
+}
+
+.yc-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 8px;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.yc-heading i {
+    color: var(--color-primary);
+}
+
+.yc-subtitle {
+    margin: 0;
+    max-width: 760px;
+    color: var(--color-text-tertiary);
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+/* 当前日期双纪年 */
+.yc-today {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    margin-top: 14px;
+    padding: 9px 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+.yc-today > i {
+    color: var(--color-primary);
+}
+
+.yc-today-sep {
+    color: var(--color-text-tertiary);
+}
+
+/* 双栏换算卡 */
+.yc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.yc-card {
+    min-width: 0;
+    padding: 22px 22px 18px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px var(--color-shadow-card);
+    box-sizing: border-box;
+}
+
+.yc-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 6px;
+    color: var(--color-text-primary);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.yc-card-title i {
+    color: var(--color-primary);
+}
+
+.yc-card-desc {
+    margin: 0 0 16px;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+/* 表单 */
+.yc-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.yc-field-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    min-width: 0;
+}
+
+.yc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.yc-field-grow {
+    flex: 2 1 0;
+}
+
+.yc-field > span {
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.yc-field input,
+.yc-field select {
+    width: 100%;
+    height: 44px;
+    padding: 0 12px;
+    border: 2px solid var(--color-border-primary);
+    border-radius: 10px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.yc-field input:focus,
+.yc-field select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    background: var(--color-bg-secondary);
+}
+
+.yc-field input::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+.yc-submit-btn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 120px;
+    padding: 10px 22px;
+    border: none;
+    border-radius: 12px;
+    background: var(--color-primary);
+    color: #fff;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.yc-submit-btn:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 4px 14px var(--color-shadow-primary);
+    transform: translateY(-1px);
+}
+
+/* 结果 */
+.yc-result {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 13px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.yc-result > i {
+    flex: 0 0 auto;
+    margin-top: 2px;
+}
+
+.yc-result p {
+    margin: 0;
+    min-width: 0;
+}
+
+.yc-result-idle {
+    color: var(--color-text-tertiary);
+}
+
+.yc-result-success {
+    border-color: rgba(34, 160, 107, 0.35);
+    background: rgba(34, 160, 107, 0.1);
+    color: #1d7a52;
+}
+
+.yc-result-warning {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: rgba(245, 158, 11, 0.12);
+    color: #b9770e;
+}
+
+.yc-result-error {
+    border-color: rgba(231, 76, 60, 0.35);
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+}
+
+.yc-formula {
+    margin: 12px 0 0;
+    color: var(--color-text-tertiary);
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+}
+
+/* 规则说明 */
+.yc-rules {
+    margin-top: 20px;
+    padding: 20px 22px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: 16px;
+    box-sizing: border-box;
+}
+
+.yc-rules-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    color: var(--color-text-primary);
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.yc-rules-title i {
+    color: var(--color-primary);
+}
+
+.yc-rules-list {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    line-height: 1.85;
+    overflow-wrap: anywhere;
+}
+
+.yc-rules-list li {
+    margin: 3px 0;
+}
+
+.yc-rules-list li::marker {
+    color: var(--color-primary);
+}
+
+@media (max-width: 768px) {
+    .year-converter-page {
+        padding: 20px 12px 40px;
+    }
+
+    .yc-heading {
+        font-size: 23px;
+    }
+
+    .yc-subtitle {
+        font-size: 13px;
+    }
+
+    .yc-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .yc-card {
+        padding: 18px 16px 16px;
+        border-radius: 14px;
+    }
+
+    .yc-card-title {
+        font-size: 16px;
+    }
+
+    .yc-rules {
+        padding: 16px;
+        border-radius: 14px;
+    }
+}
+
+@media (max-width: 360px) {
+    .year-converter-page {
+        padding: 16px 10px 36px;
+    }
+
+    .yc-card {
+        padding: 16px 14px 14px;
+    }
+
+    .yc-field-row {
+        gap: 8px;
+    }
+
+    .yc-field input,
+    .yc-field select {
+        height: 42px;
+        padding: 0 10px;
+        font-size: 13px;
+    }
+
+    .yc-submit-btn {
+        width: 100%;
+    }
+}
