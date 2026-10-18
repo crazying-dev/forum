@@ -1,13 +1,16 @@
 "use client";
 
 // 世界频道：桌面入口按钮 + 受控独立的浮动窗口 / 移动端近全屏底部模态框。
-// - 桌面：固定视口右上（Header 下方 16px）纵向矩形按钮；窗口标题栏可拖拽、边界 clamp、localStorage 记忆位置
+// - 桌面：固定视口右上（Header 下方 16px）纵向矩形按钮；窗口标题栏可拖拽、右/下/右下角可 resize、
+//   边界 clamp、localStorage 记忆位置与尺寸；纯悬浮窗（无遮罩/不锁滚动/不拦截底层页面）
 // - 移动：底部滑入近全屏；顶部标题 + 关闭；底部输入条；Android 返回键优先关闭（popstate）
 // - 消息：首屏 50、向上边界自动加载 200 条、SSE 增量去重、断线轮询降级、贴底/新消息提示
+// - 传输：标题栏「实时 / 轮询」手动切换（localStorage 记忆），poll 不建立 SSE；SSE 失败仍自动降级
 // - 输入：复用 CommentEditor（scene=world_message；2000 字 / 9 图 / 2 秒限流提示）
 
 import Link from "next/link";
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -45,12 +48,24 @@ import { createSSEConnection, type SSEConnection } from "@/lib/sse";
 const MOBILE_MEDIA_QUERY = "(max-width: 700px)";
 /** 窗口位置记忆 key */
 const POSITION_STORAGE_KEY = "ouo:world-channel:window-position";
+/** 窗口尺寸记忆 key */
+const SIZE_STORAGE_KEY = "ouo:world-channel:window-size";
+/** 传输模式记忆 key（'sse' | 'poll'） */
+const TRANSPORT_STORAGE_KEY = "ouo:world-channel:transport";
 /** Header 高度 + 16px 间距（桌面入口与窗口最小 top） */
 const HEADER_BOTTOM = 70;
 const DESKTOP_TOP = HEADER_BOTTOM + 16;
 const EDGE_GAP = 8;
 /** SSE 断裂时的轮询间隔 */
 const POLL_INTERVAL_MS = 5000;
+/** 桌面窗口默认尺寸（保持改造前约 408×620） */
+const DEFAULT_WINDOW_WIDTH = 408;
+const DEFAULT_WINDOW_HEIGHT = 620;
+/** 桌面窗口最小尺寸 */
+const MIN_WINDOW_WIDTH = 340;
+const MIN_WINDOW_HEIGHT = 420;
+/** 极端小视口兜底下限（避免尺寸出现负数/不可用） */
+const MIN_RENDER_SIZE = 240;
 
 const EMPTY_SUBSCRIBE = () => () => {};
 
@@ -67,6 +82,21 @@ interface WindowPosition {
   left: number;
   top: number;
 }
+
+interface WindowSize {
+  width: number;
+  height: number;
+}
+
+interface SizeLimits {
+  minWidth: number;
+  minHeight: number;
+  maxWidth: number;
+  maxHeight: number;
+}
+
+type TransportMode = "sse" | "poll";
+type ResizeDirection = "e" | "s" | "se";
 
 function readStoredPosition(): WindowPosition | null {
   if (typeof window === "undefined") return null;
@@ -90,8 +120,81 @@ function saveStoredPosition(position: WindowPosition) {
   }
 }
 
+function readStoredSize(): WindowSize | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(SIZE_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<WindowSize> | null;
+    if (!parsed || typeof parsed.width !== "number" || typeof parsed.height !== "number") return null;
+    if (!Number.isFinite(parsed.width) || !Number.isFinite(parsed.height)) return null;
+    return { width: parsed.width, height: parsed.height };
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredSize(size: WindowSize) {
+  try {
+    window.localStorage.setItem(SIZE_STORAGE_KEY, JSON.stringify(size));
+  } catch {
+    /* 隐私模式/配额不足时忽略 */
+  }
+}
+
+function readStoredTransport(): TransportMode {
+  if (typeof window === "undefined") return "sse";
+  try {
+    return window.localStorage.getItem(TRANSPORT_STORAGE_KEY) === "poll" ? "poll" : "sse";
+  } catch {
+    return "sse";
+  }
+}
+
+function saveStoredTransport(mode: TransportMode) {
+  try {
+    window.localStorage.setItem(TRANSPORT_STORAGE_KEY, mode);
+  } catch {
+    /* 隐私模式/配额不足时忽略 */
+  }
+}
+
 function isMobileViewport(): boolean {
   return typeof window !== "undefined" && window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+}
+
+/** 当前视口允许的窗口尺寸区间（最大不超过视口减边距） */
+function getSizeLimits(): SizeLimits {
+  const vw = typeof window === "undefined" ? DEFAULT_WINDOW_WIDTH : window.innerWidth;
+  const vh = typeof window === "undefined" ? DEFAULT_WINDOW_HEIGHT : window.innerHeight;
+  const maxWidth = Math.max(MIN_RENDER_SIZE, vw - EDGE_GAP * 2);
+  const maxHeight = Math.max(MIN_RENDER_SIZE, vh - DESKTOP_TOP - EDGE_GAP);
+  return {
+    minWidth: Math.min(MIN_WINDOW_WIDTH, maxWidth),
+    minHeight: Math.min(MIN_WINDOW_HEIGHT, maxHeight),
+    maxWidth,
+    maxHeight,
+  };
+}
+
+/** 按视口边界 clamp 尺寸（打开时读取 localStorage 后使用） */
+function clampWindowSize(width: number, height: number): WindowSize {
+  const limits = getSizeLimits();
+  return {
+    width: Math.round(Math.min(Math.max(width, limits.minWidth), limits.maxWidth)),
+    height: Math.round(Math.min(Math.max(height, limits.minHeight), limits.maxHeight)),
+  };
+}
+
+/** 拖拽 resize：除视口上限外，还保证右/下边缘不越界（左上角锚定） */
+function clampResizeSize(width: number, height: number, left: number, top: number): WindowSize {
+  const limits = getSizeLimits();
+  const availableWidth = Math.max(limits.minWidth, window.innerWidth - Math.max(left, EDGE_GAP) - EDGE_GAP);
+  const availableHeight = Math.max(limits.minHeight, window.innerHeight - Math.max(top, DESKTOP_TOP) - EDGE_GAP);
+  return {
+    width: Math.round(Math.min(Math.max(width, limits.minWidth), Math.min(limits.maxWidth, availableWidth))),
+    height: Math.round(Math.min(Math.max(height, limits.minHeight), Math.min(limits.maxHeight, availableHeight))),
+  };
 }
 
 /** 边界 clamp：窗口始终完整留在视口内（桌面 top 不低于 Header 下方 16px） */
@@ -112,7 +215,7 @@ function compareMessages(a: WorldMessage, b: WorldMessage): number {
 }
 
 /** 单条消息：左右布局 + 头像/名称/身份标签 + 富文本（历史 markdown 走 Markdown） */
-function WorldMessageItem({
+const WorldMessageItem = memo(function WorldMessageItem({
   message,
   isMe,
   parentName,
@@ -163,7 +266,7 @@ function WorldMessageItem({
       </div>
     </article>
   );
-}
+});
 
 /** 加载骨架 */
 function WorldMessagesSkeleton() {
@@ -191,7 +294,8 @@ export interface WorldChannelModalProps {
 
 /**
  * 世界频道受控模态框。
- * 桌面为独立浮动窗口（拖拽 + 位置记忆），移动端为底部滑入近全屏。
+ * 桌面为独立浮动窗口（拖拽 + 可缩放 + 位置/尺寸记忆，不阻断底层页面），移动端为底部滑入近全屏。
+ * 标题栏可手动切换实时（SSE）/ 轮询（5s GET），选择会持久化。
  */
 export default function WorldChannelModal({ open, onClose }: WorldChannelModalProps) {
   const isClient = useIsClient();
@@ -208,8 +312,14 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
   const [sending, setSending] = useState(false);
   const [pendingNew, setPendingNew] = useState(0);
   const [live, setLive] = useState<boolean | null>(null);
+  const [transport, setTransport] = useState<TransportMode>(() => readStoredTransport());
+  /** 仅用于「已降级时再次点击实时」强制重建 SSE */
+  const [transportRetry, setTransportRetry] = useState(0);
+  const [isMobile, setIsMobile] = useState<boolean>(() => isMobileViewport());
   const [position, setPosition] = useState<WindowPosition | null>(null);
+  const [size, setSize] = useState<WindowSize | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
 
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -229,6 +339,7 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
   const openRef = useRef(open);
   const userIdRef = useRef(userId);
   const positionRef = useRef<WindowPosition | null>(null);
+  const sizeRef = useRef<WindowSize | null>(null);
   const dragStateRef = useRef<{
     pointerId: number;
     startX: number;
@@ -236,6 +347,16 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     left: number;
     top: number;
   } | null>(null);
+  const resizeStateRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    width: number;
+    height: number;
+    direction: ResizeDirection;
+  } | null>(null);
+  /** 当前 resize 的 window 级监听清理函数（避免指针移出窗口后丢失 pointerup） */
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const historyPushedRef = useRef(false);
 
   const onCloseRef = useRef(onClose);
@@ -249,6 +370,20 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     openRef.current = open;
     userIdRef.current = userId;
   }, [open, userId]);
+
+  // 响应式断点：仅移动端启用遮罩 / 锁滚动 / 焦点圈定；桌面保持纯悬浮窗
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    // 兼容部分内嵌 WebView / 设备模拟环境：窗口尺寸变化时也重新判定断点
+    window.addEventListener("resize", onChange);
+    return () => {
+      mq.removeEventListener("change", onChange);
+      window.removeEventListener("resize", onChange);
+    };
+  }, []);
 
   /** 关闭入口：若为移动端压入的历史条目，先回退再关闭 */
   const requestClose = useCallback(() => {
@@ -270,6 +405,11 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
   const applyPosition = useCallback((next: WindowPosition) => {
     positionRef.current = next;
     setPosition(next);
+  }, []);
+
+  const applySize = useCallback((next: WindowSize) => {
+    sizeRef.current = next;
+    setSize(next);
   }, []);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
@@ -471,30 +611,46 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     }
   }, [draft, refreshAfter, scrollToBottom, toast, user]);
 
-  // 打开：加载首屏 + 锁滚动 + 焦点圈定 + ESC 关闭
+  // 打开：加载首屏（桌面/移动端一致）
   useEffect(() => {
     if (!open || !isClient) return;
     // 微任务中启动，避免在 effect 同步阶段触发 setState（loading/ready）
     void Promise.resolve()
       .then(() => loadInitial())
       .finally(() => setReady(true));
+  }, [open, isClient, loadInitial]);
 
+  // ESC 关闭：桌面悬浮窗与移动端模态框都保留
+  useEffect(() => {
+    if (!open || !isClient) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+      // 编辑器内的链接弹窗/引用选择器优先处理 ESC
+      if (dialog.querySelector(".donate-modal, .quote-picker-modal")) return;
+      // 桌面非模态：焦点在别的弹窗/控件上时不抢 ESC（避免吞掉其他 Modal 的关闭）
+      const active = document.activeElement;
+      if (active && active !== document.body && !dialog.contains(active)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      requestCloseRef.current();
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [open, isClient]);
+
+  // 仅移动端：锁 body 滚动 + 自动聚焦 + Tab 焦点圈定（桌面不拦截底层页面）
+  useEffect(() => {
+    if (!open || !isClient || !isMobile) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
     const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
 
     const onKeyDown = (event: KeyboardEvent) => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (event.key === "Escape") {
-        // 编辑器内的链接弹窗/引用选择器优先处理 ESC
-        if (dialog.querySelector(".donate-modal, .quote-picker-modal")) return;
-        event.preventDefault();
-        event.stopPropagation();
-        requestCloseRef.current();
-        return;
-      }
       if (event.key !== "Tab") return;
       const focusable = Array.from(
         dialog.querySelectorAll<HTMLElement>(
@@ -527,7 +683,7 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
       document.body.style.overflow = previousOverflow;
       previousActive?.focus?.();
     };
-  }, [open, isClient, loadInitial]);
+  }, [open, isClient, isMobile]);
 
   // 关闭：停止 SSE / 轮询
   useEffect(() => {
@@ -535,11 +691,26 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     stopPolling();
     sseRef.current?.close();
     sseRef.current = null;
+    resizeCleanupRef.current?.();
+    resizeStateRef.current = null;
+    dragStateRef.current = null;
+    // 避免在 effect 同步阶段 setState；SSE effect 的 cleanup 会同步把 live 置空
+    queueMicrotask(() => {
+      setResizing(false);
+      setDragging(false);
+    });
   }, [open, stopPolling]);
 
-  // SSE：首屏就绪后按当前 last_id 续传；断线/心跳超时→轮询降级；重连成功→停轮询
+  // 连接管理：poll 只轮询（不建立 SSE）；sse 建立 SSE，断线/心跳超时自动降级轮询，重连成功停轮询
   useEffect(() => {
     if (!open || !ready || !isClient) return;
+
+    if (transport === "poll") {
+      // 手动 poll：只轮询，绝不建立 SSE（live 状态由切换 handler 置为 false）
+      startPolling();
+      return () => stopPolling();
+    }
+
     let stopped = false;
     const connection = createSSEConnection({
       url: `/world/stream?last_id=${lastIdRef.current}`,
@@ -573,39 +744,73 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
       stopped = true;
       connection.close();
       if (sseRef.current === connection) sseRef.current = null;
+      stopPolling();
       setLive(null);
     };
-  }, [open, ready, isClient, appendIncoming, loadInitial, startPolling, stopPolling, toast]);
+  }, [
+    open,
+    ready,
+    isClient,
+    transport,
+    transportRetry,
+    appendIncoming,
+    loadInitial,
+    startPolling,
+    stopPolling,
+    toast,
+  ]);
 
-  // 窗口位置：打开时读取 localStorage 并 clamp；resize 时重新 clamp
+  // 桌面窗口尺寸/位置：打开时读取 localStorage 并 clamp（移动端保持整屏 sheet，不写内联宽高）
   useEffect(() => {
-    if (!open || !isClient) return;
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-    const width = dialog.offsetWidth || 400;
-    const height = dialog.offsetHeight || 560;
-    const stored = readStoredPosition();
-    const fallbackLeft = window.innerWidth - width - 88;
-    applyPosition(
-      clampWindowPosition(stored?.left ?? fallbackLeft, stored?.top ?? DESKTOP_TOP, width, height)
+    if (!open || !isClient || isMobile) return;
+    const storedSize = readStoredSize();
+    const nextSize = clampWindowSize(
+      storedSize?.width ?? DEFAULT_WINDOW_WIDTH,
+      storedSize?.height ?? DEFAULT_WINDOW_HEIGHT
     );
-  }, [open, isClient, applyPosition]);
+    const stored = readStoredPosition();
+    const fallbackLeft = window.innerWidth - nextSize.width - 88;
+    // 用微任务而不是 rAF：后台标签页/无焦点窗口会暂停 rAF，导致尺寸/位置记忆不生效；
+    // 微任务仍会在本次渲染前执行，且避免在 effect 同步阶段直接 setState。
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      applySize(nextSize);
+      applyPosition(
+        clampWindowPosition(stored?.left ?? fallbackLeft, stored?.top ?? DESKTOP_TOP, nextSize.width, nextSize.height)
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isClient, isMobile, applyPosition, applySize]);
 
+  // 视口变化：重新 clamp 尺寸与位置（不写入 storage，避免污染用户设定）
   useEffect(() => {
-    if (!open || !isClient) return;
+    if (!open || !isClient || isMobile) return;
     const onResize = () => {
       const dialog = dialogRef.current;
+      if (!dialog) return;
+      const currentSize = sizeRef.current;
+      const nextSize = clampWindowSize(
+        currentSize?.width ?? dialog.offsetWidth,
+        currentSize?.height ?? dialog.offsetHeight
+      );
+      if (!currentSize || nextSize.width !== currentSize.width || nextSize.height !== currentSize.height) {
+        applySize(nextSize);
+      }
       const current = positionRef.current;
-      if (!dialog || !current) return;
-      applyPosition(clampWindowPosition(current.left, current.top, dialog.offsetWidth, dialog.offsetHeight));
+      if (current) {
+        applyPosition(clampWindowPosition(current.left, current.top, nextSize.width, nextSize.height));
+      }
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [open, isClient, applyPosition]);
+  }, [open, isClient, isMobile, applyPosition, applySize]);
 
   // 移动端 Android 返回键：先关闭世界频道（popstate）
   useEffect(() => {
-    if (!open || !isClient || !isMobileViewport()) return;
+    if (!open || !isClient || !isMobile) return;
     historyPushedRef.current = true;
     try {
       const currentState = window.history.state as Record<string, unknown> | null;
@@ -621,9 +826,20 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     window.addEventListener("popstate", onPopState);
     return () => {
       window.removeEventListener("popstate", onPopState);
-      historyPushedRef.current = false;
+      // 仅在“仍打开且已跨出移动端断点”时回退，清掉为返回键压入的历史条目；
+      // 正常关闭/组件卸载不在这里 back，避免打断路由导航。
+      if (historyPushedRef.current && openRef.current && !isMobileViewport()) {
+        historyPushedRef.current = false;
+        try {
+          window.history.back();
+        } catch {
+          /* 忽略 */
+        }
+      } else {
+        historyPushedRef.current = false;
+      }
     };
-  }, [open, isClient]);
+  }, [open, isClient, isMobile]);
 
   // 回到前台时补拉一次，避免后台期间 SSE/轮询被浏览器节流造成缺口
   useEffect(() => {
@@ -651,7 +867,7 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
   }, [loadOlder]);
 
   const handleDragStart = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || isMobileViewport()) return;
+    if (event.button !== 0 || isMobile) return;
     const target = event.target as HTMLElement;
     if (target.closest("button, a, input, textarea, select")) return;
     const dialog = dialogRef.current;
@@ -677,12 +893,17 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     const drag = dragStateRef.current;
     const dialog = dialogRef.current;
     if (!drag || drag.pointerId !== event.pointerId || !dialog) return;
+    // 丢失 pointerup（系统弹窗/窗口失焦）时兜底结束拖拽，避免窗口粘在鼠标上
+    if (event.buttons === 0) {
+      handleDragEnd(event);
+      return;
+    }
     applyPosition(
       clampWindowPosition(
         drag.left + event.clientX - drag.startX,
         drag.top + event.clientY - drag.startY,
-        dialog.offsetWidth,
-        dialog.offsetHeight
+        sizeRef.current?.width ?? dialog.offsetWidth,
+        sizeRef.current?.height ?? dialog.offsetHeight
       )
     );
   };
@@ -700,21 +921,139 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
     if (positionRef.current) saveStoredPosition(positionRef.current);
   };
 
+  /** 手动切换传输模式：persist + 立即反馈 + 补拉缺口（实际连接由 effect 管理） */
+  const handleTransportSelect = useCallback(
+    (mode: TransportMode) => {
+      if (mode === transport) {
+        // 已降级为轮询时再次点击「实时」→ 重建 SSE 重试
+        if (mode === "sse" && live === false) {
+          setLive(null);
+          setTransportRetry((value) => value + 1);
+          void refreshAfter().catch(() => {});
+        }
+        return;
+      }
+      saveStoredTransport(mode);
+      setTransport(mode);
+      setLive(mode === "poll" ? false : null);
+      // poll 分支的 startPolling 会立即 pollOnce，无需额外刷新；sse 需要补拉断档
+      if (mode === "sse") void refreshAfter().catch(() => {});
+    },
+    [live, refreshAfter, transport]
+  );
+
+  const handleResizeStart = (event: ReactPointerEvent<HTMLSpanElement>, direction: ResizeDirection) => {
+    if (isMobile || event.button !== 0) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const rect = dialog.getBoundingClientRect();
+    if (!positionRef.current) applyPosition({ left: rect.left, top: rect.top });
+    resizeStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      width: sizeRef.current?.width ?? rect.width,
+      height: sizeRef.current?.height ?? rect.height,
+      direction,
+    };
+    setResizing(true);
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
+    };
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const resize = resizeStateRef.current;
+      if (!resize || moveEvent.pointerId !== resize.pointerId) return;
+      if (moveEvent.buttons === 0) {
+        onEnd(moveEvent);
+        return;
+      }
+      const position = positionRef.current ?? { left: EDGE_GAP, top: DESKTOP_TOP };
+      const deltaX = moveEvent.clientX - resize.startX;
+      const deltaY = moveEvent.clientY - resize.startY;
+      const rawWidth = resize.direction === "s" ? resize.width : resize.width + deltaX;
+      const rawHeight = resize.direction === "e" ? resize.height : resize.height + deltaY;
+      applySize(clampResizeSize(rawWidth, rawHeight, position.left, position.top));
+      moveEvent.preventDefault();
+    };
+
+    const onEnd = (endEvent: PointerEvent) => {
+      const resize = resizeStateRef.current;
+      if (resize && endEvent.pointerId !== resize.pointerId) return;
+      resizeStateRef.current = null;
+      setResizing(false);
+      cleanup();
+      const finalSize = sizeRef.current;
+      if (finalSize) saveStoredSize(finalSize);
+      const position = positionRef.current;
+      if (finalSize && position) {
+        const nextPosition = clampWindowPosition(position.left, position.top, finalSize.width, finalSize.height);
+        if (nextPosition.left !== position.left || nextPosition.top !== position.top) {
+          applyPosition(nextPosition);
+          saveStoredPosition(nextPosition);
+        }
+      }
+    };
+
+    // 先清理上一次可能残留的监听，再挂 window 级监听（指针移出窗口也能继续 resize）
+    resizeCleanupRef.current?.();
+    resizeCleanupRef.current = cleanup;
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
+
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+    } catch {
+      /* 指针已释放等场景，忽略 */
+    }
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  useEffect(
+    () => () => {
+      resizeCleanupRef.current?.();
+      resizeCleanupRef.current = null;
+    },
+    []
+  );
+
   if (!isClient || !open) return null;
 
-  const windowStyle: CSSProperties | undefined = position
-    ? { left: `${position.left}px`, top: `${position.top}px` }
-    : undefined;
+  // 状态 chip：手动 poll 与自动降级都显示「轮询」，但 title 区分原因
+  const manualPoll = transport === "poll";
+  const liveStateClass = manualPoll || live === false ? "polling" : live === true ? "live" : "connecting";
+  const liveStateLabel = manualPoll || live === false ? "轮询" : live === true ? "实时" : "连接中";
+  const liveStateTitle = manualPoll
+    ? "已手动切换为轮询（每 5 秒拉取一次，不建立 SSE 连接）"
+    : live === true
+      ? "SSE 实时推送"
+      : live === false
+        ? "SSE 连接失败，已自动降级为轮询（每 5 秒拉取一次）"
+        : "正在连接实时推送";
+
+  // 桌面：内联尺寸/位置；移动端完全交给 CSS（底部整屏 sheet，不应用内联宽高）
+  const windowStyle: CSSProperties | undefined = isMobile
+    ? undefined
+    : {
+        ...(position ? { left: `${position.left}px`, top: `${position.top}px` } : {}),
+        ...(size ? { width: `${size.width}px`, height: `${size.height}px` } : {}),
+      };
 
   return createPortal(
     <>
-      <div className="world-channel-overlay" aria-hidden="true" />
+      {isMobile && <div className="world-channel-overlay" aria-hidden="true" />}
       <section
         ref={dialogRef}
-        className={`world-window${dragging ? " dragging" : ""}`}
+        className={`world-window${dragging ? " dragging" : ""}${resizing ? " resizing" : ""}`}
         style={windowStyle}
         role="dialog"
-        aria-modal="true"
+        aria-modal={isMobile ? true : undefined}
         aria-labelledby="world-channel-title"
         tabIndex={-1}
       >
@@ -730,13 +1069,30 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
               <i className="fa fa-globe" aria-hidden="true"></i>
               世界频道
             </span>
-            <span
-              className={`world-live ${live === true ? "live" : live === false ? "polling" : "connecting"}`}
-              title={live === true ? "SSE 实时推送" : live === false ? "SSE 不可用，已降级为轮询" : "正在连接实时推送"}
-            >
+            <span className={`world-live ${liveStateClass}`} title={liveStateTitle}>
               <i className="fa fa-circle" aria-hidden="true"></i>
-              {live === true ? "实时" : live === false ? "轮询" : "连接中"}
+              {liveStateLabel}
             </span>
+            <div className="world-transport-switch" role="group" aria-label="消息传输模式">
+              <button
+                type="button"
+                className="world-transport-btn"
+                aria-pressed={transport === "sse"}
+                title="实时推送（SSE）：自动重连，连接失败时自动降级为轮询"
+                onClick={() => handleTransportSelect("sse")}
+              >
+                实时
+              </button>
+              <button
+                type="button"
+                className="world-transport-btn"
+                aria-pressed={transport === "poll"}
+                title="轮询模式：每 5 秒拉取一次，不建立 SSE 连接"
+                onClick={() => handleTransportSelect("poll")}
+              >
+                轮询
+              </button>
+            </div>
           </div>
           <button
             ref={closeButtonRef}
@@ -845,6 +1201,26 @@ export default function WorldChannelModal({ open, onClose }: WorldChannelModalPr
             allowQuotePicker={false}
           />
         </div>
+
+        {!isMobile && (
+          <>
+            <span
+              className="world-resize-handle world-resize-e"
+              aria-hidden="true"
+              onPointerDown={(event) => handleResizeStart(event, "e")}
+            />
+            <span
+              className="world-resize-handle world-resize-s"
+              aria-hidden="true"
+              onPointerDown={(event) => handleResizeStart(event, "s")}
+            />
+            <span
+              className="world-resize-handle world-resize-se"
+              aria-hidden="true"
+              onPointerDown={(event) => handleResizeStart(event, "se")}
+            />
+          </>
+        )}
       </section>
     </>,
     document.body

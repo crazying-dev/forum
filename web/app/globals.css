@@ -11,13 +11,15 @@
          loading article-cards huiguan article-detail publish-page filters huiguan-entry ui-fixes
          huiguan-members rich-editor quote-cards quote-picker night-adapt huiguan-intro
          feedback guide account email-change message-center world-channel altcha
-         announcement changelog download year-converter ===== */
+         announcement rich-content changelog download year-converter ===== */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
 @import "./styles/header-nav.css";
 @import "./styles/header-responsive.css";
 @import "./styles/footer.css";
 @import "./styles/elements.css";
+/* 富文本基础排版：紧跟 elements.css（需覆盖其 list-style 重置），先于页面分片以允许页面样式覆盖 */
+@import "./styles/rich-content.css";
 @import "./styles/windows-card.css";
 @import "./styles/easter-egg.css";
 @import "./styles/privacy.css";

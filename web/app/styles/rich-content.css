@@ -1,0 +1,168 @@
+/* ===== 富文本内容基础排版（RichContent / Markdown 共用）=====
+   背景：elements.css 全局 `ul,li{list-style:none}` 与 base.css 的 `*{margin:0;padding:0}`
+   会把正文列表变成无项目符号、无间距的纯文本，标题字重也被重置为 400。
+   本分片只在 .rich-content 作用域内恢复基础排版；页面专属正文样式
+   （如 .changelog-content、.download-notes-markdown）在入口后部导入，可覆盖这里。 */
+
+.rich-content {
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.rich-content > :first-child {
+    margin-top: 0;
+}
+
+.rich-content > :last-child {
+    margin-bottom: 0;
+}
+
+/* 标题层级：restore 字重与字号（全局 h1-h6 为 font-weight:400） */
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5,
+.rich-content h6 {
+    margin: 1.15em 0 0.5em;
+    color: var(--color-text-primary);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.rich-content h1 { font-size: 1.6em; }
+.rich-content h2 { font-size: 1.4em; }
+.rich-content h3 { font-size: 1.22em; }
+.rich-content h4 { font-size: 1.1em; }
+.rich-content h5 { font-size: 1em; }
+.rich-content h6 { font-size: 0.92em; }
+
+/* 段落间距 */
+.rich-content p {
+    margin: 0.65em 0;
+}
+
+/* 列表：恢复项目符号（覆盖 elements.css 的全局 list-style:none） */
+.rich-content ul {
+    margin: 0.65em 0;
+    padding-left: 1.6em;
+    list-style: disc;
+}
+
+.rich-content ol {
+    margin: 0.65em 0;
+    padding-left: 1.6em;
+    list-style: decimal;
+}
+
+.rich-content li {
+    margin: 0.28em 0;
+    list-style: inherit;
+}
+
+.rich-content ul ul { list-style: circle; }
+.rich-content ul ul ul { list-style: square; }
+
+.rich-content li > ul,
+.rich-content li > ol {
+    margin: 0.25em 0;
+}
+
+/* 引用块 */
+.rich-content blockquote {
+    margin: 0.85em 0;
+    padding: 0.55em 0.95em;
+    border-left: 3px solid var(--color-border-primary);
+    border-radius: 0 8px 8px 0;
+    background: var(--color-bg-item);
+    color: var(--color-text-secondary);
+}
+
+.rich-content blockquote > :first-child {
+    margin-top: 0;
+}
+
+.rich-content blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+/* 行内代码 / 代码块 */
+.rich-content code {
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    background: var(--color-bg-icon);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.92em;
+}
+
+.rich-content pre {
+    margin: 0.85em 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--color-bg-item);
+    font-size: 0.92em;
+    line-height: 1.65;
+    overflow-x: auto;
+}
+
+.rich-content pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+    white-space: pre;
+}
+
+/* 分隔线 */
+.rich-content hr {
+    margin: 1.25em 0;
+    border: none;
+    border-top: 1px solid var(--color-border-divider);
+}
+
+/* 图片：全局 svg,img 的 all:inherit 会丢失 max-width，这里恢复正文图片约束 */
+.rich-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* 表格 */
+.rich-content table {
+    width: 100%;
+    margin: 0.85em 0;
+    border-collapse: collapse;
+    font-size: 0.95em;
+}
+
+.rich-content th,
+.rich-content td {
+    padding: 7px 9px;
+    border: 1px solid var(--color-border-divider);
+    text-align: left;
+    vertical-align: top;
+}
+
+.rich-content th {
+    background: var(--color-bg-item-hover);
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+/* 链接 / 强调 */
+.rich-content a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.rich-content a:hover {
+    text-decoration: underline;
+}
+
+.rich-content strong {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.rich-content em {
+    font-style: italic;
+}

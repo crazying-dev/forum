@@ -311,6 +311,7 @@ export default function Header() {
             </div>
             {/* 社区 */}
             <div className="mobile-menu-title">社区</div>
+            <Link className="mobile-menu-item" href="/" onClick={() => setShowMobileMenu(false)}><i className="fa fa-home"></i> 首页</Link>
             <Link className="mobile-menu-item" href="/messages" onClick={() => setShowMobileMenu(false)}>
               <i className="fa fa-envelope-o"></i> 消息中心
               {unreadTotal > 0 && <span className="mobile-menu-badge">{unreadBadge}</span>}

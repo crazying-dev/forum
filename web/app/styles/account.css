@@ -306,7 +306,7 @@
     cursor: not-allowed;
 }
 
-/* --- 个人主页：账号设置小组 + 已注销简洁态 --- */
+/* --- 个人主页：账号操作小组 + 已注销简洁态 --- */
 .user-account-settings {
     flex-basis: 100%;
     display: flex;
@@ -315,15 +315,6 @@
     gap: 12px;
     padding-top: 16px;
     border-top: 1px dashed var(--color-border-divider);
-}
-
-.user-account-settings-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    margin-right: 4px;
-    color: var(--color-text-tertiary);
-    font-size: 13px;
 }
 
 .account-settings-btn {
@@ -410,7 +401,7 @@
         width: 100%;
     }
 
-    /* 移动端资料卡左对齐：账号设置与资料信息同一起始线 */
+    /* 移动端资料卡其余内容居中，账号操作区保持左对齐 */
     .user-account-settings {
         justify-content: flex-start;
         text-align: left;

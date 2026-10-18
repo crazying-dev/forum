@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Markdown from "@/components/Markdown";
 import PwaInstallButton from "@/components/PwaInstallButton";
 import { useToast } from "@/components/Toast";
 import { ApiException } from "@/lib/api";
@@ -301,7 +302,9 @@ export default function DownloadPage() {
 
           <div className="download-notes-block">
             <h3 className="download-notes-title">更新说明</h3>
-            {latest.notes && latest.notes.length > 0 ? (
+            {latest.notes_markdown ? (
+              <Markdown content={latest.notes_markdown} className="download-notes-markdown" />
+            ) : latest.notes && latest.notes.length > 0 ? (
               <ul className="download-notes">
                 {latest.notes.map((note, idx) => (
                   <li key={idx}>{note}</li>
@@ -403,13 +406,18 @@ export default function DownloadPage() {
                         <span className="download-release-date">{formatDate(item.date)}</span>
                         <span className="download-release-size">{formatSize(item.size)}</span>
                       </div>
-                      {item.notes && item.notes.length > 0 && (
+                      {item.notes_markdown ? (
+                        <Markdown
+                          content={item.notes_markdown}
+                          className="download-notes-markdown download-notes-markdown-small"
+                        />
+                      ) : item.notes && item.notes.length > 0 ? (
                         <ul className="download-notes download-notes-small">
                           {item.notes.map((note, noteIdx) => (
                             <li key={noteIdx}>{note}</li>
                           ))}
                         </ul>
-                      )}
+                      ) : null}
                       <div className="download-sha-row download-sha-compact">
                         <span className="download-sha-label">SHA-256</span>
                         <code className="download-sha-value">{item.sha256 || "未提供"}</code>

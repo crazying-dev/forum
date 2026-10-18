@@ -8,6 +8,7 @@
 }
 
 .changelog-header {
+    display: block; /* 标题在上、描述在下（不被全局 header 的 flex 布局干扰） */
     margin-bottom: 24px;
 }
 
@@ -62,9 +63,21 @@
     border-radius: 999px;
     background: var(--color-bg-icon);
     color: var(--color-primary);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
     line-height: 1.6;
+    /* 站点手写字体把 "." 渲染得几乎不可见：版本号改用系统无衬线字体，保证 v2.0.0 清晰 */
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 版本号分隔点：单独放大，正常字号下也能看清 2.0.0 的两个点 */
+.changelog-version-dot {
+    display: inline-block;
+    font-size: 1.8em;
+    font-weight: 700;
+    line-height: 0;
+    vertical-align: -0.04em;
 }
 
 .changelog-title {
@@ -336,6 +349,10 @@
 
     .changelog-subtitle {
         font-size: 13px;
+    }
+
+    .changelog-version {
+        font-size: 15px;
     }
 
     .changelog-item {

@@ -64,7 +64,7 @@
     text-align: center;
 }
 
-/* 遮罩：桌面极淡（仅拦截背景交互），移动端加深；点击遮罩不关闭 */
+/* 遮罩：仅移动端渲染（桌面为纯悬浮窗，不拦截背景交互）；点击遮罩不关闭 */
 .world-channel-overlay {
     position: fixed;
     inset: 0;
@@ -73,17 +73,22 @@
     animation: worldOverlayIn 0.18s ease;
 }
 
-/* 桌面浮动窗口：默认位置由 JS 计算（右上、入口左侧），拖拽后写入 localStorage */
+/* 桌面浮动窗口：默认位置/尺寸由 JS 计算（右上、入口左侧），拖拽/缩放后写入 localStorage；
+   未写入内联样式前先用 408×620 兜底，min/max 与 JS clamp 保持一致 */
 .world-window {
     position: fixed;
     top: 86px;
     right: 88px;
-    z-index: 1401;
+    /* 桌面层级低于 #header（100），避免遮挡顶栏下拉菜单；移动端在下方媒体查询中提升到遮罩之上 */
+    z-index: 95;
     display: flex;
     flex-direction: column;
     width: min(408px, calc(100vw - 32px));
     height: min(620px, calc(100vh - 102px));
-    min-height: min(380px, calc(100vh - 102px));
+    min-width: 0;
+    min-height: 0;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 94px);
     overflow: hidden;
     border: 1px solid var(--color-border-card);
     border-radius: 16px;
@@ -99,6 +104,76 @@
 .world-window.dragging {
     user-select: none;
     box-shadow: 0 22px 64px rgba(0, 0, 0, 0.38);
+}
+
+.world-window.resizing {
+    user-select: none;
+    box-shadow: 0 22px 64px rgba(0, 0, 0, 0.38);
+}
+
+/* 桌面 resize 手柄：默认完全透明，悬停窗口时低干扰显现（移动端不渲染且 CSS 兜底隐藏） */
+.world-resize-handle {
+    position: absolute;
+    z-index: 6;
+    display: block;
+    background: transparent;
+    opacity: 0;
+    touch-action: none;
+    transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.world-resize-e {
+    top: 12px;
+    /* 让开右侧 6px 滚动条，避免拖滚动条误触 resize */
+    right: 6px;
+    bottom: 12px;
+    width: 4px;
+    cursor: ew-resize;
+}
+
+.world-resize-s {
+    left: 12px;
+    right: 12px;
+    bottom: 0;
+    height: 5px;
+    cursor: ns-resize;
+}
+
+.world-resize-se {
+    right: 0;
+    bottom: 0;
+    width: 15px;
+    height: 15px;
+    cursor: nwse-resize;
+}
+
+/* 右下角斜纹抓握提示：仅悬停时显示，使用文字色而非白/近白边 */
+.world-resize-se::after {
+    content: "";
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 6px;
+    height: 6px;
+    border-right: 1px solid var(--color-text-tertiary);
+    border-bottom: 1px solid var(--color-text-tertiary);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.world-window:hover .world-resize-handle {
+    background: var(--color-primary);
+    opacity: 0.16;
+}
+
+.world-window .world-resize-handle:hover,
+.world-window.resizing .world-resize-handle {
+    background: var(--color-primary);
+    opacity: 0.42;
+}
+
+.world-window:hover .world-resize-se::after {
+    opacity: 0.6;
 }
 
 /* 标题栏：桌面拖拽手柄；移动端取消 pointer 拖拽 */
@@ -122,8 +197,9 @@
 
 .world-window-title-wrap {
     display: flex;
+    flex: 1;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-width: 0;
 }
 
@@ -153,6 +229,7 @@
 /* SSE 状态：实时（绿）/ 轮询（橙）/ 连接中（灰） */
 .world-live {
     display: inline-flex;
+    flex-shrink: 0;
     align-items: center;
     gap: 4px;
     font-size: 11px;
@@ -174,6 +251,52 @@
 
 .world-live.polling i {
     color: #f59e0b !important;
+}
+
+/* 实时 / 轮询 手动分段切换：紧凑低干扰，选中态用项目变量而非白色边 */
+.world-transport-switch {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+    padding: 2px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 9px;
+    background: var(--color-bg-icon);
+}
+
+.world-transport-btn {
+    min-width: 0;
+    padding: 3px 7px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-text-tertiary);
+    font-size: 10px;
+    font-family: inherit;
+    line-height: 1;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.world-transport-btn:hover {
+    background: var(--color-bg-item-hover);
+    color: var(--color-text-secondary);
+}
+
+.world-transport-btn[aria-pressed="true"] {
+    /* 与分段组底色拉开层次（日/夜均由 tokens 自适应） */
+    background: var(--color-bg-icon-hover);
+    color: var(--color-text-accent);
+    font-weight: 500;
+}
+
+.world-transport-btn:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
 }
 
 .world-window-close {
@@ -716,15 +839,22 @@
         top: auto !important;
         right: 0;
         bottom: 0;
+        z-index: 1401;
         width: 100%;
         height: calc(100vh - 8px);
         height: calc(100dvh - 8px);
+        max-width: none;
         max-height: none;
         min-height: 0;
         border-right: none;
         border-bottom: none;
         border-radius: 16px 16px 0 0;
         animation: worldSheetIn 0.26s cubic-bezier(0.22, 0.8, 0.3, 1);
+    }
+
+    /* 移动端底部整屏 sheet：不显示 resize 手柄 */
+    .world-resize-handle {
+        display: none;
     }
 
     .world-window-header {
@@ -799,7 +929,10 @@
     .world-window,
     .world-channel-overlay,
     .world-new-messages,
-    .world-skeleton {
+    .world-skeleton,
+    .world-resize-handle,
+    .world-resize-se::after,
+    .world-transport-btn {
         animation: none;
         transition: none;
     }

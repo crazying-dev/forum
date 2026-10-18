@@ -39,6 +39,9 @@ function scheduleUnmount(roots: Root[]) {
  *   「Attempted to synchronously unmount a root while React was already rendering」）
  */
 export default function RichContent({ content, className = "" }: { content?: string | null; className?: string }) {
+  // 自动追加 rich-content：启用 styles/rich-content.css 的正文基础排版（列表符号 / 标题 / 表格等）
+  const rootClassName = ["rich-content", className].filter(Boolean).join(" ");
+
   const html = useMemo(() => {
     if (!content) return "";
     const sanitized = sanitizeHtml(content);
@@ -102,5 +105,5 @@ export default function RichContent({ content, className = "" }: { content?: str
     };
   }, [html]);
 
-  return <div ref={ref} className={className || undefined} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={ref} className={rootClassName} dangerouslySetInnerHTML={{ __html: html }} />;
 }

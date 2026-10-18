@@ -1,6 +1,7 @@
 package releases
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -89,6 +90,10 @@ func TestParseGitHubReleases(t *testing.T) {
 	if len(win.Notes) != 2 || win.Notes[0] != "无限历纪年改为 1 起算" {
 		t.Errorf("notes = %#v", win.Notes)
 	}
+	wantMarkdown := "## 修复\n- 无限历纪年改为 1 起算\n- 设置页「年制换算」支持无限元年\n\n"
+	if win.NotesMarkdown != wantMarkdown {
+		t.Errorf("notes_markdown = %q, want %q", win.NotesMarkdown, wantMarkdown)
+	}
 
 	var android *Release
 	for i := range result.Items {
@@ -156,6 +161,20 @@ func TestLatestPrefersStable(t *testing.T) {
 	}
 	if latest.Version != "1.3.18" || latest.Channel != "stable" {
 		t.Fatalf("latest = %s/%s, want 1.3.18/stable", latest.Version, latest.Channel)
+	}
+	// cloneRelease 需保留 Markdown 原文（string 直接赋值）
+	if !strings.HasPrefix(latest.NotesMarkdown, "## 修复") {
+		t.Errorf("latest.notes_markdown = %q, want raw markdown body", latest.NotesMarkdown)
+	}
+}
+
+func TestReleaseJSONNotesMarkdown(t *testing.T) {
+	raw, err := json.Marshal(Release{Version: "1.0.0", Notes: []string{"a"}, NotesMarkdown: "- a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"notes_markdown":"- a"`) {
+		t.Fatalf("json = %s, want notes_markdown field", raw)
 	}
 }
 

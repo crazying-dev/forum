@@ -54,6 +54,8 @@ export function sanitizeHtml(html: string): string | null {
     ensureHook();
     return DOMPurify.sanitize(html, {
       USE_PROFILES: { html: true },
+      // style 属性可被用来做视觉覆盖/隐藏（发布来源可信时风险低，但仍不必要）：正文宽度走 width 属性
+      FORBID_ATTR: ["style"],
       FORBID_TAGS: ["script", "iframe", "object", "embed", "form", "style", "link", "meta"],
     });
   } catch {

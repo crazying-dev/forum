@@ -12,6 +12,9 @@ import { escapeHtml, sanitizeHtml } from "@/lib/sanitize";
  * 注意：正文由客户端 API 加载，首次渲染 content 为空，因此 SSR 不会输出未净化 HTML。
  */
 export default function Markdown({ content, className = "" }: { content?: string; className?: string }) {
+  // 自动追加 rich-content：启用 styles/rich-content.css 的正文基础排版（列表符号 / 标题 / 表格等）
+  const rootClassName = ["rich-content", className].filter(Boolean).join(" ");
+
   const html = useMemo(() => {
     if (!content) return "";
     let raw: string | null = null;
@@ -26,7 +29,7 @@ export default function Markdown({ content, className = "" }: { content?: string
     return sanitized === null ? escapeHtml(raw) : sanitized;
   }, [content]);
 
-  return <div className={className || undefined} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div className={rootClassName} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 

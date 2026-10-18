@@ -305,6 +305,29 @@
     line-height: 1.7;
 }
 
+/* Markdown 更新说明（notes_markdown 优先渲染，空时回退 .download-notes 列表） */
+.download-notes-markdown {
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.download-notes-markdown > :first-child {
+    margin-top: 0;
+}
+
+.download-notes-markdown > :last-child {
+    margin-bottom: 0;
+}
+
+.download-notes-markdown-small {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
 .download-notes-empty {
     margin: 0;
     color: var(--color-text-tertiary);

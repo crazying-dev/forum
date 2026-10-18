@@ -60,16 +60,18 @@ type Asset struct {
 
 // Release 单个平台版本的公开结构（字段与 backend-contract 对齐）。
 type Release struct {
-	Version   string   `json:"version"`
-	Channel   string   `json:"channel"` // stable | beta（GitHub prerelease）
-	Date      string   `json:"date"`    // YYYY-MM-DD
-	Size      int64    `json:"size"`
-	URL       string   `json:"url"`
-	Filename  string   `json:"filename"`
-	SHA256    string   `json:"sha256"`
-	Notes     []string `json:"notes"`
-	Mandatory bool     `json:"mandatory"`
-	Platform  string   `json:"platform"`
+	Version  string   `json:"version"`
+	Channel  string   `json:"channel"` // stable | beta（GitHub prerelease）
+	Date     string   `json:"date"`    // YYYY-MM-DD
+	Size     int64    `json:"size"`
+	URL      string   `json:"url"`
+	Filename string   `json:"filename"`
+	SHA256   string   `json:"sha256"`
+	Notes    []string `json:"notes"`
+	// NotesMarkdown 原始 Release 正文（Markdown）；Notes 保留为旧客户端兼容的纯文本行列表。
+	NotesMarkdown string `json:"notes_markdown,omitempty"`
+	Mandatory     bool   `json:"mandatory"`
+	Platform      string `json:"platform"`
 
 	// PublishedAt 发布时间（仅内部排序用）。
 	PublishedAt time.Time `json:"-"`
@@ -413,17 +415,18 @@ func parseReleases(raw []githubRelease) []Release {
 			date = gr.PublishedAt.UTC().Format("2006-01-02")
 		}
 		out = append(out, Release{
-			Version:     version,
-			Channel:     channel,
-			Date:        date,
-			Size:        primary.Size,
-			URL:         primary.URL,
-			Filename:    primary.Filename,
-			SHA256:      primary.SHA256,
-			Notes:       parseNotes(gr.Body),
-			Platform:    platform,
-			PublishedAt: gr.PublishedAt,
-			assets:      assets,
+			Version:       version,
+			Channel:       channel,
+			Date:          date,
+			Size:          primary.Size,
+			URL:           primary.URL,
+			Filename:      primary.Filename,
+			SHA256:        primary.SHA256,
+			Notes:         parseNotes(gr.Body),
+			NotesMarkdown: gr.Body,
+			Platform:      platform,
+			PublishedAt:   gr.PublishedAt,
+			assets:        assets,
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {

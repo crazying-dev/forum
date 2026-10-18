@@ -3,6 +3,7 @@ package handler
 import (
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -103,7 +104,70 @@ func (h *MediaHandler) UploadImage(c *gin.Context) {
 		c.JSON(status, gin.H{"success": false, "message": msg})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "id": asset.ID, "url": asset.PublicURL})
+	c.JSON(http.StatusOK, gin.H{"success": true, "id": asset.ID, "url": absoluteMediaURL(h.Cfg, c.Request, asset.PublicURL)})
+}
+
+// absoluteMediaURL 把媒体相对路径（数据库仍存相对路径）补成绝对地址：
+// 优先 PUBLIC_BASE_URL（normalizeBaseURL），为空时按请求 scheme/host 兜底。
+func absoluteMediaURL(cfg *config.Config, r *http.Request, publicURL string) string {
+	path := strings.TrimSpace(publicURL)
+	if path == "" {
+		return ""
+	}
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	base := ""
+	if cfg != nil {
+		base = normalizeBaseURL(cfg.PublicBaseURL)
+	}
+	// 配置为本机地址时不可靠（开发默认 localhost:3000、实际端口可能不同），
+	// 回退到请求自身 origin，避免把 localhost 写进用户正文。
+	if base != "" && !isLoopbackURL(base) {
+		return strings.TrimRight(base, "/") + path
+	}
+	if r == nil {
+		return path
+	}
+
+	scheme := "http"
+	if proto := requestProto(r); proto != "" {
+		scheme = proto
+	} else if r.TLS != nil {
+		scheme = "https"
+	}
+	host := strings.TrimSpace(r.Host)
+	if host == "" {
+		return path
+	}
+	return scheme + "://" + host + path
+}
+
+// isLoopbackURL 判断配置地址是否为本机回环 host。
+func isLoopbackURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "localhost" || host == "::1" || host == "127.0.0.1" || strings.HasPrefix(host, "127.")
+}
+
+// requestProto 读取反向代理的 X-Forwarded-Proto（取第一个值），仅接受 http/https。
+func requestProto(r *http.Request) string {
+	raw := strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))
+	if i := strings.IndexByte(raw, ','); i >= 0 {
+		raw = strings.TrimSpace(raw[:i])
+	}
+	proto := strings.ToLower(raw)
+	if proto == "http" || proto == "https" {
+		return proto
+	}
+	return ""
 }
 
 // ServeImage 读取图片；public 直接读，private 校验本人/聊天成员/定时帖作者。

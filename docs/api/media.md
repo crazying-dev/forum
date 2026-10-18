@@ -13,8 +13,10 @@
 
 成功：
 ```json
-{ "success": true, "id": "MD...", "url": "/ov2/api/media/MD..." }
+{ "success": true, "id": "MD...", "url": "https://yjlt.top/ov2/api/media/MD..." }
 ```
+
+`url` 为可对外使用的完整地址（优先 `PUBLIC_BASE_URL`；配置缺失或为本机回环地址时按请求 `Host` / `X-Forwarded-Proto` 生成）。数据库 `media_assets.public_url` 仍保存相对路径 `/ov2/api/media/<id>`，便于更换域名；前端会把该完整地址直接写入富文本正文。
 
 ## 读取与 ACL
 

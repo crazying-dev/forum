@@ -1,9 +1,6 @@
 /* ===== 主样式·顶栏导航（桌面端：header / logo / 搜索 / 更多下拉）===== */
-header{
-    display: flex;
-    background-color: rgba(0,0,0,0);
-    height: 70px;
-}
+/* 全局 header 选择器会污染各页面自定义 <header>（标题/描述被横排并限高），
+   顶栏样式统一由下方 #header 控制，不再设置裸 header 规则。 */
 #logo{
     height: 50px;
     width: 50px;

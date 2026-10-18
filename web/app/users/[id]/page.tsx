@@ -386,7 +386,6 @@ export default function UserPage() {
           )}
           {isSelf && !profile.deleted && (
             <div className="user-account-settings" id="user-account-settings">
-              <span className="user-account-settings-label"><i className="fa fa-cog"></i> 账号设置</span>
               <button type="button" className="account-settings-btn" onClick={() => setShowEmailChange(true)}>
                 <i className="fa fa-envelope-o"></i> 更换邮箱
               </button>

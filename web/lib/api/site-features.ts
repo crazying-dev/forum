@@ -49,7 +49,10 @@ export interface ReleaseItem {
   url: string;
   filename: string;
   sha256: string;
+  /** 旧客户端兼容的纯文本行列表 */
   notes: string[];
+  /** Release 正文原始 Markdown（优先用于渲染） */
+  notes_markdown: string;
   mandatory: boolean;
   platform: string;
 }

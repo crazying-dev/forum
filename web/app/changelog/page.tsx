@@ -14,6 +14,21 @@ function versionLabel(version: string): string {
   return /^v/i.test(v) ? v : `v${v}`;
 }
 
+/** 版本号徽标：把分隔点单独放大，避免手写字体下 "." 过小难以辨认 */
+function VersionBadge({ version }: { version: string }) {
+  const parts = versionLabel(version).split(".");
+  return (
+    <span className="changelog-version">
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`}>
+          {index > 0 && <span className="changelog-version-dot">.</span>}
+          {part}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 /** RFC3339 → YYYY-MM-DD（无效值原样展示） */
 function formatDate(value: string): string {
   if (!value) return "—";
@@ -64,12 +79,13 @@ export default function ChangelogPage() {
 
   return (
     <div className="changelog-page">
-      <header className="changelog-header">
+      {/* 不用 <header>：全局 header{display:flex;height:70px} 会把标题与描述压成横排并限高 */}
+      <div className="changelog-header">
         <h1 className="changelog-heading">
           <i className="fa fa-history" aria-hidden="true"></i> 更新日志
         </h1>
         <p className="changelog-subtitle">记录妖精论坛的每一次更新：功能上新、体验优化与问题修复。</p>
-      </header>
+      </div>
 
       {loading ? (
         <div className="changelog-status" role="status">
@@ -89,7 +105,7 @@ export default function ChangelogPage() {
           {items.map((item) => (
             <article className="changelog-item" key={item.id}>
               <div className="changelog-item-head">
-                <span className="changelog-version">{versionLabel(item.version)}</span>
+                <VersionBadge version={item.version} />
                 <h2 className="changelog-title">{item.title || "更新"}</h2>
                 <time className="changelog-date" dateTime={item.published_at || undefined}>
                   <i className="fa fa-clock-o" aria-hidden="true"></i> {formatDate(item.published_at)}
