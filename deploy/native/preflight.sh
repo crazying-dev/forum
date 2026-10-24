@@ -16,13 +16,13 @@
 #   bash deploy/native/preflight.sh --help
 #
 # 可用环境变量（一般无需调整）：
-#   MIN_FREE_GB=20      / 剩余空间建议下限（GB）
+#   MIN_FREE_GB=15      / 剩余空间建议下限（GB；SeaweedFS 10G + nginx 缓存 3G + 系统余量）
 #   DISK_WARN_PCT=85    磁盘使用率告警线（%）
-#   MIN_MEM_MB=1024     建议最小物理内存（MB，unit 里 MemoryMax=1G）
+#   MIN_MEM_MB=1024     建议最小物理内存（MB，unit 里 MemoryMax=768M + GOMEMLIMIT=640MiB）
 # ============================================================
 set -euo pipefail
 
-MIN_FREE_GB="${MIN_FREE_GB:-20}"
+MIN_FREE_GB="${MIN_FREE_GB:-15}"
 DISK_WARN_PCT="${DISK_WARN_PCT:-85}"
 MIN_MEM_MB="${MIN_MEM_MB:-1024}"
 

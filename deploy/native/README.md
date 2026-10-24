@@ -177,9 +177,9 @@ sudo systemctl start seaweedfs
 | 应用上传 500 / AccessDenied | `journalctl -u seaweedfs -n 100`；核对 `.env` 的 key | accessKey/secretKey 不匹配，或 actions 不足 |
 | 应用上传 500 / NoSuchBucket | `printf 's3.bucket.list\n' \| weed shell -master=10.8.0.1:9333` | 重跑 install 脚本第 9 步，或手动 `s3.bucket.create -name yj-forum` |
 | 公网 `curl` 8333 超时 / 拒绝 | `ss -ltnp \| grep 8333` | 这是预期（只绑 10.8.0.1）；防火墙还应显式丢弃公网 8333/9327 |
-| 服务被 OOM 杀（`status=9/KILL`） | `journalctl -u seaweedfs \| grep -i oom`；`systemd-cgtop` | unit 限制 `MemoryMax=1G`；降低 volume 数或调大限制并评估主机内存 |
+| 服务被 OOM 杀（`status=9/KILL`） | `journalctl -u seaweedfs \| grep -i oom`；`systemd-cgtop` | unit 限制 `MemoryMax=768M` + `GOMEMLIMIT=640MiB`；降低 volume 数或调大限制并评估主机内存 |
 | SELinux 拒绝 | `ausearch -m avc -ts recent` | `semanage fcontext -a -t var_lib_t '/var/lib/seaweedfs(/.*)?'` + `restorecon -Rv /var/lib/seaweedfs`（按发行版策略调整） |
-| 磁盘涨满 | `du -sh /var/lib/seaweedfs/data/*`、`weed shell` 的 `volume.check.disk` | 扩容/清理；`-volume.max=50`、`volumeSizeLimitMB=1024` 为当前上限 |
+| 磁盘涨满 | `du -sh /var/lib/seaweedfs/data/*`、`weed shell` 的 `volume.check.disk` | 扩容/清理；`-volume.max=20`、`volumeSizeLimitMB=512`（上限 10GB）为当前配置 |
 
 ## 9. 与开发（Docker）的区别
 

@@ -33,8 +33,8 @@
 | 项 | 要求 |
 |---|---|
 | 系统 | Debian/Ubuntu 或 RHEL 系，systemd ≥ 232，x86_64/arm64 |
-| 磁盘 | `/var/lib/seaweedfs` 可用 ≥ 50G（建议独立磁盘/分区） |
-| 内存 | ≥ 2G（unit `MemoryMax=1G` + ouo + node） |
+| 磁盘 | 根盘**可用 ≥ 15G**；SeaweedFS 上限 10G（512MB×20），Nginx 媒体缓存 3G |
+| 内存 | ≥ 2G（unit `MemoryMax=768M` + `GOMEMLIMIT=640MiB` + ouo + node；低于 2G 需评估） |
 | 端口 | 公网只开 22/80/443/51820udp；8333/9327/8080 不对公网 |
 | 时间 | 两台主机 NTP 同步（S3 签名对时间敏感） |
 | 备份 | PG 全量备份 + `/var/lib/seaweedfs`（首次为空）+ admin GridFS |
@@ -174,7 +174,7 @@ sudo nginx -t && sudo systemctl reload nginx
 检查点：
 
 - `/guild-img/`、`/guide-img/` 已指向 `http://10.8.0.2:8080/api/`；
-- `/ov2/api/media/` 启用 `proxy_cache media`（20g / inactive=30d / keys_zone=100m）；
+- `/ov2/api/media/` 启用 `proxy_cache media`（**3g** / inactive=30d / keys_zone=100m）；
 - SSE 两个 exact location 仍在（`/ov2/api/world/stream`、`/ov2/api/messages/stream`）；
 - 安全头仍在（media location 内已重复声明）。
 
@@ -307,7 +307,7 @@ sudo bash deploy/native/uninstall-weed.sh --apply     # 保留数据
 | nginx 启动报 `proxy_cache_path` 不允许 | 配置放错层级 | 把 map / proxy_cache_path 移到 http 级 conf.d |
 | 媒体首次请求 500、日志 `Permission denied /var/cache/nginx/...` | `ls -ld /var/cache/nginx/ov2-media` | 目录属主改为 nginx 用户（www-data/nginx） |
 | 私有图被外部看到 | 检查 `X-Media-Cache` / `Cache-Control` | 上游必须对私有资源返回 `private`；nginx 已有 map 兜底，勿删 |
-| 缓存盘被写满 | `du -sh /var/cache/nginx/ov2-media` | `max_size=20g` 会自动淘汰；仍涨满则查 `proxy_cache_key` 是否异常（如缺 `$request_uri`） |
+| 缓存盘被写满 | `du -sh /var/cache/nginx/ov2-media` | `max_size=3g` 会自动淘汰；仍涨满则查 `proxy_cache_key` 是否异常（只应含 `$uri` + 归一化 `w`） |
 | OOM（`status=9/KILL`） | `journalctl -k \| grep -i oom`；`systemd-cgtop` | `MemoryMax=1G`：评估调大或减少 volume |
 | SELinux 拦截 | `ausearch -m avc -ts recent` | 配 `semanage fcontext` / `restorecon`，见 native/README |
 | AppArmor 拦截 | `dmesg \| grep -i apparmor` | 为 weed/nginx 放行 `/var/lib/seaweedfs` 与 `10.8.0.1:8333` |
@@ -329,7 +329,7 @@ sudo bash deploy/native/uninstall-weed.sh --apply     # 保留数据
 | unit | `/etc/systemd/system/seaweedfs.service` |
 | 数据 | `/var/lib/seaweedfs/data` |
 | 配置 | `/etc/seaweedfs/s3.json` |
-| 媒体缓存 | `/var/cache/nginx/ov2-media`（20g） |
+| 媒体缓存 | `/var/cache/nginx/ov2-media`（3g） |
 | 巡检脚本 | `/usr/local/bin/yj-ops/*.sh` |
 | 巡检配置 | `/etc/yj-ops/mail.env`、`/etc/yj-ops/ops.env`（可选） |
 | admin 静态 | `/var/www/yj-forum-admin` |
