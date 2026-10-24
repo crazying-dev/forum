@@ -24,7 +24,7 @@ Host A（公网）                                Host B（公网）
 │ yj-web   :3000             │               │ MongoDB（原生）     │
 │ SeaweedFS 4.47             │               │                    │
 │  S3   10.8.0.1:8333        │               │                    │
-│  metrics 10.8.0.1:9327     │               │                    │
+│  metrics 127.0.0.1:9327    │               │                    │
 └────────────────────────────┘               └────────────────────┘
 ```
 
@@ -102,7 +102,7 @@ journalctl -u seaweedfs -n 50 --no-pager
 # 未签名请求返回 403 才是正常（说明 S3 gateway 在跑）
 curl -s -o /dev/null -w '%{http_code}\n' http://10.8.0.1:8333/
 # 指标
-curl -s http://10.8.0.1:9327/metrics | head
+curl -s http://127.0.0.1:9327/metrics | head
 # bucket
 printf 's3.bucket.list\n' | weed shell -master=10.8.0.1:9333 | grep yj-forum
 ```

@@ -6,7 +6,7 @@
 # 退出码：0 正常；1 异常（会尝试发邮件）。
 # 可用环境变量：
 #   S3_ENDPOINT=http://10.8.0.1:8333    S3 根地址
-#   METRICS_URL=http://10.8.0.1:9327/metrics
+#   METRICS_URL=http://127.0.0.1:9327/metrics
 #   S3_BUCKET=yj-forum / MASTER=10.8.0.1:9333
 #   CHECK_BUCKET=1（weed 存在时检查 bucket）/ CHECK_TIMEOUT=5
 # ============================================================
@@ -14,7 +14,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 S3_ENDPOINT="${S3_ENDPOINT:-http://10.8.0.1:8333}"
-METRICS_URL="${METRICS_URL:-http://10.8.0.1:9327/metrics}"
+METRICS_URL="${METRICS_URL:-http://127.0.0.1:9327/metrics}"
 S3_BUCKET="${S3_BUCKET:-yj-forum}"
 MASTER="${MASTER:-10.8.0.1:9333}"
 CHECK_BUCKET="${CHECK_BUCKET:-1}"

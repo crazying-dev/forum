@@ -107,9 +107,9 @@ sudo bash deploy/native/install-weed.sh --apply --version=$VERSION --sha256=<hex
 
 ```bash
 systemctl is-active seaweedfs
-ss -ltnp | grep -E '8333|9327'      # 应为 10.8.0.1:8333 / 10.8.0.1:9327
+ss -ltnp | grep -E '8333|9327'      # 应为 127.0.0.1:8333 / 127.0.0.1:9327
 curl -s -o /dev/null -w '%{http_code}\n' http://10.8.0.1:8333/   # 403 或 200
-curl -s http://10.8.0.1:9327/metrics | head -3
+curl -s http://127.0.0.1:9327/metrics | head -3
 printf 's3.bucket.list\n' | weed shell -master=10.8.0.1:9333      # 应含 yj-forum
 ```
 
@@ -237,7 +237,7 @@ journalctl -u yj-ops.service -n 50 --no-pager
 | 3 | 内网连通 | Host B: `curl -s -o /dev/null -w '%{http_code}' http://10.8.0.1:8333/` | `403`/`200` |
 | 4 | 公网不可达 | 外部: `curl --connect-timeout 3 http://<A公网IP>:8333/` | 超时/拒绝 |
 | 5 | 服务 | `systemctl is-active seaweedfs` | `active` |
-| 6 | 指标 | `curl -s -o /dev/null -w '%{http_code}' http://10.8.0.1:9327/metrics` | `200` |
+| 6 | 指标 | `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9327/metrics` | `200` |
 | 7 | bucket | `printf 's3.bucket.list\n' \| weed shell -master=10.8.0.1:9333` | 含 `yj-forum` |
 | 8 | 应用上传 | 论坛发帖带图 | 201/200，PG 有 `media_assets` 记录 |
 | 9 | 媒体读取 | `curl -s -D- -o /dev/null https://yjlt.top/ov2/api/media/<id>` | `200`，`X-Cache-Status: MISS` 后为 `HIT` |
@@ -324,7 +324,7 @@ sudo bash deploy/native/uninstall-weed.sh --apply     # 保留数据
 |---|---|
 | WireGuard | `10.8.0.1`（A）/ `10.8.0.2`（B），`51820/udp` |
 | SeaweedFS S3 | `10.8.0.1:8333`（仅 wg0） |
-| SeaweedFS metrics | `10.8.0.1:9327`（仅 wg0） |
+| SeaweedFS metrics | `127.0.0.1:9327`（仅回环） |
 | ouo Go | `127.0.0.1:8090` |
 | ouo Web（Next） | `127.0.0.1:3000` |
 | admin Go | `10.8.0.2:8080`（本机 nginx 反代；wg0 仅对 A 放行） |

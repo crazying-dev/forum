@@ -24,7 +24,7 @@ UMask=0027
 # 容量：512MB/卷 × 20 = 10GB 上限（宿主机仅 39G 盘、21G 可用；不要照搬默认 30G 卷）
 # 内存：宿主机 2GB，Go 软限 + cgroup 硬限双保险
 Environment=GOMEMLIMIT=640MiB
-ExecStart=/usr/local/bin/weed server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/var/lib/seaweedfs/data -ip.bind=127.0.0.1 -master.volumeSizeLimitMB=512 -volume.max=20 -metrics.port=9327
+ExecStart=/usr/local/bin/weed server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/var/lib/seaweedfs/data -ip.bind=127.0.0.1 -master.volumeSizeLimitMB=512 -volume.max=20 -metricsIp=127.0.0.1 -metricsPort=9327
 
 Restart=always
 RestartSec=5
