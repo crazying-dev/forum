@@ -72,8 +72,18 @@ func (d *DB) PurgeUser(ctx context.Context, userID string) (string, error) {
 			Scan(&oldEmail, &oldAvatar); err != nil {
 			return err
 		}
-		// media_assets 仅置为已删除，物理文件交由后台过期媒体清理任务处理
-		if _, err := tx.Exec(ctx, `UPDATE media_assets SET status=0, deleted_at=NOW() WHERE uploader_user_id=$1`, userID); err != nil {
+		// 先清理该用户帖子/评论产生的媒体引用：下面会级联删除 posts/comments，
+		// media_references 无外键不会自动清，残留引用会把媒体永久钉住（无法 GC，公开图仍可被访问）。
+		if _, err := tx.Exec(ctx, `DELETE FROM media_references
+			WHERE (owner_type = 'post' AND owner_id IN (SELECT id FROM posts WHERE user_id=$1))
+			   OR (owner_type = 'comment' AND owner_id IN (SELECT id FROM comments WHERE user_id=$1))`, userID); err != nil {
+			return err
+		}
+		// media_assets 仅置为已删除，物理文件交由后台过期媒体清理任务处理；
+		// 仍被 media_references 引用的资产保持 status=1，避免误删其他内容仍在用的图片。
+		if _, err := tx.Exec(ctx, `UPDATE media_assets SET status=0, deleted_at=NOW()
+			WHERE uploader_user_id=$1
+			  AND NOT EXISTS (SELECT 1 FROM media_references mr WHERE mr.media_id = media_assets.id)`, userID); err != nil {
 			return err
 		}
 		// bug_report_logs 与 bug_reports 无外键关联，需先删日志再删报告

@@ -1,28 +1,37 @@
-# SeaweedFS（S3）部署与使用
+# SeaweedFS（S3）：开发 Docker / 生产 native
 
-> 本目录是单机 SeaweedFS 的开发/单机生产参考。S3 只监听 `127.0.0.1:8333`，前端统一经 ouo `/ov2/api/media/<id>` 代理取流；admin 前端也经 ouo 取图。
+> 本目录**仅用于开发环境**：`docker-compose.dev.yml` 把 S3 绑在 `127.0.0.1:8333`。
+> **生产不使用 Docker**，改用 systemd + 原生二进制（SeaweedFS 4.47，只绑 WireGuard `10.8.0.1:8333`）：
+> 见 [`../native/README.md`](../native/README.md) 与 [`../../docs/runbook-s3-prod.md`](../../docs/runbook-s3-prod.md)。
 
-## 1. 启动
+| 环境 | 编排 | 监听 | 数据目录 |
+|---|---|---|---|
+| 开发 | `docker-compose.dev.yml` | `127.0.0.1:8333` | `deploy/seaweedfs/data` |
+| 生产 | systemd `seaweedfs.service` | `10.8.0.1:8333`（+ 指标 9327） | `/var/lib/seaweedfs/data` |
+
+## 1. 开发：启动
 
 ```bash
 cd yj-forum-ouo/deploy/seaweedfs
 cp s3.json.example s3.json   # 首次：改成强随机 access/secret
 mkdir -p data
-docker compose up -d
+docker compose -f docker-compose.dev.yml up -d
 ```
 
 或在仓库根：
 
 ```bash
-make s3-up      # 自动确保容器/数据目录/bucket
+make s3-up      # 确保数据目录 / s3.json / 容器 / bucket
 make s3-status
 make s3-logs
 make s3-down
 ```
 
-## 2. 配置 ouo / admin
+健康检查：容器内 `wget -S http://127.0.0.1:8333/` 返回 `403` 或 `200` 即视为存活（未签名请求 403 是正常的）。
 
-在 `yj-forum-ouo/server/.env` 与 `yj-forum-admin/server/.env` 中设置同一组值：
+## 2. 配置 ouo / admin（开发）
+
+在 `yj-forum-ouo/server/.env` 与 `yj-forum-admin/server/.env` 中设置：
 
 ```env
 S3_ENABLED=true
@@ -34,24 +43,25 @@ S3_SECRET_KEY=<s3.json 中的 secretKey>
 S3_USE_PATH_STYLE=true
 ```
 
-> 建议 ouo 与 admin 使用不同的 key（`s3.json.example` 已给出两个 identity），权限都只到 `yj-forum` bucket。
+> ouo 与 admin 使用不同的 key（`s3.json.example` 已给出两个 identity），权限都只到 `yj-forum` bucket。
+> 生产环境把 `S3_ENDPOINT` 换成 `http://10.8.0.1:8333`（见 native/README）。
 
 ## 3. Bucket / object key
 
 - 单 bucket：`yj-forum`。
-- 前缀：`posts/`、`comments/`、`world/`、`chat/`、`guilds/{uuid}/`、`guides/`、`avatars/`、`feedback/`。
-- 私有 bucket；应用 key 不授予 `List` 以外的全局权限；不要对公网开放 8333。
+- 前缀（按 scene）：`post_image/`、`comment_image/`、`world_message/`、`chat_message/`、`avatar/`、`guild_logo/`、`guild_leader_image/`、`guild_intro_image/`、`guide_image/`、`feedback_attachment/`；变体为同前缀下的 `<id>@480.jpg`、`<id>@1280.jpg`。
+- 私有 bucket；应用 key 只授予该 bucket 的读写列表权限；不要对公网开放 8333。
 
 ## 4. 备份 / 恢复
 
-- 数据目录：`deploy/seaweedfs/data`（生产建议挂到独立磁盘）。
-- 停止写入后快照整个数据目录；恢复时停容器、还原目录、再启动。
-- 定期执行 `weed shell` 的 `volume.check.disk` / `volume.fsck`（按 SeaweedFS 版本命令为准）。
-- 备份同时覆盖 PG 与 admin GridFS（旧资源仍可能被读取）。
+- 开发：数据在 `deploy/seaweedfs/data`，随容器删除不会丢，但不要提交进 Git。
+- 生产：`/var/lib/seaweedfs/data` + `/etc/seaweedfs/s3.json`，详见 native/README 第 7 节。
+- 备份同时覆盖 PG 与 admin 旧 GridFS（旧资源仍可能被读取）。
 
 ## 5. 故障排查
 
-- `docker logs ouo-seaweedfs` 看 S3 gateway 日志。
+- `docker compose -f docker-compose.dev.yml logs -f` 看 S3 gateway 日志。
 - `curl -i http://127.0.0.1:8333/` 返回 403 说明网关在跑（未签名请求被拒是正常的）。
 - 上传 500：先确认 bucket 已创建、key 有 `Write:yj-forum` 权限、`S3_ENDPOINT` 可从服务容器/主机访问。
 - 旧资源 404：确认 `MEDIA_DIR`/`AVATAR_DIR` 与 admin GridFS 未删除；新 S3 不迁移旧字节。
+- 生产问题（启动失败、OOM、SELinux 等）：见 [`../native/README.md`](../native/README.md) 第 8 节排障表。

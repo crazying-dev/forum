@@ -5,9 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -51,8 +54,55 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3Provider, error) {
 			o.BaseEndpoint = aws.String(strings.TrimRight(cfg.Endpoint, "/"))
 		}
 		o.UsePathStyle = cfg.UsePathStyle
+		o.HTTPClient = newHTTPClient()
 	})
 	return &S3Provider{client: client, bucket: cfg.Bucket}, nil
+}
+
+// newHTTPClient 构造 S3 专用 HTTP 客户端：单请求 30s 超时 + 连接池复用。
+// 基于 http.DefaultTransport 克隆，保留 Proxy/HTTP2 等默认行为。
+func newHTTPClient() *http.Client {
+	transport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		transport = &http.Transport{}
+	}
+	t := transport.Clone()
+	t.MaxIdleConnsPerHost = 100
+	t.IdleConnTimeout = 90 * time.Second
+	t.TLSHandshakeTimeout = 10 * time.Second
+	return &http.Client{Timeout: 30 * time.Second, Transport: t}
+}
+
+// Ping 探测 bucket 是否可访问（HeadBucket；启动/健康检查使用）。
+func (p *S3Provider) Ping(ctx context.Context) error {
+	if p == nil || p.client == nil {
+		return fmt.Errorf("S3 客户端未初始化")
+	}
+	_, err := p.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(p.bucket)})
+	return err
+}
+
+// IsNotFound 判断存储错误是否为“对象不存在”（S3 404/NoSuchKey 等）。
+func IsNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		switch apiErr.ErrorCode() {
+		case "NotFound", "NoSuchKey", "404":
+			return true
+		}
+		// NoSuchBucket 是配置/部署错误，不能当作"对象不存在"（否则会被静默回退掩盖成 404）
+		if apiErr.ErrorCode() == "NoSuchBucket" {
+			return false
+		}
+	}
+	var respErr *awshttp.ResponseError
+	if errors.As(err, &respErr) && respErr.HTTPStatusCode() == http.StatusNotFound {
+		return true
+	}
+	return false
 }
 
 func (p *S3Provider) Put(ctx context.Context, key string, data []byte, contentType, cacheControl string) error {
@@ -106,12 +156,8 @@ func (p *S3Provider) Exists(ctx context.Context, key string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	var apiErr smithy.APIError
-	if errors.As(err, &apiErr) {
-		switch apiErr.ErrorCode() {
-		case "NotFound", "NoSuchKey", "NoSuchBucket":
-			return false, nil
-		}
+	if IsNotFound(err) {
+		return false, nil
 	}
 	return false, err
 }

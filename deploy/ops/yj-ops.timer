@@ -1,0 +1,17 @@
+# ============================================================
+# yj-ops 定时器：每 5 分钟触发一次 yj-ops.service
+# 安装：systemctl daemon-reload && systemctl enable --now yj-ops.timer
+# 查看：systemctl list-timers yj-ops.timer；journalctl -u yj-ops.service
+# ============================================================
+[Unit]
+Description=Run YJ Forum ops checks every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=yj-ops.service
+
+[Install]
+WantedBy=timers.target

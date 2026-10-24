@@ -25,6 +25,12 @@ import (
 	"yj-forum/server/internal/world"
 )
 
+// S3 启动探测：12 次 × 10s（约 2 分钟），容忍 SeaweedFS 比应用晚启动。
+const (
+	s3PingAttempts = 12
+	s3PingInterval = 10 * time.Second
+)
+
 func main() {
 	cfg := config.Load()
 
@@ -76,11 +82,15 @@ func main() {
 		if s3Err != nil {
 			log.Fatalf("[FATAL] S3 初始化失败: %v", s3Err)
 		}
-		log.Printf("[MEDIA] S3 已启用: %s bucket=%s", cfg.S3Endpoint, cfg.S3Bucket)
+		// fail-fast：S3 不可用时不接受流量（否则上传会持续失败）。
+		if pingErr := pingS3WithRetry(ctx, s3Provider); pingErr != nil {
+			log.Fatalf("[FATAL] S3 启动探测失败: %v", pingErr)
+		}
+		log.Printf("[MEDIA] S3 已启用: endpoint=%s bucket=%s", cfg.S3Endpoint, cfg.S3Bucket)
 	} else {
 		log.Println("[MEDIA] S3 未启用，新媒体落本地 MEDIA_DIR")
 	}
-	mediaSvc := media.NewService(db, s3Provider, cfg.MediaDir, cfg.S3Bucket)
+	mediaSvc := media.NewService(db, s3Provider, cfg.MediaDir, cfg.S3Bucket, cfg.MediaVariantsEnabled)
 
 	// 4. 路由（返回帖子处理器，供定时发布任务复用 DB/缓存）
 	gin.SetMode(gin.ReleaseMode)
@@ -122,7 +132,10 @@ func main() {
 					log.Printf("[DB] 清理 ALTCHA 记录失败: %v", err)
 				}
 			case <-mediaTicker.C:
-				cleanDeletedMediaFiles(ctx, db, mediaSvc)
+				// 每轮 GC 单独限时 5 分钟，避免卡住整个后台循环。
+				gcCtx, gcCancel := context.WithTimeout(ctx, 5*time.Minute)
+				cleanDeletedMediaFiles(gcCtx, db, mediaSvc)
+				gcCancel()
 			case <-publishTicker.C:
 				postsH.ProcessScheduledPublishes(ctx)
 			}
@@ -156,6 +169,30 @@ func main() {
 	_ = srv.Shutdown(shutdownCtx)
 }
 
+// pingS3WithRetry 启动时探测 S3/SeaweedFS：最多 12 次、间隔 10s，全部失败返回最后一次错误。
+func pingS3WithRetry(ctx context.Context, p *storage.S3Provider) error {
+	var err error
+	for attempt := 1; attempt <= s3PingAttempts; attempt++ {
+		// 每次探测单独限时，避免 endpoint 不可达时单次 Ping 拖满 HTTP client 超时。
+		pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err = p.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			return nil
+		}
+		log.Printf("[MEDIA] S3 探测失败（%d/%d）: %v", attempt, s3PingAttempts, err)
+		if attempt == s3PingAttempts {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(s3PingInterval):
+		}
+	}
+	return err
+}
+
 // checkAvatarDir 检查旧头像目录是否可读；缺失只告警，不影响新头像（媒体服务）启动。
 func checkAvatarDir(dir string) {
 	if dir == "" {
@@ -185,7 +222,7 @@ func checkAvatarDir(dir string) {
 }
 
 // cleanDeletedMediaFiles 清理已删除（status=0）且超过 7 天的媒体对象；
-// is_legacy / 有活跃引用的资产永不删除；行记录保留。
+// is_legacy 与仍被 media_references 引用的资产永不删除（与查询 SQL 的 NOT EXISTS 守卫一致）；行记录保留。
 func cleanDeletedMediaFiles(ctx context.Context, db *database.DB, mediaSvc *media.Service) {
 	assets, err := db.ListExpiredMediaAssets(ctx, 7)
 	if err != nil {
@@ -200,6 +237,10 @@ func cleanDeletedMediaFiles(ctx context.Context, db *database.DB, mediaSvc *medi
 		}
 		if err := mediaSvc.Delete(ctx, a); err == nil {
 			removed++
+			// 标记已回收并清理变体行：避免每小时对历史资产重复删对象。
+			if err := db.MarkMediaGCed(ctx, a.ID); err != nil {
+				log.Printf("[MEDIA] 标记 GC 状态失败 media_id=%s err=%v", a.ID, err)
+			}
 		}
 	}
 	if removed > 0 {

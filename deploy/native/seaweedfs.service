@@ -1,0 +1,45 @@
+# ============================================================
+# SeaweedFS 4.x 单机服务（master + volume + filer + S3 gateway）
+#
+# 安装：由 deploy/native/install-weed.sh --apply 写入
+#       /etc/systemd/system/seaweedfs.service
+# 依赖：WireGuard Host A（wg0 = 10.8.0.1）；公网不开放 8333/9327
+# 数据：/var/lib/seaweedfs/data
+# 配置：/etc/seaweedfs/s3.json
+# ============================================================
+[Unit]
+Description=SeaweedFS S3 (single-node: master+volume+filer+s3)
+Documentation=https://github.com/seaweedfs/seaweedfs
+# 用 Wants 而不是 Requires：重启/重载 wg0 时不应连带停掉 SeaweedFS（只需保证启动顺序）。
+# wg0 未就绪时 weed 会 bind 失败并退出，由 Restart=always 等到接口就绪后自愈。
+Wants=network-online.target wg-quick@wg0.service
+After=network-online.target wg-quick@wg0.service
+
+[Service]
+Type=simple
+User=seaweedfs
+Group=seaweedfs
+UMask=0027
+
+# 只绑定 WireGuard 内网：S3=10.8.0.1:8333，指标=9327
+ExecStart=/usr/local/bin/weed server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/var/lib/seaweedfs/data -ip.bind=10.8.0.1 -master.volumeSizeLimitMB=1024 -volume.max=50 -metrics.port=9327
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=65536
+
+# 资源与加固
+MemoryMax=1G
+CPUQuota=200%
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/var/lib/seaweedfs
+
+[Install]
+WantedBy=multi-user.target

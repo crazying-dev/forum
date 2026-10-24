@@ -47,6 +47,9 @@ type Config struct {
 	S3SecretKey    string
 	S3UsePathStyle bool
 
+	// 媒体变体（S3 模式下上传时预生成 w480/w1280）
+	MediaVariantsEnabled bool
+
 	// 业务
 	ImageFatherURL string
 	PublicBaseURL  string // 站点对外地址（用于邮件链接）
@@ -99,9 +102,11 @@ func Load() *Config {
 		S3AccessKey:    getEnv("S3_ACCESS_KEY", ""),
 		S3SecretKey:    getEnv("S3_SECRET_KEY", ""),
 		S3UsePathStyle: getEnvBool("S3_USE_PATH_STYLE", true),
-		ImageFatherURL: getEnv("IMAGE_FATHER_URL", "https://img.crazying-dev.top/text/one"),
-		PublicBaseURL:  getEnv("PUBLIC_BASE_URL", "localhost:3000"),
-		EasterEggPath:  getEnv("EASTER_EGG_PATH", "main/EasterEgg/1.json"),
+		// 变体仅影响 S3 模式；默认开启，本地存储不受影响
+		MediaVariantsEnabled: getEnvBool("MEDIA_VARIANTS_ENABLED", true),
+		ImageFatherURL:       getEnv("IMAGE_FATHER_URL", "https://img.crazying-dev.top/text/one"),
+		PublicBaseURL:        getEnv("PUBLIC_BASE_URL", "localhost:3000"),
+		EasterEggPath:        getEnv("EASTER_EGG_PATH", "main/EasterEgg/1.json"),
 
 		AltchaEnabled:   getEnvBool("ALTCHA_ENABLED", false),
 		AltchaHMACKey:   getEnv("ALTCHA_HMAC_KEY", ""),

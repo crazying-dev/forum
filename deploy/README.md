@@ -2,7 +2,10 @@
 
 ## 架构总览
 
+生产为**两台裸机**（生产不使用 Docker；Docker 只用于开发）：
+
 ```
+Host A（公网 + WireGuard 10.8.0.1）        Host B（公网 + WireGuard 10.8.0.2）
 Browser
   │ HTTPS
   ▼
@@ -10,18 +13,22 @@ Nginx (宝塔管理 80/443)
   ├── /ov2/api/*      → Go 后端  127.0.0.1:8090（canonical；SSE 单独 location）
   ├── /api/*          → Go 后端  127.0.0.1:8090（/api/v1 别名 + 旧 APP 兼容层）
   ├── /avatar/*       → Go 后端  127.0.0.1:8090（旧头像兼容）
-  ├── /guild-img/*    → 管理端 admin 127.0.0.1:8080（旧会馆图片兼容）
-  ├── /guide-img/*    → 管理端 admin 127.0.0.1:8080（旧指南图片兼容）
+  ├── /guild-img/*    ────────────────► 10.8.0.2:8080（admin，WG 内网）
+  ├── /guide-img/*    ────────────────► 10.8.0.2:8080（admin，WG 内网）
   ├── /static/*       → Next.js  127.0.0.1:3000（旧帖图/默认头像兼容）
   └── 其余            → Next.js  127.0.0.1:3000
+
+SeaweedFS 原生进程（systemd）10.8.0.1:8333 ◄──── WG ──── admin 写 S3
 ```
 
 > 新媒体统一经 ouo `/ov2/api/media/<id>` 代理；字节存 SeaweedFS（S3），元数据存 PG。ouo/admin 前端都经 ouo 取图。
+> SeaweedFS 为原生二进制 + systemd（**不是容器**），安装与升级见 `deploy/native/README.md` 与 `docs/runbook-s3-prod.md`。
 
 - **渲染层**：Next.js（standalone 产物，Node 直跑）
 - **服务层**：Go（编译二进制，systemd 管理）
-- **管理端**：yj-forum-admin（会馆图片存储与入馆申请审批；仅 `/guild-img/*` 对外反代）
+- **管理端**：yj-forum-admin（Host B；会馆图片存储与入馆申请审批；仅 `/guild-img/*`、`/guide-img/*` 对外反代）
 - **数据库**：开发 = 本机 Docker PGSQL；生产 = **用户提供的外部 PGSQL**（`DATABASE_URL`）
+- **对象存储**：生产 = 原生 SeaweedFS 4.47（Host A）；开发 = `make s3-up`（Docker）
 
 ## 一、数据库准备
 
@@ -44,14 +51,29 @@ docker exec ouo-postgres psql -U postgres -c "CREATE DATABASE yj_forum;"  # 若�
 
 ## 一·五、SeaweedFS（新媒体 S3）
 
+**生产（Host A，原生二进制 + systemd，不使用 Docker）**
+
 ```bash
-make s3-up       # 单容器 weed server -s3，127.0.0.1:8333，bucket yj-forum
+# 1) 先建好 WireGuard（10.8.0.1 / 10.8.0.2），见 deploy/wireguard/
+bash deploy/native/preflight.sh                 # 只读，先看兼容性结论
+sudo bash deploy/native/install-weed.sh --apply --version=4.47 --sha256=<官方发布 sha256>
+systemctl status seaweedfs
+```
+
+- 数据 `/var/lib/seaweedfs/data`，配置 `/etc/seaweedfs/s3.json`，单元 `seaweedfs.service`。
+- 只监听 `10.8.0.1:8333`（S3）与 `9327`（指标）；公网不开放，Host B 经 WireGuard 访问。
+- 完整步骤、升级、回滚与排障见 `deploy/native/README.md`、`docs/runbook-s3-prod.md`。
+
+**开发（Docker，仅本机）**
+
+```bash
+make s3-up       # docker compose（deploy/seaweedfs/docker-compose.dev.yml），127.0.0.1:8333
 make s3-status
 ```
 
 - 配置见 `deploy/seaweedfs/README.md` 与 `deploy/seaweedfs/s3.json.example`。
-- ouo/admin 的 `.env` 设置同一组 `S3_*`；`S3_ENABLED=false` 时新媒体回退本地，旧资源始终可读。
-- 数据目录 `deploy/seaweedfs/data` 必须纳入备份；S3 端口不要对公网开放。
+- ouo/admin 的 `.env` 设置同一组 `S3_*`；`S3_ENABLED=false` 时新媒体落本地，旧资源始终可读（生产**不允许**静默回退，见下）。
+- 数据目录 `deploy/seaweedfs/data` 只属于开发环境；生产数据在 `/var/lib/seaweedfs/data`。
 
 ## 二、后端部署（Go）
 

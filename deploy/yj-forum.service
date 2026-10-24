@@ -1,8 +1,16 @@
 # 妖精论坛 ov2 后端服务（Go）
 # 安装: cp deploy/yj-forum.service /etc/systemd/system/ && systemctl enable --now yj-forum
+#
+# 依赖说明：
+#   * postgresql.service：本机 PG（若 PG 在外部主机，该依赖会自然跳过）；
+#   * wg-quick@wg0.service：S3 只绑 10.8.0.1，生产必须先有 wg0；
+#   * seaweedfs.service：只做启动顺序（After），不硬依赖。
+#     注意：进程启动时会探测 S3（12×10s），仍失败则退出（既定策略：不允许存储分裂），
+#     由 Restart=always 持续重试；即 S3 不可用 = 论坛不启动，这是有意行为。
 [Unit]
 Description=YJ Forum ov2 Backend (Go)
-After=network.target postgresql.service
+After=network-online.target postgresql.service wg-quick@wg0.service seaweedfs.service
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -12,6 +20,7 @@ EnvironmentFile=/opt/yj-forum/server/.env
 ExecStart=/opt/yj-forum/server/bin/yj-forum
 Restart=always
 RestartSec=5
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target

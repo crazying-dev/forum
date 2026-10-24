@@ -1,8 +1,11 @@
 # 妖精论坛 ov2 前端服务（Next.js standalone）
 # 安装: cp deploy/yj-web.service /etc/systemd/system/ && systemctl enable --now yj-web
+#
+# 依赖：先等后端 yj-forum 就绪（只做启动顺序，不硬依赖，后端重启时前端不断）。
 [Unit]
 Description=YJ Forum ov2 Web (Next.js)
-After=network.target yj-forum.service
+After=network-online.target yj-forum.service
+Wants=network-online.target yj-forum.service
 
 [Service]
 Type=simple
@@ -13,6 +16,7 @@ Environment=PORT=3000
 ExecStart=/usr/bin/node /opt/yj-forum/web/.next/standalone/server.js
 Restart=always
 RestartSec=5
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target

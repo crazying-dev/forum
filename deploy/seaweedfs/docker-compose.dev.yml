@@ -1,0 +1,34 @@
+# ============================================================
+# SeaweedFS —— 仅开发环境（Docker）
+#
+# 生产不使用 Docker：见 deploy/native/（systemd + 原生二进制 4.47）。
+# 开发只绑 127.0.0.1:8333，前端不直连，统一经 ouo /ov2/api/media 代理。
+#
+# 启动：仓库根 make s3-up（或本目录 docker compose -f docker-compose.dev.yml up -d）
+# 停止：make s3-down
+# ============================================================
+name: ouo-seaweedfs-dev
+
+services:
+  seaweedfs:
+    # 开发用 latest；如需与生产对齐可改为 chrislusf/seaweedfs:4.47
+    image: chrislusf/seaweedfs:latest
+    container_name: ouo-seaweedfs
+    restart: unless-stopped
+    command: >
+      server -s3 -s3.port=8333
+      -s3.config=/etc/seaweedfs/s3.json
+      -dir=/data -ip.bind=0.0.0.0
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - ./data:/data
+      - ./s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      # 未签名请求返回 403 或 200 都说明 S3 gateway 存活；
+      # 不能用 wget 退出码（403 会被当成失败）。
+      test: ["CMD-SHELL", "wget -S -O /dev/null http://127.0.0.1:8333/ 2>&1 | grep -Eq 'HTTP/[0-9.]+ (200|403)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

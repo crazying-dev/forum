@@ -1,0 +1,20 @@
+# ============================================================
+# Host B（admin）—— /etc/wireguard/wg0.conf
+# 安装：install -m 0600 wg0-host-b.conf.example /etc/wireguard/wg0.conf
+# 启动：systemctl enable --now wg-quick@wg0
+# 注意：替换所有 <...> 占位符；本文件不得提交真实私钥。
+# ============================================================
+[Interface]
+Address = 10.8.0.2/24
+ListenPort = 51820
+PrivateKey = <HOST_B_PRIVATE_KEY>
+MTU = 1420
+
+[Peer]
+# Host A（ouo + SeaweedFS）
+PublicKey = <HOST_A_PUBLIC_KEY>
+Endpoint = <HOST_A_PUBLIC_IP>:51820
+# 只允许到 Host A 的 /32，不做全局路由
+AllowedIPs = 10.8.0.1/32
+# B 在 NAT 后时必须保持（默认每 25s 发一次保活）
+PersistentKeepalive = 25

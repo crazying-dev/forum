@@ -1,0 +1,32 @@
+# ============================================================
+# yj-ops 巡检（oneshot，由 yj-ops.timer 每 5 分钟触发）
+#
+# 安装：
+#   install -d -m 0755 /usr/local/bin/yj-ops /etc/yj-ops
+#   install -m 0755 deploy/ops/*.sh /usr/local/bin/yj-ops/
+#   install -m 0644 deploy/ops/yj-ops.service deploy/ops/yj-ops.timer /etc/systemd/system/
+#   install -m 0600 deploy/ops/mail.env.example /etc/yj-ops/mail.env  # 改成真实 SMTP
+#   systemctl daemon-reload && systemctl enable --now yj-ops.timer
+#
+# 可选环境变量文件 /etc/yj-ops/ops.env（不存在则忽略），例：
+#   DISK_WARN_PCT=80
+#   DISK_CRIT_PCT=90
+#   CERT_DOMAINS=yjlt.top www.yjlt.top
+#   S3_ENDPOINT=http://10.8.0.1:8333
+#   METRICS_URL=http://10.8.0.1:9327/metrics
+# ============================================================
+[Unit]
+Description=YJ Forum ops checks (disk / S3 / TLS cert)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Nice=10
+EnvironmentFile=-/etc/yj-ops/ops.env
+# 某项失败不阻断后续检查；失败时各脚本自行调用 notify-mail.sh
+ExecStart=-/usr/local/bin/yj-ops/check-disk.sh
+ExecStart=-/usr/local/bin/yj-ops/check-s3.sh
+ExecStart=-/usr/local/bin/yj-ops/check-cert.sh
+TimeoutStartSec=120

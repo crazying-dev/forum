@@ -1,0 +1,34 @@
+{
+  "identities": [
+    {
+      "name": "yj-forum",
+      "credentials": [
+        {
+          "accessKey": "<CHANGE_ME_YJ_FORUM_ACCESS_KEY>",
+          "secretKey": "<CHANGE_ME_YJ_FORUM_SECRET_KEY>"
+        }
+      ],
+      "actions": [
+        "Read:yj-forum",
+        "Write:yj-forum",
+        "List:yj-forum",
+        "Tagging:yj-forum"
+      ]
+    },
+    {
+      "name": "yj-forum-admin",
+      "credentials": [
+        {
+          "accessKey": "<CHANGE_ME_YJ_FORUM_ADMIN_ACCESS_KEY>",
+          "secretKey": "<CHANGE_ME_YJ_FORUM_ADMIN_SECRET_KEY>"
+        }
+      ],
+      "actions": [
+        "Read:yj-forum",
+        "Write:yj-forum",
+        "List:yj-forum",
+        "Tagging:yj-forum"
+      ]
+    }
+  ]
+}

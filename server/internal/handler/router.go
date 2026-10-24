@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -45,6 +47,36 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 	if cacheSet == nil {
 		cacheSet = NewCacheSet()
 	}
+
+	// 根路径健康检查：DB 与 S3（启用时）各限时 3s 探测，全部正常 200，否则 503。
+	r.GET("/healthz", func(c *gin.Context) {
+		resp := gin.H{"ok": true, "service": "yj-forum", "db": "ok", "s3": "disabled"}
+		code := http.StatusOK
+		if db == nil || db.Pool == nil {
+			resp["ok"], resp["db"] = false, "error"
+			code = http.StatusServiceUnavailable
+		} else {
+			dbCtx, dbCancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+			err := db.Pool.Ping(dbCtx)
+			dbCancel()
+			if err != nil {
+				resp["ok"], resp["db"] = false, "error"
+				code = http.StatusServiceUnavailable
+			}
+		}
+		if mediaSvc != nil && mediaSvc.S3 != nil {
+			s3Ctx, s3Cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+			err := mediaSvc.S3.Ping(s3Ctx)
+			s3Cancel()
+			if err != nil {
+				resp["ok"], resp["s3"] = false, "error"
+				code = http.StatusServiceUnavailable
+			} else {
+				resp["s3"] = "ok"
+			}
+		}
+		c.JSON(code, resp)
+	})
 	altchaSvc := altcha.New(db, altcha.Config{
 		Enabled: cfg.AltchaEnabled, HMACKey: cfg.AltchaHMACKey,
 		Algorithm: cfg.AltchaAlgorithm, Cost: cfg.AltchaCost, Expires: cfg.AltchaExpires,
@@ -177,6 +209,8 @@ func registerAPIRoutes(api *gin.RouterGroup, h apiHandlers) {
 	api.GET("/embeds", embedsH.List)
 	api.POST("/media/images", middleware.RateLimit("media_image", 30, 600*time.Second), authH.AuthRequired(), mediaH.UploadImage)
 	api.GET("/media/:id", authH.OptionalAuth(), mediaH.ServeImage)
+	// HEAD 供探针/爬虫与 nginx 缓存校验使用（gin 不会自动为 GET 注册 HEAD）。
+	api.HEAD("/media/:id", authH.OptionalAuth(), mediaH.ServeImage)
 
 	// ---- 投票 / 举报 / 杂项 ----
 	api.POST("/votes/version", miscH.VoteVersion)
