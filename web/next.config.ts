@@ -14,7 +14,7 @@ const htmlLimitedBots =
 
 const nextConfig: NextConfig = {
   htmlLimitedBots,
-  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.19"],
+  allowedDevOrigins: ["127.0.0.1", "localhost", "192.168.1.19", "154.37.215.149", "154.37.215.157"],
   reactStrictMode: true,
   images: {
     unoptimized: true, // 本地资源全部走 public/，无需服务端优化
