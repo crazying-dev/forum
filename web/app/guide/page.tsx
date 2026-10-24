@@ -34,6 +34,15 @@ export default function GuidePage() {
   const [doc, setDoc] = useState<GuideNodeDetail | null>(null);
   const [docLoading, setDocLoading] = useState(false);
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
+  // 移动端抽屉展开时锁定背景滚动
+  useEffect(() => {
+    if (!mobileTreeOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileTreeOpen]);
   // 请求序号：快速切换文档时丢弃过期响应
   const docSeqRef = useRef(0);
 
@@ -136,15 +145,17 @@ export default function GuidePage() {
 
       <div className="guide-layout">
         {/* 窄屏：目录折叠开关（桌面隐藏） */}
-        <button
-          type="button"
-          className="guide-tree-toggle"
-          onClick={() => setMobileTreeOpen(!mobileTreeOpen)}
-          aria-expanded={mobileTreeOpen}
-        >
-          <i className={`fa ${mobileTreeOpen ? "fa-folder-open-o" : "fa-folder-o"}`}></i>
-          {mobileTreeOpen ? "收起目录" : "展开目录"}
-        </button>
+        {!mobileTreeOpen && (
+          <button
+            type="button"
+            className="guide-tree-toggle"
+            onClick={() => setMobileTreeOpen(true)}
+            aria-expanded={false}
+          >
+            <i className="fa fa-folder-o"></i>
+            展开目录
+          </button>
+        )}
 
         {/* 移动端右侧抽屉遮罩：点击关闭目录 */}
         <div

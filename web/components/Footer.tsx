@@ -27,6 +27,8 @@ export default function Footer() {
 
   return (
     <footer id="footer">
+      {/* 移动端二维码遮罩：真实元素，点击即可关闭（桌面隐藏） */}
+      {qrOpen && <span className="qr-backdrop" aria-hidden="true" onClick={() => setQrOpen(false)} />}
       <div className="footer-container">
         <div className="footer-col footer-brand">
           <h4 className="footer-title">

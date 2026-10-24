@@ -13,16 +13,22 @@ import { feedItemToPost } from "@/lib/feed";
 
 /** 会馆行：顶部栏（会馆名/馆长 + 进入会馆）+ 横向滚动内容区（每页 10 条，到边界自动续拉） */
 function GuildFeedRow({ guild }: { guild: GuildListItem }) {
+  const [visible, setVisible] = useState(false);
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState("");
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
   const pageRef = useRef(1);
   const scrollerRef = useRef<HTMLDivElement>(null);
   // 防重入：滚动事件高频触发，避免同一页被并发请求多次
   const loadingMoreRef = useRef(false);
+  // 请求序号 + AbortController：卸载/切换时丢弃迟到响应，避免无谓解析与旧数据写回
+  const seqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const load = useCallback(
     async (page: number, append: boolean) => {
@@ -33,8 +39,14 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
       } else {
         setLoading(true);
       }
+      setError("");
+      const seq = ++seqRef.current;
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       try {
-        const r = await guildApi.feed(guild.slug, page, 10);
+        const r = await guildApi.feed(guild.slug, page, 10, "", ctrl.signal);
+        if (seq !== seqRef.current) return;
         const list = r.items || [];
         setItems((prev) => {
           if (!append) return list;
@@ -44,22 +56,51 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
         setHasMore(!!r.has_more);
         pageRef.current = page;
       } catch {
+        if (ctrl.signal.aborted || seq !== seqRef.current) return;
+        setError("加载失败");
         if (!append) setItems([]);
         setHasMore(false);
       } finally {
-        setLoading(false);
-        setLoadingMore(false);
-        loadingMoreRef.current = false;
+        if (seq === seqRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+          loadingMoreRef.current = false;
+        }
       }
     },
     [guild.slug]
   );
 
+  // 卸载时中止在途请求
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  // 视口懒加载：会馆行进入可视区域（含 300px 预取边距）后才发起请求
   useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisible(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
     // 延后一个 tick，避免在 effect 内同步触发加载态更新
     const t = window.setTimeout(() => load(1, false), 0);
     return () => window.clearTimeout(t);
-  }, [load]);
+  }, [visible, load]);
 
   const syncArrows = useCallback(() => {
     const el = scrollerRef.current;
@@ -97,7 +138,7 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
   const leader = guild.leader;
 
   return (
-    <section className="guild-row">
+    <section className="guild-row" ref={sectionRef} aria-busy={loading || loadingMore}>
       <header className="guild-row-head">
         <div className="guild-row-identity">
           <GuildLogo
@@ -145,9 +186,16 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
         </button>
 
         <div className="guild-row-scroller" ref={scrollerRef} onScroll={onScroll}>
-          {loading ? (
+          {!visible || loading ? (
             <div className="guild-row-loading">
               <i className="fa fa-spinner fa-spin"></i> 加载中...
+            </div>
+          ) : error && items.length === 0 ? (
+            <div className="guild-row-error" role="alert">
+              <i className="fa fa-exclamation-circle"></i> 内容加载失败
+              <button type="button" className="guild-row-retry" onClick={() => load(1, false)}>
+                重试
+              </button>
             </div>
           ) : items.length === 0 ? (
             <div className="guild-row-empty">暂无内容</div>
@@ -162,6 +210,17 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
                   )}
                 </div>
               ))}
+              {error && (
+                <div className="guild-row-error is-tail" role="alert">
+                  <button
+                    type="button"
+                    className="guild-row-retry"
+                    onClick={() => load(pageRef.current + 1, true)}
+                  >
+                    加载失败，点击重试
+                  </button>
+                </div>
+              )}
               {loadingMore && (
                 <div className="guild-row-loading is-tail">
                   <i className="fa fa-spinner fa-spin"></i>
@@ -175,7 +234,7 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
           type="button"
           className="guild-row-arrow"
           aria-label="向右滚动"
-          disabled={!canRight && !hasMore}
+          disabled={(!canRight && !hasMore) || !visible}
           onClick={() => scrollBy(1)}
         >
           <i className="fa fa-chevron-right"></i>

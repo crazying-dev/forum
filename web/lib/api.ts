@@ -573,9 +573,10 @@ export const guildApi = {
   // 文章搜索（k≥2 字符；引用卡片选文用）
   searchArticles: (k: string, page = 1, pageSize = 10) =>
     request<ArticleSearchResult>(`/articles/search?k=${encodeURIComponent(k)}&page=${page}&page_size=${pageSize}`),
-  feed: (slug: string, page = 1, pageSize = 20, category = "") =>
+  feed: (slug: string, page = 1, pageSize = 20, category = "", signal?: AbortSignal) =>
     request<{ items: FeedItem[]; has_more: boolean; page: number; page_size: number; guild: { id: number; uuid?: string; slug: string; name: string; theme_color: string } }>(
-      `/guilds/${encodeURIComponent(slug)}/feed?page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`
+      `/guilds/${encodeURIComponent(slug)}/feed?page=${page}&page_size=${pageSize}${category ? `&category=${encodeURIComponent(category)}` : ""}`,
+      { signal }
     ),
   article: (id: string) =>
     request<{ article: GuildArticle }>(`/articles/${encodeURIComponent(id)}`),

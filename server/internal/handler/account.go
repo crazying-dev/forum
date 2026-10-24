@@ -107,6 +107,7 @@ func (h *AccountHandler) invalidateAccountCaches() {
 		return
 	}
 	h.Cache.Posts.DeletePrefix("posts:list:")
+	h.Cache.Posts.Delete(randomPoolKey)
 	h.Cache.PostDetail.DeletePrefix("post:detail:")
 	h.Cache.Comments.DeletePrefix("comments:post:")
 	h.Cache.Search.DeletePrefix("search:")

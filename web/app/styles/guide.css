@@ -242,7 +242,7 @@
         width: auto;
         padding: 11px 18px;
         border-radius: 999px;
-        z-index: 1210;
+        z-index: 1310;
         box-shadow: 0 8px 24px var(--color-shadow-dropdown);
     }
 
@@ -251,7 +251,7 @@
         display: block;
         position: fixed;
         inset: 0;
-        z-index: 1190;
+        z-index: 1290;
         background: rgba(0, 0, 0, 0.42);
         opacity: 0;
         visibility: hidden;
@@ -273,9 +273,9 @@
         height: 100dvh;
         max-height: none;
         margin: 0;
-        padding: calc(70px + env(safe-area-inset-top)) 12px 24px;
+        padding: calc(60px + env(safe-area-inset-top)) 12px 24px;
         border-radius: 14px 0 0 14px;
-        z-index: 1200;
+        z-index: 1300;
         transform: translateX(105%);
         transition: transform 0.28s ease;
         box-shadow: -8px 0 28px rgba(0, 0, 0, 0.28);

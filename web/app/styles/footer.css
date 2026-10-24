@@ -80,6 +80,11 @@
     text-decoration: underline;
 }
 
+/* 二维码遮罩仅移动端显示 */
+.qr-backdrop {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .footer-container {
         grid-template-columns: 1fr;
@@ -91,9 +96,9 @@
         display: none;
     }
 
-    /* 移动端点击二维码：固定居中展示，带遮罩，不再溢出页脚 */
-    .qr-hover-wrap.open::before {
-        content: "";
+    /* 移动端点击二维码：固定居中展示，带真实遮罩元素，不再溢出页脚 */
+    .qr-backdrop {
+        display: block;
         position: fixed;
         inset: 0;
         z-index: 1290;

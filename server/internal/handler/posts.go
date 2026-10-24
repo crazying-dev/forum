@@ -4,6 +4,7 @@ import (
 	"context"
 	"html"
 	"log"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"yj-forum/server/internal/database"
 	"yj-forum/server/internal/email"
 	"yj-forum/server/internal/media"
+	"yj-forum/server/internal/models"
 	"yj-forum/server/internal/sanitize"
 )
 
@@ -61,14 +63,42 @@ func (h *PostsHandler) List(c *gin.Context) {
 
 // ---- GET /api/v1/posts/random ----
 
-// Random 随机推荐（每次 100 条；首页「继续加载」重复调用）。
+// randomPoolKey 随机推荐候选池（缓存 60s，避免每次请求都全表 ORDER BY RANDOM）。
+const randomPoolKey = "posts:random:pool"
+
+// randomPoolSize 候选池大小；每次响应从中随机取 100 条（首页「继续加载」重复调用）。
+const randomPoolSize = 200
+
+// Random 随机推荐（每次 100 条）。
+// 候选池按 60s 缓存：池内随机打乱后取前 100；既保持「每次都是随机顺序」，又把全表排序压到分钟级一次。
 func (h *PostsHandler) Random(c *gin.Context) {
-	posts, err := h.DB.GetRandomPosts(c.Request.Context(), 100)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
-		return
+	var (
+		pool  []models.PostListItem
+		found bool
+	)
+	if v, ok := h.Cache.Posts.Get(randomPoolKey); ok {
+		if cached, ok := v.([]models.PostListItem); ok {
+			pool, found = cached, true
+		}
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "posts": posts})
+	if !found {
+		posts, err := h.DB.GetRandomPosts(c.Request.Context(), randomPoolSize)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
+			return
+		}
+		pool = posts
+		// 池为空也缓存，避免空库/全定时未发布时反复打 DB
+		h.Cache.Posts.Set(randomPoolKey, pool, 60*time.Second)
+	}
+	// 复制后打乱，避免并发请求互相修改共享切片顺序
+	out := make([]models.PostListItem, len(pool))
+	copy(out, pool)
+	rand.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	if len(out) > 100 {
+		out = out[:100]
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "posts": out})
 }
 
 // ---- GET /api/v1/posts/picker-defaults ----
@@ -199,6 +229,7 @@ func (h *PostsHandler) Create(c *gin.Context) {
 		go h.notifyFollowers(uid, postID, title)
 	}
 	h.Cache.Posts.DeletePrefix("posts:list:")
+	h.Cache.Posts.Delete(randomPoolKey)
 	c.JSON(http.StatusCreated, gin.H{"success": true, "id": postID})
 }
 
@@ -286,6 +317,7 @@ func (h *PostsHandler) ProcessScheduledPublishes(ctx context.Context) {
 	}
 	// 定时帖转为可见：失效帖子列表、搜索与单帖详情缓存
 	h.Cache.Posts.DeletePrefix("posts:list:")
+	h.Cache.Posts.Delete(randomPoolKey)
 	h.Cache.Search.DeletePrefix("search:")
 	for _, p := range pending {
 		h.Cache.PostDetail.Delete("post:detail:" + p.ID)
@@ -384,6 +416,7 @@ func (h *PostsHandler) Like(c *gin.Context) {
 	}
 	h.Cache.PostDetail.Delete("post:detail:" + id)
 	h.Cache.Posts.DeletePrefix("posts:list:")
+	h.Cache.Posts.Delete(randomPoolKey)
 	c.JSON(http.StatusOK, gin.H{"success": true, "liked": liked, "likes": likes})
 }
 
@@ -457,6 +490,7 @@ func (h *PostsHandler) Delete(c *gin.Context) {
 	}
 	h.Cache.PostDetail.Delete("post:detail:" + id)
 	h.Cache.Posts.DeletePrefix("posts:list:")
+	h.Cache.Posts.Delete(randomPoolKey)
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
