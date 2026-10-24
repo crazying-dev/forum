@@ -218,24 +218,79 @@
     }
 }
 
+/* 遮罩仅移动端抽屉使用（桌面不渲染） */
+.guide-drawer-overlay {
+    display: none;
+}
+
 @media (max-width: 760px) {
-    /* 窄屏：目录在上（默认折叠，可展开），正文在下 */
+    /* 窄屏：正文占满宽度；目录改为右侧抽屉，悬浮按钮唤出 */
+    .guide-page {
+        max-width: 100%;
+        padding: 0 0 24px;
+    }
     .guide-layout {
-        flex-direction: column;
-    }
-    .guide-tree-toggle {
-        display: flex;
-    }
-    .guide-sidebar {
-        display: none;
-        position: static;
-        width: 100%;
-        max-height: none;
-    }
-    .guide-sidebar.open {
         display: block;
     }
+
+    /* 悬浮目录按钮（固定在页面右下，不占文档流） */
+    .guide-tree-toggle {
+        display: inline-flex;
+        position: fixed;
+        right: 16px;
+        bottom: 24px;
+        width: auto;
+        padding: 11px 18px;
+        border-radius: 999px;
+        z-index: 1210;
+        box-shadow: 0 8px 24px var(--color-shadow-dropdown);
+    }
+
+    /* 抽屉遮罩 */
+    .guide-drawer-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1190;
+        background: rgba(0, 0, 0, 0.42);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.28s ease, visibility 0.28s ease;
+    }
+    .guide-drawer-overlay.open {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /* 右侧抽屉 */
+    .guide-sidebar {
+        display: block;
+        position: fixed;
+        top: 0;
+        right: 0;
+        left: auto;
+        width: min(84vw, 320px);
+        height: 100dvh;
+        max-height: none;
+        margin: 0;
+        padding: calc(70px + env(safe-area-inset-top)) 12px 24px;
+        border-radius: 14px 0 0 14px;
+        z-index: 1200;
+        transform: translateX(105%);
+        transition: transform 0.28s ease;
+        box-shadow: -8px 0 28px rgba(0, 0, 0, 0.28);
+    }
+    .guide-sidebar.open {
+        transform: translateX(0);
+    }
+
+    /* 正文卡片满宽 */
     .guide-content {
         padding: 18px 16px;
+        border-left: none;
+        border-right: none;
+        border-radius: 0;
     }
 }
+
+

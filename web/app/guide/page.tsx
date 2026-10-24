@@ -146,7 +146,14 @@ export default function GuidePage() {
           {mobileTreeOpen ? "收起目录" : "展开目录"}
         </button>
 
-        <aside className={`guide-sidebar ${mobileTreeOpen ? "open" : ""}`}>
+        {/* 移动端右侧抽屉遮罩：点击关闭目录 */}
+        <div
+          className={`guide-drawer-overlay ${mobileTreeOpen ? "open" : ""}`}
+          onClick={() => setMobileTreeOpen(false)}
+          aria-hidden="true"
+        ></div>
+
+        <aside className={`guide-sidebar ${mobileTreeOpen ? "open" : ""}`} aria-label="指南目录">
           {treeLoading ? (
             <ListLoading />
           ) : nodes.length === 0 ? (

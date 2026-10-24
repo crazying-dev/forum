@@ -71,6 +71,8 @@ export default function UserPage() {
   const [followLoadingMore, setFollowLoadingMore] = useState(false);
   const followPageRef = useRef(1);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  // 移动端「编辑」按钮：直接打开编辑态；点名字/资料仍打开详情态
+  const [profileModalEdit, setProfileModalEdit] = useState(false);
   const [showEmailChange, setShowEmailChange] = useState(false);
   const [activeTab, setActiveTab] = useState<"posts" | "comments">("posts");
   const [postView, setPostView] = useState<"posts" | "favorites">("posts");
@@ -290,7 +292,7 @@ export default function UserPage() {
           </div>
           <div className="user-profile-info">
             <h2>
-              <div id="user-profile-name" className="user-name-clickable Username" title="点击查看详情" onClick={() => setShowProfileModal(true)}>
+              <div id="user-profile-name" className="user-name-clickable Username" title="点击查看详情" onClick={() => { setProfileModalEdit(false); setShowProfileModal(true); }}>
                 {profile.name}
               </div>
             </h2>
@@ -382,6 +384,19 @@ export default function UserPage() {
               <i className="fa fa-calendar-check-o"></i>
               <span className="user-signin-label user-signin-label-desktop">{signedToday ? "今日已签到" : "今日签到 +10"}</span>
               <span className="user-signin-label user-signin-label-mobile">{signedToday ? "已签到" : "签到"}</span>
+            </button>
+          )}
+          {isSelf && (
+            <button
+              type="button"
+              className="user-mobile-edit-btn"
+              id="user-mobile-edit-btn"
+              onClick={() => {
+                setProfileModalEdit(true);
+                setShowProfileModal(true);
+              }}
+            >
+              <i className="fa fa-pencil"></i> 编辑
             </button>
           )}
           {isSelf && !profile.deleted && (
@@ -550,7 +565,16 @@ export default function UserPage() {
       </div>
 
       {showProfileModal && profile && (
-        <UserProfileModal profile={profile} isSelf={isSelf} onClose={() => setShowProfileModal(false)} onSaved={onProfileSaved} />
+        <UserProfileModal
+          profile={profile}
+          isSelf={isSelf}
+          initialMode={profileModalEdit ? "edit" : "detail"}
+          onClose={() => {
+            setProfileModalEdit(false);
+            setShowProfileModal(false);
+          }}
+          onSaved={onProfileSaved}
+        />
       )}
 
       {showEmailChange && (

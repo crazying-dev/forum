@@ -24,6 +24,74 @@
     width: 100%;
 }
 
+/* 评论框吸附顶栏：越过评论区顶部后贴在 Header 下方 */
+.comment-sticky-sentinel {
+    height: 1px;
+    margin-bottom: -1px;
+}
+
+.comment-input-bar {
+    position: sticky;
+    top: 70px;
+    z-index: 90;
+    background: var(--color-bg-card);
+}
+
+/* 吸顶时顶部两侧圆角改为直角，并补一层投影区分层级 */
+.comment-input-bar.is-stuck {
+    border-radius: 0;
+    box-shadow: 0 6px 16px var(--color-shadow-search);
+}
+
+.comment-input-bar.is-stuck .comment-editor-toolbar {
+    border-radius: 0;
+}
+
+.comment-input-bar.is-stuck .comment-reply-indicator {
+    border-radius: 0;
+}
+
+/* 未登录：禁止写入评论，展示登录入口 */
+.comment-login-gate {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 18px 16px;
+    margin-bottom: 20px;
+    border: 1px dashed var(--color-border-divider);
+    border-radius: 14px;
+    background: var(--color-bg-item);
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+}
+
+.comment-login-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 16px;
+    border-radius: 16px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+/* ALTCHA 隐藏容器：保留 Widget 能力（点击发送自动求解），不占布局 */
+.comment-editor {
+    position: relative;
+}
+
+.comment-altcha-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
 .comment-send-btn {
     flex-shrink: 0;
     white-space: nowrap;
@@ -144,9 +212,6 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-height: 500px;
-    overflow-y: auto;
-    padding-right: 8px;
 }
 
 .comment-empty {
@@ -360,6 +425,9 @@
 @media (max-width: 700px) {
     .comment-replies {
         margin-left: 8px;
+    }
+    .comment-input-bar {
+        top: 60px;
     }
 }
 

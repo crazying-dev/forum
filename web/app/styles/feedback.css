@@ -445,6 +445,31 @@
     .feedback-waterfall {
         columns: 1;
     }
+    /* 移动端：标签横滚单行；提交按钮移到标签栏下方并靠右 */
+    .feedback-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    .feedback-chips {
+        flex: none;
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+    .feedback-chips::-webkit-scrollbar {
+        display: none;
+    }
+    .feedback-chip {
+        flex: 0 0 auto;
+    }
+    .feedback-toolbar .forum-create-btn {
+        align-self: flex-end;
+    }
     .feedback-stats {
         flex-wrap: wrap;
     }

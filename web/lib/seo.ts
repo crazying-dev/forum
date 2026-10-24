@@ -63,7 +63,8 @@ export async function fetchApi<T = unknown>(
       ...(personalized ? { cache: "no-store" as const } : { next: { revalidate } }),
       headers: { Accept: "application/json", ...(options.headers || {}) },
       // 超时保护：上游挂起时不拖住页面渲染 / sitemap 生成（Node fetch 默认超时为分钟级）
-      signal: AbortSignal.timeout(4000),
+      // 4s 对「详情 + 评论」查询偶发偏紧，放宽到 8s；超时只降级 SEO 元数据，不影响页面本体
+      signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {
       console.warn(`[seo] fetchApi ${path} 返回 HTTP ${res.status}`);

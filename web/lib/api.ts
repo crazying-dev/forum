@@ -541,13 +541,14 @@ export const postApi = {
     request<{ success: boolean }>(`/posts/${id}/report`, { method: "POST", body: JSON.stringify({ reason, detail }) }),
   comments: (id: string, page = 1, pageSize = 50) =>
     request<{ comments: Comment[] }>(`/posts/${id}/comments?page=${page}&page_size=${pageSize}`),
-  createComment: (id: string, content: string, parentId?: string, contentFormat?: string) =>
+  createComment: (id: string, content: string, parentId?: string, contentFormat?: string, altcha?: string) =>
     request<{ comment: Comment }>(`/posts/${id}/comments`, {
       method: "POST",
       body: JSON.stringify({
         content,
         parent_id: parentId || null,
         ...(contentFormat ? { content_format: contentFormat } : {}),
+        ...(altcha ? { altcha } : {}),
       }),
     }),
   deleteComment: (id: string) => request<{ success: boolean }>(`/comments/${id}`, { method: "DELETE" }),

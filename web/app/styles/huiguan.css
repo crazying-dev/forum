@@ -813,3 +813,187 @@
     margin-top: 14px;
 }
 
+
+/* ===== 会馆广场：每个会馆一行（顶部栏 + 横向滚动内容区）===== */
+.guild-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.guild-row {
+    padding: 14px 16px 16px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 18px;
+    background: var(--color-bg-card);
+    box-shadow: 0 2px 10px var(--color-shadow-search);
+}
+
+.guild-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--color-border-divider);
+}
+
+.guild-row-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.guild-row-logo {
+    border-radius: 12px;
+}
+
+.guild-row-names {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.guild-row-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.guild-row-name:hover {
+    color: var(--color-primary);
+}
+
+.guild-row-leader {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.guild-row-leader-link {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.guild-row-leader-link:hover {
+    text-decoration: underline;
+}
+
+.guild-row-enter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 7px 16px;
+    border-radius: 16px;
+    font-size: 13px;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.guild-row-enter:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.guild-row-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.guild-row-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border: 1px solid var(--color-border-card);
+    border-radius: 50%;
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.guild-row-arrow:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.guild-row-arrow:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.guild-row-scroller {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 2px 6px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.guild-row-scroller::-webkit-scrollbar {
+    display: none;
+}
+
+.guild-row-card {
+    flex: 0 0 300px;
+    min-width: 0;
+    display: flex;
+}
+
+.guild-row-card .post-card {
+    width: 100%;
+}
+
+.guild-row-loading,
+.guild-row-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 140px;
+    padding: 24px 12px;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+}
+
+.guild-row-loading.is-tail {
+    min-width: 56px;
+}
+
+@media (max-width: 700px) {
+    .guild-row {
+        padding: 12px 12px 14px;
+    }
+    .guild-row-card {
+        flex-basis: 258px;
+    }
+    .guild-row-arrow {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+    .guild-row-enter {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+}

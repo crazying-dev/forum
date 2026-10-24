@@ -307,6 +307,39 @@
     color: var(--color-primary);
 }
 
+/* 窄屏：生日选择器收窄，避免在编辑弹窗中横向溢出 */
+@media (max-width: 480px) {
+    .profile-birthday-row {
+        flex-wrap: wrap;
+    }
+    .profile-birthday-picker {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 4px;
+    }
+    .profile-birthday-picker input {
+        min-width: 0;
+    }
+    .profile-birthday-picker .bp-arrow {
+        width: 26px;
+        height: 34px;
+        padding: 0;
+    }
+    .profile-birthday-picker .bp-year {
+        width: 64px;
+        height: 34px;
+    }
+    .profile-birthday-picker .bp-month,
+    .profile-birthday-picker .bp-day {
+        width: 42px;
+        height: 34px;
+    }
+    .profile-cal-btn {
+        width: 34px;
+        height: 34px;
+    }
+}
+
 .profile-calendar {
     border: none;
     background: transparent;

@@ -13,7 +13,7 @@
     max-width: 1080px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: 1.6fr 1fr 1fr;
+    grid-template-columns: 1.6fr 1fr;
     gap: 36px;
     text-align: left;
 }
@@ -84,6 +84,35 @@
     .footer-container {
         grid-template-columns: 1fr;
         gap: 24px;
+    }
+
+    /* 触屏 hover 残留兜底：未处于 open 状态时不得展示（避免关闭后仍悬停显示） */
+    .qr-hover-wrap:not(.open) .qr-img {
+        display: none;
+    }
+
+    /* 移动端点击二维码：固定居中展示，带遮罩，不再溢出页脚 */
+    .qr-hover-wrap.open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 1290;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    .qr-hover-wrap.open .qr-img {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        bottom: auto;
+        transform: translate(-50%, -50%);
+        width: min(72vw, 240px);
+        height: auto;
+        max-width: calc(100vw - 48px);
+        max-height: calc(100vh - 120px);
+        z-index: 1300;
+        border-radius: 12px;
+        pointer-events: none;
     }
 }
 

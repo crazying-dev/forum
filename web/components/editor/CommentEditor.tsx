@@ -13,6 +13,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { useToast } from "@/components/Toast";
 import Modal from "@/components/ui/Modal";
 import { ApiException, EmbedKind, mediaApi } from "@/lib/api";
+import { AltchaWidget, type AltchaWidgetHandle } from "@/components/AltchaWidget";
 import EmbedNode from "./Embed";
 import QuotePickerModal from "./QuotePickerModal";
 import { MAX_IMAGE_WIDTH, MIN_IMAGE_WIDTH, ResizableImage } from "./resizableImage";
@@ -150,10 +151,12 @@ export default function CommentEditor({
   maxImages = Number.POSITIVE_INFINITY,
   uploadScene = "comment_image",
   allowQuotePicker = true,
+  captcha = false,
 }: {
   value: string;
   onChange: (html: string) => void;
-  onSubmit: () => void;
+  /** altcha：启用人机验证时传入已验证 payload（未启用/未完成时 undefined/null） */
+  onSubmit: (altcha?: string) => void;
   placeholder?: string;
   editorRef?: React.RefObject<CommentEditorHandle | null>;
   /** 提交中：禁用发送按钮，防双击重复 */
@@ -166,6 +169,8 @@ export default function CommentEditor({
   uploadScene?: string;
   /** 是否显示「插入引用」按钮（世界频道不支持引用卡片） */
   allowQuotePicker?: boolean;
+  /** 是否在发送时自动完成 ALTCHA 人机验证（评论启用；世界频道/私信不启用） */
+  captcha?: boolean;
 }) {
   const { toast } = useToast();
   const [showEmoji, setShowEmoji] = useState(false);
@@ -174,6 +179,9 @@ export default function CommentEditor({
   const [linkUrl, setLinkUrl] = useState("");
   const [pickerKind, setPickerKind] = useState<EmbedKind | null>(null);
   const [uploading, setUploading] = useState(false);
+  // ALTCHA 求解中（点击发送后自动认证，期间禁用重复提交）
+  const [verifying, setVerifying] = useState(false);
+  const altchaRef = useRef<AltchaWidgetHandle>(null);
   // 自定义宽度输入缓冲（null = 直接显示编辑器实际宽度，避免用 effect 同步 state）
   const [widthDraft, setWidthDraft] = useState<string | null>(null);
   const [plainLen, setPlainLen] = useState(() => plainTextOf(value).length);
@@ -351,8 +359,8 @@ export default function CommentEditor({
   };
 
   /** 提交前校验：纯文本 ≤500 且（≥1 字 或 含图片/引用卡），与服务端口径一致 */
-  const trySubmit = () => {
-    if (submitting) return; // 提交中忽略重复点击
+  const trySubmit = async () => {
+    if (submitting || verifying) return; // 提交中忽略重复点击
     const html = editor?.getHTML() ?? value;
     const text = plainTextOf(html);
     const len = Array.from(text).length;
@@ -364,7 +372,24 @@ export default function CommentEditor({
       toast("请先输入内容", "warning");
       return;
     }
-    onSubmitRef.current();
+    let altcha: string | undefined;
+    if (captcha && altchaRef.current?.isEnabled()) {
+      // 保留「点发送自动认证」的传统：不要求用户先单独点击验证
+      setVerifying(true);
+      try {
+        const payload = await altchaRef.current.ensurePayload();
+        if (!payload) {
+          toast("请先完成人机验证", "warning");
+          return;
+        }
+        altcha = payload;
+      } finally {
+        setVerifying(false);
+      }
+    }
+    onSubmitRef.current(altcha);
+    // 挑战一次性：每次提交后重置，下次发送自动重新求解
+    if (captcha) altchaRef.current?.reset();
   };
 
   return (
@@ -512,10 +537,17 @@ export default function CommentEditor({
 
       <div className="comment-editor-actions">
         <span className="comment-editor-hint">Ctrl/⌘+Enter 发送</span>
-        <button className="comment-send-btn" onClick={trySubmit} disabled={uploading || submitting}>
-          {submitting ? "发送中..." : "发送"}
+        <button className="comment-send-btn" onClick={trySubmit} disabled={uploading || submitting || verifying}>
+          {verifying ? "验证中..." : submitting ? "发送中..." : "发送"}
         </button>
       </div>
+
+      {/* ALTCHA：不占布局（发送时自动求解），启用与否由 /captcha/config 决定 */}
+      {captcha && (
+        <div className="comment-altcha-hidden" aria-hidden="true">
+          <AltchaWidget ref={altchaRef} />
+        </div>
+      )}
 
       <input
         ref={fileRef}

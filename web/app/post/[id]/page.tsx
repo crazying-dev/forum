@@ -34,7 +34,7 @@ function isScheduled(v?: string) {
 export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { userId } = useStore();
+  const { userId, user } = useStore();
   const { toast } = useToast();
   const [post, setPost] = useState<any | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -113,7 +113,7 @@ export default function PostDetailPage() {
     }
   };
 
-  const submitComment = async () => {
+  const submitComment = async (altcha?: string) => {
     if (!userId) return router.push("/auth");
     if (submittingComment) return; // 提交中：忽略重复点击/快捷键，防重复发送
     const content = commentText.trim();
@@ -124,7 +124,7 @@ export default function PostDetailPage() {
     setSubmittingComment(true);
     try {
       // 评论存 HTML（content_format=html）；回复仅与直接对象建立 parent_id 关联
-      const r = await postApi.createComment(id, content, replyTo?.id, "html");
+      const r = await postApi.createComment(id, content, replyTo?.id, "html", altcha);
       setComments((prev) => [...prev, r.comment]);
       setCommentText("");
       setReplyTo(null);
@@ -267,6 +267,7 @@ export default function PostDetailPage() {
             onChangeReplyText={setCommentText}
             onSubmit={submitComment}
             submitting={submittingComment}
+            canWrite={!!user}
             onDelete={deleteComment}
             onLike={doLikeComment}
           />

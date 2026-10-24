@@ -31,6 +31,8 @@ export default function MessageItem({ item, unread = false, showKind = false }: 
 
   if (item.kind === "system") {
     const link = externalHref(item.system.link);
+    // 更新日志广播（broadcast_notices.type=changelog）带「版本更新」标识
+    const isChangelog = item.system.type === "changelog";
     const open = () => {
       if (!link) return;
       if (/^https?:\/\//i.test(link) || link.startsWith("mailto:")) window.location.href = link;
@@ -49,12 +51,13 @@ export default function MessageItem({ item, unread = false, showKind = false }: 
           }
         }}
       >
-        <span className="msg-item-avatar msg-system-icon" aria-hidden="true">
-          <i className="fa fa-bullhorn"></i>
+        <span className={`msg-item-avatar msg-system-icon${isChangelog ? " is-changelog" : ""}`} aria-hidden="true">
+          <i className={`fa ${isChangelog ? "fa-rocket" : "fa-bullhorn"}`}></i>
         </span>
         <div className="msg-item-main">
           <div className="msg-item-head">
             <span className="msg-item-name">{item.system.title || "系统通知"}</span>
+            {isChangelog && <span className="msg-kind msg-kind-version">版本更新</span>}
             {showKind && <span className="msg-kind">{KIND_LABEL.system}</span>}
             <span className="msg-item-time">{timeAgo(item.system.created_at)}</span>
             {unread && <span className="msg-item-dot" aria-label="未读" />}

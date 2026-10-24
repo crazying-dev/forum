@@ -466,6 +466,18 @@
     font-size: 18px;
 }
 
+/* 版本更新（changelog 广播）：火箭图标 + 主题色标识 */
+.msg-system-icon.is-changelog {
+    background: var(--color-bg-item-active);
+    color: var(--color-primary);
+}
+
+.msg-kind-version {
+    background: var(--color-bg-item-active);
+    color: var(--color-primary) !important;
+    font-weight: 600;
+}
+
 .msg-item-body.msg-rich {
     margin-top: 2px;
     font-size: 13px;

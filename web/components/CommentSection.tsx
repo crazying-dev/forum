@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { Comment } from "@/lib/api";
 import { timeAgo } from "@/lib/constants";
@@ -120,6 +120,7 @@ export default function CommentSection({
   onDelete,
   onLike,
   submitting,
+  canWrite = true,
 }: {
   comments: Comment[];
   userId: string | null;
@@ -129,13 +130,30 @@ export default function CommentSection({
   replyTo: { id: string; name: string } | null;
   setReplyTo: (v: { id: string; name: string } | null) => void;
   onChangeReplyText: (html: string) => void;
-  onSubmit: () => void;
+  onSubmit: (altcha?: string) => void;
   onDelete: (id: string) => void;
   onLike: (c: Comment) => void;
   /** 提交中：禁用发送按钮，防双击重复 */
   submitting: boolean;
+  /** 是否允许写入评论（需服务端已验证的登录态；不能只信 user_id Cookie） */
+  canWrite?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // 评论框吸附顶栏：哨兵离开「顶栏下方可视区」即视为贴住（此时两侧上圆角改为直角）
+  const [stuck, setStuck] = useState(false);
+  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const el = stickySentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      // 仅「哨兵越过顶栏（在视口上方）」才算吸顶；哨兵在视口下方时 isIntersecting 也是 false
+      ([entry]) => setStuck(!entry.isIntersecting && entry.boundingClientRect.top < 70),
+      { rootMargin: "-70px 0px 0px 0px", threshold: 0 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [userId]);
 
   const { mainComments, replyMap, parentMap } = useMemo(() => {
     const parentMap: Record<string, Comment> = {};
@@ -182,24 +200,36 @@ export default function CommentSection({
   return (
     <>
       <div className="comment-section-title">评论区</div>
-      <div className="comment-input-bar">
-        {replyTo && (
-          <div className="comment-reply-indicator">
-            <span>
-              回复 <b className="Username">{replyTo.name}</b>
-            </span>
-            <button onClick={() => setReplyTo(null)}><i className="fa fa-times"></i></button>
+      {canWrite ? (
+        <>
+          <div ref={stickySentinelRef} className="comment-sticky-sentinel" aria-hidden="true" />
+          <div className={`comment-input-bar${stuck ? " is-stuck" : ""}`}>
+            {replyTo && (
+              <div className="comment-reply-indicator">
+                <span>
+                  回复 <b className="Username">{replyTo.name}</b>
+                </span>
+                <button onClick={() => setReplyTo(null)}><i className="fa fa-times"></i></button>
+              </div>
+            )}
+            <CommentEditor
+              value={replyText}
+              onChange={onChangeReplyText}
+              onSubmit={onSubmit}
+              placeholder={replyTo ? `回复 ${replyTo.name}…` : "写下你的评论…"}
+              editorRef={editorRef}
+              submitting={submitting}
+              captcha
+            />
           </div>
-        )}
-        <CommentEditor
-          value={replyText}
-          onChange={onChangeReplyText}
-          onSubmit={onSubmit}
-          placeholder={replyTo ? `回复 ${replyTo.name}…` : "写下你的评论…"}
-          editorRef={editorRef}
-          submitting={submitting}
-        />
-      </div>
+        </>
+      ) : (
+        <div className="comment-login-gate">
+          <i className="fa fa-lock"></i>
+          <span>登录后即可参与评论</span>
+          <Link href="/auth" className="comment-login-btn">去登录</Link>
+        </div>
+      )}
       <div className="comment-list" id="comment-list">
         {comments.length === 0 ? (
           <div className="comment-empty">暂无评论，快来抢沙发~</div>

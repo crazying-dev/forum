@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"yj-forum/server/internal/altcha"
 	"yj-forum/server/internal/auth"
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
@@ -29,6 +30,7 @@ type PostsHandler struct {
 	Mailer   *email.Sender
 	Sessions *auth.SessionManager
 	Media    *media.Service
+	Altcha   *altcha.Service // nil 安全：未注入时跳过 ALTCHA 校验
 }
 
 // ---- GET /api/v1/posts ----
@@ -59,9 +61,9 @@ func (h *PostsHandler) List(c *gin.Context) {
 
 // ---- GET /api/v1/posts/random ----
 
-// Random 随机 200 条。
+// Random 随机推荐（每次 100 条；首页「继续加载」重复调用）。
 func (h *PostsHandler) Random(c *gin.Context) {
-	posts, err := h.DB.GetRandomPosts(c.Request.Context(), 200)
+	posts, err := h.DB.GetRandomPosts(c.Request.Context(), 100)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "查询失败"})
 		return
@@ -294,13 +296,14 @@ func (h *PostsHandler) ProcessScheduledPublishes(ctx context.Context) {
 // ---- GET /api/v1/posts/:id ----
 
 // Detail 帖子详情（匿名缓存 post:detail:ID；登录用户实时返回含个人状态）。
-// track=0：SEO 等服务端拉取不计数、不走缓存；其余请求同一访客同帖 30 分钟内只计一次（匿名按 IP / 登录按 uid）。
+// track=0：SEO 等服务端拉取不计数、只读匿名缓存不写入；其余请求同一访客同帖 30 分钟内只计一次（匿名按 IP / 登录按 uid）。
 func (h *PostsHandler) Detail(c *gin.Context) {
 	id := c.Param("id")
 	me := currentUserFromCookie(c, h.Sessions)
 	noTrack := c.Query("track") == "0"
 	key := "post:detail:" + id
-	if !noTrack && me == "" {
+	// SEO（track=0）复用匿名详情缓存读：不计数、只读不写，避免每次 SEO 拉取都打到 DB 导致超时
+	if me == "" {
 		if v, ok := h.Cache.PostDetail.Get(key); ok {
 			c.Header("X-Cache", "HIT")
 			c.JSON(http.StatusOK, v)

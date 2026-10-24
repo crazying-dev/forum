@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import BackButton from "@/components/ui/BackButton";
 import { postApi, userApi, guildApi, ApiException, GuildMembership } from "@/lib/api";
 import { POST_CATEGORIES, contrastText, themeColor, themeInk, themeTint } from "@/lib/constants";
+import { useStore } from "@/lib/store";
 
 const COMPLIANCE = [
   "遵守中华人民共和国相关法律法规，不得发布违法违规内容",
@@ -41,17 +42,38 @@ const SCHEDULE_MAX_AHEAD_MS = 365 * 24 * 60 * 60 * 1000;
  * 发帖页（useSearchParams 需在 Suspense 内，遵循 Next.js App Router 规范）：
  * 发布到（公共空间 / 我的会馆）+ 分类联动 + 富文本编辑器（TipTap，提交 HTML）；支持 ?guild=slug 预选会馆。
  */
+/** 未登录路由守卫：等待会话加载完成后跳转登录页（避免未登录进入发帖界面） */
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { user, loadingUser } = useStore();
+
+  useEffect(() => {
+    if (!loadingUser && !user) router.replace("/auth");
+  }, [loadingUser, user, router]);
+
+  if (loadingUser || !user) {
+    return (
+      <div className="route-loading">
+        <GlobalLoading />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
+
 export default function PostCreatePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="route-loading">
-          <GlobalLoading />
-        </div>
-      }
-    >
-      <PostCreateForm />
-    </Suspense>
+    <RequireAuth>
+      <Suspense
+        fallback={
+          <div className="route-loading">
+            <GlobalLoading />
+          </div>
+        }
+      >
+        <PostCreateForm />
+      </Suspense>
+    </RequireAuth>
   );
 }
 

@@ -2,6 +2,18 @@
 
 import { ReactNode, useEffect } from "react";
 
+// 滚动锁计数：支持弹窗叠加（如资料弹窗内再打开日历），全部关闭后才恢复页面滚动。
+// 模块级计数用 globalThis 保存，避免 HMR / 多 bundle 场景下丢失。
+const lockState = globalThis as unknown as { __yjModalLockCount?: number };
+function lockBodyScroll() {
+  lockState.__yjModalLockCount = (lockState.__yjModalLockCount || 0) + 1;
+  document.body.style.overflow = "hidden";
+}
+function unlockBodyScroll() {
+  lockState.__yjModalLockCount = Math.max(0, (lockState.__yjModalLockCount || 0) - 1);
+  if (lockState.__yjModalLockCount === 0) document.body.style.overflow = "";
+}
+
 /**
  * 通用居中弹窗(overlay + card + close + ESC 关闭)。
  * 默认样式类为 donate-*(视觉 1:1);可通过 className 覆盖(如 FollowListModal 的 follow-list-*)。
@@ -31,14 +43,14 @@ export default function Modal({
 }) {
   useEffect(() => {
     if (!open) return;
-    if (lockScroll) document.body.style.overflow = "hidden";
+    if (lockScroll) lockBodyScroll();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      if (lockScroll) document.body.style.overflow = "";
+      if (lockScroll) unlockBodyScroll();
     };
   }, [open, onClose, lockScroll]);
 

@@ -17,14 +17,17 @@ export default function UserProfileModal({
   isSelf,
   onClose,
   onSaved,
+  initialMode = "detail",
 }: {
   profile: User;
   isSelf: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** 初始模式：移动端「编辑」按钮直接打开编辑态 */
+  initialMode?: "detail" | "edit";
 }) {
   const { toast } = useToast();
-  const [mode, setMode] = useState<"detail" | "edit">("detail");
+  const [mode, setMode] = useState<"detail" | "edit">(initialMode);
   const [name, setName] = useState(profile.name || "");
   const [intro, setIntro] = useState(profile.intro || "");
   const [avatar, setAvatar] = useState(profile.avatar || "");
@@ -128,7 +131,7 @@ export default function UserProfileModal({
 
   return (
     <>
-      <Modal open onClose={onClose} cardStyle={{ maxWidth: 440 }} closeable={mode !== "detail"}>
+      <Modal open onClose={onClose} cardStyle={{ maxWidth: 440 }} closeable={mode !== "detail"} lockScroll>
       {mode === "detail" ? (
         <>
           <h3 className="donate-title profile-modal-title">
@@ -240,7 +243,7 @@ export default function UserProfileModal({
       )}
       </Modal>
       {showCalendar && (
-        <Modal open onClose={() => setShowCalendar(false)} cardStyle={{ maxWidth: 320 }}>
+        <Modal open onClose={() => setShowCalendar(false)} cardStyle={{ maxWidth: 320 }} lockScroll>
           <div className="profile-cal-title"><i className="fa fa-calendar"></i> 选择日期</div>
           <div className="profile-calendar">
             <div className="profile-calendar-head">

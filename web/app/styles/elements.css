@@ -74,6 +74,15 @@ svg,img {
     height: inherit;
 }
 
+/* 头像统一圆形：UserAvatar 渲染的 img 始终带 .avatar-round，
+   不依赖外层容器（容器 overflow: visible 时也能裁成圆形），兼容 webp 等所有格式 */
+img.avatar-round {
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    display: block !important;
+    max-width: 100%;
+}
+
 img.avatar-img,
 .user-avatar img,
 .post-card-avatar img,
@@ -187,7 +196,8 @@ input {
     z-index: 100;
     pointer-events: none;
 }
-.qr-hover-wrap:hover .qr-img {
+.qr-hover-wrap:hover .qr-img,
+.qr-hover-wrap.open .qr-img {
     display: block;
 }
 

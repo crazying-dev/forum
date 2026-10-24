@@ -62,6 +62,8 @@ func (h *PostsHandler) Comments(c *gin.Context) {
 type createCommentReq struct {
 	Content  string  `json:"content" binding:"required"`
 	ParentID *string `json:"parent_id"`
+	Altcha   string  `json:"altcha"`
+	Grant    string  `json:"grant"`
 }
 
 // CreateComment 评论/回复（富文本，与发帖共用净化白名单）。
@@ -79,6 +81,11 @@ func (h *PostsHandler) CreateComment(c *gin.Context) {
 	var req createCommentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "参数错误"})
+		return
+	}
+	// ALTCHA 人机验证（启用时 fail-closed；未启用保持原行为）
+	if !VerifyRequest(c, h.Altcha, req.Altcha, req.Grant) {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "请先完成人机验证"})
 		return
 	}
 	// 原始 HTML 长度上限

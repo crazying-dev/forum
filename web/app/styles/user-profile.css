@@ -436,6 +436,11 @@
     font-size: 14px;
 }
 
+/* 移动端「编辑」按钮（桌面隐藏；位于签到按钮下方） */
+.user-mobile-edit-btn {
+    display: none;
+}
+
 @media (max-width: 768px) {
     .user-profile-page {
         margin: 20px auto;
@@ -533,13 +538,45 @@
         display: inline;
     }
 
+    /* 移动端：签到按钮（卡片右上角）正下方的「编辑」入口 */
+    .user-profile-card > .user-mobile-edit-btn {
+        display: inline-flex;
+        position: absolute;
+        top: 46px;
+        right: 12px;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 5px 12px;
+        border: 1px solid var(--color-border-primary);
+        border-radius: 16px;
+        background: transparent;
+        color: var(--color-text-secondary);
+        font-size: 12px;
+        font-family: inherit;
+        cursor: pointer;
+    }
+
+    .user-mobile-edit-btn:hover {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+    }
+
+    /* 账号设置区：整行居中（分隔线随整行居中） */
+    .user-account-settings {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
     /* 标签栏允许换行，避免窄屏「帖子列表 / 评论列表 / 发布新帖」横向溢出 */
     .user-profile-tabs {
         flex-wrap: wrap;
     }
 
+    /* 「发布新帖」保持在标签栏最右侧 */
     .profile-tab-create {
-        margin-left: 0;
+        margin-left: auto;
     }
 
     .post-item {

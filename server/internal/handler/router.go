@@ -82,7 +82,7 @@ func Register(r *gin.Engine, cfg *config.Config, db *database.DB, sessions *auth
 		Algorithm: cfg.AltchaAlgorithm, Cost: cfg.AltchaCost, Expires: cfg.AltchaExpires,
 	})
 	authH := &AuthHandler{DB: db, Cfg: cfg, Sessions: sessions, Mailer: mailer, Altcha: altchaSvc}
-	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions, Media: mediaSvc}
+	postsH := &PostsHandler{DB: db, Cfg: cfg, Cache: cacheSet, Mailer: mailer, Sessions: sessions, Media: mediaSvc, Altcha: altchaSvc}
 	miscH := &MiscHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions, Altcha: altchaSvc}
 	accountH := &AccountHandler{DB: db, Cfg: cfg, Mailer: mailer, Sessions: sessions, Cache: cacheSet}
 	siteH := &SiteHandler{DB: db}

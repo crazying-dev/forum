@@ -291,3 +291,35 @@
     }
 }
 
+/* 首页随机推荐：底部「继续加载」按钮（仅首页，不自动加载） */
+.home-load-more {
+    display: flex;
+    justify-content: center;
+    padding: 18px 0 4px;
+}
+
+.home-load-more-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 28px;
+    border: 1px solid var(--color-border-primary);
+    border-radius: 20px;
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.home-load-more-btn:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.home-load-more-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+

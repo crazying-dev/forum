@@ -55,7 +55,7 @@ export function UserAvatar({
       width={imgWidth}
       height={imgHeight}
       style={imgStyle}
-      className={imgClassName || undefined}
+      className={`avatar-round${imgClassName ? ` ${imgClassName}` : ""}`}
       id={imgId}
       onError={handleError}
     />

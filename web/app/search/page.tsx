@@ -182,7 +182,7 @@ function SearchInner() {
           </div>
 
           {tab === "all" && <h2 className="search-section-title">帖子</h2>}
-          <div className="forum-post-list" id="search-post-list" style={{ display: tab === "posts" || tab === "all" ? "block" : "none" }}>
+          <div className="forum-post-list" id="search-post-list" style={{ display: tab === "posts" || tab === "all" ? "flex" : "none" }}>
             {searching && posts.length === 0 ? (
               <ListLoading />
             ) : posts.length === 0 ? (
