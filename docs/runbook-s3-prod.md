@@ -28,7 +28,7 @@
 ```
 
 - S3 与指标**只**监听 `10.8.0.1`，公网不开放；Host B 的 admin 经 `10.8.0.1:8333` 访问 S3。
-- 原 Host A 的 nginx 经 `10.8.0.2:8080` 访问 admin（`/guild-img/`、`/guide-img/`）的图片反代已退役；图片统一经 `/ov2/api/media/<id>` 直出。
+- 新图片统一经 `/ov2/api/media/<id>` 直出；旧 GridFS 图片仍需 nginx 将 `/guild-img/`、`/guide-img/` 反代到 Host B 管理端（配置文件已保留该兼容 location）。
 - 媒体字节在 SeaweedFS，元数据在 PG（`media_assets` 等）；旧本地文件/GridFS 保持只读兼容。
 - 生产 S3 数据：`/var/lib/seaweedfs/data`；配置：`/etc/seaweedfs/s3.json`。
 
@@ -177,7 +177,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 检查点：
 
-- `/guild-img/`、`/guide-img/` 已退役，nginx 不应再配置这两个 location；
+- `/guild-img/`、`/guide-img/` 为旧 GridFS 兼容代理：nginx 必须保留（反代到 Host B `10.8.0.2:8080`），否则历史会馆/指南图片 404；
 - `/ov2/api/media/` 启用 `proxy_cache media`（**3g** / inactive=30d / keys_zone=100m）；
 - SSE 两个 exact location 仍在（`/ov2/api/world/stream`、`/ov2/api/messages/stream`）；
 - 安全头仍在（media location 内已重复声明）。

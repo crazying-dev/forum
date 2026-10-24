@@ -78,6 +78,10 @@ svg,img {
    不依赖外层容器（容器 overflow: visible 时也能裁成圆形），兼容 webp 等所有格式 */
 img.avatar-round {
     border-radius: 50% !important;
+    /* 全局 svg,img 的 all:inherit / overflow:visible 会让部分浏览器不按圆角裁剪不透明图片（如 jpg/webp），
+       补 clip-path 强制圆形，保证任何格式头像都不会显示成方形 */
+    -webkit-clip-path: circle(50%) !important;
+    clip-path: circle(50%) !important;
     object-fit: cover !important;
     display: block !important;
     max-width: 100%;
@@ -94,6 +98,8 @@ img.avatar-img,
     height: 100% !important;
     object-fit: cover !important;
     border-radius: 50% !important;
+    -webkit-clip-path: circle(50%) !important;
+    clip-path: circle(50%) !important;
     display: block !important;
 }
 

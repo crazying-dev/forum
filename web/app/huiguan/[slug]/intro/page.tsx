@@ -7,7 +7,7 @@ import GlobalLoading from "@/components/GlobalLoading";
 import RichContent from "@/components/ui/RichContent";
 import { guildApi, GuildIntroPageData } from "@/lib/api";
 import { contrastText, formatUserTime, guildForeground, isLightHex, themeColor, themeInk, themeTint } from "@/lib/constants";
-import { mediaUrl } from "@/lib/media";
+import { guildImageUrl } from "@/lib/media";
 
 /** 会馆介绍页：封面/主题色 hero + 信息卡 + 富文本正文（管理端编辑的 HTML） */
 export default function GuildIntroPage() {
@@ -64,7 +64,7 @@ export default function GuildIntroPage() {
   const inkStyle = { "--guild-ink": themeInk(theme) } as React.CSSProperties;
   const lightTheme = isLightHex(theme);
   // 封面图（媒体直出 /ov2/api/media/<id>）；旧 GridFS 文件或未设封面时回退主题色渐变
-  const coverUrl = mediaUrl(g.cover_file_id);
+  const coverUrl = guildImageUrl(g.cover_file_id, g.uuid, "intro-images");
   const hasCover = !!coverUrl;
   // hero 前景色：有封面统一白字 + 层级遮罩；否则亮色主题用深字、暗色主题用白字
   const heroVars = {

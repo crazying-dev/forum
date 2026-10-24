@@ -1,9 +1,9 @@
 import { themeColor, themeTint } from "@/lib/constants";
-import { mediaUrl } from "@/lib/media";
+import { guildImageUrl } from "@/lib/media";
 
-/** 会馆 Logo 图片地址（媒体直出：/ov2/api/media/<media_id>，不再经管理端代理） */
-export function guildLogoUrl(logoFileId?: string | null): string {
-  return mediaUrl(logoFileId);
+/** 会馆 Logo 图片地址：新 MD 媒体直出；旧 GridFS 走 /guild-img 兼容代理（需 guildUuid） */
+export function guildLogoUrl(logoFileId?: string | null, guildUuid?: string | null, logoVersion?: number): string {
+  return guildImageUrl(logoFileId, guildUuid, "logo", logoVersion);
 }
 
 /**
@@ -12,6 +12,8 @@ export function guildLogoUrl(logoFileId?: string | null): string {
  */
 export default function GuildLogo({
   logoFileId,
+  guildUuid,
+  logoVersion,
   name,
   hasLogo,
   color,
@@ -19,6 +21,9 @@ export default function GuildLogo({
   className = "guild-logo",
 }: {
   logoFileId?: string | null;
+  /** 会馆 uuid：旧 GridFS logo 经 /guild-img 兼容代理读取时必需 */
+  guildUuid?: string | null;
+  logoVersion?: number;
   name: string;
   hasLogo?: boolean;
   color?: string;
@@ -26,8 +31,7 @@ export default function GuildLogo({
   className?: string;
 }) {
   const c = themeColor(color);
-  // 旧 GridFS 文件（ObjectID）已无法直出，mediaUrl 返回空串时回退占位图
-  const url = hasLogo ? guildLogoUrl(logoFileId) : "";
+  const url = hasLogo ? guildLogoUrl(logoFileId, guildUuid, logoVersion) : "";
 
   if (url) {
     return (

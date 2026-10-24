@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Comment } from "@/lib/api";
 import { timeAgo } from "@/lib/constants";
@@ -139,21 +139,6 @@ export default function CommentSection({
   canWrite?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  // 评论框吸附顶栏：哨兵离开「顶栏下方可视区」即视为贴住（此时两侧上圆角改为直角）
-  const [stuck, setStuck] = useState(false);
-  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const el = stickySentinelRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(
-      // 仅「哨兵越过顶栏（在视口上方）」才算吸顶；哨兵在视口下方时 isIntersecting 也是 false
-      ([entry]) => setStuck(!entry.isIntersecting && entry.boundingClientRect.top < 70),
-      { rootMargin: "-70px 0px 0px 0px", threshold: 0 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [canWrite]);
 
   const { mainComments, replyMap, parentMap } = useMemo(() => {
     const parentMap: Record<string, Comment> = {};
@@ -201,28 +186,25 @@ export default function CommentSection({
     <>
       <div className="comment-section-title">评论区</div>
       {canWrite ? (
-        <>
-          <div ref={stickySentinelRef} className="comment-sticky-sentinel" aria-hidden="true" />
-          <div className={`comment-input-bar${stuck ? " is-stuck" : ""}`}>
-            {replyTo && (
-              <div className="comment-reply-indicator">
-                <span>
-                  回复 <b className="Username">{replyTo.name}</b>
-                </span>
-                <button onClick={() => setReplyTo(null)}><i className="fa fa-times"></i></button>
-              </div>
-            )}
-            <CommentEditor
-              value={replyText}
-              onChange={onChangeReplyText}
-              onSubmit={onSubmit}
-              placeholder={replyTo ? `回复 ${replyTo.name}…` : "写下你的评论…"}
-              editorRef={editorRef}
-              submitting={submitting}
-              captcha
-            />
-          </div>
-        </>
+        <div className="comment-input-bar">
+          {replyTo && (
+            <div className="comment-reply-indicator">
+              <span>
+                回复 <b className="Username">{replyTo.name}</b>
+              </span>
+              <button onClick={() => setReplyTo(null)}><i className="fa fa-times"></i></button>
+            </div>
+          )}
+          <CommentEditor
+            value={replyText}
+            onChange={onChangeReplyText}
+            onSubmit={onSubmit}
+            placeholder={replyTo ? `回复 ${replyTo.name}…` : "写下你的评论…"}
+            editorRef={editorRef}
+            submitting={submitting}
+            captcha
+          />
+        </div>
       ) : (
         <div className="comment-login-gate">
           <i className="fa fa-lock"></i>

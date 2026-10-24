@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/ui/JsonLd";
-import { mediaUrl } from "@/lib/media";
+import { guildImageUrl } from "@/lib/media";
 import { absoluteUrl, fetchApi, pageMetadata, truncate } from "@/lib/seo";
 
 // 会馆详情动态 SEO（服务端 layout：generateMetadata + Organization JSON-LD）。
@@ -61,7 +61,7 @@ export default async function GuildDetailLayout({ children, params }: { children
   const { ok, status, guild } = await getGuild(slug);
   // 会馆不存在（HTTP 404）→ 渲染 404 页（流式渲染下状态码保持 200，由自动注入 + 兜底 noindex 防收录）；临时故障不触发（避免误伤）
   if (!ok && status === 404) notFound();
-  const logoUrl = guild?.has_logo ? mediaUrl(guild.logo_file_id) : "";
+  const logoUrl = guild?.has_logo ? guildImageUrl(guild.logo_file_id, guild.uuid, "logo", guild.logo_version) : "";
   return (
     <>
       {children}

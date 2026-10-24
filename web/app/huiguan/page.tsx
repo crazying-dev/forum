@@ -143,6 +143,8 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
         <div className="guild-row-identity">
           <GuildLogo
             logoFileId={guild.logo_file_id}
+            guildUuid={guild.uuid}
+            logoVersion={guild.logo_version}
             name={guild.name}
             hasLogo={guild.has_logo}
             color={guild.theme_color}
@@ -299,6 +301,8 @@ export default function HuiGuanPage() {
               <Link className="guild-list-item" href={`/huiguan/${g.slug}`}>
                 <GuildLogo
                   logoFileId={g.logo_file_id}
+                  guildUuid={g.uuid}
+                  logoVersion={g.logo_version}
                   name={g.name}
                   hasLogo={g.has_logo}
                   color={g.theme_color}

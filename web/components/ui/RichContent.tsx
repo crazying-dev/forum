@@ -22,8 +22,9 @@ const MEDIA_IMG_SIZES = "(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 820
  *   /guild-img/guilds/{uuid}/intro-images/{fileId}
  *   /guild-img/guilds/{uuid}/leader-images/{fileId}
  *   /guide-img/guides/images/{fileId}
- * 管理端代理已退役，渲染时把新媒体 ID（MD 开头）重写为论坛直出 /ov2/api/media/<id>；
- * 旧 GridFS 文件（ObjectID）无对应媒体行，保留原样（按约定接受 404，后续单独迁移）。
+ * 渲染时把新媒体 ID（MD 开头）重写为论坛直出 /ov2/api/media/<id>；
+ * 旧 GridFS 文件（24 位 ObjectID）保留原路径，由论坛 /guild-img、/guide-img
+ * 兼容代理转发到管理端（见 next.config rewrites 与 deploy/nginx）。
  */
 const LEGACY_MEDIA_SRC_RE =
   /(\ssrc=)(["'])\/(?:guild-img\/guilds\/[^"'/]+\/(?:intro|leader)-images|guide-img\/guides\/images)\/([^"'/?]+)\2/g;

@@ -47,6 +47,7 @@ export default function PostDetailPage() {
   const [showReport, setShowReport] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const commentEditorRef = useRef<CommentEditorHandle>(null);
+  const commentSectionRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     try {
@@ -256,7 +257,7 @@ export default function PostDetailPage() {
           </div>
         </article>
 
-        <div className="comment-section">
+        <div className="comment-section" ref={commentSectionRef}>
           <CommentSection
             comments={comments}
             userId={userId}
@@ -273,6 +274,17 @@ export default function PostDetailPage() {
           />
         </div>
       </div>
+      {/* 前往评论：桌面端与移动端一致的右下角悬浮小按钮 */}
+      <button
+        type="button"
+        className="post-comment-fab"
+        aria-label="前往评论"
+        onClick={() => commentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+      >
+        <i className="fa fa-comment-o" aria-hidden="true"></i>
+        <span>前往评论</span>
+      </button>
+
       {showReport && <ReportPostDialog postId={id} onClose={() => setShowReport(false)} />}
     </>
   );

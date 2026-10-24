@@ -24,31 +24,9 @@
     width: 100%;
 }
 
-/* 评论框吸附顶栏：越过评论区顶部后贴在 Header 下方 */
-.comment-sticky-sentinel {
-    height: 1px;
-    margin-bottom: -1px;
-}
-
-.comment-input-bar {
-    position: sticky;
-    top: 70px;
-    z-index: 90;
-    background: var(--color-bg-card);
-}
-
-/* 吸顶时顶部两侧圆角改为直角，并补一层投影区分层级 */
-.comment-input-bar.is-stuck {
-    border-radius: 0;
-    box-shadow: 0 6px 16px var(--color-shadow-search);
-}
-
-.comment-input-bar.is-stuck .comment-editor-toolbar {
-    border-radius: 0;
-}
-
-.comment-input-bar.is-stuck .comment-reply-indicator {
-    border-radius: 0;
+/* 评论定位锚点留出粘性 Header 空间（顶部「前往评论」跳转用） */
+.comment-section {
+    scroll-margin-top: 84px;
 }
 
 /* 未登录：禁止写入评论，展示登录入口 */
@@ -425,9 +403,6 @@
 @media (max-width: 700px) {
     .comment-replies {
         margin-left: 8px;
-    }
-    .comment-input-bar {
-        top: 60px;
     }
 }
 
