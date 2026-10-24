@@ -103,8 +103,10 @@ pnpm install
 # 构建时确定：rewrites 的 API_TARGET 会写进路由清单，构建后再改无效
 API_TARGET=http://127.0.0.1:8090 pnpm build   # 产出 .next/standalone
 # 静态资源必须进 standalone 目录（server.js 只服务该目录内的文件）
-cp -r public .next/standalone/public
-cp -r .next/static .next/standalone/.next/static
+# 用 `src/.` 形式复制，可重复执行（直接 cp -r public <dest>/public 重跑会嵌套成 public/public）
+mkdir -p .next/standalone
+cp -a public/. .next/standalone/public/
+cp -a .next/static/. .next/standalone/.next/static/
 
 cp /opt/yj-forum/deploy/yj-web.service /etc/systemd/system/
 systemctl daemon-reload
