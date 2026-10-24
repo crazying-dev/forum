@@ -1,0 +1,48 @@
+// 妖精论坛 V2 前端构建：多入口渐进式 Vue3，产物输出到 ../static/vue/（Flask 直接托管）
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { fileURLToPath, URL } from 'node:url'
+
+export default defineConfig({
+  plugins: [vue()],
+  // 生产构建保留 Vue Devtools 连接（默认 false 会 tree-shake 掉 devtools hook，
+  // 导致 Vue Devtools / Unlocker 检测不到 Vue 应用）
+  define: {
+    __VUE_PROD_DEVTOOLS__: JSON.stringify(true),
+  },
+  build: {
+    // 输出到 Flask 静态目录（模板用 ?v={{ static_version }} 做缓存版本控制）
+    outDir: fileURLToPath(new URL('../static/vue', import.meta.url)),
+    emptyOutDir: true,
+    target: 'es2018',
+    rollupOptions: {
+      input: {
+        home: fileURLToPath(new URL('./src/entries/home.js', import.meta.url)),
+        forum: fileURLToPath(new URL('./src/entries/forum.js', import.meta.url)),
+        post_detail: fileURLToPath(new URL('./src/entries/post_detail.js', import.meta.url)),
+        auth: fileURLToPath(new URL('./src/entries/auth.js', import.meta.url)),
+        users: fileURLToPath(new URL('./src/entries/users.js', import.meta.url)),
+        search: fileURLToPath(new URL('./src/entries/search.js', import.meta.url)),
+        post_create: fileURLToPath(new URL('./src/entries/post_create.js', import.meta.url)),
+        world_page: fileURLToPath(new URL('./src/entries/world_page.js', import.meta.url)),
+        goto: fileURLToPath(new URL('./src/entries/goto.js', import.meta.url)),
+        verify_success: fileURLToPath(new URL('./src/entries/verify_success.js', import.meta.url)),
+        verify_failed: fileURLToPath(new URL('./src/entries/verify_failed.js', import.meta.url)),
+        privacy: fileURLToPath(new URL('./src/entries/privacy.js', import.meta.url)),
+        wiki: fileURLToPath(new URL('./src/entries/wiki.js', import.meta.url)),
+        wiki_guanfang: fileURLToPath(new URL('./src/entries/wiki_guanfang.js', import.meta.url)),
+        wiki_personal: fileURLToPath(new URL('./src/entries/wiki_personal.js', import.meta.url)),
+        mouse: fileURLToPath(new URL('./src/entries/mouse.js', import.meta.url)),
+        mouse_liunx: fileURLToPath(new URL('./src/entries/mouse_liunx.js', import.meta.url)),
+        live2d: fileURLToPath(new URL('./src/entries/live2d.js', import.meta.url)),
+        oauth: fileURLToPath(new URL('./src/entries/oauth.js', import.meta.url)),
+      },
+      output: {
+        // 文件名确定化：由 ?v= 版本号控制浏览器缓存失效
+        entryFileNames: '[name].js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
+      },
+    },
+  },
+})

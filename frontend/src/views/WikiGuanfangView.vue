@@ -1,0 +1,12 @@
+<template>
+  <div class="wiki-page">
+    <div class="wiki-header">
+      <h2>罗小黑战记官方</h2>
+      <p style="color: red">因为版权问题无法发布</p>
+    </div>
+    <div class="wiki-container"></div>
+    <div class="wiki-footer">
+      <p>更多内容持续更新中...</p>
+    </div>
+  </div>
+</template>

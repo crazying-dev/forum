@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}罗小黑战记鼠标 - 妖精论坛{% endblock %}
+{% block body_attrs %} data-vue-page="mouse"{% endblock %}
+{% block content %}
+<div id="app"></div>
+<script type="module" src="/static/vue/mouse.js?v={{ static_version }}"></script>
+{% endblock %}

@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "updated_at": "2026-10-18T22:11:41+08:00",
+  "min_versions": {
+    "windows": "1.3.19",
+    "android": "1.0.18",
+    "web": "0"
+  },
+  "platforms": [
+    {
+      "key": "windows",
+      "name": "Windows",
+      "icon": "fa-windows",
+      "status": "available",
+      "requirement": "Windows 10 / 11（64 位）",
+      "releases": [
+        {
+          "version": "1.3.19",
+          "channel": "stable",
+          "date": "2026-10-18",
+          "size": 141320337,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.19/forum_setup.exe",
+          "filename": "forum_setup.exe",
+          "sha256": "941176604ef0ac0bb49105242500deb01221a2c2b645d4ef57aa00a9888f70e4",
+          "notes": [
+            "修复：年制换算的公元年输入框不支持公元前——负数被直接丢进换算，既差了一年，也没换成公元前文案",
+            "现在输入 -1（公元前 1 年）输出「公元前 1 年 = 无限前 1604 年」；公元前 M 年按天文纪年 (1 − M) 归一后再换算，不会差一年",
+            "口径与网页端、Android 端完全一致（ceNum < 0 ? ceNum + 1 : ceNum）；输入 0 仍提示「公元纪年没有 0 年」",
+            "yearmode 新增 ce_input_to_astronomical() / ce_text()，无限年方向也不再出现「公元 -N 年」；test_core 补 3 例，共 302 例全绿",
+            "版本号升至 1.3.19"
+          ],
+          "mandatory": false
+        }
+      ]
+    },
+    {
+      "key": "android",
+      "name": "Android",
+      "icon": "fa-android",
+      "status": "available",
+      "requirement": "Android 7.0 及以上",
+      "releases": [
+        {
+          "version": "1.0.18",
+          "channel": "stable",
+          "date": "2026-10-18",
+          "size": 8168888,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.18/forum-android-1.0.18.apk",
+          "filename": "forum-android-1.0.18.apk",
+          "sha256": "f410be372e0b5c0327d6d64a6ca8e8fc4efc5f2ee56fd56645f877616875f276",
+          "notes": [
+            "修复：年制换算的公元年输入框不支持公元前——负数输入被当成非法值拒绝",
+            "现在输入 -1 即「公元前 1 年」，输出「公元前 1 年 = 无限前 1604 年」；公元前 M 年按天文纪年 (1 − M) 归一后再换算，不会差一年",
+            "口径与网页端完全一致（ceNum < 0 ? ceNum + 1 : ceNum）；输入 0 仍提示「公元纪年没有 0 年」",
+            "TimeFmt 新增 ceInputToAstronomical() / ceInputToNewEra()；TimeFmtTest 补 3 例，共 91 例全绿",
+            "版本号 versionCode 19 / versionName 1.0.18"
+          ],
+          "mandatory": false
+        },
+        {
+          "version": "1.0.17",
+          "channel": "stable",
+          "date": "2026-10-18",
+          "size": 8168888,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.17/forum-android-1.0.17.apk",
+          "filename": "forum-android-1.0.17.apk",
+          "sha256": "0d36a0626ed8e870eed4a1497c7178ae8e76fea9178cdcf5288b68b4ad399287",
+          "notes": [
+            "修复：无限历纪年改为 1 起算——无限元年 = 公元 1604 年（无限 N 年 = 公元 1603 + N 年），此前会错显为「无限 0 年」",
+            "公元 1604 年以前显示「无限前 N 年」（无限前 1 年 = 公元 1603 年），不存在无限 0 年",
+            "重构：TimeFmt.kt 新增 NewEraDate 结构化换算核心（gregorianToNewEra / newEraToGregorian / ceText），双向换算统一入口",
+            "新增「我的 › 年制换算」页：无限年 ⇄ 公元年实时双向换算，输入 0 或负数给出明确提示",
+            "与网页端、Windows 端纪年口径完全统一；版本号 versionCode 18 / versionName 1.0.17"
+          ],
+          "mandatory": false
+        },
+        {
+          "version": "1.0.16",
+          "channel": "stable",
+          "date": "2026-10-10",
+          "size": 8152504,
+          "url": "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.16/forum-android-1.0.16.apk",
+          "filename": "forum-android-1.0.16.apk",
+          "sha256": "1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61",
+          "notes": [
+            "修复：从帖子详情退出后列表跳回最顶端——新增跨页面保留的列表状态（FeedStateStore 由根节点持有），返回时复用同一实例，已加载内容与滚动位置都不丢",
+            "配合 needReload 判定：仅在信息流/分类/搜索词/用户 tab 变化时重载，进入详情再返回不再重载",
+            "首页/论坛/搜索/用户主页四个列表均接入保留的 LazyListState",
+            "版本号 versionCode 17 / versionName 1.0.16"
+          ],
+          "mandatory": false
+        }
+      ]
+    },
+    { "key": "linux",   "name": "Linux",   "icon": "fa-linux",   "status": "coming_soon", "requirement": "x86_64 桌面发行版", "releases": [] },
+    { "key": "macos",   "name": "macOS",   "icon": "fa-apple", "status": "coming_soon", "requirement": "macOS 11 及以上（Intel / Apple Silicon）", "releases": [] }
+  ]
+}
