@@ -106,7 +106,7 @@ func Load() *Config {
 		MediaVariantsEnabled: getEnvBool("MEDIA_VARIANTS_ENABLED", true),
 		ImageFatherURL:       getEnv("IMAGE_FATHER_URL", "https://img.crazying-dev.top/text/one"),
 		PublicBaseURL:        getEnv("PUBLIC_BASE_URL", "localhost:3000"),
-		EasterEggPath:        getEnv("EASTER_EGG_PATH", "main/EasterEgg/1.json"),
+		EasterEggPath:        getEnv("EASTER_EGG_PATH", ""), // 可选：覆盖内置彩蛋 JSON
 
 		AltchaEnabled:   getEnvBool("ALTCHA_ENABLED", false),
 		AltchaHMACKey:   getEnv("ALTCHA_HMAC_KEY", ""),

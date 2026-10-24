@@ -51,7 +51,7 @@
 - **缓存**：进程内 LRU+TTL（posts 30s / post_detail 60s / user_info 300s / guilds 30s / search 120s / comments 60s）。
 - **中间件**：CORS 白名单 / CSRF（Origin+Referer）/ 限流（IP+维度）/ 安全响应头 / gzip。
 - **邮件**：SMTP（net/smtp），异步 goroutine 发送（注册码/重置码/登录提醒/粉丝通知/评论提醒/Bug 通知）。
-- **存储**：新版头像走媒体服务（S3 或本地 `MEDIA_DIR`），旧 `/avatar/<uuid>.webp` 从 `AVATAR_DIR` 只读兼容；彩蛋 JSON 由 `EASTER_EGG_PATH` 读取；帖子/用户/会馆/文章均在 PostgreSQL。会馆 logo 由管理端（yj-forum-admin）存储，ouo 侧仅保存 `logo_file_id` / `logo_version` 并通过 `/guild-img` 代理展示（以 uuid 定位，兼容旧数字 id）。
+- **存储**：新版头像走媒体服务（S3 或本地 `MEDIA_DIR`），旧 `/avatar/<uuid>.webp` 从 `AVATAR_DIR` 只读兼容；彩蛋 JSON 默认随二进制内置（`internal/assets/easteregg`，可用 `EASTER_EGG_PATH` 覆盖）；帖子/用户/会馆/文章均在 PostgreSQL。会馆 logo 由管理端（yj-forum-admin）存储，ouo 侧仅保存 `logo_file_id` / `logo_version` 并通过 `/guild-img` 代理展示（以 uuid 定位，兼容旧数字 id）。
 - **模块边界**：`handler/`（auth、users、posts、comments、guilds、misc、search）负责路由与参数校验；`database/`（users、users_credentials、posts、comments、guilds、misc）负责 SQL 查询；`models/` 定义对外数据结构；`middleware/`、`cache/`、`email/` 为横切与基础设施。会馆系统新增 `handler/guilds.go`（列表/详情/信息流/文章/入退馆）与 `database/guilds.go`（会馆、成员、入馆申请、分类、公告、文章与信息流查询）。
 
 ## 通信方式

@@ -17,6 +17,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"yj-forum/server/internal/assets/easteregg"
 	"yj-forum/server/internal/auth"
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
@@ -786,6 +787,15 @@ func (s *Service) RandomEasterEgg() (map[string]any, error) {
 			return list[0], nil
 		}
 		return list[n.Int64()], nil
+	}
+	// 回退到随二进制内置的彩蛋数据（不再依赖外部 JSON 文件）。
+	var builtin []map[string]any
+	if err := json.Unmarshal(easteregg.JSON(), &builtin); err == nil && len(builtin) > 0 {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(builtin))))
+		if err != nil {
+			return builtin[0], nil
+		}
+		return builtin[n.Int64()], nil
 	}
 	return nil, os.ErrNotExist
 }

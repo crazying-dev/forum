@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"yj-forum/server/internal/altcha"
+	"yj-forum/server/internal/assets/easteregg"
 	"yj-forum/server/internal/auth"
 	"yj-forum/server/internal/config"
 	"yj-forum/server/internal/database"
@@ -457,10 +458,14 @@ func (h *MiscHandler) BugReportDetail(c *gin.Context) {
 
 // EasterEgg 随机彩蛋。
 func (h *MiscHandler) EasterEgg(c *gin.Context) {
-	data, err := os.ReadFile(h.Cfg.EasterEggPath)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "彩蛋不存在"})
-		return
+	// 默认使用随二进制内置的数据；EASTER_EGG_PATH 非空时可覆盖（方便运营临时替换）。
+	data := easteregg.JSON()
+	if p := strings.TrimSpace(h.Cfg.EasterEggPath); p != "" {
+		if b, err := os.ReadFile(p); err == nil {
+			data = b
+		} else {
+			log.Printf("[EASTER_EGG] 覆盖文件读取失败，回退内置数据 path=%s err=%v", p, err)
+		}
 	}
 	var list []struct {
 		ID   string `json:"ID"`
