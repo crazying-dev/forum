@@ -295,7 +295,7 @@ fi
 # ---------------------------------------------------------- #
 # 9. 既有 SeaweedFS / WireGuard
 # ---------------------------------------------------------- #
-section '9. 既有安装与 WireGuard'
+section '9. 既有安装与组网（可选）'
 if has_cmd systemctl && systemctl list-unit-files seaweedfs.service 2>/dev/null | grep -q '^seaweedfs\.service'; then
     SVC_STATE=$(systemctl is-active seaweedfs 2>/dev/null || true)
     SVC_FRAG=$(systemctl show -p FragmentPath --value seaweedfs 2>/dev/null || true)
@@ -306,21 +306,12 @@ else
     info '未检测到 seaweedfs.service（全新安装）'
 fi
 
-if has_cmd wg; then
-    ok 'wireguard-tools 已安装（wg 命令可用）'
-else
-    manual '未安装 wireguard-tools：S3 只绑定 10.8.0.1，必须先按 deploy/wireguard/README.md 建立 wg0'
-fi
-if has_cmd ip && ip link show wg0 >/dev/null 2>&1; then
+# 当前采用公网直连方案（Nginx TLS + IP 白名单），WireGuard 为可选；无 wg0 不再阻塞。
+if has_cmd wg && has_cmd ip && ip link show wg0 >/dev/null 2>&1; then
     WG_ADDR=$(ip -o -4 addr show dev wg0 2>/dev/null | awk '{print $4}' | paste -sd, - || true)
-    info "wg0 已存在，地址: ${WG_ADDR:-无 IPv4}"
-    if [[ ",${WG_ADDR}," == *',10.8.0.1/'* ]]; then
-        ok 'wg0 已配置 10.8.0.1'
-    else
-        manual 'wg0 存在但未配置 10.8.0.1（Host A 需要 10.8.0.1/24）'
-    fi
+    info "检测到 wg0（${WG_ADDR:-无 IPv4}）：可选组网方案在用，不影响公网直连"
 else
-    manual 'wg0 接口不存在：请先部署 WireGuard（deploy/wireguard/）'
+    info '未启用 WireGuard：按公网直连方案（S3 只绑 127.0.0.1 + Nginx TLS）部署，无需 wg0'
 fi
 
 # ---------------------------------------------------------- #

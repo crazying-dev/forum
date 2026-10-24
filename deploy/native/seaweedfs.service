@@ -10,10 +10,9 @@
 [Unit]
 Description=SeaweedFS S3 (single-node: master+volume+filer+s3)
 Documentation=https://github.com/seaweedfs/seaweedfs
-# 用 Wants 而不是 Requires：重启/重载 wg0 时不应连带停掉 SeaweedFS（只需保证启动顺序）。
-# wg0 未就绪时 weed 会 bind 失败并退出，由 Restart=always 等到接口就绪后自愈。
-Wants=network-online.target wg-quick@wg0.service
-After=network-online.target wg-quick@wg0.service
+# 公网直连方案：S3 只绑 127.0.0.1，由 Nginx 做 TLS 终止与 IP 白名单；不依赖 WireGuard。
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -21,11 +20,11 @@ User=seaweedfs
 Group=seaweedfs
 UMask=0027
 
-# 只绑定 WireGuard 内网：S3=10.8.0.1:8333，指标=9327
+# 只绑定本机回环：S3=127.0.0.1:8333，指标=127.0.0.1:9327（公网不可见，由 Nginx 反代）
 # 容量：512MB/卷 × 20 = 10GB 上限（宿主机仅 39G 盘、21G 可用；不要照搬默认 30G 卷）
 # 内存：宿主机 2GB，Go 软限 + cgroup 硬限双保险
 Environment=GOMEMLIMIT=640MiB
-ExecStart=/usr/local/bin/weed server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/var/lib/seaweedfs/data -ip.bind=10.8.0.1 -master.volumeSizeLimitMB=512 -volume.max=20 -metrics.port=9327
+ExecStart=/usr/local/bin/weed server -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -dir=/var/lib/seaweedfs/data -ip.bind=127.0.0.1 -master.volumeSizeLimitMB=512 -volume.max=20 -metrics.port=9327
 
 Restart=always
 RestartSec=5

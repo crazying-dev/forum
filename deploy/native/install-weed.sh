@@ -31,7 +31,7 @@
 #   --bind-ip=<ip>           监听地址（默认 10.8.0.1，WireGuard Host A）
 #   --master=<host:port>     weed shell 连接 master（默认 <bind-ip>:9333）
 #   --allow-placeholder-s3   s3.json 仍含 <CHANGE_ME_*> 时也继续（不建议）
-#   --skip-wg-check          跳过 wg0/10.8.0.1 地址检查（仅用于预装二进制）
+#   --skip-wg-check          已废弃（保留兼容）：公网直连方案不再依赖 WireGuard
 #   -h, --help               显示帮助
 #
 # 幂等：重复执行 = 升级/修复；不改写已存在的 s3.json；已存在的 bucket 不会重建。
@@ -56,7 +56,7 @@ SHA256=''
 ARCHIVE=''
 URL_OVERRIDE=''
 BUCKET='yj-forum'
-BIND_IP='10.8.0.1'
+BIND_IP='127.0.0.1'
 MASTER_ADDR=''
 ALLOW_PLACEHOLDER_S3=0
 SKIP_WG_CHECK=0
@@ -83,7 +83,7 @@ usage() {
   --bind-ip=<ip>           监听地址，默认 10.8.0.1（WireGuard Host A）
   --master=<host:port>     weed shell 的 master 地址，默认 <bind-ip>:9333
   --allow-placeholder-s3   s3.json 仍含 <CHANGE_ME_*> 时也继续（不建议）
-  --skip-wg-check          跳过 wg0 / 10.8.0.1 检查（仅预装二进制时使用）
+  --skip-wg-check          已废弃（保留兼容）：公网直连方案不再依赖 WireGuard
   -h, --help               显示本帮助
 
 示例:
@@ -176,22 +176,12 @@ printf '  bucket: %s\n' "$BUCKET"
 # ---- 1. WireGuard 前置（服务 unit Requires=wg-quick@wg0.service）----
 printf '\n--- 1/9 检查 WireGuard 与监听地址 ---\n'
 if (( SKIP_WG_CHECK )); then
-    warn '已指定 --skip-wg-check，跳过 10.8.0.1 / wg-quick@wg0 检查（服务可能无法启动）'
+    warn '--skip-wg-check 已废弃（现在默认即不依赖 WireGuard），继续'
+fi
+if [[ -n "$(ip -o -4 addr show 2>/dev/null | awk -v ip="${BIND_IP}" '$4 ~ ("^" ip "/")' || true)" ]]; then
+    info "主机已配置监听地址 ${BIND_IP}"
 else
-    if [[ -n "$(ip -o -4 addr show 2>/dev/null | awk -v ip="${BIND_IP}" '$4 ~ ("^" ip "/")' || true)" ]]; then
-        info "主机已配置 ${BIND_IP}"
-    elif (( DRY_RUN )); then
-        warn "当前主机未找到 ${BIND_IP}；--apply 时会在此中止（请先部署 deploy/wireguard/）"
-    else
-        die "主机未配置 ${BIND_IP}；请先按 deploy/wireguard/README.md 建立 wg0（Host A = 10.8.0.1）"
-    fi
-    if systemctl cat wg-quick@wg0.service >/dev/null 2>&1; then
-        info 'wg-quick@wg0.service 存在'
-    elif (( DRY_RUN )); then
-        warn '未找到 wg-quick@wg0.service；--apply 时启动会失败（unit 里 Requires=wg-quick@wg0.service）'
-    else
-        die '未找到 wg-quick@wg0.service；请先按 deploy/wireguard/README.md 部署 WireGuard'
-    fi
+    die "主机未配置监听地址 ${BIND_IP}（公网直连方案应为 127.0.0.1）"
 fi
 
 # ---- 2. 系统用户 -------------------------------------------------

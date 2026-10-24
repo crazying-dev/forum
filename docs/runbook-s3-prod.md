@@ -2,22 +2,26 @@
 
 > 适用：yj-forum-ouo / yj-forum-admin 生产环境从「本地/GridFS」切换到 SeaweedFS S3。
 > 生产不使用 Docker；开发仍用 Docker（`deploy/seaweedfs/docker-compose.dev.yml`）。
-> 相关文件：`deploy/native/`（安装/unit/卸载）、`deploy/wireguard/`（内网）、`deploy/nginx/yj-forum.conf`、`deploy/ops/`。
+> 相关文件：`deploy/native/`（安装/unit/卸载）、`deploy/nginx/yj-forum.conf`、`deploy/ops/`。
+>
+> ⚠️ **2026-10-24 方案变更**：Host A 位于 NAT 后、WireGuard 无法建立，网络改为
+> **公网直连：SeaweedFS 只绑 `127.0.0.1` + Nginx TLS 反代 + IP 白名单**。
+> 下文所有 `10.8.0.1` 相关描述与 WireGuard 章节**仅作备选**，以本节与 `deploy/native/README.md` 为准。
 
 ## 1. 拓扑与关键约定
 
 ```
                         公网
                           │
-        ┌─────────────────┴─────────────────┐
-        │                                   │
-   Host A（10.8.0.1）                  Host B（10.8.0.2）
-   nginx :80/:443                      nginx :80/:443（admin SPA）
-   yj-forum :8090                      yj-admin :8080
-   yj-web   :3000                      MongoDB（原生）
+   Host A（NAT 后，公网 154.219.110.63）   Host B（公网）
+   nginx :80/:443                          nginx :80/:443（admin SPA）
+     └─ s3.yjlt.top（TLS + allow B）         yj-admin :8080
+          └─ http://127.0.0.1:8333           MongoDB（原生）
+   yj-forum :8090
+   yj-web   :3000
    SeaweedFS 4.47
-     S3       10.8.0.1:8333
-     metrics  10.8.0.1:9327
+     S3       127.0.0.1:8333（仅回环）
+     metrics  127.0.0.1:9327
         │                                   │
         └──────── WireGuard wg0 ────────────┘
               51820/udp，AllowedIPs=/32
