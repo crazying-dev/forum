@@ -32,7 +32,8 @@ PAGE = 1000
 
 
 def conn(dsn, autocommit=False):
-    c = psycopg2.connect(dsn)
+    # dsn 支持连接串或 parse_dsn() 返回的 dict（建库时需要用 dict 改 dbname）
+    c = psycopg2.connect(**dsn) if isinstance(dsn, dict) else psycopg2.connect(dsn)
     c.autocommit = autocommit
     with c.cursor() as cur:
         cur.execute("SET TIME ZONE 'UTC'")
