@@ -14,22 +14,3 @@ export function mediaUrl(id?: string | null): string {
   const v = (id || "").trim();
   return isMediaId(v) ? `/ov2/api/media/${encodeURIComponent(v)}` : "";
 }
-
-/** 会馆 logo / 介绍页封面等：新 MD 直出，旧 GridFS 走管理端兼容代理 */
-export function guildImageUrl(
-  fileId: string | null | undefined,
-  guildUuid: string | null | undefined,
-  kind: "logo" | "intro-images" | "leader-images" = "logo",
-  version?: number
-): string {
-  const media = mediaUrl(fileId);
-  if (media) return media;
-  const id = (fileId || "").trim();
-  const uuid = (guildUuid || "").trim();
-  if (!id || !uuid) return "";
-  const base =
-    kind === "logo"
-      ? `/guild-img/guilds/${encodeURIComponent(uuid)}/logo`
-      : `/guild-img/guilds/${encodeURIComponent(uuid)}/${kind}/${encodeURIComponent(id)}`;
-  return version && version > 0 ? `${base}?v=${version}` : base;
-}

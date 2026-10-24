@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const API_TARGET = process.env.API_TARGET || "http://127.0.0.1:8090";
-// 管理端（会馆 logo / 馆长页 / 介绍页 / 指南旧图仍存于 admin GridFS）
-const ADMIN_TARGET = process.env.ADMIN_TARGET || "http://127.0.0.1:8080";
 
 // HTML-limited bots：命中名单的 UA 会等待元数据解析完成后再发包（阻塞式渲染），
 // 确保 title/og:* 标签稳定出现在 <head>。默认的流式元数据在冷缓存场景可能把标签
@@ -37,17 +35,6 @@ const nextConfig: NextConfig = {
         // 旧兼容层 + /api/v1 别名
         source: "/api/:path*",
         destination: `${API_TARGET}/api/:path*`,
-      },
-      {
-        // 历史会馆/指南图片兼容：/guild-img/guilds/{uuid}/... → admin /api/guilds/{uuid}/...
-        // 仅当资源仍是旧 GridFS（24 位 ObjectID）时使用；新 MD 媒体直接走 /ov2/api/media。
-        source: "/guild-img/:path*",
-        destination: `${ADMIN_TARGET}/api/:path*`,
-      },
-      {
-        // 指南正文旧图：/guide-img/guides/images/{id} → admin /api/guides/images/{id}
-        source: "/guide-img/:path*",
-        destination: `${ADMIN_TARGET}/api/:path*`,
       },
       {
         // 旧头像兼容：/avatar/<uuid>.webp → Go 后端（生产由 Nginx 分发）

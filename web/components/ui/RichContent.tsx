@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import type { Root } from "react-dom/client";
 import { QuoteCard, QuoteCardSkeleton } from "@/components/quote/QuoteCards";
 import { EmbedSpec, embedKey, loadEmbeds, parseEmbedElement } from "@/lib/embed";
-import { isMediaId } from "@/lib/media";
 import { escapeHtml, sanitizeHtml } from "@/lib/sanitize";
 
 /** SSR 下 useLayoutEffect 降级为 useEffect（避免服务端告警） */
@@ -16,24 +15,6 @@ const MEDIA_SRC_RE = /^\/(ov2\/api|api\/v1)\/media\/(MD[0-9a-fA-F]{16,})(\?.*)?$
 
 /** 正文媒体图响应式 sizes（与后端 ?w=480 / ?w=1280 变体配合） */
 const MEDIA_IMG_SIZES = "(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 820px";
-
-/**
- * 历史富文本里图片 src 存的是管理端逻辑路径：
- *   /guild-img/guilds/{uuid}/intro-images/{fileId}
- *   /guild-img/guilds/{uuid}/leader-images/{fileId}
- *   /guide-img/guides/images/{fileId}
- * 渲染时把新媒体 ID（MD 开头）重写为论坛直出 /ov2/api/media/<id>；
- * 旧 GridFS 文件（24 位 ObjectID）保留原路径，由论坛 /guild-img、/guide-img
- * 兼容代理转发到管理端（见 next.config rewrites 与 deploy/nginx）。
- */
-const LEGACY_MEDIA_SRC_RE =
-  /(\ssrc=)(["'])\/(?:guild-img\/guilds\/[^"'/]+\/(?:intro|leader)-images|guide-img\/guides\/images)\/([^"'/?]+)\2/g;
-
-function rewriteLegacyMediaSrc(html: string): string {
-  return html.replace(LEGACY_MEDIA_SRC_RE, (whole, attr: string, quote: string, fileId: string) => {
-    return isMediaId(fileId) ? `${attr}${quote}/ov2/api/media/${encodeURIComponent(fileId)}${quote}` : whole;
-  });
-}
 
 /**
  * 异步卸载 roots：绝不在 React 渲染/提交阶段同步调用 root.unmount（React 19 限制）。
@@ -73,7 +54,7 @@ export default function RichContent({ content, className = "" }: { content?: str
   const html = useMemo(() => {
     if (!content) return "";
     const sanitized = sanitizeHtml(content);
-    return sanitized === null ? escapeHtml(content) : rewriteLegacyMediaSrc(sanitized);
+    return sanitized === null ? escapeHtml(content) : sanitized;
   }, [content]);
 
   const ref = useRef<HTMLDivElement>(null);

@@ -43,7 +43,7 @@
 
 - 上传：`POST /media/images`（multipart `file` + `scene`）。
 - 读取：`GET /media/:id`，按 `visibility` 做 ACL（public / 本人 / 聊天成员 / 定时帖作者）。
-- 新 URL：`/ov2/api/media/<id>`；旧 `/api/v1/media/<id>`、`/avatar/*`、`/static/*` 继续可用；`/guild-img/*`、`/guide-img/*` 保留为旧 GridFS 图片兼容代理。
+- 新 URL：`/ov2/api/media/<id>`；旧 `/api/v1/media/<id>`、`/avatar/*`、`/static/*` 继续可用；`/guild-img/*`、`/guide-img/*` 兼容代理已删除（统一走 `/ov2/api/media/<id>`）。
 
 ## 6. 文档索引
 

@@ -59,7 +59,7 @@ func (d *DB) GetGuildBySlug(ctx context.Context, slug string) (*models.GuildDeta
 	var det models.GuildDetail
 	var leaderID, leaderName, leaderAvatar, leaderIntro, leaderTitle *string
 	var createdAt, updatedAt *time.Time
-	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, COALESCE(g.intro, ''), g.logo_file_id, g.logo_version, COALESCE(g.theme_color, ''),
+	err := d.QueryRow(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, COALESCE(g.intro, ''), COALESCE(g.logo_file_id, ''), g.logo_version, COALESCE(g.theme_color, ''),
 		g.leader_user_id, COALESCE(g.leader_bio, ''), g.leader_title, g.created_at, g.updated_at,
 		(COALESCE(g.logo_file_id, '') <> '') AS has_logo,
 		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
