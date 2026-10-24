@@ -13,6 +13,12 @@ const htmlLimitedBots =
   /[\w-]+-Google|Google-[\w-]+|Chrome-Lighthouse|Slurp|DuckDuckBot|baiduspider|yandex|sogou|bitlybot|tumblr|vkShare|quora link preview|redditbot|ia_archiver|Bingbot|BingPreview|applebot|facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|Discordbot|WhatsApp|SkypeUriPreview|Yeti|googleweblight|MicroMessenger|WeChat|QQ\/|Weibo|Bytespider|BytedanceBot/i;
 
 const nextConfig: NextConfig = {
+  // 裸机部署：产出 .next/standalone/server.js（自带最小 node_modules 依赖树），
+  // 由 deploy/yj-web.service 直接 `node .next/standalone/server.js` 运行；
+  // 仅影响 `next build`，对 `next dev` 无影响。
+  // 注意：下方 rewrites 的 API_TARGET / ADMIN_TARGET 会在**构建时**写进路由清单，
+  // standalone 运行时再改这两个环境变量不生效（生产由 Nginx 分流，不受影响）。
+  output: "standalone",
   htmlLimitedBots,
   allowedDevOrigins: ["*"],
   reactStrictMode: true,
