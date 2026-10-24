@@ -34,7 +34,7 @@ function isScheduled(v?: string) {
 export default function PostDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { userId, user } = useStore();
+  const { userId, user, loadingUser } = useStore();
   const { toast } = useToast();
   const [post, setPost] = useState<any | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -267,7 +267,7 @@ export default function PostDetailPage() {
             onChangeReplyText={setCommentText}
             onSubmit={submitComment}
             submitting={submittingComment}
-            canWrite={!!user}
+            canWrite={!loadingUser && (!!user || !!userId)}
             onDelete={deleteComment}
             onLike={doLikeComment}
           />

@@ -36,7 +36,11 @@ function GuildFeedRow({ guild }: { guild: GuildListItem }) {
       try {
         const r = await guildApi.feed(guild.slug, page, 10);
         const list = r.items || [];
-        setItems((prev) => (append ? [...prev, ...list] : list));
+        setItems((prev) => {
+          if (!append) return list;
+          const seen = new Set(prev.map((x) => `${x.type}-${x.id}`));
+          return [...prev, ...list.filter((x) => !seen.has(`${x.type}-${x.id}`))];
+        });
         setHasMore(!!r.has_more);
         pageRef.current = page;
       } catch {

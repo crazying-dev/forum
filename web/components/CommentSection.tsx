@@ -153,7 +153,7 @@ export default function CommentSection({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [userId]);
+  }, [canWrite]);
 
   const { mainComments, replyMap, parentMap } = useMemo(() => {
     const parentMap: Record<string, Comment> = {};

@@ -191,6 +191,8 @@ export default function CommentEditor({
   const lastValueRef = useRef(value);
   const onChangeRef = useRef(onChange);
   const onSubmitRef = useRef(onSubmit);
+  // 供 useEditor 的快捷键回调调用（trySubmit 在 useEditor 之后定义）
+  const trySubmitRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -223,7 +225,8 @@ export default function CommentEditor({
         // Ctrl/Cmd+Enter 提交（普通 Enter 仍为换行）
         if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
           event.preventDefault();
-          onSubmitRef.current();
+          // 与发送按钮同一路径：启用 ALTCHA 时同样自动完成验证
+          trySubmitRef.current();
           return true;
         }
         return false;
@@ -392,6 +395,13 @@ export default function CommentEditor({
     if (captcha) altchaRef.current?.reset();
   };
 
+  // 保持快捷键引用最新闭包
+  useEffect(() => {
+    trySubmitRef.current = () => {
+      void trySubmit();
+    };
+  });
+
   return (
     <div className="comment-editor">
       {editor && (
@@ -545,7 +555,7 @@ export default function CommentEditor({
       {/* ALTCHA：不占布局（发送时自动求解），启用与否由 /captcha/config 决定 */}
       {captcha && (
         <div className="comment-altcha-hidden" aria-hidden="true">
-          <AltchaWidget ref={altchaRef} />
+          <AltchaWidget ref={altchaRef} onError={(message) => toast(message, "warning")} />
         </div>
       )}
 

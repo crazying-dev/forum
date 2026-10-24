@@ -75,13 +75,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setUserId(res.user.id);
       } else {
         setUser(null);
-        setUserId(getUserIdFromCookie());
+        setUserId(null);
       }
     } catch (e) {
       if (e instanceof ApiException && e.status === 401) {
+        // 会话确已失效：user_id Cookie 可能仍在（30 天），不能再用它冒充登录态
         setUser(null);
+        setUserId(null);
+      } else {
+        // 网络/服务端临时故障：保留 Cookie 中的身份用于展示，写操作仍由服务端校验
+        setUserId(getUserIdFromCookie());
       }
-      setUserId(getUserIdFromCookie());
     } finally {
       setLoadingUser(false);
     }
