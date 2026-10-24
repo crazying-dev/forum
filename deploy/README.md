@@ -99,22 +99,25 @@ systemctl status yj-forum
 
 ```bash
 cd /opt/yj-forum/web
+git pull
 pnpm install
 # 构建时确定：rewrites 的 API_TARGET 会写进路由清单，构建后再改无效
 API_TARGET=http://127.0.0.1:8090 pnpm build   # 产出 .next/standalone
-# 静态资源必须进 standalone 目录（server.js 只服务该目录内的文件）
-# 用 `src/.` 形式复制，可重复执行（直接 cp -r public <dest>/public 重跑会嵌套成 public/public）
-mkdir -p .next/standalone
-cp -a public/. .next/standalone/public/
-cp -a .next/static/. .next/standalone/.next/static/
 
 cp /opt/yj-forum/deploy/yj-web.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now yj-web
 ```
 
+> **静态资源打包已自动化**：`pnpm build` 会触发 `postbuild` → `web/scripts/prepare-standalone.mjs`，把 `public/` 与 `.next/static/` 复制进 `.next/standalone/`（幂等，可重复执行）。
+> 不再需要手工 `cp`；若手工补做，必须使用 `cp -a src/. dst/` 形式（直接 `cp -r public <dest>/public` 会嵌套成 `public/public`）。
+>
+> ⚠️ **本步骤不可用 `next start` 替代**：systemd 跑的是 `.next/standalone/server.js`，它只服务**自身目录**内的文件（`/_next/static/*` → `standalone/.next/static/`，`/assets/*` → `standalone/public/`）。
+> 漏打包的典型症状：**首页 HTTP 200，但所有 JS/CSS/图片 404**（Next 返回 9 字节纯文本 `Not Found`，且 `cache-control: no-store`）。
+> 排查：`ls .next/standalone` 应有 `public/`；`ls .next/standalone/.next` 应有 `static/`。巡检脚本 `deploy/ops/check-web.sh` 已入驻 yj-ops 定时任务，会在 5 分钟内告警。
+
 > Next.js standalone 部署说明：
-> - `pnpm build` 后 `.next/standalone/server.js` 为独立运行入口；`public/` 与 `.next/static/` 必须复制进 standalone 目录（见上）。
+> - `pnpm build` 后 `.next/standalone/server.js` 为独立运行入口；`public/` 与 `.next/static/` 由 `postbuild` 自动复制进 standalone 目录（见上）。
 > - standalone 运行时只读取**自身目录**下的 `.env`（实测：`web/.env` 不会被读取）；systemd 单元用 `EnvironmentFile=/opt/yj-forum/web/.env` 注入进程环境，手动裸跑需先 `set -a; . ./.env; set +a`，或把 `.env` 放进 `.next/standalone/`。
 > - `API_TARGET` 除作为 rewrites 目标（构建时固化）外，还供服务端 SSR/SEO 直连后端（运行期读取）；`NEXT_PUBLIC_API_BASE` 与 `SITE_URL` 的预渲染部分在构建期固化。
 

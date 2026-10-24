@@ -13,6 +13,7 @@
 #   DISK_CRIT_PCT=90
 #   CERT_DOMAINS=yjlt.top www.yjlt.top
 #   S3_ENDPOINT=http://10.8.0.1:8333
+#   WEB_BASE=http://127.0.0.1:3000
 #   METRICS_URL=http://10.8.0.1:9327/metrics
 # ============================================================
 [Unit]
@@ -27,6 +28,7 @@ Nice=10
 EnvironmentFile=-/etc/yj-ops/ops.env
 # 某项失败不阻断后续检查；失败时各脚本自行调用 notify-mail.sh
 ExecStart=-/usr/local/bin/yj-ops/check-disk.sh
+ExecStart=-/usr/local/bin/yj-ops/check-web.sh
 ExecStart=-/usr/local/bin/yj-ops/check-s3.sh
 ExecStart=-/usr/local/bin/yj-ops/check-cert.sh
 TimeoutStartSec=120
