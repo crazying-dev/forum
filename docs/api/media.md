@@ -32,7 +32,7 @@
 ## 存储
 
 - 新上传：`storage_provider=s3`（SeaweedFS）或 `local`（S3 未启用时回退 `MEDIA_DIR`）。
-- 旧资源：`is_legacy=TRUE`，永不参与孤儿 GC；`/avatar/*`、`/api/v1/media/*`、`/guild-img/*`、`/guide-img/*`、`/static/*` 继续可用。
+- 旧资源：`is_legacy=TRUE`，永不参与孤儿 GC；`/avatar/*`、`/api/v1/media/*`、`/static/*` 继续可用；`/guild-img/*`、`/guide-img/*` 已退役（历史富文本由 `RichContent` 渲染时重写为 `/ov2/api/media/<id>`）。
 - 删除：`status=0 + deleted_at`；7 天后 GC；`media_references` 有活跃引用时不删。
 
 ## 头像

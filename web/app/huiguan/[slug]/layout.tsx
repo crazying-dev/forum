@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import JsonLd from "@/components/ui/JsonLd";
+import { mediaUrl } from "@/lib/media";
 import { absoluteUrl, fetchApi, pageMetadata, truncate } from "@/lib/seo";
 
 // 会馆详情动态 SEO（服务端 layout：generateMetadata + Organization JSON-LD）。
@@ -15,6 +16,7 @@ interface GuildDetailResp {
     intro?: string;
     theme_color?: string;
     logo_version?: number;
+    logo_file_id?: string;
     has_logo?: boolean;
     member_count?: number;
   };
@@ -59,6 +61,7 @@ export default async function GuildDetailLayout({ children, params }: { children
   const { ok, status, guild } = await getGuild(slug);
   // 会馆不存在（HTTP 404）→ 渲染 404 页（流式渲染下状态码保持 200，由自动注入 + 兜底 noindex 防收录）；临时故障不触发（避免误伤）
   if (!ok && status === 404) notFound();
+  const logoUrl = guild?.has_logo ? mediaUrl(guild.logo_file_id) : "";
   return (
     <>
       {children}
@@ -70,9 +73,7 @@ export default async function GuildDetailLayout({ children, params }: { children
             name: guild.name,
             description: guild.intro || undefined,
             url: absoluteUrl(`/huiguan/${guild.slug}`),
-            logo: guild.has_logo && guild.uuid
-              ? absoluteUrl(`/guild-img/guilds/${guild.uuid}/logo?v=${guild.logo_version || 0}`)
-              : undefined,
+            logo: logoUrl ? absoluteUrl(logoUrl) : undefined,
           }}
         />
       )}

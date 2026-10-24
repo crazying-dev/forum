@@ -24,6 +24,7 @@ func strVal(s *string) string {
 // ListGuilds 会馆列表（id 升序，含成员数与馆长摘要）。
 func (d *DB) ListGuilds(ctx context.Context) ([]models.GuildListItem, error) {
 	rows, err := d.Query(ctx, `SELECT g.id, g.uuid::text, g.slug, g.name, COALESCE(g.intro, ''), COALESCE(g.theme_color, ''), g.logo_version,
+		COALESCE(g.logo_file_id, '') AS logo_file_id,
 		(COALESCE(g.logo_file_id, '') <> '') AS has_logo,
 		(SELECT COUNT(*) FROM guild_members m WHERE m.guild_id = g.id) AS member_count,
 		g.created_at,
@@ -39,7 +40,7 @@ func (d *DB) ListGuilds(ctx context.Context) ([]models.GuildListItem, error) {
 		var it models.GuildListItem
 		var createdAt *time.Time
 		var leaderID, leaderName, leaderAvatar, leaderIntro *string
-		if err := rows.Scan(&it.ID, &it.UUID, &it.Slug, &it.Name, &it.Intro, &it.ThemeColor, &it.LogoVersion, &it.HasLogo,
+		if err := rows.Scan(&it.ID, &it.UUID, &it.Slug, &it.Name, &it.Intro, &it.ThemeColor, &it.LogoVersion, &it.LogoFileID, &it.HasLogo,
 			&it.MemberCount, &createdAt, &leaderID, &leaderName, &leaderAvatar, &leaderIntro); err != nil {
 			return nil, err
 		}

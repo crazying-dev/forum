@@ -114,10 +114,9 @@ export default function HuiGuanPage() {
     >
       <div className="guild-card-glow" style={{ background: `linear-gradient(135deg, ${themeTint(current.theme_color, "44")} 0%, transparent 72%)` }}></div>
       <GuildLogo
-        uuid={current.uuid}
+        logoFileId={current.logo_file_id}
         name={current.name}
         hasLogo={current.has_logo}
-        logoVersion={current.logo_version}
         color={current.theme_color}
         size={96}
         className="guild-logo guild-card-logo"
@@ -216,10 +215,9 @@ export default function HuiGuanPage() {
                       whileTap={reduce ? undefined : { scale: 0.96 }}
                     >
                       <GuildLogo
-                        uuid={prev.uuid}
+                        logoFileId={prev.logo_file_id}
                         name={prev.name}
                         hasLogo={prev.has_logo}
-                        logoVersion={prev.logo_version}
                         color={prev.theme_color}
                         size={44}
                         className="guild-logo guild-thumb-logo"
@@ -262,10 +260,9 @@ export default function HuiGuanPage() {
                       whileTap={reduce ? undefined : { scale: 0.96 }}
                     >
                       <GuildLogo
-                        uuid={next.uuid}
+                        logoFileId={next.logo_file_id}
                         name={next.name}
                         hasLogo={next.has_logo}
-                        logoVersion={next.logo_version}
                         color={next.theme_color}
                         size={44}
                         className="guild-logo guild-thumb-logo"
@@ -311,10 +308,9 @@ export default function HuiGuanPage() {
                   >
                     <Link className="guild-list-item" href={`/huiguan/${g.slug}`}>
                       <GuildLogo
-                        uuid={g.uuid}
+                        logoFileId={g.logo_file_id}
                         name={g.name}
                         hasLogo={g.has_logo}
-                        logoVersion={g.logo_version}
                         color={g.theme_color}
                         size={48}
                         className="guild-logo guild-list-logo"

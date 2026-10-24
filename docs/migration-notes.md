@@ -84,7 +84,7 @@
 5. **World 表**：legacy 的 `world` 表已在 0003 迁移中 `DROP`，实时消息功能由公共广场（`/feed?space=public`）与会馆信息流取代。
 6. **分类**：公共广场白名单为 `general` / `talk` / `question` / `share` / `creative`，并兼容旧中文 `求助` / `创意`（缺省归一 `general`）；会馆帖子使用各馆自定义分类（`guild_categories`，缺省/非法值回退「综合」或第一项）。
 7. 头像存储：legacy `/root/db/avatar/`（Vercel 上不可持久）→ ov2 `AVATAR_DIR` 本地磁盘。
-8. **会馆**：legacy 静态 `hui-guan.json` 列表 + `hei.navifox.net` 外链 → ov2 动态会馆（PostgreSQL `guilds` 系列表）、入馆申请由管理端审批；会馆 logo 由管理端存储，经 `/guild-img` 代理展示。
+8. **会馆**：legacy 静态 `hui-guan.json` 列表 + `hei.navifox.net` 外链 → ov2 动态会馆（PostgreSQL `guilds` 系列表）、入馆申请由管理端审批；会馆 logo 存媒体中台，前端经 `/ov2/api/media/<id>` 直出（原 `/guild-img` 代理已退役）。
 
 ## 部署要点
 

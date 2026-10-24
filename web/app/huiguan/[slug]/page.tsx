@@ -202,10 +202,9 @@ export default function GuildDetailPage() {
       <div className="guild-detail-hero" style={{ background: theme, ...heroVars }}>
         <div className="guild-hero-shade"></div>
         <GuildLogo
-          uuid={guild.uuid}
+          logoFileId={guild.logo_file_id}
           name={guild.name}
           hasLogo={guild.has_logo}
-          logoVersion={guild.logo_version}
           color={guild.theme_color}
           size={88}
           className="guild-logo guild-hero-logo"

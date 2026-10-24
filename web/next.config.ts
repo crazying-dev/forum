@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const API_TARGET = process.env.API_TARGET || "http://127.0.0.1:8090";
-// 会馆图片资源（logo、馆长介绍页图片、会馆介绍页封面与正文图片）由管理端提供（/guild-img/* → {ADMIN_TARGET}/api/*）
-const ADMIN_TARGET = process.env.ADMIN_TARGET || "http://127.0.0.1:8080";
 
 // HTML-limited bots：命中名单的 UA 会等待元数据解析完成后再发包（阻塞式渲染），
 // 确保 title/og:* 标签稳定出现在 <head>。默认的流式元数据在冷缓存场景可能把标签
@@ -16,8 +14,8 @@ const nextConfig: NextConfig = {
   // 裸机部署：产出 .next/standalone/server.js（自带最小 node_modules 依赖树），
   // 由 deploy/yj-web.service 直接 `node .next/standalone/server.js` 运行；
   // 仅影响 `next build`，对 `next dev` 无影响。
-  // 注意：下方 rewrites 的 API_TARGET / ADMIN_TARGET 会在**构建时**写进路由清单，
-  // standalone 运行时再改这两个环境变量不生效（生产由 Nginx 分流，不受影响）。
+  // 注意：下方 rewrites 的 API_TARGET 会在**构建时**写进路由清单，
+  // standalone 运行时再改该环境变量不生效（生产由 Nginx 分流，不受影响）。
   output: "standalone",
   htmlLimitedBots,
   allowedDevOrigins: ["*"],
@@ -42,16 +40,6 @@ const nextConfig: NextConfig = {
         // 旧头像兼容：/avatar/<uuid>.webp → Go 后端（生产由 Nginx 分发）
         source: "/avatar/:path*",
         destination: `${API_TARGET}/avatar/:path*`,
-      },
-      {
-        // 会馆图片代理：/guild-img/guilds/{uuid}/logo（logo）、/guild-img/guilds/{uuid}/leader-images/{fileId}（馆长介绍页图片）、/guild-img/guilds/{uuid}/intro-images/{fileId}（会馆介绍页封面/正文图片）→ 管理端 /api/*
-        source: "/guild-img/:path*",
-        destination: `${ADMIN_TARGET}/api/:path*`,
-      },
-      {
-        // 论坛指南正文图片代理：/guide-img/* → 管理端 /api/*（与 /guild-img 同模式）
-        source: "/guide-img/:path*",
-        destination: `${ADMIN_TARGET}/api/:path*`,
       },
     ];
   },

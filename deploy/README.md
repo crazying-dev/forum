@@ -13,8 +13,6 @@ Nginx (宝塔管理 80/443)
   ├── /ov2/api/*      → Go 后端  127.0.0.1:8090（canonical；SSE 单独 location）
   ├── /api/*          → Go 后端  127.0.0.1:8090（/api/v1 别名 + 旧 APP 兼容层）
   ├── /avatar/*       → Go 后端  127.0.0.1:8090（旧头像兼容）
-  ├── /guild-img/*    ────────────────► 10.8.0.2:8080（admin，WG 内网）
-  ├── /guide-img/*    ────────────────► 10.8.0.2:8080（admin，WG 内网）
   ├── /static/*       → Next.js  127.0.0.1:3000（旧帖图/默认头像兼容）
   └── 其余            → Next.js  127.0.0.1:3000
 
@@ -26,7 +24,7 @@ SeaweedFS 原生进程（systemd）10.8.0.1:8333 ◄──── WG ────
 
 - **渲染层**：Next.js（standalone 产物，Node 直跑）
 - **服务层**：Go（编译二进制，systemd 管理）
-- **管理端**：yj-forum-admin（Host B；会馆图片存储与入馆申请审批；仅 `/guild-img/*`、`/guide-img/*` 对外反代）
+- **管理端**：yj-forum-admin（Host B；会馆图片存储与入馆申请审批；图片统一由论坛 `/ov2/api/media/<id>` 直出，后台自身接口仅供预览与历史迁移）
 - **数据库**：开发 = 本机 Docker PGSQL；生产 = **用户提供的外部 PGSQL**（`DATABASE_URL`）
 - **对象存储**：生产 = 原生 SeaweedFS 4.47（Host A）；开发 = `make s3-up`（Docker）
 
@@ -102,31 +100,35 @@ systemctl status yj-forum
 ```bash
 cd /opt/yj-forum/web
 pnpm install
-pnpm build                    # 产出 .next/standalone
-# 复制 standalone 产物（含 public/.next 静态文件）
-cp -r .next/standalone/* .next/standalone/../ 2>/dev/null || true
-mkdir -p .next/standalone && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/
+# 构建时确定：rewrites 的 API_TARGET 会写进路由清单，构建后再改无效
+API_TARGET=http://127.0.0.1:8090 pnpm build   # 产出 .next/standalone
+# 静态资源必须进 standalone 目录（server.js 只服务该目录内的文件）
+cp -r public .next/standalone/public
+cp -r .next/static .next/standalone/.next/static
 
 cp /opt/yj-forum/deploy/yj-web.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now yj-web
 ```
 
-> Next.js standalone 部署说明：`pnpm build` 后 `.next/standalone/server.js` 为独立运行入口；
-> 需将 `public/` 与 `.next/static/` 复制到 standalone 目录内（见上）。
+> Next.js standalone 部署说明：
+> - `pnpm build` 后 `.next/standalone/server.js` 为独立运行入口；`public/` 与 `.next/static/` 必须复制进 standalone 目录（见上）。
+> - standalone 运行时只读取**自身目录**下的 `.env`（实测：`web/.env` 不会被读取）；systemd 单元用 `EnvironmentFile=/opt/yj-forum/web/.env` 注入进程环境，手动裸跑需先 `set -a; . ./.env; set +a`，或把 `.env` 放进 `.next/standalone/`。
+> - `API_TARGET` 除作为 rewrites 目标（构建时固化）外，还供服务端 SSR/SEO 直连后端（运行期读取）；`NEXT_PUBLIC_API_BASE` 与 `SITE_URL` 的预渲染部分在构建期固化。
 
-### 会馆图片代理（ADMIN_TARGET）
+### 会馆 / 指南图片（媒体直出）
 
-会馆图片（logo、馆长介绍页图片、会馆介绍页封面与正文图片）由管理端 yj-forum-admin 存储（GridFS：`guild_logos` / `guild_leader_images` / `guild_intro_images`），ouo 前端请求 `/guild-img/guilds/{id}/logo?v={logo_version}`（logo）、`/guild-img/guilds/{id}/leader-images/{fileId}`（馆长介绍页图片）与 `/guild-img/guilds/{id}/intro-images/{fileId}`（会馆介绍页封面/正文图片），两种环境分别处理：
+会馆 logo、馆长与会馆介绍页图片、指南正文图片统一存 SeaweedFS（S3），元数据存 PG `media_assets`；论坛前端直接请求 `/ov2/api/media/<media_id>`（`media_id` 以 `MD` 开头）。
 
-- **开发（Next.js rewrites）**：`next.config.ts` 将 `/guild-img/*` 重写到 `ADMIN_TARGET`（默认 `http://127.0.0.1:8080`），转发目标为 `${ADMIN_TARGET}/api/*`；管理端不在本机时在 `web/.env` 设 `ADMIN_TARGET=http://<admin-host>:<port>` 即可。
-- **生产（Nginx）**：由 `deploy/nginx/yj-forum.conf` 的 `location /guild-img/` 直接反代到管理端（示例 `proxy_pass http://127.0.0.1:8080/api/;`，需按实际部署地址调整；也支持 upstream 写法，见配置内注释）。请求先命中 Nginx 规则，不再落到 Next.js 代理。
+- ouo 的会馆列表与详情接口下发 `logo_file_id`，前端拼 `/ov2/api/media/<id>`；旧 GridFS 文件（24 位 ObjectID）无法直出，前端回退占位图（按约定接受 404，待后续数据迁移）。
+- 历史富文本（会馆介绍/馆长页/指南/公告等）中的 `/guild-img/...`、`/guide-img/...` 逻辑路径由 `RichContent` 渲染时重写为媒体直出地址；旧 ObjectID 文件仍按 404 处理。
+- `/guild-img/*`、`/guide-img/*` 代理（Next.js rewrites 与 Nginx location）已退役；管理端的相关接口仅保留给后台预览与历史数据迁移。
 
 ## 四、Nginx 反代
 
 1. 宝塔面板创建站点（域名绑定）。
 2. 将 `deploy/nginx/yj-forum.conf` 内容合并入站点配置（注意替换 `server_name` 为实际域名）。
-3. 按实际部署地址校对 `location /guild-img/` 的 `proxy_pass`（默认 `http://127.0.0.1:8080/api/` 指向本机管理端）。
+3. 无需再配置 `/guild-img/`、`/guide-img/` 反代（已退役，图片走 `/ov2/api/media/`）。
 4. 媒体上传（`POST /ov2/api/media/images`，图片 ≤5MB；头像 ≤10MB）需 Nginx/反代允许较大请求体：配置已在 `location /ov2/api/` 与 `location /api/` 内置 `client_max_body_size 12m;`，若在 http 层统一配置请核对（不足会返回 413）。
 5. SSE 必须走 `location = /ov2/api/world/stream` 与 `location = /ov2/api/messages/stream` 的专用配置（`proxy_buffering off`、`proxy_read_timeout 3600s`、`gzip off`），否则会出现“连上但不流动”。
 6. 宝塔内申请 SSL 证书，开启 HTTPS（注释段提供 443 示范）。
@@ -155,7 +157,6 @@ curl -I http://127.0.0.1:3000/
 | `LEGACY_TOKEN_TTL_HOURS` / `LEGACY_APP_SUNSET` | server/.env | 旧 APP 兼容层的 token 窗口与下线日期 |
 | `GITHUB_TOKEN` | server/.env | 下载页 GitHub Releases 可选 token（提高限额） |
 | `PUBLIC_BASE_URL` | server/.env | 邮件中链接的站点地址 |
-| `API_TARGET` | web/.env | 开发时 Next 代理的 Go 地址（生产由 Nginx 分发） |
-| `ADMIN_TARGET` | web/.env | 会馆图片（logo / 馆长介绍页 / 会馆介绍页）代理的管理端地址（默认 `http://127.0.0.1:8080`，仅开发/未配 Nginx 时生效） |
+| `API_TARGET` | web/.env | Next rewrites 的 Go 地址（构建时写进路由清单）兼服务端 SSR/SEO 直连地址（运行期读取；生产由 Nginx 分发 API） |
 | `SITE_URL` | web/.env | 站点规范域名（SEO：canonical / sitemap.xml / robots.txt / Open Graph；默认 `https://yjlt.top`，回退 `NEXT_PUBLIC_SITE_URL`，非法值自动回退）。注意：预渲染页在构建期固化（建议构建前配置），动态详情页与 sitemap 运行期生效 |
 | `PORT` | web/.env | Next.js 监听端口（默认 3000） |

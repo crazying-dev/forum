@@ -10,7 +10,7 @@
 | 角色 | 论坛本体 + SeaweedFS | 管理后台 |
 | wg0 地址 | `10.8.0.1/24` | `10.8.0.2/24` |
 | WireGuard 监听 | `51820/udp` | `51820/udp` |
-| 需要互访 | 被 B 访问 `8333`、`9327` | 被 A 访问 `8080`（`/guild-img`、`/guide-img` 反代） |
+| 需要互访 | 被 B 访问 `8333`、`9327` | 被 A 访问 `8080`（历史 `/guild-img`、`/guide-img` 反代，已退役，可不再放行） |
 | 公网开放 | 仅 `51820/udp`、`80/tcp`、`443/tcp` | 仅 `51820/udp`、`80/tcp`、`443/tcp` |
 
 > `AllowedIPs` 一律用 `/32` 精确到对端地址，**不要**用 `0.0.0.0/0`（避免把默认路由劫持进隧道）。
@@ -95,7 +95,8 @@ table inet yj {
         udp dport 51820 accept
         icmp type echo-request accept
 
-        # 只允许 Host A 经 wg0 访问 admin 后端（/guild-img、/guide-img）
+        # 历史：只允许 Host A 经 wg0 访问 admin 后端（/guild-img、/guide-img 反代，已退役）
+        # 若 admin 后台不需要 Host A 直连，可删除本行与下一行
         iifname "wg0" ip saddr 10.8.0.1 tcp dport 8080 accept
         tcp dport 8080 drop
     }

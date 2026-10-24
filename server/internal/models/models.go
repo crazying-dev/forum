@@ -177,17 +177,20 @@ type GuildIntroPage struct {
 
 // GuildListItem 会馆列表项。
 type GuildListItem struct {
-	ID          int64            `json:"id"`
-	UUID        string           `json:"uuid"`
-	Slug        string           `json:"slug"`
-	Name        string           `json:"name"`
-	Intro       string           `json:"intro"`
-	ThemeColor  string           `json:"theme_color"`
-	MemberCount int              `json:"member_count"`
-	HasLogo     bool             `json:"has_logo"`
-	LogoVersion int              `json:"logo_version"`
-	CreatedAt   *time.Time       `json:"created_at"`
-	Leader      *GuildLeaderInfo `json:"leader"`
+	ID          int64  `json:"id"`
+	UUID        string `json:"uuid"`
+	Slug        string `json:"slug"`
+	Name        string `json:"name"`
+	Intro       string `json:"intro"`
+	ThemeColor  string `json:"theme_color"`
+	MemberCount int    `json:"member_count"`
+	HasLogo     bool   `json:"has_logo"`
+	LogoVersion int    `json:"logo_version"`
+	// LogoFileID 会馆 logo 的媒体 ID（MD 开头），前端据此直出 /ov2/api/media/<id>；
+	// 旧 GridFS 的 24 位 ObjectID 不再可读，前端会回退占位图。
+	LogoFileID string           `json:"logo_file_id,omitempty"`
+	CreatedAt  *time.Time       `json:"created_at"`
+	Leader     *GuildLeaderInfo `json:"leader"`
 }
 
 // GuildCategory 会馆自定义分类。
@@ -209,11 +212,10 @@ type GuildAnnouncement struct {
 
 // GuildDetail 会馆详情（含馆长、分类、公告）。
 type GuildDetail struct {
+	// Guild 内嵌基础字段；LogoFileID（json:"logo_file_id,omitempty"）随详情一并下发媒体 ID。
 	Guild
 	// UUID 会馆稳定标识（对外契约）
-	UUID string `json:"uuid"`
-	// LogoFileID 覆盖内嵌 Guild 的同名字段：管理端文件 ID 仅服务端内部使用，不随详情下发 JSON
-	LogoFileID    string              `json:"-"`
+	UUID          string              `json:"uuid"`
 	Leader        *GuildLeaderInfo    `json:"leader"`
 	MemberCount   int                 `json:"member_count"`
 	HasLogo       bool                `json:"has_logo"`

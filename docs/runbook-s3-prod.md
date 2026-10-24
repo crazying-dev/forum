@@ -28,7 +28,7 @@
 ```
 
 - S3 与指标**只**监听 `10.8.0.1`，公网不开放；Host B 的 admin 经 `10.8.0.1:8333` 访问 S3。
-- Host A 的 nginx 经 `10.8.0.2:8080` 访问 admin（`/guild-img/`、`/guide-img/`）。
+- 原 Host A 的 nginx 经 `10.8.0.2:8080` 访问 admin（`/guild-img/`、`/guide-img/`）的图片反代已退役；图片统一经 `/ov2/api/media/<id>` 直出。
 - 媒体字节在 SeaweedFS，元数据在 PG（`media_assets` 等）；旧本地文件/GridFS 保持只读兼容。
 - 生产 S3 数据：`/var/lib/seaweedfs/data`；配置：`/etc/seaweedfs/s3.json`。
 
@@ -177,7 +177,7 @@ sudo nginx -t && sudo systemctl reload nginx
 
 检查点：
 
-- `/guild-img/`、`/guide-img/` 已指向 `http://10.8.0.2:8080/api/`；
+- `/guild-img/`、`/guide-img/` 已退役，nginx 不应再配置这两个 location；
 - `/ov2/api/media/` 启用 `proxy_cache media`（**3g** / inactive=30d / keys_zone=100m）；
 - SSE 两个 exact location 仍在（`/ov2/api/world/stream`、`/ov2/api/messages/stream`）；
 - 安全头仍在（media location 内已重复声明）。
@@ -244,8 +244,8 @@ journalctl -u yj-ops.service -n 50 --no-pager
 | 10 | 变体缓存 | 同 id `?w=480` 与 `?w=1280` | 各自独立缓存（key 只认 480/1280） |
 | 11 | 私有不进缓存 | 聊天/私密图请求两次 | 两次都不是 `HIT` |
 | 12 | 404 不缓存 | `curl -s -D- -o /dev/null https://yjlt.top/ov2/api/media/not-exist` | `404`，再次请求仍 `MISS` |
-| 13 | 会馆图 | `curl -s -D- -o /dev/null https://yjlt.top/guild-img/guilds/<uuid>/logo` | 200/304（经 Host B） |
-| 14 | 指南图 | `curl -s -D- -o /dev/null https://yjlt.top/guide-img/guides/images/<id>` | 200/304 |
+| 13 | 会馆图 | `curl -s -D- -o /dev/null https://yjlt.top/ov2/api/media/<media_id>` | 200/304 |
+| 14 | 旧图路径退役 | `curl -s -o /dev/null -w '%{http_code}' https://yjlt.top/guild-img/probe` | 404（不再反代管理端） |
 | 15 | SSE | 浏览器进世界频道/私信 | 消息实时到达，无「连上不流动」 |
 | 16 | admin | `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/ping`（Host B） | `200` |
 | 17 | admin 页面 | 浏览器打开 `https://admin.yjlt.top` | 登录正常，静态资源 200 |
@@ -307,7 +307,6 @@ sudo bash deploy/native/uninstall-weed.sh --apply     # 保留数据
 | 应用上传 500 / `AccessDenied` | `journalctl -u seaweedfs -n 100`；核对 `.env` 与 s3.json | key 不匹配或 actions 不含 `Write:yj-forum` |
 | 应用上传 500 / `NoSuchBucket` | `printf 's3.bucket.list\n' \| weed shell -master=10.8.0.1:9333` | 缺 bucket：`s3.bucket.create -name yj-forum` |
 | 请求 S3 报 `SignatureDoesNotMatch` | 两台 `timedatectl` | 时间偏移 > 15min：启用 NTP（`timedatectl set-ntp true`） |
-| nginx `/guild-img/` 502 | Host B：`ss -ltnp \| grep 8080`、防火墙 | admin 未启动 / 只监听 127.0.0.1 / wg0 未放行 8080 |
 | nginx 启动报 `proxy_cache_path` 不允许 | 配置放错层级 | 把 map / proxy_cache_path 移到 http 级 conf.d |
 | 媒体首次请求 500、日志 `Permission denied /var/cache/nginx/...` | `ls -ld /var/cache/nginx/ov2-media` | 目录属主改为 nginx 用户（www-data/nginx） |
 | 私有图被外部看到 | 检查 `X-Media-Cache` / `Cache-Control` | 上游必须对私有资源返回 `private`；nginx 已有 map 兜底，勿删 |

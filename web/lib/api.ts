@@ -136,6 +136,8 @@ export interface GuildListItem {
   member_count: number;
   has_logo: boolean;
   logo_version: number;
+  /** 会馆 logo 的媒体 ID（MD 开头，媒体直出 /ov2/api/media/<id>；旧数据为空） */
+  logo_file_id?: string;
   created_at?: string;
   leader?: GuildLeader | null;
 }
@@ -157,7 +159,7 @@ export interface GuildAnnouncement {
   updated_at?: string;
 }
 
-// 会馆详情（logo_file_id 为管理端内部字段，接口不下发）
+// 会馆详情（logo_file_id 为会馆 logo 的媒体 ID，前端直出 /ov2/api/media/<id>）
 export interface GuildDetail {
   id: number;
   uuid: string;
@@ -165,6 +167,7 @@ export interface GuildDetail {
   name: string;
   intro: string;
   logo_version: number;
+  logo_file_id?: string;
   theme_color: string;
   leader_user_id?: string | null;
   leader_bio?: string;

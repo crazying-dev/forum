@@ -129,7 +129,7 @@ make dev                # Docker PGSQL + Go :8090 + Next.js :3200
 2. **后端**：`make server-build` 编译二进制，交给 `deploy/yj-forum.service`（systemd）；
 3. **前端**：`pnpm build` 产出 `.next/standalone`，由 `deploy/yj-web.service` 运行；
 4. **媒体**：SeaweedFS（S3 兼容）或本地目录，上传经 `/ov2/api/media/*` 代理；
-5. **Nginx**：`/ov2/api/*`、`/api/*`、`/avatar/*` 反代 Go；`/guild-img/*`、`/guide-img/*` 反代管理端；其余反代 Next.js；
+5. **Nginx**：`/ov2/api/*`、`/api/*`、`/avatar/*` 反代 Go；其余反代 Next.js（会馆/指南图片已改为 `/ov2/api/media/<id>` 媒体直出，原 `/guild-img/*`、`/guide-img/*` 反代已退役）；
 6. **管理端**：[yj-forum-admin](https://github.com/yoyo-ouo/yj-forum-admin) 独立部署，负责会馆审批、图片存储与用户 / 内容管理。
 
 ## 项目结构

@@ -82,7 +82,7 @@
 **响应字段**
 
 - `guilds[]` 列表项：`id`(int，仅供展示/排序) / `uuid`(string，稳定标识) / `slug` / `name` / `intro` / `theme_color` / `member_count` / `has_logo` / `logo_version` / `leader`（`{id, name, avatar, intro}`，无馆长为 `null`）。
-- `guild` 详情：列表项字段（含 `uuid`）+ `leader_user_id`(string\|null) / `leader_bio` / `created_at` / `updated_at` / `categories[]`（`{id, guild_id, name, sort}`）/ `announcements[]`（`{id, guild_id, content, created_at, updated_at}`，新→旧）。会馆 logo 使用 `has_logo` + `logo_version` 经 `/guild-img/guilds/{uuid}/logo?v={logo_version}` 代理展示（管理端兼容旧数字 id）；`logo_file_id` 为管理端内部文件 ID，**不随详情下发**。
+- `guild` 详情：列表项字段（含 `uuid`）+ `leader_user_id`(string\|null) / `leader_bio` / `created_at` / `updated_at` / `categories[]`（`{id, guild_id, name, sort}`）/ `announcements[]`（`{id, guild_id, content, created_at, updated_at}`，新→旧）。会馆 logo 使用 `logo_file_id`（媒体 ID，`MD` 开头）拼 `/ov2/api/media/<id>` 直出，`has_logo` 表示是否设置过；旧 GridFS 文件（24 位 ObjectID）无法直出，前端回退占位图。
 - `my_state`：登录时 `{is_member, is_leader, has_pending_request, request_id?}`，未登录为 `null`。
 - 信息流 `items[]`（帖子与文章同构）：`type`（`post` / `article`）/ `id`(string) / `title` / `summary` / `category`（文章为空串）/ `likes` / `views` / `comment_count` / `created_at` / `updated_at` / `user_id` / `user_name` / `user_avatar` / `user_guild_name` / `user_guild_theme_color` / `user_is_leader` / `guild_id`(number\|null) / `guild_name` / `guild_theme_color` / `author`（文章作者 `{id, name, avatar}`，帖子为 `null`）/ `participants_count`。
 - 分页：`page` / `page_size`（默认 20，上限 50）+ `has_more`（布尔，是否为多取一条探测所得）。
@@ -109,7 +109,7 @@
 
 > 搜索结果：`posts[]` 与帖子列表字段同构（含会馆归属与作者会馆字段）；`users[]` 为用户摘要。响应另含 `keyword` / `page` / `page_size` 与 `posts_total` / `posts_has_more` / `users_total` / `users_has_more`（按 `type` 选择性返回）。
 
-> 兼容说明：旧 `GET /api/v1/hui-guan`（会馆 JSON 列表）**已删除**，由 `GET /api/v1/guilds` 替代；旧实时消息接口 `/api/v1/world/messages`（`/World` 页面）与 `world` 数据表一并移除，由公共广场（`/feed?space=public`）与会馆信息流取代。会馆 logo 图片由管理端存储，前端经 `/guild-img/guilds/{uuid}/logo?v={logo_version}` 代理访问（管理端兼容旧数字 id）。
+> 兼容说明：旧 `GET /api/v1/hui-guan`（会馆 JSON 列表）**已删除**，由 `GET /api/v1/guilds` 替代；旧实时消息接口 `/api/v1/world/messages`（`/World` 页面）与 `world` 数据表一并移除，由公共广场（`/feed?space=public`）与会馆信息流取代。会馆 logo 与正文图片统一由媒体中台提供，前端请求 `/ov2/api/media/<id>`；原 `/guild-img/*` 代理已退役。
 
 ## 限流规则（key: IP）
 

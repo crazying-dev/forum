@@ -14,7 +14,6 @@
 ┌────────────────────────────────────────────────────┐
 │                 Nginx (宝塔 80/443)                │
 │   /api/* /avatar/* → Go :8090                      │
-│   /guild-img/* → 管理端 admin :8080                │
 │   其余 → Next.js :3000                             │
 └──────────┬─────────────────────────┬──────────────┘
            │                         │
@@ -43,7 +42,7 @@
 - **数据获取**：客户端 `lib/api.ts` 统一 `fetch('/api/v1/...')`，`credentials: 'include'` 携带会话 cookie。
 - **静态资源**：全部本地化于 `public/assets/`（图片/字体/CSS/JS/Live2D/鼠标包）。
 - **状态**：`lib/store.tsx`（主题/登录用户），主题 localStorage 持久化 + 时间段自动切换。
-- **开发代理**：`next.config.ts` rewrites `/api/*`、`/avatar/*` → Go（`API_TARGET`），`/guild-img/*` → 管理端（`ADMIN_TARGET`，默认 `http://127.0.0.1:8080`）；生产由 Nginx 分发。
+- **开发代理**：`next.config.ts` rewrites `/api/*`、`/avatar/*` → Go（`API_TARGET`）；生产由 Nginx 分发。`/guild-img/*`、`/guide-img/*` 的管理端代理已退役，图片统一走 `/ov2/api/media/<id>`。
 
 ### Go（服务层）
 - **框架**：Gin；数据库 pgxpool + golang-migrate；密码 bcrypt（兼容 werkzeug scrypt/pbkdf2 旧哈希）。
@@ -51,7 +50,7 @@
 - **缓存**：进程内 LRU+TTL（posts 30s / post_detail 60s / user_info 300s / guilds 30s / search 120s / comments 60s）。
 - **中间件**：CORS 白名单 / CSRF（Origin+Referer）/ 限流（IP+维度）/ 安全响应头 / gzip。
 - **邮件**：SMTP（net/smtp），异步 goroutine 发送（注册码/重置码/登录提醒/粉丝通知/评论提醒/Bug 通知）。
-- **存储**：新版头像走媒体服务（S3 或本地 `MEDIA_DIR`），旧 `/avatar/<uuid>.webp` 从 `AVATAR_DIR` 只读兼容；彩蛋 JSON 默认随二进制内置（`internal/assets/easteregg`，可用 `EASTER_EGG_PATH` 覆盖）；帖子/用户/会馆/文章均在 PostgreSQL。会馆 logo 由管理端（yj-forum-admin）存储，ouo 侧仅保存 `logo_file_id` / `logo_version` 并通过 `/guild-img` 代理展示（以 uuid 定位，兼容旧数字 id）。
+- **存储**：新版头像走媒体服务（S3 或本地 `MEDIA_DIR`），旧 `/avatar/<uuid>.webp` 从 `AVATAR_DIR` 只读兼容；彩蛋 JSON 默认随二进制内置（`internal/assets/easteregg`，可用 `EASTER_EGG_PATH` 覆盖）；帖子/用户/会馆/文章均在 PostgreSQL。会馆 logo 与介绍页/指南图片统一存媒体中台（S3 + PG `media_assets`），ouo 侧保存 `logo_file_id` 并经 `/ov2/api/media/<id>` 直出；旧 GridFS 文件（24 位 ObjectID）保留字段但不再可读，待后续迁移。
 - **模块边界**：`handler/`（auth、users、posts、comments、guilds、misc、search）负责路由与参数校验；`database/`（users、users_credentials、posts、comments、guilds、misc）负责 SQL 查询；`models/` 定义对外数据结构；`middleware/`、`cache/`、`email/` 为横切与基础设施。会馆系统新增 `handler/guilds.go`（列表/详情/信息流/文章/入退馆）与 `database/guilds.go`（会馆、成员、入馆申请、分类、公告、文章与信息流查询）。
 
 ## 通信方式

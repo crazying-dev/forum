@@ -1,8 +1,9 @@
 import { themeColor, themeTint } from "@/lib/constants";
+import { mediaUrl } from "@/lib/media";
 
-/** 会馆 Logo 图片地址（经 next.config rewrites 的 /guild-img 代理到管理端，按 uuid 定位） */
-export function guildLogoUrl(uuid?: string | null, logoVersion?: number): string {
-  return `/guild-img/guilds/${uuid || ""}/logo?v=${logoVersion || 0}`;
+/** 会馆 Logo 图片地址（媒体直出：/ov2/api/media/<media_id>，不再经管理端代理） */
+export function guildLogoUrl(logoFileId?: string | null): string {
+  return mediaUrl(logoFileId);
 }
 
 /**
@@ -10,28 +11,28 @@ export function guildLogoUrl(uuid?: string | null, logoVersion?: number): string
  * 轮播 / 详情 / 列表统一使用本组件。
  */
 export default function GuildLogo({
-  uuid,
+  logoFileId,
   name,
   hasLogo,
-  logoVersion,
   color,
   size = 64,
   className = "guild-logo",
 }: {
-  uuid?: string | null;
+  logoFileId?: string | null;
   name: string;
   hasLogo?: boolean;
-  logoVersion?: number;
   color?: string;
   size?: number;
   className?: string;
 }) {
   const c = themeColor(color);
+  // 旧 GridFS 文件（ObjectID）已无法直出，mediaUrl 返回空串时回退占位图
+  const url = hasLogo ? guildLogoUrl(logoFileId) : "";
 
-  if (hasLogo && uuid) {
+  if (url) {
     return (
       <div className={`${className} guild-logo-img`} style={{ width: size, height: size }}>
-        <img src={guildLogoUrl(uuid, logoVersion)} alt={name} />
+        <img src={url} alt={name} />
       </div>
     );
   }
