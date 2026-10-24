@@ -602,7 +602,7 @@ def _build_user_stats(user_id):
     return {**stats, **follow_stats}
 
 
-# ── 8. 上传头像（保存本地 /root/db/avatar，经 /avatar/<file> 访问；与 v1 一致）──
+# ── 8. 上传头像（保存本地 ../db/avatar，经 /avatar/<file> 访问；与 v1 一致）──
 @user_bp.route("/avatar/upload", methods=["POST"])
 @login_required
 def api_user_avatar_upload():

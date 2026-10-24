@@ -378,6 +378,16 @@ def test_avatar_upload_saves_locally():
     assert "/avatar/" in src, "头像上传未返回 /avatar/<file> 本地访问路径"
 
 
+# ── 回归 5b：头像目录默认 ../db/avatar（相对 main/ 解析，不再写死 /root/db/avatar） ──
+def test_avatar_dir_relative_to_main():
+    if os.getenv("AVATAR_UPLOAD_DIR"):
+        return  # 显式配置环境变量时不校验默认值
+    import config
+    expected = os.path.abspath(os.path.join(str(PROJECT), os.pardir, "db", "avatar"))
+    assert config.AVATAR_UPLOAD_DIR == expected, \
+        f"头像默认目录应为 main/../db/avatar，实际: {config.AVATAR_UPLOAD_DIR}"
+
+
 # ── 回归 6：全局 Live2D 可点击（pointer-events 不再为 none，点击触发动作） ──
 def test_global_live2d_clickable():
     main = next((b for b in re.findall(r"#global-live2d(?:\.global-live2d)?\s*\{([^}]+)\}", CSS, re.S)

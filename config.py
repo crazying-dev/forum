@@ -333,7 +333,20 @@ CF_IMAGES_DELIVERY_HOST = os.getenv("avatar_DELIVERY_HOST", "https://imagedelive
 
 # 头像上传：保存到本地目录，通过 /avatar/<file> 静态路由访问（与 v1 一致）
 # 不用 Cloudflare Images API（store_xxx 是交付 hash，不是 Account ID，无法路由到 /images/v1）
-AVATAR_UPLOAD_DIR = os.getenv("AVATAR_UPLOAD_DIR", "/root/db/avatar")
+# 默认 ../db/avatar：相对本文件（main/）解析，即项目根下的 db/avatar；
+# 不再写死绝对路径，换部署目录时无需改代码。绝对路径/环境变量仍照原样使用。
+_MAIN_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _resolve_from_main(path: str) -> str:
+    """相对路径按 main/ 目录解析，绝对路径原样返回。"""
+    path = (path or "").strip()
+    return path if os.path.isabs(path) else os.path.abspath(os.path.join(_MAIN_DIR, path))
+
+
+AVATAR_UPLOAD_DIR = _resolve_from_main(
+    (os.getenv("AVATAR_UPLOAD_DIR") or "").strip() or os.path.join("..", "db", "avatar")
+)
 
 # 客户端安装包分发目录：把 forum.exe / forum_setup.exe 放进来即可被
 # /api/app/windows/forum.exe 与 /api/app/download/<platform>/<filename> 对外分发。
