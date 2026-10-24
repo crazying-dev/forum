@@ -204,7 +204,8 @@ def run(source, target, args):
     if parents:
         extras.execute_values(
             dst,
-            "UPDATE comments c SET parent_id = v.parent_id FROM (VALUES %s) AS v(id, parent_id) WHERE c.id = v.id",
+            "UPDATE comments c SET parent_id = v.parent_id FROM (VALUES %s) AS v(id, parent_id) "
+            "WHERE c.id = v.id AND EXISTS (SELECT 1 FROM comments p WHERE p.id = v.parent_id)",
             parents,
             page_size=PAGE,
         )
@@ -273,7 +274,8 @@ def run(source, target, args):
     if wparents:
         extras.execute_values(
             dst,
-            "UPDATE world_messages w SET parent_id = v.parent_id FROM (VALUES %s) AS v(id, parent_id) WHERE w.id = v.id",
+            "UPDATE world_messages w SET parent_id = v.parent_id FROM (VALUES %s) AS v(id, parent_id) "
+            "WHERE w.id = v.id AND EXISTS (SELECT 1 FROM world_messages p WHERE p.id = v.parent_id)",
             wparents,
             page_size=PAGE,
         )
