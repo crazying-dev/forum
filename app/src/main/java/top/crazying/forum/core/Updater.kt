@@ -22,7 +22,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 
 /**
- * 发布清单里的单个版本（对应 `/api/app/check` 响应里的 `release` 对象）。
+ * 发布清单里的单个版本（对应 `/ov2/api/downloads/check` 响应里的 `release` 对象）。
  *
  * 字段与 Web 端 `app_releases.json` / Windows 端 `app/releases.py` 完全同源。
  */
@@ -120,20 +120,34 @@ object Updater {
         return info
     }
 
-    /** 把 `/api/app/check` 的 JSON 解析成 [UpdateInfo]；结构不对返回 null。 */
+    /** 把 `/downloads/check` 的 JSON 解析成 [UpdateInfo]；结构不对返回 null。 */
     fun parseCheck(current: String, obj: JSONObject?): UpdateInfo? {
         obj ?: return null
-        val release = obj.optJSONObject("release")?.let { parseRelease(it) }
+        val available = obj.optBoolean("available", false)
+        val cur = obj.optString("current", "").ifBlank { current }
+        val latest = obj.optString("latest", "").trim()
+        // ov2 顶层 mandatory = current < min_version；release 内也有一份，缺省时沿用顶层。
+        val release = obj.optJSONObject("release")
+            ?.let { parseRelease(it, obj.optBoolean("mandatory", false)) }
         return UpdateInfo(
-            available = obj.optBoolean("available", false),
-            current = obj.optString("current", "").ifBlank { current },
-            latest = obj.optString("latest", "").trim(),
-            message = obj.optString("message", "").trim(),
+            available = available,
+            current = cur,
+            latest = latest,
+            message = obj.optString("message", "").trim().ifBlank {
+                // ov2 `/downloads/check` 不返回 message：本地兜底一句可直接展示的文案。
+                // 有可用更新但清单不完整（release 缺失）时留空，交给弹窗提示「发布信息不完整」。
+                when {
+                    release != null -> if (latest.isNotEmpty()) "发现新版本 " + latest else "发现新版本"
+                    available -> ""
+                    cur.isNotEmpty() -> "已是最新版本 " + cur
+                    else -> "已是最新版本"
+                }
+            },
             release = release,
         )
     }
 
-    private fun parseRelease(obj: JSONObject): UpdateRelease {
+    private fun parseRelease(obj: JSONObject, topMandatory: Boolean = false): UpdateRelease {
         val url = obj.optString("url", "").trim()
         val notes = ArrayList<String>()
         obj.optJSONArray("notes")?.let { arr ->
@@ -151,7 +165,7 @@ object Updater {
             size = obj.optLong("size", 0L),
             sha256 = obj.optString("sha256", "").trim(),
             notes = notes,
-            mandatory = obj.optBoolean("mandatory", false),
+            mandatory = obj.optBoolean("mandatory", topMandatory),
         )
     }
 

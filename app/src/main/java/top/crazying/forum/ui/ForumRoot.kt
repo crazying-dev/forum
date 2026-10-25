@@ -43,7 +43,6 @@ import top.crazying.forum.ui.screens.PrivacyScreen
 import top.crazying.forum.ui.screens.ProfileEditScreen
 import top.crazying.forum.ui.screens.SearchScreen
 import top.crazying.forum.ui.screens.UserScreen
-import top.crazying.forum.ui.screens.WebLoginScreen
 import top.crazying.forum.ui.screens.WikiScreen
 import top.crazying.forum.ui.screens.WorldScreen
 import top.crazying.forum.ui.screens.YearConvertScreen
@@ -153,15 +152,14 @@ fun ForumRoot() {
                     is Screen.Search -> SearchScreen(nav, feedStore, s.keyword)
                     is Screen.UserProfile -> UserScreen(nav, feedStore, s.userId)
                     is Screen.Auth -> AuthScreen(nav, s.register)
-                    Screen.WebLogin -> WebLoginScreen(nav)
                 }
 
                 // 发现新版本时由 App.updateInfo 驱动弹出（冷启动自动检查 / 设置页手动检查）
                 UpdateDialogHost()
 
-                // 人机验证（滑块拼图）：业务流程调用 `askCaptcha()` 时由 CaptchaPrompt 驱动。
+                // ALTCHA 求解进度遮罩：由 Api 内部的 CaptchaSession 自动驱动。
                 // 放在最后，保证叠在页面自带的 AlertDialog（如注销二次确认）之上。
-                CaptchaHost()
+                AltchaHost()
             }
         }
     }

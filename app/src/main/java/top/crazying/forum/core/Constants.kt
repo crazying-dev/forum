@@ -2,6 +2,7 @@ package top.crazying.forum.core
 
 import okhttp3.Interceptor
 import okhttp3.Request
+import top.crazying.forum.BuildConfig
 
 /**
  * 全局常量。
@@ -11,11 +12,19 @@ import okhttp3.Request
  */
 object Constants {
 
-    /** 服务端根地址（全站 HTTPS，且是客户端唯一出网目标）。 */
-    const val BASE_URL = "https://www.yjlt.top"
+    /**
+     * 服务端根地址。
+     *
+     * 默认生产地址；本地联调时可用 `-PapiBaseUrl=http://10.0.2.2:8090` 覆盖
+     * （仅用于调试构建，release 仍指向生产）。
+     */
+    val BASE_URL: String = BuildConfig.API_BASE_URL.trim().trimEnd('/')
+
+    /** ouo canonical API 前缀；客户端不再使用 legacy 旧接口组。 */
+    const val API_PREFIX = "/ov2/api"
 
     /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.0.18"
+    const val APP_VERSION = "1.1.0"
 
     /** 请求 UA，便于服务端日志区分端（服务端最低版本闸门也会回退解析它）。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
@@ -86,17 +95,17 @@ object Constants {
     const val MOUSE_IMG_DIR = "/static/img/mouse/Liunx"
     const val MOUSE_README_PATH = "/static/mouse/Liunx/README.md"
 
-    const val HEALTHZ_PATH = "/healthz"
+    const val HEALTHZ_PATH = API_PREFIX + "/healthz"
 
     // ────────────────── 应用更新 ──────────────────
     /** 与发布清单里的平台 key 一致。 */
     const val PLATFORM_ANDROID = "android"
 
-    /** 版本检查：`GET /api/app/check?platform=android&version=<当前版本>`。 */
-    const val CHECK_UPDATE_PATH = "/api/app/check"
+    /** 版本检查：`GET /ov2/api/downloads/check?platform=android&version=<当前版本>`。 */
+    const val CHECK_UPDATE_PATH = API_PREFIX + "/downloads/check"
 
-    /** 站内反代前缀：`/api/app/mirror/android/<文件名>`（服务器流式转发 GitHub 直链）。 */
-    const val MIRROR_PATH = "/api/app/mirror"
+    /** 站内反代前缀：`/ov2/api/downloads/mirror/android/<文件名>`（服务器流式转发 GitHub 直链）。 */
+    const val MIRROR_PATH = API_PREFIX + "/downloads/mirror"
 
     /** 冷启动自动检查的最小间隔：24 小时（手动点「检查更新」不受此限制）。 */
     const val UPDATE_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
@@ -121,7 +130,7 @@ object Constants {
 
     // ────────────────── 彩蛋 ──────────────────
     /** 随机一条彩蛋（服务端从 `EasterEgg/1.json` 抽）。 */
-    const val EASTER_EGG_PATH = "/Easter-Egg"
+    const val EASTER_EGG_PATH = API_PREFIX + "/easter-egg"
 
     /** 每日一言（第三方，与网页端 `AfterBody.js` 用的是同一个接口）。 */
     const val SENTENCE_TEXT_URL = "https://dlystc.unknownmp.top/api/v2/sentence/text?format=full"
@@ -139,7 +148,7 @@ object Constants {
      * 用户同意后把该值写入 `Prefs.privacyAgreedVersion`；政策版本升号时
      * 会在下次启动重新弹窗征得同意（合规要求）。
      */
-    const val PRIVACY_POLICY_VERSION = "2.1"
+    const val PRIVACY_POLICY_VERSION = "2.2"
 
     // ────────────────── 国庆假期 ──────────────────
     // 本地时间 10-01 00:00 ~ 10-07 24:00（等价于 10-08 00:00 开区间，因此只判 1..7 日）
@@ -161,8 +170,9 @@ object Constants {
 
     // ────────────────── 分页 ──────────────────
     const val PAGE_SIZE = 20
-    const val RANDOM_LIMIT = 200
-    const val COMPREHENSIVE_LIMIT = 100
+
+    /** ov2 `/posts/random` 每次最多返回 100 条（服务端上限）。 */
+    const val RANDOM_LIMIT = 100
     const val WORLD_LIMIT = 100
 
     // ────────────────── 帖子分类 ──────────────────

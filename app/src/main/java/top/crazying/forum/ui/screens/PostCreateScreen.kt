@@ -1,12 +1,13 @@
 package top.crazying.forum.ui.screens
 
-import androidx.compose.foundation.background
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -19,13 +20,26 @@ import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.*
+import top.crazying.forum.ui.richtext.RichTextEditorScreen
+import top.crazying.forum.ui.richtext.rememberRichEditorState
+
+/** 正文图片上限：与服务端 `media.MaxInputBytes`（5MB）一致。 */
+private const val POST_IMAGE_MAX_BYTES = 5 * 1024 * 1024
+
+/** 从 MIME 推断扩展名（服务端只接受 jpeg / png / webp / gif）。 */
+private fun postImageExt(mime: String): String = when {
+    mime.contains("png", ignoreCase = true) -> "png"
+    mime.contains("webp", ignoreCase = true) -> "webp"
+    mime.contains("gif", ignoreCase = true) -> "gif"
+    else -> "jpg"
+}
 
 /**
- * 发帖页。
+ * 发帖页：全屏富文本编辑器。
  *
- * 正文**原样直传**服务端，不做任何 HTML 包装 / 转义：三端统一为
- * 「原文入库 + 一律按 Markdown 渲染，HTML 标签按字面文字展示」。
- * 历史上这里会把纯文本包装成 `<p>…<br>…</p>`，已废弃。
+ * 正文由 `RichEditorState` 生成白名单 HTML（`state.toHtml()`），服务端按
+ * `content_format=html` 入库；图片先传 `/media/images`（scene=`post_image`），
+ * 成功后把返回的 url 以图片块插进正文。
  */
 @Composable
 fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
@@ -35,9 +49,10 @@ fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
 
     var category by remember { mutableStateOf(initialCategory) }
     var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var uploading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    val editor = rememberRichEditorState()
 
     if (!App.isLoggedIn) {
         PageScaffold(title = "发布帖子", onBack = { nav.pop() }) { padding ->
@@ -51,23 +66,50 @@ fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
         return
     }
 
+    // 选图 → 读字节 → 校验 5MB → 上传 → 插入正文（期间禁用发布按钮）
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val bytes = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            }.getOrNull()
+            if (bytes == null) {
+                toast(context, "读取图片失败")
+                return@launch
+            }
+            if (bytes.size > POST_IMAGE_MAX_BYTES) {
+                toast(context, "图片不能超过 5MB")
+                return@launch
+            }
+            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+            uploading = true
+            val result = App.api.uploadImage(bytes, "image." + postImageExt(mime), mime, "post_image")
+            uploading = false
+            if (result.ok) {
+                val url = result.str("url")
+                if (url.isNotBlank()) editor.insertImage(url) else toast(context, "上传成功但未返回图片地址")
+            } else {
+                toast(context, result.message)
+            }
+        }
+    }
+
     fun publish() {
-        if (busy) return
+        if (busy || uploading) return
         error = ""
         val t = title.trim()
-        val c = content.trim()
         when {
             t.isEmpty() -> { error = "请填写标题"; return }
             t.length > 100 -> { error = "标题不能超过 100 字"; return }
-            c.isEmpty() -> { error = "请填写正文"; return }
+            editor.toDocument().isBlank -> { error = "请填写正文"; return }
         }
         busy = true
         scope.launch {
-            val result = App.api.createPost(t, c, category)
+            val result = App.api.createPost(t, editor.toHtml(), category)
             busy = false
             if (result.ok) {
                 toast(context, "发布成功")
-                val newId = result.obj()?.optJSONObject("post")?.optString("id", "") ?: ""
+                val newId = result.str("id")
                 nav.pop()
                 if (newId.isNotBlank()) nav.push(Screen.PostDetail(newId))
             } else {
@@ -76,80 +118,54 @@ fun PostCreateScreen(nav: Navigator, initialCategory: String = "general") {
         }
     }
 
-    PageScaffold(
+    RichTextEditorScreen(
+        state = editor,
         title = "发布帖子",
-        onBack = { nav.pop() },
-        actions = {
-            GhostButton(
-                text = if (busy) "发布中…" else "发布",
-                onClick = { publish() },
-                enabled = !busy,
-                tint = colors.primary,
-                modifier = Modifier.padding(end = 8.dp),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(colors.bgBody)
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("选择分类", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        publishLabel = "发布",
+        publishing = busy,
+        uploadingImage = uploading,
+        placeholder = "正文支持标题、列表、引用、代码块与图片…",
+        header = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                for (key in Constants.CATEGORY_ORDER) {
-                    Pill(
-                        text = Constants.categoryLabel(key),
-                        active = category == key,
-                        onClick = { category = key },
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "标题",
+                        color = colors.textPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
                     )
+                    Spacer(Modifier.width(10.dp))
+                    ForumTextField(
+                        value = title,
+                        onValueChange = { if (it.length <= 100) title = it },
+                        placeholder = "不超过 100 字",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("${title.length}/100", color = colors.textMuted, fontSize = 11.sp)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    for (key in Constants.CATEGORY_ORDER) {
+                        Pill(
+                            text = Constants.categoryLabel(key),
+                            active = category == key,
+                            onClick = { category = key },
+                        )
+                    }
+                }
+                if (error.isNotBlank()) {
+                    Text(error, color = colors.danger, fontSize = 12.sp)
                 }
             }
-
-            Text("标题", color = colors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            ForumTextField(
-                value = title,
-                onValueChange = { if (it.length <= 100) title = it },
-                placeholder = "不超过 100 字",
-            )
-
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(
-                    text = "正文",
-                    color = colors.textPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                )
-                Text("${content.length} 字", color = colors.textMuted, fontSize = 12.sp)
-            }
-            ForumTextField(
-                value = content,
-                onValueChange = { content = it },
-                placeholder = "支持分段（空行分段），本轮不支持富文本与图片",
-                singleLine = false,
-                minHeight = 220.dp,
-            )
-
-            if (error.isNotBlank()) {
-                Text(error, color = colors.danger, fontSize = 13.sp)
-            }
-
-            PrimaryButton(
-                text = if (busy) "发布中…" else "发布帖子",
-                onClick = { publish() },
-                enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
-            )
-
-            EmptyBox("发布后可在帖子详情页查看与回复")
-        }
-    }
+        },
+        onPickImage = { pickImage.launch("image/*") },
+        onCancel = { if (!busy) nav.pop() },
+        onPublish = { publish() },
+    )
 }

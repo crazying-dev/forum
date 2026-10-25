@@ -45,12 +45,7 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
         if (replace) st.error = ""
         val kind = st.filter
         val result = when (kind) {
-            "random" -> App.api.randomPosts(Constants.RANDOM_LIMIT)
-            "comprehensive" -> App.api.posts(
-                page = 1,
-                pageSize = Constants.COMPREHENSIVE_LIMIT,
-                sort = "comprehensive",
-            )
+            "random" -> App.api.randomPosts()
             "favorites" -> App.api.userFavorites(
                 userId = App.userId,
                 page = targetPage,
@@ -59,7 +54,6 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
             else -> App.api.posts(
                 page = targetPage,
                 pageSize = Constants.PAGE_SIZE,
-                sort = "time",
             )
         }
         if (st.filter != kind) return
@@ -136,7 +130,6 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
             FeedChip("最新发布", st.filter == "latest") {
                 if (st.filter != "latest") st.filter = "latest" else scope.launch { load(1, true) }
             }
-            FeedChip("综合排序", st.filter == "comprehensive") { st.filter = "comprehensive" }
             FeedChip("随机推荐", st.filter == "random") { st.filter = "random" }
             if (name.isNotBlank()) {
                 FeedChip("我的收藏", st.filter == "favorites") { st.filter = "favorites" }

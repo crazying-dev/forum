@@ -181,7 +181,8 @@ object MarkdownBody {
         // 远端内嵌图本轮不展示（HtmlBody 会再剥掉 <img>），只保留替代文字
         s = RE_IMG.replace(s) { m -> m.groupValues[1] }
         // 行内代码最先处理，避免里面的 * _ 被当成强调
-        s = RE_CODE.replace(s) { m -> "<tt>" + m.groupValues[1] + "</tt>" }
+        // 用 <code> 而不是 <tt>：服务端富文本白名单只保留 <code>。
+        s = RE_CODE.replace(s) { m -> "<code>" + m.groupValues[1] + "</code>" }
         s = RE_LINK.replace(s) { m ->
             val href = m.groupValues[2]
             if (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("/")) {

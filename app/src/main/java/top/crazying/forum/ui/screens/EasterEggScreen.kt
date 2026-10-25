@@ -55,7 +55,7 @@ private data class EggPiece(
  *
  * 与网页端手机版底栏的「彩蛋」入口对齐：点一下随机给一条内容——
  * 50% 概率是**每日一言**（第三方接口，与 `AfterBody.js` 用的是同一个），
- * 50% 概率是本站的 `/Easter-Egg`；任一来源拿不到会自动改拿另一个。
+ * 50% 概率是本站的 `/ov2/api/easter-egg`；任一来源拿不到会自动改拿另一个。
  */
 @Composable
 fun EasterEggScreen(nav: Navigator) {

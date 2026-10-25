@@ -1,9 +1,12 @@
 package top.crazying.forum.core
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -45,7 +48,9 @@ class ApiResult(
             if (d is JSONObject) {
                 for (k in MESSAGE_KEYS) {
                     val v = d.optString(k, "").trim()
-                    if (v.isNotEmpty() && v != "null") return v
+                    if (v.isNotEmpty() && v != "null") {
+                        return if (v == "CAPTCHA_REQUIRED") "请先完成人机验证" else v
+                    }
                 }
             }
             if (error != null) return error
@@ -124,9 +129,17 @@ class Api(private val prefs: Prefs) {
 
     private val jar = PrefsCookieJar(prefs)
 
+    /** ALTCHA 求解串行化，避免并发请求同时算同一份挑战。 */
+    private val captchaMutex = Mutex()
+    @Volatile private var captchaDisabledUntil = 0L
+    @Volatile private var grantValue: String? = null
+    @Volatile private var grantExpiresAt = 0L
+
     private val client: OkHttpClient = OkHttpClient.Builder()
-        // 每个请求都带上 X-Client-Platform / X-Client-Version（最低版本闸门）
+        // 每个请求都带上 X-Client-Platform / X-Client-Version
         .addInterceptor(Constants.clientHeaderInterceptor())
+        // ov2 的 CSRF 要求同源 Origin/Referer；原生客户端显式自报来源。
+        .addInterceptor(originInterceptor())
         .cookieJar(jar)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
@@ -139,26 +152,33 @@ class Api(private val prefs: Prefs) {
 
     fun clearCookies() = jar.clear()
 
+    /** 站内 API 路径统一拼 canonical 前缀，页面不得自行拼 `/ov2/api`。 */
+    private fun api(path: String): String =
+        Constants.API_PREFIX + "/" + path.trimStart('/')
+
     /**
-     * 把 WebView（网页登录）的 Cookie 头搬进本 App 的会话。
+     * 对同源请求补 `Origin` / `Referer`。
      *
-     * 只接纳 `token` / `ID` 两个服务端登录态 Cookie，其余一律忽略——
-     * 网页里可能还有统计类 Cookie，不该跟着进原生请求。
-     *
-     * 非 suspend：只改本地 SharedPreferences，不发网。
-     *
-     * @return 实际导入的 Cookie 条数（0 表示没拿到会话）
+     * ouo 的 CSRF 中间件要求非 GET 请求带同源 Origin/Referer；OkHttp 默认不带。
+     * 只对 `BASE_URL` 同源请求生效，避免把站点来源带给第三方（每日一言、GitHub）。
      */
-    fun importWebCookies(cookieHeader: String): Int {
-        val url = Constants.BASE_URL.toHttpUrlOrNull() ?: return 0
-        var n = 0
-        for ((name, value) in WebAuth.cookiePairs(cookieHeader)) {
-            if (name != WebAuth.TOKEN_COOKIE && name != WebAuth.ID_COOKIE) continue
-            val cookie = runCatching { Cookie.parse(url, "$name=$value") }.getOrNull() ?: continue
-            jar.put(cookie)
-            n++
+    private fun originInterceptor(): Interceptor = Interceptor { chain ->
+        val request = chain.request()
+        val base = Constants.BASE_URL.toHttpUrlOrNull()
+        val sameOrigin = base != null &&
+            request.url.host == base.host &&
+            request.url.port == base.port &&
+            request.url.scheme == base.scheme
+        if (!sameOrigin) {
+            chain.proceed(request)
+        } else {
+            chain.proceed(
+                request.newBuilder()
+                    .header("Origin", Constants.BASE_URL)
+                    .header("Referer", Constants.BASE_URL + "/")
+                    .build(),
+            )
         }
-        return n
     }
 
     /** 是否有本地凭证（粗略判断，真正有效性由服务端决定）。 */
@@ -208,17 +228,19 @@ class Api(private val prefs: Prefs) {
         }
     }
 
-    suspend fun request(
+    /** 一次底层 HTTP 请求（不做 ALTCHA，不改全局会话状态）。 */
+    private fun execute(
         method: String,
         path: String,
-        params: Map<String, Any?>? = null,
-        json: JSONObject? = null,
-    ): ApiResult = withContext(Dispatchers.IO) {
+        params: Map<String, Any?>?,
+        json: JSONObject?,
+    ): ApiResult {
         val url = buildUrl(path, params)
         val verb = method.uppercase()
         val body: RequestBody? = when {
             json != null -> json.toString().toRequestBody(jsonMedia)
-            verb == "POST" || verb == "PUT" || verb == "PATCH" -> "{}".toRequestBody(jsonMedia)
+            verb == "POST" || verb == "PUT" || verb == "PATCH" || verb == "DELETE" ->
+                "{}".toRequestBody(jsonMedia)
             else -> null
         }
         val request = Request.Builder()
@@ -228,18 +250,52 @@ class Api(private val prefs: Prefs) {
             .header("Accept-Language", "zh-CN,zh;q=0.9")
             .method(verb, body)
             .build()
-
         // GET 允许重试一次（弱网下很常见）；写操作绝不重试，避免重复发帖/评论。
         var result = callOnce(request)
         if (result.status == 0 && verb == "GET") {
             result = callOnce(request)
         }
+        return result
+    }
+
+    /** 401 清会话；426 弹强制更新。 */
+    private fun handleStatus(result: ApiResult) {
         if (result.status == 401) {
             runCatching { App.onUnauthorized() }
         } else if (Constants.isVersionTooLow(result.status, result.str("code"))) {
-            // 服务端 426 / VERSION_TOO_LOW：交给 App 弹不可绕过的强制更新窗
             runCatching { App.onVersionTooLow(result.obj()) }
         }
+    }
+
+    suspend fun request(
+        method: String,
+        path: String,
+        params: Map<String, Any?>? = null,
+        json: JSONObject? = null,
+        captcha: Boolean = false,
+    ): ApiResult = withContext(Dispatchers.IO) {
+        val verb = method.uppercase()
+        var proof: ProofResult = ProofResult.None
+        if (captcha) {
+            proof = ensureCaptchaProof()
+            when (proof) {
+                is ProofResult.Cancelled -> return@withContext ApiResult(0, null, "已取消安全验证")
+                is ProofResult.Failed -> return@withContext ApiResult(0, null, proof.message)
+                else -> Unit
+            }
+        }
+        var result = execute(verb, path, params, applyProof(json, proof))
+        if (captcha && isCaptchaRequired(result)) {
+            // grant 可能过期 / 绑定 IP 变化：清缓存后重新求解，只重试一次。
+            invalidateCaptcha()
+            val retry = ensureCaptchaProof(force = true)
+            when (retry) {
+                is ProofResult.Cancelled -> return@withContext ApiResult(0, null, "已取消安全验证")
+                is ProofResult.Failed -> return@withContext ApiResult(0, null, retry.message)
+                else -> result = execute(verb, path, params, applyProof(json, retry))
+            }
+        }
+        handleStatus(result)
         result
     }
 
@@ -249,10 +305,112 @@ class Api(private val prefs: Prefs) {
     suspend fun post(path: String, json: JSONObject? = null): ApiResult =
         request("POST", path, null, json ?: JSONObject())
 
+    private suspend fun patch(path: String, json: JSONObject): ApiResult =
+        request("PATCH", path, null, json)
+
+    private suspend fun delete(path: String): ApiResult = request("DELETE", path)
+
     /** 登录 / 拉用户信息后同步全局会话状态。 */
     private fun adoptUser(result: ApiResult) {
         App.setUser(result.jsonObj("user"))
     }
+
+    // ────────────────── ALTCHA 会话（grant 缓存） ──────────────────
+
+    private sealed interface ProofResult {
+        data object None : ProofResult
+        data class Ready(val grant: String) : ProofResult
+        data object Cancelled : ProofResult
+        data class Failed(val message: String) : ProofResult
+    }
+
+    private fun applyProof(json: JSONObject?, proof: ProofResult): JSONObject? {
+        if (proof !is ProofResult.Ready) return json
+        val out = if (json == null) JSONObject() else JSONObject(json.toString())
+        if (proof.grant.isNotBlank()) out.put("grant", proof.grant)
+        return out
+    }
+
+    private fun isCaptchaRequired(result: ApiResult): Boolean {
+        if (result.status != 400) return false
+        val message = result.message
+        return message.contains("CAPTCHA_REQUIRED") ||
+            message.contains("请先完成人机验证") ||
+            message.contains("人机验证")
+    }
+
+    private fun invalidateCaptcha() {
+        grantValue = null
+        grantExpiresAt = 0L
+    }
+
+    /**
+     * 确保拿到可复用的 grant：
+     * 1) 已缓存且未过期 → 直接复用；
+     * 2) 服务端未启用 → 返回 None（不带字段）；
+     * 3) 否则拉 challenge → 本地求解 → `/captcha/verify` 换 grant。
+     */
+    private suspend fun ensureCaptchaProof(force: Boolean = false): ProofResult =
+        captchaMutex.withLock {
+            val now = System.currentTimeMillis()
+            if (!force && captchaDisabledUntil > now) return@withLock ProofResult.None
+            if (!force) {
+                val cached = grantValue
+                if (!cached.isNullOrBlank() && grantExpiresAt > now) {
+                    return@withLock ProofResult.Ready(cached)
+                }
+            }
+
+            val challengeRes = execute("GET", api("captcha/challenge"), null, null)
+            if (challengeRes.status == 404 || challengeRes.message.contains("CAPTCHA_DISABLED")) {
+                captchaDisabledUntil = System.currentTimeMillis() + 10 * 60_000L
+                return@withLock ProofResult.None
+            }
+            if (!challengeRes.ok) return@withLock ProofResult.Failed(challengeRes.message)
+            val challenge = Altcha.parse(challengeRes.obj())
+                ?: return@withLock ProofResult.Failed("安全验证数据异常")
+            if (Altcha.isExpired(challenge)) {
+                return@withLock ProofResult.Failed("安全验证已过期，请重试")
+            }
+
+            AltchaUi.begin()
+            try {
+                val solution = Altcha.solve(
+                    challenge = challenge,
+                    onProgress = { attempts, elapsed ->
+                        AltchaUi.update(attempts, elapsed, challenge.cost)
+                    },
+                    isCancelled = { AltchaUi.isCancelled() },
+                )
+                if (solution == null) {
+                    return@withLock if (AltchaUi.isCancelled()) {
+                        ProofResult.Cancelled
+                    } else {
+                        ProofResult.Failed("安全验证未通过，请重试")
+                    }
+                }
+                val payload = Altcha.payload(challenge, solution)
+                val verifyRes = execute(
+                    "POST",
+                    api("captcha/verify"),
+                    null,
+                    JSONObject().put("altcha", payload),
+                )
+                if (verifyRes.status == 404 || verifyRes.message.contains("CAPTCHA_DISABLED")) {
+                    captchaDisabledUntil = System.currentTimeMillis() + 10 * 60_000L
+                    return@withLock ProofResult.None
+                }
+                if (!verifyRes.ok) return@withLock ProofResult.Failed(verifyRes.message)
+                val grant = verifyRes.str("grant").trim()
+                if (grant.isEmpty()) return@withLock ProofResult.Failed("安全验证返回异常")
+                val ttl = verifyRes.int("expires_in", 300).coerceAtLeast(60) * 1000L
+                grantValue = grant
+                grantExpiresAt = System.currentTimeMillis() + ttl - 10_000L
+                ProofResult.Ready(grant)
+            } finally {
+                AltchaUi.end()
+            }
+        }
 
     // ────────────────── 认证 ──────────────────
 
@@ -260,23 +418,24 @@ class Api(private val prefs: Prefs) {
         name: String = "",
         email: String = "",
         password: String,
-        captchaToken: String = "",
     ): ApiResult {
+        val identifier = name.ifBlank { email }.trim()
         val body = JSONObject()
-        if (name.isNotBlank()) body.put("name", name.trim())
-        if (email.isNotBlank()) body.put("email", email.trim())
-        body.put("password", password)
-        val result = post("/api/user/login", Captcha.withToken(body, captchaToken))
+            .put("name", identifier)
+            .put("password", password)
+            .put("remember", true)
+        val result = request("POST", api("auth/login"), json = body, captcha = true)
         if (result.ok) {
-            adoptUser(result)
-            val who = name.ifBlank { email }.trim()
-            if (who.isNotEmpty()) prefs.lastName = who
+            // ov2 登录只返回 {success,id}，用户资料需要再拉一次。
+            val who = me()
+            if (!who.ok) return who
+            if (identifier.isNotEmpty()) prefs.lastName = identifier
         }
         return result
     }
 
     suspend fun logout(): ApiResult {
-        val result = post("/api/user/logout")
+        val result = post(api("auth/logout"))
         App.logoutLocal()
         return result
     }
@@ -285,157 +444,155 @@ class Api(private val prefs: Prefs) {
         name: String,
         email: String,
         password: String,
-        captchaToken: String = "",
+        code: String,
     ): ApiResult {
         val body = JSONObject()
             .put("name", name.trim())
             .put("email", email.trim())
             .put("password", password)
-        val result = post("/api/user/register", Captcha.withToken(body, captchaToken))
+            .put("code", code.trim())
+        val result = request("POST", api("auth/register"), json = body, captcha = true)
         if (result.ok) {
-            adoptUser(result)
-            if (App.user.value == null) runCatching { me() }
             prefs.lastName = name.trim()
+            val who = me()
+            if (!who.ok) return who
         }
         return result
     }
 
-    suspend fun sendRegisterCode(email: String, captchaToken: String = ""): ApiResult =
-        post(
-            "/api/email/send-register-code",
-            Captcha.withToken(JSONObject().put("email", email.trim()), captchaToken),
+    suspend fun sendRegisterCode(email: String): ApiResult =
+        request(
+            "POST",
+            api("auth/register/code"),
+            json = JSONObject().put("email", email.trim()),
+            captcha = true,
         )
 
-    /** 注销账号验证码：发到当前绑定邮箱（需登录；未绑定有效邮箱服务端返回 400）。 */
-    suspend fun sendDeleteAccountCode(captchaToken: String = ""): ApiResult =
-        post("/api/email/send-delete-account-code", Captcha.withToken(JSONObject(), captchaToken))
-
-    /**
-     * 自助注销账号。
-     *
-     * @param mode     "purge" 彻底删除 / "anonymize" 匿名化保留
-     * @param password 账号密码（与 [code] 二选一，可为 null）
-     * @param code     邮箱验证码（与 [password] 二选一，可为 null）
-     */
+    /** 自助注销：ov2 要求密码 + 输入当前用户名（confirmName）。 */
     suspend fun deleteAccount(
         mode: String,
-        password: String?,
-        code: String?,
-        captchaToken: String = "",
-    ): ApiResult {
-        val body = JSONObject()
+        password: String,
+        confirmName: String,
+    ): ApiResult = post(
+        api("users/me/delete"),
+        JSONObject()
             .put("mode", mode)
-            .put("confirm", "注销账号")
-        if (!password.isNullOrBlank()) body.put("password", password)
-        if (!code.isNullOrBlank()) body.put("code", code.trim())
-        return post("/api/user/delete", Captcha.withToken(body, captchaToken))
-    }
+            .put("password", password)
+            .put("confirmName", confirmName),
+    )
 
     suspend fun me(): ApiResult {
-        val result = get("/api/user/info")
-        if (result.ok) adoptUser(result)
+        val result = get(api("users/me"))
+        if (result.ok) {
+            adoptUser(result)
+        } else if (result.status == 200 && result.message.contains("未登录")) {
+            // ov2 的 /users/me 未登录返回 200 + success:false，不是 401。
+            runCatching { App.onUnauthorized() }
+        }
         return result
     }
 
     suspend fun updateProfile(fields: JSONObject): ApiResult {
-        val result = request("PUT", "/api/user/info", null, fields)
-        if (result.ok) {
-            adoptUser(result)
-            if (App.user.value == null) runCatching { me() }
-        }
+        val result = patch(api("users/me"), fields)
+        if (result.ok) runCatching { me() }
         return result
     }
 
-    /**
-     * 上传头像（multipart，字段名 `avatar`，与 Web 端一致）。
-     *
-     * 服务端会裁剪压缩为 400×400 WebP 并直接落库，成功后调用方应再调一次 [me] 刷新本地用户。
-     */
+    /** 上传头像（multipart 字段 `avatar`）。 */
     suspend fun uploadAvatar(bytes: ByteArray, filename: String, mimeType: String): ApiResult =
-        withContext(Dispatchers.IO) {
-            try {
-                val body = MultipartBody.Builder()
-                    .setType(MultipartBody.FORM)
-                    .addFormDataPart(
-                        "avatar",
-                        filename.ifBlank { "avatar.jpg" },
-                        bytes.toRequestBody(mimeType.toMediaTypeOrNull()),
-                    )
-                    .build()
-                val request = Request.Builder()
-                    .url(Constants.BASE_URL + "/api/user/avatar/upload")
-                    .header("User-Agent", Constants.CLIENT_UA)
-                    .header("Accept", "application/json, text/plain, */*")
-                    .post(body)
-                    .build()
-                val result = callOnce(request)
-                if (result.status == 401) {
-                    runCatching { App.onUnauthorized() }
-                } else if (Constants.isVersionTooLow(result.status, result.str("code"))) {
-                    runCatching { App.onVersionTooLow(result.obj()) }
-                }
-                result
-            } catch (e: Exception) {
-                ApiResult(0, null, "网络错误，请检查网络连接后重试")
-            }
+        multipart(
+            path = "users/me/avatar",
+            field = "avatar",
+            bytes = bytes,
+            filename = filename,
+            mimeType = mimeType,
+        )
+
+    /** 通用 multipart 上传（头像 / 正文图片）。 */
+    private suspend fun multipart(
+        path: String,
+        field: String,
+        bytes: ByteArray,
+        filename: String,
+        mimeType: String,
+        extra: Map<String, String> = emptyMap(),
+    ): ApiResult = withContext(Dispatchers.IO) {
+        try {
+            val builder = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart(
+                    field,
+                    filename.ifBlank { "upload.bin" },
+                    bytes.toRequestBody(mimeType.toMediaTypeOrNull()),
+                )
+            for ((k, v) in extra) builder.addFormDataPart(k, v)
+            val request = Request.Builder()
+                .url(buildUrl(api(path), null))
+                .header("User-Agent", Constants.CLIENT_UA)
+                .header("Accept", "application/json, text/plain, */*")
+                .post(builder.build())
+                .build()
+            val result = callOnce(request)
+            handleStatus(result)
+            result
+        } catch (e: Exception) {
+            ApiResult(0, null, "网络错误，请检查网络连接后重试")
         }
-
-    // ────────────────── 账号安全（修改密码 / 更换邮箱） ──────────────────
-
-    /** 修改密码第 1 步：发送 6 位验证码到当前绑定邮箱。 */
-    suspend fun sendChangePasswordCode(captchaToken: String = ""): ApiResult =
-        post("/api/email/send-change-password-code", Captcha.withToken(JSONObject(), captchaToken))
-
-    /** 修改密码第 2 步：凭邮箱验证码设置新密码（成功后服务端会清 cookie，需重新登录）。 */
-    suspend fun changePassword(code: String, newPassword: String): ApiResult =
-        post(
-            "/api/user/password",
-            JSONObject().put("code", code.trim()).put("new_password", newPassword),
-        )
-
-    /** 更换邮箱第 1 步：发送验证码到「当前绑定邮箱」（身份确认）。 */
-    suspend fun sendChangeEmailOldCode(captchaToken: String = ""): ApiResult =
-        post("/api/email/send-change-email-old-code", Captcha.withToken(JSONObject(), captchaToken))
-
-    /** 更换邮箱第 2 步：发送验证码到「新邮箱」（可达性验证）。 */
-    suspend fun sendChangeEmailCode(email: String, captchaToken: String = ""): ApiResult =
-        post(
-            "/api/email/send-change-email-code",
-            Captcha.withToken(JSONObject().put("email", email.trim()), captchaToken),
-        )
-
-    /** 更换邮箱第 3 步：凭两枚验证码完成换绑。 */
-    suspend fun changeEmail(email: String, oldCode: String, code: String): ApiResult {
-        val body = JSONObject()
-            .put("email", email.trim())
-            .put("old_code", oldCode.trim())
-            .put("code", code.trim())
-        val result = post("/api/user/email", body)
-        if (result.ok) adoptUser(result)
-        return result
     }
 
-    // ────────────────── 人机验证（滑块拼图） ──────────────────
+    /** 发送正文/评论/世界频道图片（scene 决定服务端用途）。 */
+    suspend fun uploadImage(
+        bytes: ByteArray,
+        filename: String,
+        mimeType: String,
+        scene: String = "post_image",
+    ): ApiResult = multipart(
+        path = "media/images",
+        field = "file",
+        bytes = bytes,
+        filename = filename,
+        mimeType = mimeType,
+        extra = mapOf("scene" to scene),
+    )
 
-    /**
-     * 申请一次滑块拼图挑战。
-     *
-     * 返回 `{success, token, bg, piece, y, width, height, piece_size}`（`bg` / `piece`
-     * 是 data URL PNG）；服务端未启用人机验证时返回 `{success: true, enabled: false}`。
-     *
-     * [provider] 非空时强制指定（`"slider"` = Turnstile 解不出来时的回退通道）。
-     */
-    suspend fun captchaChallenge(provider: String = ""): ApiResult =
-        post(Captcha.challengePath(provider))
+    /** 引用卡片批量数据（users/posts/articles 都是 id 列表）。 */
+    suspend fun embeds(
+        users: List<String> = emptyList(),
+        posts: List<String> = emptyList(),
+        articles: List<String> = emptyList(),
+    ): ApiResult = get(
+        api("embeds"),
+        mapOf(
+            "users" to users.joinToString(","),
+            "posts" to posts.joinToString(","),
+            "articles" to articles.joinToString(","),
+        ),
+    )
 
-    /** 提交滑块 x 坐标；成功返回原 token，失败返回 400 + 可读文案。 */
-    suspend fun captchaVerify(captchaToken: String, captchaX: Int): ApiResult =
-        post(
-            Captcha.VERIFY_PATH,
-            JSONObject()
-                .put(Captcha.FIELD_TOKEN, captchaToken)
-                .put(Captcha.FIELD_X, captchaX),
+    // ────────────────── 账号安全（改密 / 换绑邮箱） ──────────────────
+
+    /** ov2 改密：当前密码 + 新密码；成功后服务端会重签当前会话。 */
+    suspend fun changePassword(currentPassword: String, newPassword: String): ApiResult =
+        patch(
+            api("users/me"),
+            JSONObject().put("password", newPassword).put("current_password", currentPassword),
         )
+
+    /** 换绑第 1 步：向当前邮箱发验证码。 */
+    suspend fun sendChangeEmailOldCode(): ApiResult =
+        post(api("users/me/email-change/code"))
+
+    /** 换绑第 2 步：验证当前邮箱验证码。 */
+    suspend fun verifyChangeEmailOld(code: String): ApiResult =
+        post(api("users/me/email-change/verify-old"), JSONObject().put("code", code.trim()))
+
+    /** 换绑第 3 步：向新邮箱发验证码。 */
+    suspend fun sendChangeEmailNewCode(newEmail: String): ApiResult =
+        post(api("users/me/email-change/new-code"), JSONObject().put("newEmail", newEmail.trim()))
+
+    /** 换绑第 4 步：凭新邮箱验证码完成换绑。 */
+    suspend fun confirmChangeEmail(code: String): ApiResult =
+        post(api("users/me/email-change/confirm"), JSONObject().put("code", code.trim()))
 
     // ────────────────── 帖子 ──────────────────
 
@@ -443,46 +600,51 @@ class Api(private val prefs: Prefs) {
         page: Int = 1,
         pageSize: Int = Constants.PAGE_SIZE,
         category: String? = null,
-        sort: String? = null,
     ): ApiResult = get(
-        "/api/posts",
-        mapOf("page" to page, "page_size" to pageSize, "category" to category, "sort" to sort)
+        api("posts"),
+        mapOf("page" to page, "page_size" to pageSize, "category" to category),
     )
 
-    suspend fun randomPosts(limit: Int = Constants.RANDOM_LIMIT): ApiResult =
-        get("/api/posts/random", mapOf("limit" to limit))
+    /** ov2 每次最多返回 100 条；服务端忽略 limit 参数。 */
+    suspend fun randomPosts(): ApiResult = get(api("posts/random"))
 
-    suspend fun getPost(postId: String): ApiResult = get("/api/posts/$postId")
+    suspend fun getPost(postId: String): ApiResult = get(api("posts/$postId"))
 
-    suspend fun createPost(title: String, content: String, category: String): ApiResult {
+    /** 发帖正文是白名单 HTML（由 RichDocument.toHtml() 生成）。 */
+    suspend fun createPost(title: String, contentHtml: String, category: String): ApiResult {
         val body = JSONObject()
             .put("title", title.trim())
-            .put("content", content)
+            .put("content", contentHtml)
             .put("category", category)
-        return post("/api/posts/create", body)
+        return post(api("posts"), body)
     }
 
-    suspend fun likePost(postId: String): ApiResult = post("/api/posts/$postId/like")
+    suspend fun likePost(postId: String): ApiResult = post(api("posts/$postId/like"))
 
-    suspend fun favoritePost(postId: String): ApiResult = post("/api/posts/$postId/favorite")
+    suspend fun favoritePost(postId: String): ApiResult = post(api("posts/$postId/favorite"))
 
-    suspend fun deletePost(postId: String): ApiResult = post("/api/posts/$postId/delete")
+    suspend fun deletePost(postId: String): ApiResult = post(api("posts/$postId/delete"))
 
     // ────────────────── 评论 ──────────────────
 
     suspend fun comments(postId: String, page: Int = 1, pageSize: Int = 50): ApiResult =
-        get("/api/posts/$postId/comments", mapOf("page" to page, "page_size" to pageSize))
+        get(api("posts/$postId/comments"), mapOf("page" to page, "page_size" to pageSize))
 
-    suspend fun createComment(postId: String, content: String, parentId: String? = null): ApiResult {
-        val body = JSONObject().put("content", content.trim())
+    /** 评论正文同样是白名单 HTML；ov2 对评论启用 ALTCHA。 */
+    suspend fun createComment(
+        postId: String,
+        contentHtml: String,
+        parentId: String? = null,
+    ): ApiResult {
+        val body = JSONObject().put("content", contentHtml)
         if (!parentId.isNullOrBlank()) body.put("parent_id", parentId)
-        return post("/api/posts/$postId/comments/create", body)
+        return request("POST", api("posts/$postId/comments"), json = body, captcha = true)
     }
 
-    suspend fun deleteComment(commentId: String): ApiResult = post("/api/comments/$commentId/delete")
+    suspend fun deleteComment(commentId: String): ApiResult = delete(api("comments/$commentId"))
 
     /** 点赞 / 取消点赞评论；返回 `{success, liked, likes}`。 */
-    suspend fun likeComment(commentId: String): ApiResult = post("/api/comments/$commentId/like")
+    suspend fun likeComment(commentId: String): ApiResult = post(api("comments/$commentId/like"))
 
     // ────────────────── 搜索 ──────────────────
 
@@ -492,40 +654,45 @@ class Api(private val prefs: Prefs) {
         pageSize: Int = Constants.PAGE_SIZE,
         type: String = "both",
     ): ApiResult = get(
-        "/api/search",
-        mapOf("k" to keyword, "page" to page, "page_size" to pageSize, "type" to type)
+        api("search"),
+        mapOf("k" to keyword, "page" to page, "page_size" to pageSize, "type" to type),
     )
 
     // ────────────────── 用户 ──────────────────
 
-    suspend fun userInfo(userId: String): ApiResult = get("/api/user/$userId")
+    suspend fun userInfo(userId: String): ApiResult = get(api("users/$userId"))
 
-    suspend fun follow(userId: String): ApiResult = post("/api/user/$userId/follow")
+    suspend fun follow(userId: String): ApiResult = post(api("users/$userId/follow"))
 
     suspend fun userPosts(userId: String, page: Int = 1, pageSize: Int = Constants.PAGE_SIZE): ApiResult =
-        get("/api/user/$userId/posts", mapOf("page" to page, "page_size" to pageSize))
+        get(api("users/$userId/posts"), mapOf("page" to page, "page_size" to pageSize))
 
     suspend fun userFavorites(userId: String, page: Int = 1, pageSize: Int = Constants.PAGE_SIZE): ApiResult =
-        get("/api/user/$userId/favorites", mapOf("page" to page, "page_size" to pageSize))
+        get(api("users/$userId/favorites"), mapOf("page" to page, "page_size" to pageSize))
 
     suspend fun userComments(userId: String, page: Int = 1, pageSize: Int = Constants.PAGE_SIZE): ApiResult =
-        get("/api/user/$userId/comments", mapOf("page" to page, "page_size" to pageSize))
+        get(api("users/$userId/comments"), mapOf("page" to page, "page_size" to pageSize))
 
     suspend fun following(userId: String, page: Int = 1, pageSize: Int = Constants.PAGE_SIZE): ApiResult =
-        get("/api/user/$userId/following", mapOf("page" to page, "page_size" to pageSize))
+        get(api("users/$userId/following"), mapOf("page" to page, "page_size" to pageSize))
 
     suspend fun followers(userId: String, page: Int = 1, pageSize: Int = Constants.PAGE_SIZE): ApiResult =
-        get("/api/user/$userId/followers", mapOf("page" to page, "page_size" to pageSize))
+        get(api("users/$userId/followers"), mapOf("page" to page, "page_size" to pageSize))
 
     // ────────────────── 世界频道 ──────────────────
 
-    /** 服务端返回裸 JSON 数组（最近 100 条）。 */
-    suspend fun worldAll(): ApiResult = get("/api/world/ALL")
+    /** ov2 返回 `{success, items, has_more, next_before_id}`（默认降序）。 */
+    suspend fun worldAll(limit: Int = Constants.WORLD_LIMIT, beforeId: Long? = null): ApiResult =
+        get(
+            api("world/messages"),
+            mapOf("limit" to limit, "before_id" to beforeId),
+        )
 
-    suspend fun worldSend(content: String, parentId: String? = null): ApiResult {
-        val body = JSONObject().put("content", content.trim())
-        if (!parentId.isNullOrBlank()) body.put("parent_id", parentId)
-        return post("/api/world/Send", body)
+    /** 世界频道正文是 HTML（服务端禁引用卡片、最多 9 图）。 */
+    suspend fun worldSend(contentHtml: String, parentId: Long? = null): ApiResult {
+        val body = JSONObject().put("content_html", contentHtml)
+        if (parentId != null && parentId > 0) body.put("parent_id", parentId)
+        return post(api("world/messages"), body)
     }
 
     // ────────────────── 杂项 ──────────────────

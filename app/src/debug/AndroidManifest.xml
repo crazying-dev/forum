@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      仅调试构建：允许明文 HTTP，便于模拟器通过 10.0.2.2 / adb reverse
+      连接本地 ouo 做 ALTCHA 与接口端到端验证。release 清单仍是 false。
+    -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:replace="android:usesCleartextTraffic" />
+</manifest>

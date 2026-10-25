@@ -25,6 +25,8 @@ data class Post(
     val title: String,
     val summary: String,
     val content: String,
+    /** 正文存储形态：html（新富文本）/ markdown（历史数据）。 */
+    val contentFormat: String,
     val category: String,
     val userId: String,
     val userName: String,
@@ -56,6 +58,7 @@ data class Post(
             title = o.s("title").ifBlank { "（无标题）" },
             summary = o.s("summary"),
             content = o.s("content"),
+            contentFormat = o.s("content_format", "markdown"),
             category = o.s("category", "general"),
             userId = o.s("user_id"),
             userName = o.s("user_name").ifBlank { "匿名用户" },
@@ -76,6 +79,7 @@ data class Post(
 data class CommentItem(
     val id: String,
     val content: String,
+    val contentFormat: String,
     val userId: String,
     val userName: String,
     val userAvatar: String,
@@ -94,12 +98,14 @@ data class CommentItem(
         fun from(o: JSONObject): CommentItem = CommentItem(
             id = o.s("id"),
             content = o.s("content"),
+            contentFormat = o.s("content_format", "markdown"),
             userId = o.s("user_id"),
             userName = o.s("user_name").ifBlank { "匿名用户" },
             userAvatar = o.s("user_avatar"),
             createdAt = o.s("created_at"),
             likes = o.i("likes"),
-            liked = o.b("liked"),
+            // ov2 字段是 liked_by_me；历史兼容旧字段 liked。
+            liked = if (o.has("liked_by_me")) o.b("liked_by_me") else o.b("liked"),
             parentId = o.s("parent_id"),
             postId = o.s("post_id"),
             postTitle = o.s("post_title"),
@@ -141,23 +147,43 @@ data class UserItem(
     companion object {
         fun from(o: JSONObject): UserItem {
             val stats = o.optJSONObject("stats") ?: JSONObject()
+            return fromProfile(
+                user = o,
+                stats = stats,
+                isFollowing = o.b("is_following"),
+                isSelf = o.b("is_self"),
+            )
+        }
+
+        /**
+         * ov2 `/users/:id` 把 stats / follow_stats / is_following / is_self 放在顶层；
+         * 列表型 UserBrief 没有 stats，传入空对象即可。
+         */
+        fun fromProfile(
+            user: JSONObject,
+            stats: JSONObject,
+            followStats: JSONObject? = null,
+            isFollowing: Boolean = false,
+            isSelf: Boolean = false,
+        ): UserItem {
+            val fs = followStats ?: JSONObject()
             return UserItem(
-                id = o.s("id"),
-                name = o.s("name").ifBlank { "匿名用户" },
-                avatar = o.s("avatar"),
-                title = o.s("title"),
-                gender = o.i("gender"),
-                birthday = if (o.has("age") && !o.isNull("age")) o.opt("age") else null,
-                intro = o.s("intro"),
-                email = o.s("email"),
-                createdAt = o.s("created_at"),
+                id = user.s("id"),
+                name = user.s("name").ifBlank { "匿名用户" },
+                avatar = user.s("avatar"),
+                title = user.s("title").ifBlank { user.s("prefix") },
+                gender = user.i("gender"),
+                birthday = if (user.has("age") && !user.isNull("age")) user.opt("age") else null,
+                intro = user.s("intro"),
+                email = user.s("email"),
+                createdAt = user.s("created_at"),
                 postCount = stats.i("post_count"),
                 totalLikes = stats.i("total_likes"),
                 totalViews = stats.i("total_views"),
-                followingCount = stats.i("following_count"),
-                followerCount = stats.i("follower_count"),
-                isFollowing = o.b("is_following"),
-                isSelf = o.b("is_self"),
+                followingCount = if (fs.has("following_count")) fs.i("following_count") else stats.i("following_count"),
+                followerCount = if (fs.has("follower_count")) fs.i("follower_count") else stats.i("follower_count"),
+                isFollowing = isFollowing,
+                isSelf = isSelf,
             )
         }
 
@@ -172,6 +198,8 @@ data class WorldMessage(
     val senderName: String,
     val senderAvatar: String,
     val content: String,
+    val contentFormat: String,
+    val parentId: String,
     val createdAt: String,
 ) {
     companion object {
@@ -181,6 +209,8 @@ data class WorldMessage(
             senderName = o.s("sender_name").ifBlank { "匿名" },
             senderAvatar = o.s("sender_avatar"),
             content = o.s("content"),
+            contentFormat = o.s("content_format", "html"),
+            parentId = o.s("parent_id"),
             createdAt = o.s("created_at"),
         )
 
