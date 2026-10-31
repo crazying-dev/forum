@@ -41,6 +41,15 @@ android {
         val apiBaseUrl = (project.findProperty("apiBaseUrl") as String?)?.trim().orEmpty()
             .ifBlank { "https://www.yjlt.top" }
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
+        // APP 专用零 PoW 验证通道密钥（与后端 ALTCHA_APP_SECRET 一致）。
+        // 本地：-PaltchaAppSecret=xxx 或环境变量 ALTCHA_APP_SECRET；CI：secrets.ALTCHA_APP_SECRET。
+        // 留空时客户端不启用该通道，自动回退 ALTCHA 本地求解。
+        val altchaAppSecret = ((project.findProperty("altchaAppSecret") as String?)
+            ?: System.getenv("ALTCHA_APP_SECRET")).orEmpty().trim()
+        require(altchaAppSecret.all { it.code in 0x21..0x7e }) {
+            "altchaAppSecret 只能是可见 ASCII（建议 openssl rand -hex 32，避免引号/空白/换行）"
+        }
+        buildConfigField("String", "ALTCHA_APP_SECRET", "\"$altchaAppSecret\"")
     }
 
     // 发布签名：环境变量优先（CI 注入），仓库根 keystore.properties 兜底（本地旧用法，兼容保留）。

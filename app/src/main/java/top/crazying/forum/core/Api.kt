@@ -83,6 +83,12 @@ class ApiResult(
         return o.optInt(key, def)
     }
 
+    fun long(key: String, def: Long = 0L): Long {
+        val o = obj() ?: return def
+        if (!o.has(key) || o.isNull(key)) return def
+        return o.optLong(key, def)
+    }
+
     fun bool(key: String, def: Boolean = false): Boolean {
         val o = obj() ?: return def
         if (!o.has(key) || o.isNull(key)) return def
@@ -133,6 +139,9 @@ class Api(private val prefs: Prefs) {
     /** ALTCHA 求解串行化，避免并发请求同时算同一份挑战。 */
     private val captchaMutex = Mutex()
     @Volatile private var captchaDisabledUntil = 0L
+
+    /** APP 专用零 PoW 通道是否已确认不可用（服务端未配置时置为 true，进程内不再尝试）。 */
+    @Volatile private var appCaptchaUnavailable = false
     @Volatile private var grantValue: String? = null
     @Volatile private var grantExpiresAt = 0L
 
@@ -359,6 +368,55 @@ class Api(private val prefs: Prefs) {
         AltchaUi.fail(message) == Decision.Retry
 
     /**
+     * APP 专用零 PoW 通道：拉一次挑战 → 本地一次 HMAC-SHA256 → 换 grant。
+     *
+     * 返回 null 表示「本次没走通，应回退 ALTCHA 求解」（密钥未注入 / 通道未开启 /
+     * 网络或服务端异常）；返回 Ready / Cancelled 表示已有最终结论。
+     * 只在服务端确认关闭通道（404 CAPTCHA_DISABLED）时置 [appCaptchaUnavailable]，
+     * 避免每次验证都白拉一次 404。
+     */
+    private suspend fun tryAppProof(): ProofResult? {
+        val secret = Constants.ALTCHA_APP_SECRET
+        if (secret.isBlank()) return null
+        val challengeRes = execute("GET", api("captcha/app/challenge"), null, null)
+        if (challengeRes.message.contains("CAPTCHA_DISABLED")) {
+            // 仅服务端明确应答“通道关闭”才进程内粘滞；网关/WAF 的裸 404 不粘滞，下次再试。
+            appCaptchaUnavailable = true
+            return null
+        }
+        if (!challengeRes.ok) return null
+        val challenge = challengeRes.str("challenge").trim()
+        val timestamp = challengeRes.long("timestamp", 0L)
+        if (challenge.isEmpty() || timestamp <= 0L) return null
+        if (AltchaUi.isCancelled()) return ProofResult.Cancelled
+        val signature = try {
+            Altcha.appProof(secret, challenge, timestamp)
+        } catch (e: Exception) {
+            return null
+        }
+        val verifyRes = execute(
+            "POST",
+            api("captcha/app/verify"),
+            null,
+            JSONObject()
+                .put("challenge", challenge)
+                .put("timestamp", timestamp)
+                .put("signature", signature),
+        )
+        if (verifyRes.message.contains("CAPTCHA_DISABLED")) {
+            appCaptchaUnavailable = true
+            return null
+        }
+        val grant = verifyRes.str("grant").trim()
+        if (!verifyRes.ok || grant.isEmpty()) return null
+        if (!AltchaUi.finishSuccess()) return ProofResult.Cancelled
+        val ttl = verifyRes.int("expires_in", 300).coerceAtLeast(60) * 1000L
+        grantValue = grant
+        grantExpiresAt = System.currentTimeMillis() + ttl - 10_000L
+        return ProofResult.Ready(grant)
+    }
+
+    /**
      * 确保拿到可复用的 grant：
      * 1) 已缓存且未过期 → 直接复用；
      * 2) 服务端未启用 → 返回 None（不带字段）；
@@ -382,6 +440,15 @@ class Api(private val prefs: Prefs) {
             // 进入验证即展示转圈：challenge 拉取期间也可取消（重试后同理）。
             AltchaUi.begin()
             try {
+                // 0) APP 专用零 PoW 通道：一次 HMAC 换 grant；通道未开启/失败时回退 ALTCHA 求解。
+                if (!appCaptchaUnavailable) {
+                    when (val app = tryAppProof()) {
+                        is ProofResult.Ready -> return@withLock app
+                        is ProofResult.Cancelled -> return@withLock app
+                        // null（回退）/ Failed（当前不会返回）都落到下面的 ALTCHA 求解。
+                        else -> Unit
+                    }
+                }
                 while (true) {
                     try {
                         // 1) 拉 challenge（首次与每次重试都重新拉，避免用过期/一次性挑战）。

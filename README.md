@@ -175,6 +175,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 
 首次构建会自动下载 Gradle 8.14.5（约 138 MB）到 `%USERPROFILE%\.gradle`。
 
+**APP 验证密钥（必需）**：release 构建需注入 `ALTCHA_APP_SECRET`（与后端 `server/.env` 同值），否则 APK 不启用 APP 专用零 PoW 通道、客户端回退 ALTCHA 本地求解。本地可用 `-PaltchaAppSecret=...` 或同名环境变量；CI 走 `secrets.ALTCHA_APP_SECRET`（缺省时工作流会给出 warning）。
+
 > ⚠️ **国内网络注意**：`services.gradle.org` 可能超时（本机实测过），导致卡在 `Downloading https://services.gradle.org/distributions/gradle-8.14.5-bin.zip`。
 > 若遇到，任选一种：
 > 1. 已预置本地缓存（本机已完成），直接 `gradlew` 即可；
@@ -306,6 +308,7 @@ ls -l app/build/outputs/apk/release/app-release.apk
 * **最低版本闸门（V1.0.11）**：与 Web / Windows 三端同源。`Constants` 新增 `CLIENT_PLATFORM = "android"` 与 `CLIENT_HEADERS`（`X-Client-Platform` / `X-Client-Version`），由 `clientHeaderInterceptor()` 挂在 OkHttp 请求链最外层——`Api.request`、头像上传、`fetchText`、`Updater` 下载客户端全自动携带；服务端对低于发布清单 `min_versions.android` 的请求返回 **HTTP 426 + `code=VERSION_TOO_LOW`**，客户端在 `Api.request` 里识别后写入 `App.versionGate`，`ForumRoot` 随即弹出**不可绕过**的「版本过低」弹窗（返回键 / 外部点击均无效，只有「去更新」与「退出应用」两个出口）。新增 `app/src/test/java/top/crazying/forum/core/VersionGateTest.kt`。
 * **全量迁移 `/ov2/api`（V1.1.0）**：`core/Api.kt` 不再保留任何 legacy `/api/*` 路径；登录/注册/改密/换绑/注销/帖子/评论/用户/搜索/世界/媒体/引用卡片/更新/彩蛋全部切换；同源 `Origin`/`Referer` 拦截器用于通过 ouo CSRF。
 * **ALTCHA v2（V1.1.0）**：`core/Altcha.kt` 纯 Kotlin 实现 PBKDF2-HMAC-SHA256 求解——**字节精确**的 `Mac` + `SecretKeySpec(passwordBytes, "HmacSHA256")`（不用 SecretKeyFactory/PBEKeySpec：后者会把 nonce 随机字节按 UTF-8 重编码）；worker 内复用 Mac 与缓冲区、≤4 worker、90s 超时、OOM 减半 worker 重试、取消/异常兜底。`Api` 自动拉 challenge → 求解 → `/captcha/verify` 换 5 分钟 `grant` 并缓存复用；失败 `CAPTCHA_REQUIRED` 自动重解重试一次；`ui/AltchaDialog.kt` 为极简等待卡片（不确定转圈 + 取消验证），失败时同一卡片内切换「具体原因 + 重试 / 取消」。
+* **APP 专用零 PoW 验证通道**：`Api.ensureCaptchaProof` 在求解之前先走 `GET /ov2/api/captcha/app/challenge` → 本地一次 HMAC-SHA256（`Altcha.appProof`，与服务端 `appProofSignature` 字节一致）→ `POST /ov2/api/captcha/app/verify` 换同一种 `grant`；服务端未配置 `ALTCHA_APP_SECRET`（两个端点 404 `CAPTCHA_DISABLED`）时自动回退上面的 ALTCHA 求解，行为与旧版一致。密钥由 `-PaltchaAppSecret` / 环境变量注入 `BuildConfig.ALTCHA_APP_SECRET`，留空即不启用。这样手机端不再做千万级 PBKDF2，避免长时间满载被系统杀进程。
 * **自建富文本（V1.1.0）**：`core/richtext/RichDocument.kt`（模型 + HTML/Markdown 互转）+ `ui/richtext/RichTextView.kt`（正文/评论/世界渲染、图片、引用卡片）+ `RichTextEditor.kt`（跨段选区、块格式、图片、撤销重做）+ `RichTextEditorScreen.kt`（发帖/评论共用全屏宿主）。图片上传走 `POST /ov2/api/media/images`。
 * **移除网页登录（V1.1.0）**：删除 `WebLoginScreen`、`WebAuth`、`importWebCookies`、`PrefsCookieJar.put` 与登录页入口；App 不再用 WebView 承载登录或人机验证。
 * **世界频道顺序**：`WorldFeed.newestLast()` 保持「早的在上、最新在下」，发送后自动滚到底部；列表读取改为 ov2 的 `{items,...}`。
@@ -356,7 +359,7 @@ ls -l app/build/outputs/apk/release/app-release.apk
 * **WebView 仅 Live2D**：网页登录与 Turnstile/滑块验证已整体移除；新增 WebView 界面仍应避免放进 Dialog（独立窗口下层级/命中区会错位）。
 * **富文本编辑器限制**：列表不嵌套；图片/分割线是原子块，选区不能跨过；粘贴一律按纯文本拆段；不支持表格/分栏。
 * **世界频道发送限制**：仅支持纯文本（发送前转义特殊字符、换行转 `<br>` 后按 `content_html` 提交）；历史消息仍按富文本渲染，但发送端不再提供图片与格式。
-* **ALTCHA 求解耗时**：服务端默认 cost=5000，手机端可能需要数秒；求解用字节精确的 `Mac`（≤4 worker、90s 超时、OOM 减半重试），等待弹窗只显示不确定转圈与「取消验证」，失败可在同一卡片重试/取消；解出的 `grant` 缓存 5 分钟复用。客户端 `cost` 上限为 20000，服务端 `ALTCHA_COST` 若调高必须同步客户端，否则会报「安全验证数据异常」。
+* **ALTCHA 求解耗时**：优先走 APP 专用零 PoW 通道（一次 HMAC，毫秒级）；未注入密钥或服务端未开启该通道时回退本地求解——服务端默认 cost=5000，手机端可能需要数秒且 CPU 满载（被系统杀进程/卡顿的主因）；求解用字节精确的 `Mac`（≤4 worker、90s 超时、OOM 减半重试），等待弹窗只显示不确定转圈与「取消验证」，失败可在同一卡片重试/取消；解出的 `grant` 缓存 5 分钟复用。客户端 `cost` 上限为 20000，服务端 `ALTCHA_COST` 若调高必须同步客户端，否则会报「安全验证数据异常」。
 * **调试基址**：debug 构建可用 `-PapiBaseUrl=http://10.0.2.2:8090` 指向本地 ouo；release 始终使用 `https://www.yjlt.top`。
 * **`auto` 主题语义**：Android 取「跟随系统深色模式」，与 Web / Windows 的「小时切换」不同（有意为之）。
 * **Coil 3 的网络加载器**：依赖 `coil-network-okhttp` 的 ServiceLoader 自动注册；若自定义 `ImageLoader` 需手动装配 `OkHttpNetworkFetcherFactory`。

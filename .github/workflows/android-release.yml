@@ -106,6 +106,7 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ALTCHA_APP_SECRET: ${{ secrets.ALTCHA_APP_SECRET }}
         run: |
           set -euo pipefail
           for name in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
@@ -114,6 +115,9 @@ jobs:
               exit 1
             fi
           done
+          if [ -z "${ALTCHA_APP_SECRET:-}" ]; then
+            echo "::warning::未设置 secrets.ALTCHA_APP_SECRET，本版 APK 将回退 ALTCHA 本地求解（真机可能卡顿/被系统杀）"
+          fi
           chmod +x gradlew
           if [ "${IS_TAG}" = "true" ]; then
             ./gradlew --stacktrace assembleRelease -PexpectedVersion="$APP_VERSION"

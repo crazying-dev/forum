@@ -8,6 +8,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Base64
@@ -329,6 +330,29 @@ class AltchaTest {
         assertTrue(Altcha.isExpired(challenge, nowMs = 1_800_000_000_001L))
         // 0 表示无期限
         assertFalse(Altcha.isExpired(buildChallenge(expiresAt = 0L), nowMs = Long.MAX_VALUE))
+    }
+
+    // ────────────────── APP 专用零 PoW 通道 ──────────────────
+
+    @Test
+    fun appProof_matchesServerVector() {
+        // 向量由 Python hmac.new(secret, b"app-captcha:v1:<challenge>:<ts>", sha256).hexdigest() 生成，
+        // 与服务端 internal/altcha/appProofSignature 同口径（UTF-8 明文 + 小写 hex）。
+        assertEquals(
+            "360663eaffba0e3d783d0c63473a9d682ac959605c4d8ea64955870aff9b21eb",
+            Altcha.appProof("test-app-secret", "0123456789abcdef0123456789abcdef", 1_700_000_000L),
+        )
+        assertEquals(
+            "06fea3e8189db2186318e1b390029a0eebd7d3ee8fac7c7509a36a726903b539",
+            Altcha.appProof("another-secret", "ffffffffffffffffffffffffffffffff", 1_700_000_123L),
+        )
+    }
+
+    @Test
+    fun appProof_rejectsBlankInput() {
+        assertThrows(IllegalArgumentException::class.java) { Altcha.appProof("", "abc", 1L) }
+        assertThrows(IllegalArgumentException::class.java) { Altcha.appProof("s", "", 1L) }
+        assertThrows(IllegalArgumentException::class.java) { Altcha.appProof("s", "abc", 0L) }
     }
 
     private fun knownKey(): ByteArray = Altcha.hexDecode(

@@ -61,6 +61,9 @@ object Altcha {
     private const val MAX_WORKERS = 4
     private const val HMAC_SHA256_LEN = 32
 
+    /** APP 专用零 PoW 通道的签名域（与后端 `internal/altcha/service.go` 一致）。 */
+    private const val APP_PROOF_DOMAIN = "app-captcha:v1"
+
     /** 解析服务端返回的 Challenge JSON；结构不合法返回 null。 */
     fun parse(json: JSONObject?): AltchaChallenge? {
         val params = json?.optJSONObject("parameters") ?: return null
@@ -208,6 +211,23 @@ object Altcha {
             timedOut.get() -> SolveOutcome.TimedOut
             else -> SolveOutcome.NoMatch
         }
+    }
+
+    /**
+     * APP 专用零 PoW 通道的证明签名：
+     * `hex(HMAC-SHA256(secret, "app-captcha:v1:<challenge>:<timestamp>"))`。
+     *
+     * 与后端 `internal/altcha/appProofSignature` 字节一致（UTF-8 明文 + 小写 hex）；
+     * 只做一次 HMAC，微秒级，不参与 PBKDF2 求解。
+     */
+    fun appProof(secret: String, challenge: String, timestamp: Long): String {
+        require(secret.isNotBlank()) { "secret must not be blank" }
+        require(challenge.isNotBlank()) { "challenge must not be blank" }
+        require(timestamp > 0L) { "timestamp must be > 0" }
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
+        val message = APP_PROOF_DOMAIN + ":" + challenge + ":" + timestamp
+        return hexEncode(mac.doFinal(message.toByteArray(Charsets.UTF_8)))
     }
 
     /** 构造服务端可校验的 Base64 payload。 */

@@ -29,6 +29,15 @@ object Constants {
     /** 请求 UA，便于服务端日志区分端（服务端最低版本闸门也会回退解析它）。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
 
+    /**
+     * APP 专用零 PoW 验证通道密钥（构建期注入，与后端 `ALTCHA_APP_SECRET` 一致）。
+     *
+     * 为空时客户端不启用该通道，自动回退 ALTCHA 本地求解（见 `Api.ensureCaptchaProof`）。
+     * 该密钥内嵌在 APK 中、可被逆向提取，仅用于「不必让手机做千万级 PBKDF2」，
+     * 真正的反滥用防线是服务端限流与账号权限。
+     */
+    val ALTCHA_APP_SECRET: String = BuildConfig.ALTCHA_APP_SECRET.trim()
+
     // ────────────────── 最低版本闸门 ──────────────────
     /**
      * 客户端平台标识。
