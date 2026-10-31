@@ -137,7 +137,7 @@ forum-Android/
                 ├── UpdateDialog.kt         「发现新版本」对话框（下载 / 校验 / 安装）
                 ├── components/             通用控件（卡片、按钮、头像、正文…）
                 ├── richtext/               富文本渲染 / 跨段选区编辑器 / 全屏宿主 / 引用卡片
-                └── screens/                15 个页面（发帖/评论/世界共用全屏编辑器）
+                └── screens/                15 个页面（发帖/评论共用全屏编辑器）
 ```
 
 ---
@@ -203,15 +203,16 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 ### 已实现（V1.1.0 概览）
 
 * **账号**：登录（用户名或邮箱）、注册（用户名 + 邮箱 + **邮箱验证码**）、退出登录、本地会话恢复与失效清理；注册/登录自动完成 ALTCHA
-* **首页**：最新发布 / 随机推荐 / 我的收藏 三个信息流，分页加载（ov2 不支持 comprehensive 排序，已移除该 Tab）
+* **首页**：最新发布 / 随机推荐 两个信息流（最新发布分页加载；随机推荐单页），ov2 不支持 comprehensive 排序已移除该 Tab；「我的收藏」流已从首页移除，可在「我的 → 主页 → 收藏」查看
 * **论坛**：全部 + 5 个分类（综合 / 闲聊 / 求助 / 分享 / 创作），分页加载
 * **帖子详情**：作者信息、**富文本正文**（按 `content_format` 分流：html 富文本 / 历史 markdown）、内联图片、引用卡片、点赞 / 收藏（就地刷新，不重复计入浏览量）、楼中楼评论（两层：根 + 回复，深层压平并以「回复 @昵称」标注）、发评论 / 回复、删除自己的帖子 / 评论（二次确认）
 * **发帖**：分类选择、标题（≤ 100 字）、**自建 WYSIWYG 富文本编辑器**（跨段选区、粗/斜/下划线/删除线/行内代码/链接、H1~H3、有序/无序列表、引用、代码块、分割线、图片块、撤销重做）；提交时转成服务端白名单 HTML
 * **搜索**：帖子 + 用户，支持「全部 / 帖子 / 用户」筛选
 * **用户主页**：资料卡、关注 / 已关注、帖子 / 收藏 / 评论三个列表
-* **世界频道**：`GET /ov2/api/world/messages` + 20 秒轮询、富文本气泡（含图片）、全屏编辑器发送、头像可点进个人主页
+* **世界频道**：`GET /ov2/api/world/messages` + 20 秒轮询、富文本气泡（历史消息可能含图片）、**底部内联纯文本输入框直接发送**（不支持富文本与图片）、头像可点进个人主页
 * **WIKI**：原生 Compose 重写（首页 / 官方 / 个人 / 鼠标 / Linux 版）；仅 Live2D 交互模型子页保留“去壳 WebView”（注入样式隐藏网页头部 / 侧边栏 / 页脚，并把 CSS 变量改写为 App 配色）
 * **我的 / 设置**：主题（浅色 / 深色 / 跟随系统）、年制（无限年 / 公元年，含示例）、版本 / 服务端 / 客户端标识、**检查更新**、快捷入口
+* **启动公告**：每次冷启动弹一次，说明 ov2 APP 开发计划（本版本仍会收到必要的升级推送）
 * **支持作者**：我的页常驻赞赏码区块（远端图床图，由 Coil 落盘缓存，不重复下载）
 * **应用自更新**：冷启动静默检查（每 24 小时最多一次；也可在「我的 › 关于」手动检查）；下载回退链「直连 GitHub → 公共加速（ghproxy.net / gh-proxy.com / ghfast.top）→ 站内反代」，下载后校验体积 + sha256，再经 FileProvider 调起系统安装器（首次会引导「安装未知应用」授权）
 * **彩蛋**：底部第 6 个「彩蛋」标签（对齐网页手机端），每次随机奉上一条 `/Easter-Egg` 彩蛋或「每日一言」
@@ -233,7 +234,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **最低版本闸门（V1.0.11）**：与 Web / Windows 三端同源。`Constants` 新增 `CLIENT_PLATFORM = "android"` 与 `CLIENT_HEADERS`（`X-Client-Platform` / `X-Client-Version`），由 `clientHeaderInterceptor()` 挂在 OkHttp 请求链最外层——`Api.request`、头像上传、`fetchText`、`Updater` 下载客户端全自动携带；服务端对低于发布清单 `min_versions.android` 的请求返回 **HTTP 426 + `code=VERSION_TOO_LOW`**，客户端在 `Api.request` 里识别后写入 `App.versionGate`，`ForumRoot` 随即弹出**不可绕过**的「版本过低」弹窗（返回键 / 外部点击均无效，只有「去更新」与「退出应用」两个出口）。新增 `app/src/test/java/top/crazying/forum/core/VersionGateTest.kt`。
 * **全量迁移 `/ov2/api`（V1.1.0）**：`core/Api.kt` 不再保留任何 legacy `/api/*` 路径；登录/注册/改密/换绑/注销/帖子/评论/用户/搜索/世界/媒体/引用卡片/更新/彩蛋全部切换；同源 `Origin`/`Referer` 拦截器用于通过 ouo CSRF。
 * **ALTCHA v2（V1.1.0）**：`core/Altcha.kt` 纯 Kotlin 实现 PBKDF2-HMAC-SHA256 求解——**字节精确**的 `Mac` + `SecretKeySpec(passwordBytes, "HmacSHA256")`（不用 SecretKeyFactory/PBEKeySpec：后者会把 nonce 随机字节按 UTF-8 重编码）；worker 内复用 Mac 与缓冲区、≤4 worker、90s 超时、OOM 减半 worker 重试、取消/异常兜底。`Api` 自动拉 challenge → 求解 → `/captcha/verify` 换 5 分钟 `grant` 并缓存复用；失败 `CAPTCHA_REQUIRED` 自动重解重试一次；`ui/AltchaDialog.kt` 为极简等待卡片（不确定转圈 + 取消验证），失败时同一卡片内切换「具体原因 + 重试 / 取消」。
-* **自建富文本（V1.1.0）**：`core/richtext/RichDocument.kt`（模型 + HTML/Markdown 互转）+ `ui/richtext/RichTextView.kt`（正文/评论/世界渲染、图片、引用卡片）+ `RichTextEditor.kt`（跨段选区、块格式、图片、撤销重做）+ `RichTextEditorScreen.kt`（发帖/评论/世界共用全屏宿主）。图片上传走 `POST /ov2/api/media/images`。
+* **自建富文本（V1.1.0）**：`core/richtext/RichDocument.kt`（模型 + HTML/Markdown 互转）+ `ui/richtext/RichTextView.kt`（正文/评论/世界渲染、图片、引用卡片）+ `RichTextEditor.kt`（跨段选区、块格式、图片、撤销重做）+ `RichTextEditorScreen.kt`（发帖/评论共用全屏宿主）。图片上传走 `POST /ov2/api/media/images`。
 * **移除网页登录（V1.1.0）**：删除 `WebLoginScreen`、`WebAuth`、`importWebCookies`、`PrefsCookieJar.put` 与登录页入口；App 不再用 WebView 承载登录或人机验证。
 * **世界频道顺序**：`WorldFeed.newestLast()` 保持「早的在上、最新在下」，发送后自动滚到底部；列表读取改为 ov2 的 `{items,...}`。
 * **列表页返回保留浏览位置（V1.0.16）**：
@@ -244,7 +245,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **全量迁移 ov2 + ALTCHA + 自建富文本（V1.1.0）**：
   * 所有接口切换到 `/ov2/api`，不再使用 legacy 兼容层；同源 `Origin`/`Referer` 过 CSRF。
   * ALTCHA v2 纯 Kotlin 求解（字节精确 Mac、≤4 worker、90s 超时、失败重试）+ grant 缓存 + 极简等待/失败弹窗；本地端到端测试验证 challenge → solve → verify → grant。
-  * 自建富文本模型/解析/序列化/跨段选区编辑器/图片上传/引用卡片；发帖、评论、世界频道共用编辑器。
+  * 自建富文本模型/解析/序列化/跨段选区编辑器/图片上传/引用卡片；发帖、评论共用编辑器（世界频道已改为内联纯文本输入）。
   * 账号流程按 ov2 重做：邮箱验证码注册、当前密码改密、四步换绑、密码+用户名注销；移除网页登录与旧滑块/Turnstile。
   * 版本号 versionCode 20 / versionName 1.1.0；隐私政策 2.2。
 
@@ -282,6 +283,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **WIKI 已全面原生化**：首页 / 官方 / 个人 / 鼠标 / Linux 版均为 Compose；仅 **Live2D 交互模型** 子页保留 WebView（网页 canvas + Live2D 运行时，无法用 Compose 复刻），并在 `onPageFinished` 注入样式隐藏网页外壳、改写 CSS 变量为当前 App 配色。
 * **WebView 仅 Live2D**：网页登录与 Turnstile/滑块验证已整体移除；新增 WebView 界面仍应避免放进 Dialog（独立窗口下层级/命中区会错位）。
 * **富文本编辑器限制**：列表不嵌套；图片/分割线是原子块，选区不能跨过；粘贴一律按纯文本拆段；不支持表格/分栏。
+* **世界频道发送限制**：仅支持纯文本（发送前转义特殊字符、换行转 `<br>` 后按 `content_html` 提交）；历史消息仍按富文本渲染，但发送端不再提供图片与格式。
 * **ALTCHA 求解耗时**：服务端默认 cost=5000，手机端可能需要数秒；求解用字节精确的 `Mac`（≤4 worker、90s 超时、OOM 减半重试），等待弹窗只显示不确定转圈与「取消验证」，失败可在同一卡片重试/取消；解出的 `grant` 缓存 5 分钟复用。客户端 `cost` 上限为 20000，服务端 `ALTCHA_COST` 若调高必须同步客户端，否则会报「安全验证数据异常」。
 * **调试基址**：debug 构建可用 `-PapiBaseUrl=http://10.0.2.2:8090` 指向本地 ouo；release 始终使用 `https://www.yjlt.top`。
 * **`auto` 主题语义**：Android 取「跟随系统深色模式」，与 Web / Windows 的「小时切换」不同（有意为之）。

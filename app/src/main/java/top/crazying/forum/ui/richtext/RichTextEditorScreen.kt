@@ -23,7 +23,7 @@ import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.components.GhostButton
 
 /**
- * 全屏编辑宿主：发帖、评论、世界频道共用。
+ * 全屏编辑宿主：发帖、评论共用（世界频道已改为页面内联纯文本输入）。
  *
  * 顶部固定「取消 / 标题 / 发布」，中间可选 header（发帖页放标题与分类），
  * 下方是共享的 `RichTextEditor`。

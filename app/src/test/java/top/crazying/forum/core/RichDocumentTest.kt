@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import top.crazying.forum.core.richtext.RichBlock
 import top.crazying.forum.core.richtext.RichDocument
+import top.crazying.forum.core.richtext.RichHtml
 import top.crazying.forum.core.richtext.RichSpan
 
 /**
@@ -233,5 +234,24 @@ class RichDocumentTest {
         val html = doc.toHtml()
         assertTrue(html.contains("<ul>"))
         assertTrue(html.contains("<li>第一</li>"))
+    }
+
+    @Test
+    fun fromPlainText_escapesAndKeepsLineBreaks() {
+        // 纯文本里的 < / & 必须转义，否则会被当成标签或被服务端净化器吞掉。
+        assertEquals("<p>a &lt; b &amp; c</p>", RichHtml.fromPlainText("a < b & c"))
+        // 换行转 <br>，保证 Web / Android 两端断行一致（字面 \n 在 HTML 里会被折叠）。
+        assertEquals("<p>第一行<br>第二行</p>", RichHtml.fromPlainText("第一行\n第二行"))
+        // Windows 来源的 CRLF / 单独 CR 也要归一成 <br>。
+        assertEquals("<p>第一行<br>第二行<br>第三行</p>", RichHtml.fromPlainText("第一行\r\n第二行\r第三行"))
+        assertEquals("", RichHtml.fromPlainText(""))
+    }
+
+    @Test
+    fun fromPlainText_roundTripsThroughParser() {
+        val doc = RichDocument.fromHtml(RichHtml.fromPlainText("第一行\n第二行"))
+
+        val paragraph = doc.blocks.single() as RichBlock.Paragraph
+        assertEquals("第一行\n第二行", paragraph.spans.joinToString("") { it.text })
     }
 }

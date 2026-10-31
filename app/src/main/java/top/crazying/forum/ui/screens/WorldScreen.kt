@@ -1,10 +1,7 @@
 package top.crazying.forum.ui.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,60 +16,70 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
 import top.crazying.forum.core.Constants
 import top.crazying.forum.core.TimeFmt
 import top.crazying.forum.core.WorldFeed
+import top.crazying.forum.core.takeCodePoints
 import top.crazying.forum.core.richtext.RichDocument
+import top.crazying.forum.core.richtext.RichHtml
 import top.crazying.forum.data.WorldMessage
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.*
-import top.crazying.forum.ui.richtext.RichTextEditorScreen
 import top.crazying.forum.ui.richtext.RichTextView
-import top.crazying.forum.ui.richtext.rememberRichEditorState
+import java.util.concurrent.atomic.AtomicInteger
 
-/** 世界频道图片上限：与服务端 `media.MaxInputBytes`（5MB）一致。 */
-private const val WORLD_IMAGE_MAX_BYTES = 5 * 1024 * 1024
-
-/** 从 MIME 推断扩展名（服务端只接受 jpeg / png / webp / gif）。 */
-private fun worldImageExt(mime: String): String = when {
-    mime.contains("png", ignoreCase = true) -> "png"
-    mime.contains("webp", ignoreCase = true) -> "webp"
-    mime.contains("gif", ignoreCase = true) -> "gif"
-    else -> "jpg"
-}
+/**
+ * 世界频道单条消息上限（Unicode 码点）：
+ * 与服务端 `worldMaxContentRunes`（2000）一致；按码点截断不会切断 emoji 代理对。
+ */
+private const val WORLD_TEXT_MAX_CHARS = 2000
 
 /**
  * 世界频道。
  *
- * 本轮用「拉取 `/api/world/messages` + 20 秒轮询」而不是 WebSocket，
+ * 本轮用「拉取 `/ov2/api/world/messages` + 20 秒轮询」而不是 WebSocket，
  * 好处是不必引入长连接与重连状态机，代价是消息有最多 20 秒延迟（已在 README 标注）。
- * 消息正文是富文本 HTML，气泡内用 [RichTextView] 渲染；发送走全屏编辑器。
+ *
+ * 发送只支持**纯文本**：底部直接内联输入框，不再打开全屏富文本编辑器。
+ * 历史消息仍是富文本 HTML（可能含图片），气泡内继续用 [RichTextView] 渲染。
  */
 @Composable
-fun WorldScreen(nav: Navigator) {
+fun WorldScreen(nav: Navigator, store: FeedStateStore, scope: CoroutineScope) {
     val colors = ForumTheme.colors
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val meId = App.userId
     val listState = rememberLazyListState()
+
+    // 草稿 / 发送状态放在根节点持有的 store 里：切 tab、点进用户主页再回来都不丢。
+    val ws = store.world
 
     var messages by remember { mutableStateOf<List<WorldMessage>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
-    /** 全屏发送器是否可见。 */
-    var composing by remember { mutableStateOf(false) }
+    /** 列表请求序号：只采用最后一次请求的响应，避免轮询/手动刷新互相覆盖。 */
+    val loadSeq = remember { AtomicInteger(0) }
     /** 需要在下一帧把列表滚到底（首次加载 / 刚发完消息）。 */
     var pendingScrollToBottom by remember { mutableStateOf(false) }
+
+    // 键盘弹出时列表视口变矮，聊天页面应保持最新消息可见。
+    val density = LocalDensity.current
+    val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
+    LaunchedEffect(keyboardVisible) {
+        if (keyboardVisible && messages.isNotEmpty()) {
+            runCatching { listState.scrollToItem(messages.lastIndex) }
+        }
+    }
 
     // 列表更新后再滚动：此时 LazyColumn 已经拿到新数据，scrollToItem 才生效。
     LaunchedEffect(messages) {
@@ -83,8 +90,11 @@ fun WorldScreen(nav: Navigator) {
     }
 
     suspend fun load(silent: Boolean = false, toBottom: Boolean = false) {
+        val seq = loadSeq.incrementAndGet()
         if (!silent) loading = true
         val result = App.api.worldAll()
+        // 期间又发起了新请求：本次响应已过期，直接丢弃。
+        if (seq != loadSeq.get()) return
         if (!silent) loading = false
         if (!result.ok) {
             if (!silent) error = result.message
@@ -109,47 +119,68 @@ fun WorldScreen(nav: Navigator) {
         }
     }
 
-    /** 打开全屏发送器；未登录先去登录页。 */
-    fun openComposer() {
+    /** 发送纯文本：未登录先去登录页；成功后清空草稿并刷新到最新。 */
+    fun send() {
+        if (ws.sending) return
         if (!App.isLoggedIn) {
             toast(context, "请先登录")
             nav.push(Screen.Auth())
             return
         }
-        composing = true
+        val text = ws.draft.trim()
+        if (text.isEmpty()) {
+            toast(context, "说点什么吧")
+            return
+        }
+        ws.sending = true
+        // 用根级 scope：发送中切 tab / 点进主页也不会取消请求与结果处理。
+        scope.launch {
+            // 服务端契约仍是 content_html：纯文本必须转义 + 换行转 <br> 后再发。
+            val result = App.api.worldSend(RichHtml.fromPlainText(text))
+            ws.sending = false
+            if (result.ok) {
+                // 发送期间用户可能已继续编辑：只清空仍等于本次发送内容的草稿。
+                if (ws.draft.trim() == text) ws.draft = ""
+                toast(context, "已发送")
+                load(silent = true, toBottom = true)
+            } else {
+                toast(context, result.message)
+            }
+        }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(colors.bgBody)) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(colors.bgBody)
-                .statusBarsPadding(),
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bgBody)
+            .statusBarsPadding(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("世界频道", color = colors.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "最近 ${Constants.WORLD_LIMIT} 条 · 每 20 秒自动刷新",
-                        color = colors.textMuted,
-                        fontSize = 12.sp,
-                    )
-                }
-                IconButton(onClick = { scope.launch { load() } }) {
-                    Icon(Icons.Default.Refresh, contentDescription = "刷新", tint = colors.textPrimary)
-                }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("世界频道", color = colors.textPrimary, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "最近 ${Constants.WORLD_LIMIT} 条 · 每 20 秒自动刷新",
+                    color = colors.textMuted,
+                    fontSize = 12.sp,
+                )
             }
+            IconButton(onClick = { scope.launch { load() } }) {
+                Icon(Icons.Default.Refresh, contentDescription = "刷新", tint = colors.textPrimary)
+            }
+        }
 
+        // 列表区占满剩余高度：否则「加载中 / 空 / 错误」占位时输入行会浮到页面中间。
+        Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             when {
                 loading && messages.isEmpty() -> LoadingBox()
                 error.isNotBlank() && messages.isEmpty() -> ErrorBox(error, onRetry = { scope.launch { load() } })
                 messages.isEmpty() -> EmptyBox("世界频道暂无消息")
                 else -> LazyColumn(
                     state = listState,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -162,139 +193,50 @@ fun WorldScreen(nav: Navigator) {
                     }
                 }
             }
+        }
 
-            // 底部只留一行「说点什么…」触发器，真正的编辑在覆盖式全屏编辑器里完成。
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.bgHeader)
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        // 底部直接内联纯文本输入框（不支持富文本，也不再打开全屏编辑器）。
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(colors.bgHeader)
+                .imePadding()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            if (App.isLoggedIn) {
+                ForumTextField(
+                    value = ws.draft,
+                    onValueChange = { ws.draft = takeCodePoints(it, WORLD_TEXT_MAX_CHARS) },
+                    placeholder = "说点什么…",
+                    singleLine = false,
+                    maxLines = 4,
+                    minHeight = 44.dp,
+                    modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                PrimaryButton(
+                    text = if (ws.sending) "发送中…" else "发送",
+                    enabled = ws.draft.isNotBlank() && !ws.sending,
+                    onClick = { send() },
+                )
+            } else {
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(10.dp))
                         .background(colors.bgInput)
-                        .clickable { openComposer() }
+                        .clickable {
+                            toast(context, "请先登录")
+                            nav.push(Screen.Auth())
+                        }
                         .padding(horizontal = 12.dp, vertical = 11.dp),
                 ) {
-                    Text("说点什么…", color = colors.textMuted, fontSize = 14.sp, maxLines = 1)
+                    Text("登录后参与聊天", color = colors.textMuted, fontSize = 14.sp, maxLines = 1)
                 }
             }
         }
-
-        if (composing) {
-            // 背景带点击拦截：避免点击穿透到下面被覆盖的消息列表。
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(colors.bgBody)
-                    .pointerInput(Unit) { detectTapGestures { } },
-            ) {
-                WorldComposer(
-                    onCancel = { composing = false },
-                    onSent = {
-                        composing = false
-                        scope.launch { load(silent = true, toBottom = true) }
-                    },
-                )
-            }
-        }
     }
-}
-
-/**
- * 世界频道发送器：全屏富文本编辑器，发送成功后由宿主刷新列表并滚到底。
- *
- * 每次打开都是全新的一次编辑（状态随组合销毁而丢弃）。
- */
-@Composable
-private fun WorldComposer(
-    onCancel: () -> Unit,
-    onSent: () -> Unit,
-) {
-    val colors = ForumTheme.colors
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val editor = rememberRichEditorState()
-    var sending by remember { mutableStateOf(false) }
-    var uploading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf("") }
-
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val bytes = runCatching {
-                context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            }.getOrNull()
-            if (bytes == null) {
-                toast(context, "读取图片失败")
-                return@launch
-            }
-            if (bytes.size > WORLD_IMAGE_MAX_BYTES) {
-                toast(context, "图片不能超过 5MB")
-                return@launch
-            }
-            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
-            uploading = true
-            val result = App.api.uploadImage(bytes, "image." + worldImageExt(mime), mime, "world_message")
-            uploading = false
-            if (result.ok) {
-                val url = result.str("url")
-                if (url.isNotBlank()) editor.insertImage(url) else toast(context, "上传成功但未返回图片地址")
-            } else {
-                toast(context, result.message)
-            }
-        }
-    }
-
-    fun send() {
-        if (sending || uploading) return
-        error = ""
-        if (editor.toDocument().isBlank) {
-            error = "说点什么吧"
-            toast(context, error)
-            return
-        }
-        sending = true
-        scope.launch {
-            val result = App.api.worldSend(editor.toHtml())
-            sending = false
-            if (result.ok) {
-                toast(context, "已发送")
-                onSent()
-            } else {
-                error = result.message
-                toast(context, result.message)
-            }
-        }
-    }
-
-    RichTextEditorScreen(
-        state = editor,
-        title = "世界频道",
-        publishLabel = "发送",
-        publishing = sending,
-        uploadingImage = uploading,
-        placeholder = "说点什么…",
-        overlay = true,
-        header = {
-            if (error.isNotBlank()) {
-                Text(
-                    text = error,
-                    color = colors.danger,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                )
-            }
-        },
-        onPickImage = { pickImage.launch("image/*") },
-        onCancel = { if (!sending) onCancel() },
-        onPublish = { send() },
-    )
 }
 
 @Composable

@@ -212,6 +212,18 @@ object RichHtml {
         return out.toString()
     }
 
+    /**
+     * 纯文本 → 服务端白名单内的 HTML：转义特殊字符、换行转 `<br>`、外层包一个 `<p>`。
+     *
+     * 世界频道只收纯文本（不支持富文本），但服务端契约仍是 `content_html`，
+     * 所以发送前必须做这一步，避免 `<` / `&` 被当成标签或被净化器吞掉。
+     * `\r\n` / `\r` 先归一为 `\n`，避免 Windows 来源的换行在 Web 端被折叠。
+     */
+    fun fromPlainText(text: String): String =
+        if (text.isEmpty()) "" else
+            "<p>" + escapeText(text.replace("\r\n", "\n").replace('\r', '\n'))
+                .replace("\n", "<br>") + "</p>"
+
     // ────────────────── 解析 ──────────────────
 
     fun parse(html: String): RichDocument {
