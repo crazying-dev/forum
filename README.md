@@ -384,9 +384,10 @@ ls -l app/build/outputs/apk/release/app-release.apk
 | Android SDK | `platform-tools`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
 | 命令 | `JAVA_HOME=/home/yoyo/.jdks/jbr-21.0.11 bash ./gradlew testDebugUnitTest assembleDebug` |
-| 结果 | **BUILD SUCCESSFUL**（**129 tests，128 通过 + 1 跳过**：AltchaTest 21 / AltchaUiTest 6 / AltchaLiveTest（env 缺省跳过）1 / RichDocumentTest 16 / TextLimitTest 5 / ModelsTest 5 / TimeFmtTest 18 / UpdateParserTest 19 / VersionGateTest 10 / FeedStateTest 9 / CachePolicyTest 7 / MarkdownBodyTest 6 / WorldFeedTest 6） |
+| 结果 | **BUILD SUCCESSFUL**（**131 tests，130 通过 + 1 跳过**：AltchaTest 23 / AltchaUiTest 6 / AltchaLiveTest（env 缺省跳过）1 / RichDocumentTest 16 / TextLimitTest 5 / ModelsTest 5 / TimeFmtTest 18 / UpdateParserTest 19 / VersionGateTest 10 / FeedStateTest 9 / CachePolicyTest 7 / MarkdownBodyTest 6 / WorldFeedTest 6） |
 | Debug 产物（V1.1.0） | `app/build/outputs/apk/debug/app-debug.apk`，**12 351 071 字节**，sha256 `b06790802636f2da90e60069e713bd9743de3046081000b647634df25c8c9253`；`BuildConfig.API_BASE_URL=https://www.yjlt.top` 已核对；release 见下一行（本机以环境变量注入签名凭据构建） |
 | Release 产物（V1.1.0 本地签名验证） | `app/build/outputs/apk/release/app-release.apk`，**8 234 428 字节**，sha256 `bcf69a164818ad759888b557e6b533abb141a5e461b74f217426d88828dab208`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`（与旧版一致）；构建命令含 `-PexpectedVersion=1.1.0` |
+| Release 产物（V1.2.0 CI 构建） | `forum-android-1.2.0.apk`，**8 234 428 字节**，sha256 `e88020b33d3d5817d5f5938ccd4d0646999a4a9dc534887bb55dec5602fa92a2`，签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`；发布页 <https://github.com/yoyo-ouo/yj-forum-ouo/releases/tag/Android-V1.2.0>（发版说明取自附注 tag 的注解正文） |
 | Release 产物（V1.0.18） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `f410be372e0b5c0327d6d64a6ca8e8fc4efc5f2ee56fd56645f877616875f276`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`；发布包副本 `release\forum-android-1.0.18.apk` |
 | 历史 Release 产物（V1.0.17） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `0d36a0626ed8e870eed4a1497c7178ae8e76fea9178cdcf5288b68b4ad399287` |
 | 历史 Release 产物（V1.0.16） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61` |
