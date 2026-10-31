@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
 import top.crazying.forum.core.TimeFmt
@@ -550,14 +551,22 @@ private fun CommentEditor(
         }
         publishing = true
         scope.launch {
-            val result = App.api.createComment(postId, editor.toHtml(), replyTo?.id)
-            publishing = false
-            if (result.ok) {
-                toast(context, "评论已发布")
-                onPublished(result.jsonObj("comment")?.let { CommentItem.from(it) })
-            } else {
-                error = result.message
-                toast(context, result.message)
+            try {
+                val result = App.api.createComment(postId, editor.toHtml(), replyTo?.id)
+                if (result.ok) {
+                    toast(context, "评论已发布")
+                    onPublished(result.jsonObj("comment")?.let { CommentItem.from(it) })
+                } else {
+                    error = result.message
+                    toast(context, result.message)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                error = "发布失败，请重试"
+                toast(context, error)
+            } finally {
+                publishing = false
             }
         }
     }

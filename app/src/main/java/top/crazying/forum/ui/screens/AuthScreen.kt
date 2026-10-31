@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
@@ -30,7 +31,7 @@ import top.crazying.forum.ui.components.toast
  * 登录 / 注册页。
  *
  * 登录用「用户名 / 邮箱 + 密码」；注册需先向邮箱发送验证码，再连同用户名、邮箱、密码一并提交。
- * 人机验证由 [top.crazying.forum.core.Api] 内部自动完成（全局 ALTCHA 遮罩），页面不再直接处理。
+ * 人机验证由 [top.crazying.forum.core.Api] 内部自动完成（全局 ALTCHA 等待/失败弹窗），页面不再直接处理。
  */
 @Composable
 fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
@@ -66,13 +67,20 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
         }
         sendingCode = true
         scope.launch {
-            val result = App.api.sendRegisterCode(email.trim())
-            sendingCode = false
-            if (result.ok) {
-                codeCountdown = 60
-                toast(context, result.message.ifBlank { "验证码已发送至邮箱" })
-            } else {
-                error = result.message
+            try {
+                val result = App.api.sendRegisterCode(email.trim())
+                if (result.ok) {
+                    codeCountdown = 60
+                    toast(context, result.message.ifBlank { "验证码已发送至邮箱" })
+                } else {
+                    error = result.message
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                error = "发送验证码失败，请重试"
+            } finally {
+                sendingCode = false
             }
         }
     }
@@ -109,18 +117,25 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
 
         busy = true
         scope.launch {
-            val result = if (register) {
-                App.api.register(account.trim(), email.trim(), password, code.trim())
-            } else {
-                // ov2 的 identifier 统一走 name 字段，服务端同时接受用户名与邮箱。
-                App.api.login(name = account.trim(), password = password)
-            }
-            busy = false
-            if (result.ok) {
-                toast(context, if (register) "注册成功" else "登录成功")
-                nav.pop()
-            } else {
-                error = result.message
+            try {
+                val result = if (register) {
+                    App.api.register(account.trim(), email.trim(), password, code.trim())
+                } else {
+                    // ov2 的 identifier 统一走 name 字段，服务端同时接受用户名与邮箱。
+                    App.api.login(name = account.trim(), password = password)
+                }
+                if (result.ok) {
+                    toast(context, if (register) "注册成功" else "登录成功")
+                    nav.pop()
+                } else {
+                    error = result.message
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                error = "操作失败，请重试"
+            } finally {
+                busy = false
             }
         }
     }

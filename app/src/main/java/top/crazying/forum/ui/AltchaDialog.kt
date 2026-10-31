@@ -2,18 +2,20 @@ package top.crazying.forum.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -24,27 +26,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.crazying.forum.core.AltchaUi
+import top.crazying.forum.core.Phase
+import top.crazying.forum.theme.ForumColors
 import top.crazying.forum.theme.ForumTheme
-import java.util.Locale
+import top.crazying.forum.ui.components.PrimaryButton
 
 /**
- * ALTCHA 求解遮罩宿主（挂在 ForumRoot 最后）。
+ * ALTCHA 等待/失败弹窗宿主（挂在 ForumRoot 最后）。
  *
- * 纯进度层，不拦截业务输入；求解期间用户只能「取消」，取消后本次操作中止。
+ * 极简卡片：求解中只给不确定转圈 + 取消；失败时同卡片内切换原因与「重试 / 取消」。
+ * 遮罩层消费点击，避免穿透到页面；按钮是上层子节点，仍可正常点击。
  */
 @Composable
 fun AltchaHost() {
-    if (!AltchaUi.solving.value) return
+    val phase by AltchaUi.phase
+    if (phase == Phase.Idle) return
     val colors = ForumTheme.colors
-    val progress by AltchaUi.progress
-    val attempts by AltchaUi.attempts
-    val elapsed by AltchaUi.elapsedMs
-    val hint by AltchaUi.hint
+    val failure by AltchaUi.failureMessage
 
     BackHandler { AltchaUi.cancel() }
 
@@ -52,58 +57,97 @@ fun AltchaHost() {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.62f))
+            .pointerInput(Unit) { detectTapGestures { } }
             .statusBarsPadding()
             .navigationBarsPadding()
             .imePadding(),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 22.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(colors.bgCard)
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = "安全验证",
-                color = colors.textPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-            CircularProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                color = colors.primary,
-                trackColor = colors.bgItemActive,
-                strokeWidth = 4.dp,
-                modifier = Modifier.height(46.dp),
-            )
-            Text(
-                text = hint,
-                color = colors.textSecondary,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = "已尝试 ${attempts} 次 · ${String.format(Locale.US, "%.1f", elapsed / 1000.0)}s",
-                color = colors.textMuted,
-                fontSize = 12.sp,
-            )
-            Text(
-                text = "ALTCHA 工作量证明在本机完成，不会上传你的密码或内容。",
-                color = colors.textMuted,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(2.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = { AltchaUi.cancel() }) {
-                    Text("取消验证", color = colors.danger)
+            val cardWidth = minOf(maxWidth * 0.8f, 300.dp)
+            Column(
+                modifier = Modifier
+                    .width(cardWidth)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(colors.bgCard)
+                    .padding(22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                when (phase) {
+                    Phase.Solving -> SolvingContent(colors)
+                    Phase.Failed -> FailedContent(colors, failure)
+                    Phase.Idle -> Unit
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SolvingContent(colors: ForumColors) {
+        CircularProgressIndicator(
+            color = colors.primary,
+            // 浅色主题的 bgItemActive 偏白，改用品牌色低透明度，避免近白环。
+            trackColor = colors.primary.copy(alpha = 0.15f),
+            strokeWidth = 4.dp,
+            modifier = Modifier.size(44.dp),
+        )
+    Text(
+        text = "正在验证…",
+        color = colors.textPrimary,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+        text = "请稍候，马上就好",
+        color = colors.textMuted,
+        fontSize = 12.5.sp,
+        textAlign = TextAlign.Center,
+    )
+    TextButton(onClick = { AltchaUi.cancel() }) {
+        Text("取消验证", color = colors.textMuted, fontSize = 13.sp)
+    }
+}
+
+@Composable
+private fun FailedContent(colors: ForumColors, message: String) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(colors.danger.copy(alpha = 0.14f))
+            .clearAndSetSemantics { },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "!",
+            color = colors.danger,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+    Text(
+        text = "验证失败",
+        color = colors.textPrimary,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Text(
+        text = message,
+        color = colors.textMuted,
+        fontSize = 12.5.sp,
+        textAlign = TextAlign.Center,
+    )
+    PrimaryButton(
+        text = "重试",
+        onClick = { AltchaUi.retry() },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    TextButton(onClick = { AltchaUi.cancel() }) {
+        Text("取消", color = colors.textMuted, fontSize = 13.sp)
     }
 }

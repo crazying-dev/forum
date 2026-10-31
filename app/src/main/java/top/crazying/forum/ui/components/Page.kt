@@ -2,6 +2,8 @@ package top.crazying.forum.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -25,10 +27,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
@@ -110,12 +117,23 @@ fun ForumTextField(
     modifier: Modifier = Modifier,
 ) {
     val colors = ForumTheme.colors
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(colors.bgInput)
             .border(1.dp, colors.border, RoundedCornerShape(10.dp))
+            // 整个视觉框都可点：外层的 11dp padding 不再是无响应死区。
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+            ) {
+                focusRequester.requestFocus()
+                keyboard?.show()
+            }
             .padding(horizontal = 12.dp, vertical = 11.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -132,7 +150,13 @@ fun ForumTextField(
             keyboardOptions = keyboardOptions,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = minHeight - 22.dp),
+                .heightIn(min = minHeight - 22.dp)
+                .focusRequester(focusRequester)
+                .onFocusChanged { state ->
+                    // 部分 OEM/输入法在“已聚焦但键盘被收起”时不会自动再弹；
+                    // 聚焦时主动 show 一次，保证点击输入框能唤出键盘。
+                    if (state.isFocused) keyboard?.show()
+                },
         )
     }
 }

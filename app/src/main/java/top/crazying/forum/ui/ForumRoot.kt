@@ -156,12 +156,12 @@ fun ForumRoot() {
 
                 // 发现新版本时由 App.updateInfo 驱动弹出（冷启动自动检查 / 设置页手动检查）
                 UpdateDialogHost()
-
-                // ALTCHA 求解进度遮罩：由 Api 内部的 CaptchaSession 自动驱动。
-                // 放在最后，保证叠在页面自带的 AlertDialog（如注销二次确认）之上。
-                AltchaHost()
             }
         }
+
+        // ALTCHA 等待/失败弹窗：由 Api.ensureCaptchaProof() 自动驱动。
+        // 放在 Scaffold 之外，覆盖底部导航栏，验证期间不允许切换 tab。
+        AltchaHost()
     }
 }
 

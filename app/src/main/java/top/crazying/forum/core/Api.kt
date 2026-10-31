@@ -1,5 +1,6 @@
 package top.crazying.forum.core
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -274,29 +275,38 @@ class Api(private val prefs: Prefs) {
         json: JSONObject? = null,
         captcha: Boolean = false,
     ): ApiResult = withContext(Dispatchers.IO) {
-        val verb = method.uppercase()
-        var proof: ProofResult = ProofResult.None
-        if (captcha) {
-            proof = ensureCaptchaProof()
-            when (proof) {
-                is ProofResult.Cancelled -> return@withContext ApiResult(0, null, "已取消安全验证")
-                is ProofResult.Failed -> return@withContext ApiResult(0, null, proof.message)
-                else -> Unit
+        try {
+            val verb = method.uppercase()
+            var proof: ProofResult = ProofResult.None
+            if (captcha) {
+                proof = ensureCaptchaProof()
+                when (proof) {
+                    is ProofResult.Cancelled -> return@withContext ApiResult(0, null, "已取消安全验证")
+                    is ProofResult.Failed -> return@withContext ApiResult(0, null, proof.message)
+                    else -> Unit
+                }
             }
-        }
-        var result = execute(verb, path, params, applyProof(json, proof))
-        if (captcha && isCaptchaRequired(result)) {
-            // grant 可能过期 / 绑定 IP 变化：清缓存后重新求解，只重试一次。
-            invalidateCaptcha()
-            val retry = ensureCaptchaProof(force = true)
-            when (retry) {
-                is ProofResult.Cancelled -> return@withContext ApiResult(0, null, "已取消安全验证")
-                is ProofResult.Failed -> return@withContext ApiResult(0, null, retry.message)
-                else -> result = execute(verb, path, params, applyProof(json, retry))
+            var result = execute(verb, path, params, applyProof(json, proof))
+            if (captcha && isCaptchaRequired(result)) {
+                // grant 可能过期 / 绑定 IP 变化：清缓存后重新求解，只重试一次。
+                invalidateCaptcha()
+                val retry = ensureCaptchaProof(force = true)
+                when (retry) {
+                    is ProofResult.Cancelled -> return@withContext ApiResult(0, null, "已取消安全验证")
+                    is ProofResult.Failed -> return@withContext ApiResult(0, null, retry.message)
+                    else -> result = execute(verb, path, params, applyProof(json, retry))
+                }
             }
+            handleStatus(result)
+            result
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: OutOfMemoryError) {
+            ApiResult(0, null, "设备内存不足，请重试")
+        } catch (t: Throwable) {
+            // 兜底文案固定，避免把内部异常 message 直接展示给用户。
+            ApiResult(0, null, "网络错误，请检查网络连接后重试")
         }
-        handleStatus(result)
-        result
     }
 
     suspend fun get(path: String, params: Map<String, Any?>? = null): ApiResult =
@@ -344,11 +354,16 @@ class Api(private val prefs: Prefs) {
         grantExpiresAt = 0L
     }
 
+    /** 失败弹窗等待用户选择：true = 重试，false = 取消。 */
+    private suspend fun awaitCaptchaRetry(message: String): Boolean =
+        AltchaUi.fail(message) == Decision.Retry
+
     /**
      * 确保拿到可复用的 grant：
      * 1) 已缓存且未过期 → 直接复用；
      * 2) 服务端未启用 → 返回 None（不带字段）；
-     * 3) 否则拉 challenge → 本地求解 → `/captcha/verify` 换 grant。
+     * 3) 否则拉 challenge → 本地求解 → `/captcha/verify` 换 grant；
+     *    求解失败（超时/未命中/异常/OOM）在弹窗内提供「重试 / 取消」，重试会重新拉 challenge。
      */
     private suspend fun ensureCaptchaProof(force: Boolean = false): ProofResult =
         captchaMutex.withLock {
@@ -361,55 +376,160 @@ class Api(private val prefs: Prefs) {
                 }
             }
 
-            val challengeRes = execute("GET", api("captcha/challenge"), null, null)
-            if (challengeRes.status == 404 || challengeRes.message.contains("CAPTCHA_DISABLED")) {
-                captchaDisabledUntil = System.currentTimeMillis() + 10 * 60_000L
-                return@withLock ProofResult.None
-            }
-            if (!challengeRes.ok) return@withLock ProofResult.Failed(challengeRes.message)
-            val challenge = Altcha.parse(challengeRes.obj())
-                ?: return@withLock ProofResult.Failed("安全验证数据异常")
-            if (Altcha.isExpired(challenge)) {
-                return@withLock ProofResult.Failed("安全验证已过期，请重试")
-            }
+            var workers = Altcha.defaultWorkers()
+            var oomRetried = false
 
+            // 进入验证即展示转圈：challenge 拉取期间也可取消（重试后同理）。
             AltchaUi.begin()
             try {
-                val solution = Altcha.solve(
-                    challenge = challenge,
-                    onProgress = { attempts, elapsed ->
-                        AltchaUi.update(attempts, elapsed, challenge.cost)
-                    },
-                    isCancelled = { AltchaUi.isCancelled() },
-                )
-                if (solution == null) {
-                    return@withLock if (AltchaUi.isCancelled()) {
-                        ProofResult.Cancelled
-                    } else {
-                        ProofResult.Failed("安全验证未通过，请重试")
+                while (true) {
+                    try {
+                        // 1) 拉 challenge（首次与每次重试都重新拉，避免用过期/一次性挑战）。
+                        val challengeRes = execute("GET", api("captcha/challenge"), null, null)
+                        if (AltchaUi.isCancelled()) {
+                            AltchaUi.end()
+                            return@withLock ProofResult.Cancelled
+                        }
+                        if (challengeRes.status == 404 ||
+                            challengeRes.message.contains("CAPTCHA_DISABLED")
+                        ) {
+                            captchaDisabledUntil = System.currentTimeMillis() + 10 * 60_000L
+                            return@withLock ProofResult.None
+                        }
+                        if (!challengeRes.ok) return@withLock ProofResult.Failed(challengeRes.message)
+                        val challenge = Altcha.parse(challengeRes.obj())
+                            ?: return@withLock ProofResult.Failed("安全验证数据异常")
+                        if (Altcha.isExpired(challenge)) {
+                            return@withLock ProofResult.Failed("安全验证已过期，请重试")
+                        }
+
+                        // 2) 求解：worker 上限 4、90s 超时；OOM 时 worker 减半重试同一挑战一次。
+                        var outcome: SolveOutcome? = null
+                        var failure: String? = null
+                        solve@ while (true) {
+                            try {
+                                outcome = Altcha.solve(
+                                    challenge = challenge,
+                                    workers = workers,
+                                    deadlineMs = 90_000L,
+                                    isCancelled = { AltchaUi.isCancelled() },
+                                )
+                                break@solve
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: OutOfMemoryError) {
+                                if (!oomRetried) {
+                                    oomRetried = true
+                                    workers = (workers / 2).coerceAtLeast(1)
+                                    continue@solve
+                                }
+                                failure = "设备内存不足，请重试"
+                                break@solve
+                            } catch (t: Throwable) {
+                                failure = "安全验证失败，请重试"
+                                break@solve
+                            }
+                        }
+
+                        if (failure != null) {
+                            if (awaitCaptchaRetry(failure)) {
+                                workers = Altcha.defaultWorkers()
+                                oomRetried = false
+                                continue
+                            }
+                            return@withLock ProofResult.Cancelled
+                        }
+
+                        // 3) 结果处理
+                        when (val result = outcome ?: SolveOutcome.NoMatch) {
+                            is SolveOutcome.Solved -> {
+                                if (AltchaUi.isCancelled()) {
+                                    AltchaUi.end()
+                                    return@withLock ProofResult.Cancelled
+                                }
+                                val payload = Altcha.payload(challenge, result.solution)
+                                val verifyRes = execute(
+                                    "POST",
+                                    api("captcha/verify"),
+                                    null,
+                                    JSONObject().put("altcha", payload),
+                                )
+                                if (verifyRes.status == 404 ||
+                                    verifyRes.message.contains("CAPTCHA_DISABLED")
+                                ) {
+                                    captchaDisabledUntil = System.currentTimeMillis() + 10 * 60_000L
+                                    return@withLock ProofResult.None
+                                }
+                                val grant = verifyRes.str("grant").trim()
+                                if (!verifyRes.ok || grant.isEmpty()) {
+                                    val reason = when {
+                                        verifyRes.status == 0 -> "网络异常，请检查连接后重试"
+                                        !verifyRes.ok -> "安全验证失败，请重试"
+                                        else -> "安全验证返回异常"
+                                    }
+                                    if (awaitCaptchaRetry(reason)) {
+                                        workers = Altcha.defaultWorkers()
+                                        oomRetried = false
+                                        continue
+                                    }
+                                    return@withLock ProofResult.Cancelled
+                                }
+                                if (!AltchaUi.finishSuccess()) return@withLock ProofResult.Cancelled
+                                val ttl = verifyRes.int("expires_in", 300).coerceAtLeast(60) * 1000L
+                                grantValue = grant
+                                grantExpiresAt = System.currentTimeMillis() + ttl - 10_000L
+                                return@withLock ProofResult.Ready(grant)
+                            }
+
+                            SolveOutcome.TimedOut -> {
+                                if (awaitCaptchaRetry("安全验证超时，请重试")) {
+                                    workers = Altcha.defaultWorkers()
+                                    oomRetried = false
+                                    continue
+                                }
+                                return@withLock ProofResult.Cancelled
+                            }
+
+                            SolveOutcome.NoMatch -> {
+                                if (awaitCaptchaRetry("安全验证失败，请重试")) {
+                                    workers = Altcha.defaultWorkers()
+                                    oomRetried = false
+                                    continue
+                                }
+                                return@withLock ProofResult.Cancelled
+                            }
+
+                            SolveOutcome.Cancelled -> {
+                                AltchaUi.end()
+                                return@withLock ProofResult.Cancelled
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (t: Throwable) {
+                        // 兜底：未预期异常收敛为失败，不让页面卡在 busy。
+                        val message = if (t is OutOfMemoryError) "设备内存不足，请重试"
+                        else "安全验证失败，请重试"
+                        if (AltchaUi.isCancelled()) {
+                            AltchaUi.end()
+                            return@withLock ProofResult.Cancelled
+                        }
+                        if (AltchaUi.phase.value == Phase.Idle) {
+                            return@withLock ProofResult.Failed(message)
+                        }
+                        if (awaitCaptchaRetry(message)) {
+                            workers = Altcha.defaultWorkers()
+                            oomRetried = false
+                        } else {
+                            return@withLock ProofResult.Cancelled
+                        }
                     }
                 }
-                val payload = Altcha.payload(challenge, solution)
-                val verifyRes = execute(
-                    "POST",
-                    api("captcha/verify"),
-                    null,
-                    JSONObject().put("altcha", payload),
-                )
-                if (verifyRes.status == 404 || verifyRes.message.contains("CAPTCHA_DISABLED")) {
-                    captchaDisabledUntil = System.currentTimeMillis() + 10 * 60_000L
-                    return@withLock ProofResult.None
-                }
-                if (!verifyRes.ok) return@withLock ProofResult.Failed(verifyRes.message)
-                val grant = verifyRes.str("grant").trim()
-                if (grant.isEmpty()) return@withLock ProofResult.Failed("安全验证返回异常")
-                val ttl = verifyRes.int("expires_in", 300).coerceAtLeast(60) * 1000L
-                grantValue = grant
-                grantExpiresAt = System.currentTimeMillis() + ttl - 10_000L
-                ProofResult.Ready(grant)
             } finally {
                 AltchaUi.end()
             }
+            // while (true) 内部所有业务路径都会 return；此行仅用于 Kotlin 类型收敛。
+            return@withLock ProofResult.Failed("安全验证失败，请重试")
         }
 
     // ────────────────── 认证 ──────────────────

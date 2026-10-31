@@ -7,6 +7,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
@@ -21,7 +22,7 @@ class AltchaLiveTest {
     @Test
     fun solveAndVerifyAgainstLocalServer() {
         val base = System.getenv("ALTCHA_LIVE_URL")?.trim()?.trimEnd('/').orEmpty()
-        if (base.isEmpty()) return
+        assumeTrue("ALTCHA_LIVE_URL 未设置，跳过本地端到端", base.isNotEmpty())
 
         val client = OkHttpClient()
         val challengeText = client.newCall(
@@ -35,8 +36,9 @@ class AltchaLiveTest {
         }
         val challenge = Altcha.parse(JSONObject(challengeText))
             ?: throw AssertionError("challenge 解析失败：$challengeText")
-        val solution = runBlocking { Altcha.solve(challenge, workers = 2) }
-            ?: throw AssertionError("求解失败")
+        val outcome = runBlocking { Altcha.solve(challenge, workers = 2) }
+        val solution = (outcome as? SolveOutcome.Solved)?.solution
+            ?: throw AssertionError("求解失败：$outcome")
 
         val payload = Altcha.payload(challenge, solution)
         val body = JSONObject().put("altcha", payload).toString()

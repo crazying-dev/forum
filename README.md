@@ -122,8 +122,8 @@ forum-Android/
             │   ├── App.kt                  进程级单例（可被 Compose 观察的状态）
             │   ├── Http.kt                 PrefsCookieJar
             │   ├── Api.kt                  ApiResult + Api（全部 /ov2/api 接口 + ALTCHA 会话）
-            │   ├── Altcha.kt               ALTCHA v2：PBKDF2 求解 / payload / prefix
-            │   ├── AltchaUi.kt             求解进度状态（全屏遮罩）
+            │   ├── Altcha.kt               ALTCHA v2：字节精确 Mac PBKDF2 求解 / payload / prefix
+            │   ├── AltchaUi.kt             验证弹窗状态（求解 / 失败重试）
             │   ├── richtext/RichDocument.kt 富文本模型 + HTML/Markdown 互转
             │   ├── Updater.kt              自更新：检查 / 回退下载 / 校验 / 安装
             │   └── TimeFmt.kt              年制 / 相对时间 / 生日 / 去 HTML
@@ -232,7 +232,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * 新增 `app/src/test/java/top/crazying/forum/core/CachePolicyTest.kt`（7 例）。
 * **最低版本闸门（V1.0.11）**：与 Web / Windows 三端同源。`Constants` 新增 `CLIENT_PLATFORM = "android"` 与 `CLIENT_HEADERS`（`X-Client-Platform` / `X-Client-Version`），由 `clientHeaderInterceptor()` 挂在 OkHttp 请求链最外层——`Api.request`、头像上传、`fetchText`、`Updater` 下载客户端全自动携带；服务端对低于发布清单 `min_versions.android` 的请求返回 **HTTP 426 + `code=VERSION_TOO_LOW`**，客户端在 `Api.request` 里识别后写入 `App.versionGate`，`ForumRoot` 随即弹出**不可绕过**的「版本过低」弹窗（返回键 / 外部点击均无效，只有「去更新」与「退出应用」两个出口）。新增 `app/src/test/java/top/crazying/forum/core/VersionGateTest.kt`。
 * **全量迁移 `/ov2/api`（V1.1.0）**：`core/Api.kt` 不再保留任何 legacy `/api/*` 路径；登录/注册/改密/换绑/注销/帖子/评论/用户/搜索/世界/媒体/引用卡片/更新/彩蛋全部切换；同源 `Origin`/`Referer` 拦截器用于通过 ouo CSRF。
-* **ALTCHA v2（V1.1.0）**：`core/Altcha.kt` 纯 Kotlin 实现 PBKDF2-HMAC-SHA256 求解（多协程分片、优先 `[cost,2*cost)`、可取消），`Api` 自动拉 challenge → 求解 → `/captcha/verify` 换 5 分钟 `grant` 并缓存复用；失败 `CAPTCHA_REQUIRED` 自动重解重试一次；`ui/AltchaDialog.kt` 显示进度/尝试次数/耗时并可取消。
+* **ALTCHA v2（V1.1.0）**：`core/Altcha.kt` 纯 Kotlin 实现 PBKDF2-HMAC-SHA256 求解——**字节精确**的 `Mac` + `SecretKeySpec(passwordBytes, "HmacSHA256")`（不用 SecretKeyFactory/PBEKeySpec：后者会把 nonce 随机字节按 UTF-8 重编码）；worker 内复用 Mac 与缓冲区、≤4 worker、90s 超时、OOM 减半 worker 重试、取消/异常兜底。`Api` 自动拉 challenge → 求解 → `/captcha/verify` 换 5 分钟 `grant` 并缓存复用；失败 `CAPTCHA_REQUIRED` 自动重解重试一次；`ui/AltchaDialog.kt` 为极简等待卡片（不确定转圈 + 取消验证），失败时同一卡片内切换「具体原因 + 重试 / 取消」。
 * **自建富文本（V1.1.0）**：`core/richtext/RichDocument.kt`（模型 + HTML/Markdown 互转）+ `ui/richtext/RichTextView.kt`（正文/评论/世界渲染、图片、引用卡片）+ `RichTextEditor.kt`（跨段选区、块格式、图片、撤销重做）+ `RichTextEditorScreen.kt`（发帖/评论/世界共用全屏宿主）。图片上传走 `POST /ov2/api/media/images`。
 * **移除网页登录（V1.1.0）**：删除 `WebLoginScreen`、`WebAuth`、`importWebCookies`、`PrefsCookieJar.put` 与登录页入口；App 不再用 WebView 承载登录或人机验证。
 * **世界频道顺序**：`WorldFeed.newestLast()` 保持「早的在上、最新在下」，发送后自动滚到底部；列表读取改为 ov2 的 `{items,...}`。
@@ -243,7 +243,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
   * 新增 `FeedStateTest`（10 例）覆盖 `needReload` 判定与 `FeedStateStore` 的「同 key 同实例」语义。
 * **全量迁移 ov2 + ALTCHA + 自建富文本（V1.1.0）**：
   * 所有接口切换到 `/ov2/api`，不再使用 legacy 兼容层；同源 `Origin`/`Referer` 过 CSRF。
-  * ALTCHA v2 纯 Kotlin 求解 + grant 缓存 + 进度遮罩；本地端到端测试验证 challenge → solve → verify → grant。
+  * ALTCHA v2 纯 Kotlin 求解（字节精确 Mac、≤4 worker、90s 超时、失败重试）+ grant 缓存 + 极简等待/失败弹窗；本地端到端测试验证 challenge → solve → verify → grant。
   * 自建富文本模型/解析/序列化/跨段选区编辑器/图片上传/引用卡片；发帖、评论、世界频道共用编辑器。
   * 账号流程按 ov2 重做：邮箱验证码注册、当前密码改密、四步换绑、密码+用户名注销；移除网页登录与旧滑块/Turnstile。
   * 版本号 versionCode 20 / versionName 1.1.0；隐私政策 2.2。
@@ -282,7 +282,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **WIKI 已全面原生化**：首页 / 官方 / 个人 / 鼠标 / Linux 版均为 Compose；仅 **Live2D 交互模型** 子页保留 WebView（网页 canvas + Live2D 运行时，无法用 Compose 复刻），并在 `onPageFinished` 注入样式隐藏网页外壳、改写 CSS 变量为当前 App 配色。
 * **WebView 仅 Live2D**：网页登录与 Turnstile/滑块验证已整体移除；新增 WebView 界面仍应避免放进 Dialog（独立窗口下层级/命中区会错位）。
 * **富文本编辑器限制**：列表不嵌套；图片/分割线是原子块，选区不能跨过；粘贴一律按纯文本拆段；不支持表格/分栏。
-* **ALTCHA 求解耗时**：服务端默认 cost=5000，手机端可能需要数秒；App 显示进度/尝试次数/耗时并可取消，解出的 `grant` 缓存 5 分钟复用。
+* **ALTCHA 求解耗时**：服务端默认 cost=5000，手机端可能需要数秒；求解用字节精确的 `Mac`（≤4 worker、90s 超时、OOM 减半重试），等待弹窗只显示不确定转圈与「取消验证」，失败可在同一卡片重试/取消；解出的 `grant` 缓存 5 分钟复用。客户端 `cost` 上限为 20000，服务端 `ALTCHA_COST` 若调高必须同步客户端，否则会报「安全验证数据异常」。
 * **调试基址**：debug 构建可用 `-PapiBaseUrl=http://10.0.2.2:8090` 指向本地 ouo；release 始终使用 `https://www.yjlt.top`。
 * **`auto` 主题语义**：Android 取「跟随系统深色模式」，与 Web / Windows 的「小时切换」不同（有意为之）。
 * **Coil 3 的网络加载器**：依赖 `coil-network-okhttp` 的 ServiceLoader 自动注册；若自定义 `ImageLoader` 需手动装配 `OkHttpNetworkFetcherFactory`。
@@ -305,8 +305,8 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | Android SDK | `platform-tools`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
 | 命令 | `JAVA_HOME=/home/yoyo/.jdks/jbr-21.0.11 bash ./gradlew testDebugUnitTest assembleDebug` |
-| 结果 | **BUILD SUCCESSFUL**（89 例全部通过：AltchaTest 12 / AltchaLiveTest（env 缺省跳过）1 / RichDocumentTest 14 / ModelsTest 5 / TimeFmtTest 18 / VersionGateTest 10 / FeedStateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6 / WorldFeedTest 6） |
-| Debug 产物（V1.1.0） | `app/build/outputs/apk/debug/app-debug.apk`，**12 628 701 字节**，sha256 `f041d45f469a99b52654a437ab135b44435d318eca976558a895a14f2df5382b`；`BuildConfig.API_BASE_URL=https://www.yjlt.top` 已核对；本机无 `keystore.properties`，未产 release |
+| 结果 | **BUILD SUCCESSFUL**（103 通过 + 1 跳过：AltchaTest 21 / AltchaUiTest 6 / AltchaLiveTest（env 缺省跳过）1 / RichDocumentTest 14 / ModelsTest 5 / TimeFmtTest 18 / VersionGateTest 10 / FeedStateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6 / WorldFeedTest 6） |
+| Debug 产物（V1.1.0） | `app/build/outputs/apk/debug/app-debug.apk`，**12 351 071 字节**，sha256 `b06790802636f2da90e60069e713bd9743de3046081000b647634df25c8c9253`；`BuildConfig.API_BASE_URL=https://www.yjlt.top` 已核对；本机无 `keystore.properties`，未产 release |
 | Release 产物（V1.0.18） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `f410be372e0b5c0327d6d64a6ca8e8fc4efc5f2ee56fd56645f877616875f276`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`；发布包副本 `release\forum-android-1.0.18.apk` |
 | 历史 Release 产物（V1.0.17） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `0d36a0626ed8e870eed4a1497c7178ae8e76fea9178cdcf5288b68b4ad399287` |
 | 历史 Release 产物（V1.0.16） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61` |
