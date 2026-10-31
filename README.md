@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.1.0**（`versionCode = 10100`） |
+| 当前版本 | **V1.2.0**（`versionCode = 10200`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -200,11 +200,11 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 ### 4. 版本号规则（唯一真相源）
 
-版本号只维护 **`app/build.gradle.kts` 里的 `val appVersionName = "1.1.0"` 一处**，其余全部由它派生：
+版本号只维护 **`app/build.gradle.kts` 里的 `val appVersionName = "1.2.0"` 一处**，其余全部由它派生：
 
 * `versionCode = major × 10000 + minor × 100 + patch`：`1.1.0 → 10100`、`1.0.18 → 10018`；预发布后缀只保留在 `versionName` 里，`versionCode` 只取数字基段（`1.2.0-beta1 → 10200`）。
 * Gradle 生成 `BuildConfig.APP_VERSION`，`core/Constants.kt` 的 `Constants.APP_VERSION` 直接读它，工程里不再有第二份版本字面量。
-* 发布 tag 必须是 `Android-V<versionName>`（如 `Android-V1.1.0`）；Release 工作流会传 `-PexpectedVersion=<tag 版本>` 校验源码版本，不一致直接构建失败（例如 tag 为 `Android-V9.9.9` 时会报「tag 版本 9.9.9 与 versionName 1.1.0 不一致」）。
+* 发布 tag 必须是 `Android-V<versionName>`（如 `Android-V1.2.0`）；Release 工作流会传 `-PexpectedVersion=<tag 版本>` 校验源码版本，不一致直接构建失败（例如 tag 为 `Android-V9.9.9` 时会报「tag 版本 9.9.9 与 versionName 1.2.0 不一致」）。
 * **发布 tag 只接受三段纯数字**：`Android-V1.2.0-beta1` 这类带后缀的 tag 会被 Release 工作流直接拒绝（Gradle 允许写后缀仅便于本地实验，CI 不发布预发布版）。
 
 ### 5. 本地签名构建（可选）
@@ -226,7 +226,7 @@ export ANDROID_KEY_ALIAS="$(sed -n 's/^keyAlias=//p' "$KEYSTORE_DIR/keystore.pro
 export ANDROID_KEY_PASSWORD="$(sed -n 's/^keyPassword=//p' "$KEYSTORE_DIR/keystore.properties" | head -n1)"
 
 # 本机 gradlew 是无执行位的 100644：用 bash 调用，或本地 chmod +x（不要把文件模式变更提交）
-bash ./gradlew assembleRelease -PexpectedVersion=1.1.0
+bash ./gradlew assembleRelease -PexpectedVersion=1.2.0
 
 # 产物与验签
 ls -l app/build/outputs/apk/release/app-release.apk
@@ -259,9 +259,9 @@ ls -l app/build/outputs/apk/release/app-release.apk
 
 1. 修改 `app/build.gradle.kts` 的 `appVersionName`（见上一节）。
 2. 提交并推送 `Android` 分支。
-3. 打 tag 并推送：`git tag Android-V1.1.0 && git push origin Android-V1.1.0`（tag 必须与 `appVersionName` 完全一致）。
+3. 打**附注 tag** 并推送：`git tag -a --cleanup=verbatim Android-V1.2.0 -F notes.txt && git push origin Android-V1.2.0`（tag 必须与 `appVersionName` 完全一致；tag 注解正文会作为 GitHub Release 的发版说明，必须用 `--cleanup=verbatim`，否则 Markdown 的 `###` 标题会被 git 当注释删掉；写轻量 tag 则回退到 `git log`）。
 4. 等 Actions 的 **Android Release** 跑完。
-5. 校验 Release 资产：`forum-android-1.1.0.apk`，以及 release notes 里的字节数 / SHA-256 / 证书指纹（`bab9ac…aa4668`）。
+5. 校验 Release 资产：`forum-android-1.2.0.apk`，以及 release notes 里的字节数 / SHA-256 / 证书指纹（`bab9ac…aa4668`）。
 
 **安全约束**：
 
@@ -309,6 +309,7 @@ ls -l app/build/outputs/apk/release/app-release.apk
 * **全量迁移 `/ov2/api`（V1.1.0）**：`core/Api.kt` 不再保留任何 legacy `/api/*` 路径；登录/注册/改密/换绑/注销/帖子/评论/用户/搜索/世界/媒体/引用卡片/更新/彩蛋全部切换；同源 `Origin`/`Referer` 拦截器用于通过 ouo CSRF。
 * **ALTCHA v2（V1.1.0）**：`core/Altcha.kt` 纯 Kotlin 实现 PBKDF2-HMAC-SHA256 求解——**字节精确**的 `Mac` + `SecretKeySpec(passwordBytes, "HmacSHA256")`（不用 SecretKeyFactory/PBEKeySpec：后者会把 nonce 随机字节按 UTF-8 重编码）；worker 内复用 Mac 与缓冲区、≤4 worker、90s 超时、OOM 减半 worker 重试、取消/异常兜底。`Api` 自动拉 challenge → 求解 → `/captcha/verify` 换 5 分钟 `grant` 并缓存复用；失败 `CAPTCHA_REQUIRED` 自动重解重试一次；`ui/AltchaDialog.kt` 为极简等待卡片（不确定转圈 + 取消验证），失败时同一卡片内切换「具体原因 + 重试 / 取消」。
 * **APP 专用零 PoW 验证通道**：`Api.ensureCaptchaProof` 在求解之前先走 `GET /ov2/api/captcha/app/challenge` → 本地一次 HMAC-SHA256（`Altcha.appProof`，与服务端 `appProofSignature` 字节一致）→ `POST /ov2/api/captcha/app/verify` 换同一种 `grant`；服务端未配置 `ALTCHA_APP_SECRET`（两个端点 404 `CAPTCHA_DISABLED`）时自动回退上面的 ALTCHA 求解，行为与旧版一致。密钥由 `-PaltchaAppSecret` / 环境变量注入 `BuildConfig.ALTCHA_APP_SECRET`，留空即不启用。这样手机端不再做千万级 PBKDF2，避免长时间满载被系统杀进程。
+* **APP 专用通道上线（V1.2.0）**：上面这条能力正式发布；Release 的发版说明优先取**附注 tag 的注解正文**（写成用户能看懂的口语化更新日志），没有注解才回退到 `git log`。
 * **自建富文本（V1.1.0）**：`core/richtext/RichDocument.kt`（模型 + HTML/Markdown 互转）+ `ui/richtext/RichTextView.kt`（正文/评论/世界渲染、图片、引用卡片）+ `RichTextEditor.kt`（跨段选区、块格式、图片、撤销重做）+ `RichTextEditorScreen.kt`（发帖/评论共用全屏宿主）。图片上传走 `POST /ov2/api/media/images`。
 * **移除网页登录（V1.1.0）**：删除 `WebLoginScreen`、`WebAuth`、`importWebCookies`、`PrefsCookieJar.put` 与登录页入口；App 不再用 WebView 承载登录或人机验证。
 * **世界频道顺序**：`WorldFeed.newestLast()` 保持「早的在上、最新在下」，发送后自动滚到底部；列表读取改为 ov2 的 `{items,...}`。

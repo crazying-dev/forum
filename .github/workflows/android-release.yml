@@ -175,17 +175,24 @@ jobs:
           APK_NAME="forum-android-${APP_VERSION}.apk"
           # 上一个 Android-V* tag（按版本排序排除当前 tag；手动触发时取最新 tag）
           PREV_TAG="$(git tag -l 'Android-V*' --sort=-v:refname | grep -F -x -v "${GITHUB_REF_NAME}" | head -n 1 || true)"
+          # 发版说明优先取 tag 注解正文（打 tag 时写成用户能看懂的口语化更新日志）；
+          # 轻量 tag（无注解）才回退到 git log 的提交标题。
+          TAG_NOTES="$(git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" 2>/dev/null | sed -e 's/[[:space:]]*$//')"
           {
-            echo "## Android V${APP_VERSION}"
-            echo
-            if [ -n "${PREV_TAG}" ]; then
-              echo "变更（\`${PREV_TAG}\`..HEAD）："
-              echo
-              git log --no-merges --pretty='- %s' "${PREV_TAG}..HEAD"
+            if [ -n "${TAG_NOTES}" ]; then
+              printf '%s\n' "${TAG_NOTES}"
             else
-              echo "变更（最近 20 条提交）："
+              echo "## Android V${APP_VERSION}"
               echo
-              git log --no-merges --pretty='- %s' -20
+              if [ -n "${PREV_TAG}" ]; then
+                echo "变更（\`${PREV_TAG}\`..HEAD）："
+                echo
+                git log --no-merges --pretty='- %s' "${PREV_TAG}..HEAD"
+              else
+                echo "变更（最近 20 条提交）："
+                echo
+                git log --no-merges --pretty='- %s' -20
+              fi
             fi
             echo
             echo "### 安装包"

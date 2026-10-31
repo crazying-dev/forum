@@ -12,7 +12,7 @@ plugins {
 // ── 版本号唯一真相源 ──
 // 改版本只改 appVersionName 这一行：versionCode 与 BuildConfig.APP_VERSION 均由此派生，
 // 再由 Constants.APP_VERSION 读 BuildConfig，全工程不再有第二份版本字面量。
-val appVersionName = "1.1.0"
+val appVersionName = "1.2.0"
 // 允许预发布后缀（如 1.2.0-beta1）：versionCode 只取数字基段，versionName 保留完整串。
 val appVersionBase = appVersionName.substringBefore('-').substringBefore('+')
 val parts = appVersionBase.split(".").map { it.toIntOrNull() ?: error("versionName 非法：$appVersionName") }
