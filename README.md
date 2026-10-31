@@ -4,7 +4,7 @@
 
 | 项 | 值 |
 | --- | --- |
-| 当前版本 | **V1.1.0**（`versionCode = 20`） |
+| 当前版本 | **V1.1.0**（`versionCode = 10100`） |
 | 分支 | `Android` |
 | 包名 | `top.crazying.forum`（debug 后缀 `.debug`） |
 | 服务端 | `https://www.yjlt.top` |
@@ -25,7 +25,7 @@
 | 图片 | Coil 3（`coil-compose` + `coil-network-okhttp`） | 头像加载 |
 | 正文渲染 | `AndroidView` + `TextView` + `HtmlCompat` | 服务端正文存的是 HTML |
 | WebView | **仅一处**：WIKI › Live2D 子页 | 其余界面（含 WIKI 其他子页、登录/注册、人机验证）均为 Compose 原生绘制；网页端登录已移除 |
-| 应用更新 | 自写 `Updater`（`core/Updater.kt`） | 版本检查 → 三级回退下载 → sha256 校验 → FileProvider 调起系统安装器 |
+| 应用更新 | 自写 `Updater`（`core/Updater.kt`） | GitHub Releases 优先 → 服务端清单兜底 → 三级回退下载 → sha256 校验 → 文件提供器调起系统安装器 |
 
 **版本基线**（已通过真实构建验证）：
 
@@ -170,7 +170,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 
 ```powershell
 .\gradlew.bat assembleDebug        # 产物 app\build\outputs\apk\debug\app-debug.apk
-.\gradlew.bat assembleRelease      # 未开启混淆；存在 keystore.properties 时自动签名
+.\gradlew.bat assembleRelease      # 未开启混淆；有签名凭据（环境变量或 keystore.properties）时自动签名
 ```
 
 首次构建会自动下载 Gradle 8.14.5（约 138 MB）到 `%USERPROFILE%\.gradle`。
@@ -195,6 +195,78 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\setup-android-env.ps1
 ```powershell
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
+
+### 4. 版本号规则（唯一真相源）
+
+版本号只维护 **`app/build.gradle.kts` 里的 `val appVersionName = "1.1.0"` 一处**，其余全部由它派生：
+
+* `versionCode = major × 10000 + minor × 100 + patch`：`1.1.0 → 10100`、`1.0.18 → 10018`；预发布后缀只保留在 `versionName` 里，`versionCode` 只取数字基段（`1.2.0-beta1 → 10200`）。
+* Gradle 生成 `BuildConfig.APP_VERSION`，`core/Constants.kt` 的 `Constants.APP_VERSION` 直接读它，工程里不再有第二份版本字面量。
+* 发布 tag 必须是 `Android-V<versionName>`（如 `Android-V1.1.0`）；Release 工作流会传 `-PexpectedVersion=<tag 版本>` 校验源码版本，不一致直接构建失败（例如 tag 为 `Android-V9.9.9` 时会报「tag 版本 9.9.9 与 versionName 1.1.0 不一致」）。
+* **发布 tag 只接受三段纯数字**：`Android-V1.2.0-beta1` 这类带后缀的 tag 会被 Release 工作流直接拒绝（Gradle 允许写后缀仅便于本地实验，CI 不发布预发布版）。
+
+### 5. 本地签名构建（可选）
+
+签名材料 **不在仓库内**，放在仓库外的 `~/.android/keys/`（keystore `forum-release.jks`，alias `forum`，证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`）。Linux / bash 下完整命令：
+
+```bash
+cd ~/yjlt/yj-forum-android
+KEYSTORE_DIR="$HOME/.android/keys"
+# 需要 JDK 17+；本机为 JetBrains Runtime 21，SDK 在 ~/Android/Sdk
+export JAVA_HOME=/home/yoyo/.jdks/jbr-21.0.11
+export PATH="$JAVA_HOME/bin:$PATH"   # apksigner 需要 PATH 上有 java
+export ANDROID_HOME="$HOME/Android/Sdk"
+
+# 四项凭据齐备且 keystore 存在才会签名；缺任意一项则产出未签名包
+export ANDROID_KEYSTORE_FILE="$KEYSTORE_DIR/forum-release.jks"
+export ANDROID_KEYSTORE_PASSWORD="$(sed -n 's/^storePassword=//p' "$KEYSTORE_DIR/keystore.properties" | head -n1)"
+export ANDROID_KEY_ALIAS="$(sed -n 's/^keyAlias=//p' "$KEYSTORE_DIR/keystore.properties" | head -n1)"
+export ANDROID_KEY_PASSWORD="$(sed -n 's/^keyPassword=//p' "$KEYSTORE_DIR/keystore.properties" | head -n1)"
+
+# 本机 gradlew 是无执行位的 100644：用 bash 调用，或本地 chmod +x（不要把文件模式变更提交）
+bash ./gradlew assembleRelease -PexpectedVersion=1.1.0
+
+# 产物与验签
+ls -l app/build/outputs/apk/release/app-release.apk
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs \
+  app/build/outputs/apk/release/app-release.apk | grep 'certificate SHA-256'
+```
+
+* 只有 `ANDROID_KEYSTORE_FILE` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD` **全部齐备**且 keystore 文件存在时才会签名；否则 release 照常构建，但产出的是 **未签名** `app-release.apk`。（旧的仓库根 `keystore.properties` 仍作为兜底读取，但仓库里已没有该文件。）
+* `-PexpectedVersion` 是可选的本地校验，不传则不校验；正式发版由 CI 传入 tag 版本。
+
+### 6. GitHub Actions：CI 与 tag 发版
+
+| 工作流 | 触发条件 | 做什么 |
+| --- | --- | --- |
+| `.github/workflows/android-ci.yml` | push 到 `Android` 分支 / PR 目标为 `Android` / 手动 `workflow_dispatch` | `testDebugUnitTest` + `assembleDebug`，上传 `android-debug-apk` 制品（保留 7 天） |
+| `.github/workflows/android-release.yml` | push tag `Android-V*` | `build` 作业：校验 tag 指向的提交在 `Android` 分支 → 还原 keystore → `assembleRelease -PexpectedVersion=<tag 版本>` → `apksigner` 验签（断言证书 SHA-256）→ 重命名 `forum-android-<版本>.apk` → 生成 notes → 上传制品；`publish` 作业（需 `contents: write`）：发 GitHub Release |
+
+> ⚠️ 两个工作流都保留 `workflow_dispatch`，但 GitHub 规定**手动触发要求工作流已存在于默认分支**；本仓库默认分支是 `main`、工作流只随 `Android` 分支提交，所以当前实际以 **tag 发版**为准（CI 由分支 push / PR 自动触发）。
+
+仓库级 Secrets（Settings → Secrets and variables → Actions，共 4 条）：
+
+| Secret | 用途 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | `forum-release.jks` 的 base64（工作流还原到 runner 临时目录） |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore 密码 |
+| `ANDROID_KEY_ALIAS` | 密钥别名（`forum`） |
+| `ANDROID_KEY_PASSWORD` | 密钥密码 |
+
+**发布流程**：
+
+1. 修改 `app/build.gradle.kts` 的 `appVersionName`（见上一节）。
+2. 提交并推送 `Android` 分支。
+3. 打 tag 并推送：`git tag Android-V1.1.0 && git push origin Android-V1.1.0`（tag 必须与 `appVersionName` 完全一致）。
+4. 等 Actions 的 **Android Release** 跑完。
+5. 校验 Release 资产：`forum-android-1.1.0.apk`，以及 release notes 里的字节数 / SHA-256 / 证书指纹（`bab9ac…aa4668`）。
+
+**安全约束**：
+
+* fork 提交的 PR **不会**注入仓库 Secrets（CI 本身也不需要），无法借 PR 获取签名凭据。
+* 只有 **tag push** 会发布 Release；且 tag 必须指向 `Android` 分支上的提交（工作流会做祖先校验），否则拒绝发布。
+* 构建作业只有 `contents: read`，发布作业才拿 `contents: write`；checkout 不持久化凭据（`persist-credentials: false`）。
+* 密钥只能放在 GitHub Secrets 或本机仓库外，**不得**写进仓库、README、构建日志或提交历史。
 
 ---
 
@@ -274,7 +346,7 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 2. **世界频道升级为 WebSocket**（当前 20 秒轮询，服务端对发送有 2 秒 / 人 限流）。
 3. **编辑器增强**：嵌套列表、表格、跨图片选区、草稿自动保存。
 4. **AGP 9.x 升级**：用 Android Studio 的 AGP Upgrade Assistant 迁移（删除 `org.jetbrains.kotlin.android`，改用内置 Kotlin DSL），并同步升级 Gradle。
-5. **发布**：本机无 `keystore.properties`，当前只验证 `assembleDebug`；签名 release 待补产物记录。
+5. **发布**：已交给 GitHub Actions——推送 `Android-V*` tag 自动签名并发布 Release；本机签名需显式注入 `ANDROID_KEY*` 环境变量。
 
 ---
 
@@ -291,7 +363,8 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 * **头像无占位图**：URL 为空时渲染「猫」字占位，尚未接入错误 / 占位 painter。
 * **服务端不可达时**：`Api` 对 GET 请求重试 1 次（写操作绝不重试，避免重复发帖 / 评论）；返回 401 会静默清理本地会话。
 * **`local.properties` 严禁入库**（已在 `.gitignore` 中）；`gradle-wrapper.jar` 相反 **必须入库**。
-* **签名材料**（`*.jks` / `*.keystore` / `keystore.properties`）同样已 git-ignore；本机当前无签名材料，只产出 debug APK。
+* **签名材料**（`*.jks` / `*.keystore` / `keystore.properties`）同样已 git-ignore；实际材料在仓库外 `~/.android/keys/`（仓库内不存在）。本机不注入 `ANDROID_KEY*` 环境变量时只产出未签名包，正式包由 CI 用 GitHub Secrets 签名。
+* **更新源**：APP 优先直连 GitHub Releases（`yoyo-ouo/yj-forum-ouo`，筛 `Android-V*` 且带 `.apk`），失败才回退服务端 `/ov2/api/downloads/check`；下载链的「站内反代」回退要求服务端发布源也指向同一仓库。
 * **自更新的额外出网域名**：应用主体只连 `https://www.yjlt.top`，但自更新下载会额外访问 GitHub 直链与三个公共加速镜像；彩蛋页的「每日一言」还会访问第三方 `dlystc.unknownmp.top`。Android 端**有意不做** Windows 那样的 DoH / DNS 接管（OkHttp 走系统解析，改造收益不值当）。
 * **自动更新的触发时机**：仅冷启动检查一次，且距上次检查不足 24 小时会跳过；用户点过「以后再说」的版本不再自动弹窗（手动「检查更新」仍会显示）。发现新版本后仍需用户在对话框中确认，不会静默安装（Android 也不允许）。
 
@@ -307,8 +380,9 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 | Android SDK | `platform-tools`、`platforms;android-36`、`build-tools;36.0.0` |
 | Gradle | 8.14.5（Wrapper 自带的发行包） |
 | 命令 | `JAVA_HOME=/home/yoyo/.jdks/jbr-21.0.11 bash ./gradlew testDebugUnitTest assembleDebug` |
-| 结果 | **BUILD SUCCESSFUL**（103 通过 + 1 跳过：AltchaTest 21 / AltchaUiTest 6 / AltchaLiveTest（env 缺省跳过）1 / RichDocumentTest 14 / ModelsTest 5 / TimeFmtTest 18 / VersionGateTest 10 / FeedStateTest 10 / CachePolicyTest 7 / MarkdownBodyTest 6 / WorldFeedTest 6） |
-| Debug 产物（V1.1.0） | `app/build/outputs/apk/debug/app-debug.apk`，**12 351 071 字节**，sha256 `b06790802636f2da90e60069e713bd9743de3046081000b647634df25c8c9253`；`BuildConfig.API_BASE_URL=https://www.yjlt.top` 已核对；本机无 `keystore.properties`，未产 release |
+| 结果 | **BUILD SUCCESSFUL**（**129 tests，128 通过 + 1 跳过**：AltchaTest 21 / AltchaUiTest 6 / AltchaLiveTest（env 缺省跳过）1 / RichDocumentTest 16 / TextLimitTest 5 / ModelsTest 5 / TimeFmtTest 18 / UpdateParserTest 19 / VersionGateTest 10 / FeedStateTest 9 / CachePolicyTest 7 / MarkdownBodyTest 6 / WorldFeedTest 6） |
+| Debug 产物（V1.1.0） | `app/build/outputs/apk/debug/app-debug.apk`，**12 351 071 字节**，sha256 `b06790802636f2da90e60069e713bd9743de3046081000b647634df25c8c9253`；`BuildConfig.API_BASE_URL=https://www.yjlt.top` 已核对；release 见下一行（本机以环境变量注入签名凭据构建） |
+| Release 产物（V1.1.0 本地签名验证） | `app/build/outputs/apk/release/app-release.apk`，**8 234 428 字节**，sha256 `bcf69a164818ad759888b557e6b533abb141a5e461b74f217426d88828dab208`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`（与旧版一致）；构建命令含 `-PexpectedVersion=1.1.0` |
 | Release 产物（V1.0.18） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `f410be372e0b5c0327d6d64a6ca8e8fc4efc5f2ee56fd56645f877616875f276`，APK 签名证书 SHA-256 `bab9ac497b3b5b4f8fe3e36fbb9fec111c08831dc6e9100889a439f019aa4668`；发布包副本 `release\forum-android-1.0.18.apk` |
 | 历史 Release 产物（V1.0.17） | `app\build\outputs\apk\release\app-release.apk`，**8 168 888 字节**，sha256 `0d36a0626ed8e870eed4a1497c7178ae8e76fea9178cdcf5288b68b4ad399287` |
 | 历史 Release 产物（V1.0.16） | `app\build\outputs\apk\release\app-release.apk`，**8 152 504 字节**，sha256 `1bedfc7f3e29a616d217762a9907f846f2d17cf1eb843cf90fd041010b2cdd61` |

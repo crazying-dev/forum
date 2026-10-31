@@ -23,8 +23,8 @@ object Constants {
     /** ouo canonical API 前缀；客户端不再使用 legacy 旧接口组。 */
     const val API_PREFIX = "/ov2/api"
 
-    /** 客户端版本，与 `app/build.gradle.kts` 的 versionName 保持一致。 */
-    const val APP_VERSION = "1.1.0"
+    /** 客户端版本，唯一来源是 `app/build.gradle.kts` 的 versionName（经 BuildConfig 注入）。 */
+    val APP_VERSION: String = BuildConfig.APP_VERSION
 
     /** 请求 UA，便于服务端日志区分端（服务端最低版本闸门也会回退解析它）。 */
     val CLIENT_UA = "CrForum-Android/" + APP_VERSION
@@ -106,6 +106,15 @@ object Constants {
 
     /** 站内反代前缀：`/ov2/api/downloads/mirror/android/<文件名>`（服务器流式转发 GitHub 直链）。 */
     const val MIRROR_PATH = API_PREFIX + "/downloads/mirror"
+
+    /** GitHub 发布仓库（全名 `owner/repo`，发布 tag 与 Releases API 均基于它拼接）。 */
+    const val UPDATE_REPO = "yoyo-ouo/yj-forum-ouo"
+
+    /** Android 发布 tag 前缀（完整 tag 形如 `Android-V1.1.0`）。 */
+    const val UPDATE_TAG_PREFIX = "Android-V"
+
+    /** GitHub Releases API：取最近 30 条 release（含 tag 与 assets），供更新检查解析。 */
+    const val UPDATE_RELEASES_API = "https://api.github.com/repos/" + UPDATE_REPO + "/releases?per_page=30"
 
     /** 冷启动自动检查的最小间隔：24 小时（手动点「检查更新」不受此限制）。 */
     const val UPDATE_CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000

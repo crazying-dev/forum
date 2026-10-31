@@ -1,3 +1,4 @@
+import java.io.File
 import java.util.Properties
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -8,6 +9,19 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// ── 版本号唯一真相源 ──
+// 改版本只改 appVersionName 这一行：versionCode 与 BuildConfig.APP_VERSION 均由此派生，
+// 再由 Constants.APP_VERSION 读 BuildConfig，全工程不再有第二份版本字面量。
+val appVersionName = "1.1.0"
+// 允许预发布后缀（如 1.2.0-beta1）：versionCode 只取数字基段，versionName 保留完整串。
+val appVersionBase = appVersionName.substringBefore('-').substringBefore('+')
+val parts = appVersionBase.split(".").map { it.toIntOrNull() ?: error("versionName 非法：$appVersionName") }
+require(parts.size == 3) { "versionName 必须是 major.minor.patch[-suffix]：$appVersionName" }
+val appVersionCode = parts[0] * 10000 + parts[1] * 100 + parts[2]
+// CI 发布时可用 -PexpectedVersion=<tag 版本> 校验 tag 与源码里的版本一致，本地构建可不传。
+val expectedVersion = (findProperty("expectedVersion") as String?)?.trim().orEmpty()
+require(expectedVersion.isEmpty() || expectedVersion == appVersionName) { "tag 版本 $expectedVersion 与 versionName $appVersionName 不一致" }
+
 android {
     namespace = "top.crazying.forum"
     compileSdk = 36
@@ -16,8 +30,10 @@ android {
         applicationId = "top.crazying.forum"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20
-        versionName = "1.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
+        // 供 Constants.APP_VERSION 读取，保证运行时版本号与构建版本同源。
+        buildConfigField("String", "APP_VERSION", "\"$appVersionName\"")
         // 中文优先即可，服务端只返回中文文案
         resourceConfigurations += listOf("zh", "en")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -27,21 +43,37 @@ android {
         buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
-    // 发布签名：凭据放在仓库根的 keystore.properties（已 gitignore，不入库）。
-    // 文件缺失时 release 回退为未签名产物，方便无凭据的 CI / 克隆直接 assembleDebug。
+    // 发布签名：环境变量优先（CI 注入），仓库根 keystore.properties 兜底（本地旧用法，兼容保留）。
+    // 四项凭据齐备且 keystore 文件存在才创建 release 签名配置；否则 release 产出未签名包，
+    // 不让无凭据的 CI / 克隆构建失败。
     val keystorePropsFile = rootProject.file("keystore.properties")
-    val hasReleaseKey = keystorePropsFile.exists()
+    val keystoreProps = Properties().apply {
+        if (keystorePropsFile.exists()) keystorePropsFile.inputStream().use { load(it) }
+    }
+    val releaseStoreFileRaw = System.getenv("ANDROID_KEYSTORE_FILE")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: keystoreProps.getProperty("storeFile")
+    val releaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: keystoreProps.getProperty("storePassword")
+    val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: keystoreProps.getProperty("keyAlias")
+    val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: keystoreProps.getProperty("keyPassword")
+    // 相对路径按仓库根解析（与旧 keystore.properties 里的相对写法一致）。
+    val releaseStoreFile = releaseStoreFileRaw?.trim()?.takeIf { it.isNotEmpty() }?.let { path ->
+        if (File(path).isAbsolute) File(path) else rootProject.file(path)
+    }
+    val hasReleaseKey = releaseStoreFile?.exists() == true &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
 
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {
-                val props = Properties().apply {
-                    keystorePropsFile.inputStream().use { load(it) }
-                }
-                storeFile = rootProject.file(props.getProperty("storeFile"))
-                storePassword = props.getProperty("storePassword")
-                keyAlias = props.getProperty("keyAlias")
-                keyPassword = props.getProperty("keyPassword")
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
     }

@@ -12,7 +12,6 @@ import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -20,42 +19,6 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
-
-/**
- * 发布清单里的单个版本（对应 `/ov2/api/downloads/check` 响应里的 `release` 对象）。
- *
- * 字段与 Web 端 `app_releases.json` / Windows 端 `app/releases.py` 完全同源。
- */
-data class UpdateRelease(
-    val version: String,
-    val url: String,
-    val filename: String,
-    val size: Long,
-    val sha256: String,
-    val notes: List<String>,
-    val mandatory: Boolean,
-) {
-
-    /** 展示用体积（如 `7.6 MB`）；未知返回空串。 */
-    val sizeText: String get() = Updater.humanSize(size)
-}
-
-/** 版本检查结果（已解析）。 */
-data class UpdateInfo(
-    val available: Boolean,
-    val current: String,
-    val latest: String,
-    val message: String,
-    val release: UpdateRelease?,
-)
-
-/** [Updater.check] 的返回值：成功带数据，失败带一句可直接展示的文案。 */
-sealed interface CheckResult {
-
-    data class Success(val info: UpdateInfo) : CheckResult
-
-    data class Failure(val message: String) : CheckResult
-}
 
 /**
  * 应用自更新：版本检查 → 三级回退下载 → 体积 / sha256 校验 → 调起系统安装器。
@@ -84,8 +47,14 @@ object Updater {
 
     // ────────────────── 版本检查 ──────────────────
 
-    /** 向服务端要一次版本信息；网络异常 / 响应不可解析都归到 [CheckResult.Failure]。 */
+    /**
+     * 版本检查：GitHub Releases 优先，服务端 `/downloads/check` 兜底。
+     *
+     * GitHub 线路不可用（限流 / 网络 / 格式不对）时才回退服务端；
+     * 网络异常 / 响应不可解析都归到 [CheckResult.Failure]。
+     */
     suspend fun check(api: Api, current: String = Constants.APP_VERSION): CheckResult {
+        githubCheck(current)?.let { return CheckResult.Success(it) }
         val result = try {
             api.checkUpdate(current)
         } catch (e: CancellationException) {
@@ -94,9 +63,36 @@ object Updater {
             return CheckResult.Failure("检查更新失败：" + (e.message ?: "网络异常"))
         }
         if (!result.ok) return CheckResult.Failure(result.message)
-        val info = parseCheck(current, result.obj())
+        val info = UpdateParser.parseServerCheck(current, result.obj())
             ?: return CheckResult.Failure("检查更新失败：服务端返回格式异常")
         return CheckResult.Success(info)
+    }
+
+    /**
+     * 直接读 GitHub Releases（最近 30 条，含 assets）。
+     *
+     * 非 2xx / 网络异常 / 解析不出清单都返回 null，交给 [check] 回退服务端；
+     * 只有协程取消必须原样抛出，否则上层会把取消误当成「线路不可用」继续走。
+     */
+    private suspend fun githubCheck(current: String): UpdateInfo? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(Constants.UPDATE_RELEASES_API)
+                // GitHub API 要求的版本头；UA 沿用客户端标识（GitHub 会拒绝空 UA）。
+                .header("Accept", "application/vnd.github+json")
+                .header("X-GitHub-Api-Version", "2022-11-28")
+                .header("User-Agent", Constants.CLIENT_UA)
+                .build()
+            downloadClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val body = response.body?.string() ?: return@withContext null
+                UpdateParser.parseGithubReleases(current, body)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
     }
 
     /** 冷启动自动检查：距上次检查不足 24 小时则直接跳过。
@@ -118,55 +114,6 @@ object Updater {
         // 用户点过「以后再说」的版本不再自动打扰（手动检查仍能看到）。
         if (info.latest.isNotEmpty() && info.latest == prefs.updateSkipVersion) return null
         return info
-    }
-
-    /** 把 `/downloads/check` 的 JSON 解析成 [UpdateInfo]；结构不对返回 null。 */
-    fun parseCheck(current: String, obj: JSONObject?): UpdateInfo? {
-        obj ?: return null
-        val available = obj.optBoolean("available", false)
-        val cur = obj.optString("current", "").ifBlank { current }
-        val latest = obj.optString("latest", "").trim()
-        // ov2 顶层 mandatory = current < min_version；release 内也有一份，缺省时沿用顶层。
-        val release = obj.optJSONObject("release")
-            ?.let { parseRelease(it, obj.optBoolean("mandatory", false)) }
-        return UpdateInfo(
-            available = available,
-            current = cur,
-            latest = latest,
-            message = obj.optString("message", "").trim().ifBlank {
-                // ov2 `/downloads/check` 不返回 message：本地兜底一句可直接展示的文案。
-                // 有可用更新但清单不完整（release 缺失）时留空，交给弹窗提示「发布信息不完整」。
-                when {
-                    release != null -> if (latest.isNotEmpty()) "发现新版本 " + latest else "发现新版本"
-                    available -> ""
-                    cur.isNotEmpty() -> "已是最新版本 " + cur
-                    else -> "已是最新版本"
-                }
-            },
-            release = release,
-        )
-    }
-
-    private fun parseRelease(obj: JSONObject, topMandatory: Boolean = false): UpdateRelease {
-        val url = obj.optString("url", "").trim()
-        val notes = ArrayList<String>()
-        obj.optJSONArray("notes")?.let { arr ->
-            for (i in 0 until arr.length()) {
-                val line = arr.optString(i, "").trim()
-                if (line.isNotEmpty()) notes.add(line)
-            }
-        }
-        return UpdateRelease(
-            version = obj.optString("version", "").trim(),
-            url = url,
-            // 清单偶尔只给 url；文件名缺失时从 URL 末段推。
-            filename = obj.optString("filename", "").trim()
-                .ifBlank { url.substringAfterLast('/').substringBefore('?') },
-            size = obj.optLong("size", 0L),
-            sha256 = obj.optString("sha256", "").trim(),
-            notes = notes,
-            mandatory = obj.optBoolean("mandatory", topMandatory),
-        )
     }
 
     // ────────────────── 下载回退链 ──────────────────
@@ -221,8 +168,8 @@ object Updater {
         val attempts = downloadAttempts(release)
         if (attempts.isEmpty()) throw IOException("发布清单里没有可用的下载地址")
         val dir = File(context.cacheDir, Constants.UPDATE_DIR).apply { mkdirs() }
-        val name = release.filename.trim()
-            .ifBlank { "forum-android-" + release.version + ".apk" }
+        // 文件名来自 GitHub 资产名或服务端清单，必须净化后才能拼路径（防 ../ 越出缓存目录）。
+        val name = safeFilename(release.filename, "forum-android-" + release.version + ".apk")
         val dest = File(dir, name)
         var reason = "下载失败"
         for ((label, url) in attempts) {
@@ -294,6 +241,17 @@ object Updater {
         return null
     }
 
+    /**
+     * 文件名净化：只取 basename，并把不安全字符替换为下划线。
+     *
+     * 文件名可能来自 GitHub 资产名或服务端清单；直接 `File(dir, name)` 会允许 `../` 越出缓存目录。
+     */
+    internal fun safeFilename(raw: String, fallback: String): String {
+        val base = raw.trim().substringAfterLast('/').substringAfterLast('\\')
+        val cleaned = base.replace(Regex("[^A-Za-z0-9._-]"), "_").trim('.')
+        return if (cleaned.isBlank()) fallback else cleaned
+    }
+
     /** 文件 sha256（小写十六进制）。 */
     fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -348,20 +306,6 @@ object Updater {
 
     // ────────────────── 杂项 ──────────────────
 
-    /** 字节数格式化（与 Web / Windows 端 `human_size` 同口径）。 */
-    fun humanSize(bytes: Long): String {
-        if (bytes <= 0L) return ""
-        var value = bytes.toDouble()
-        val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        var index = 0
-        while (value >= 1024.0 && index < units.size - 1) {
-            value /= 1024.0
-            index++
-        }
-        return if (index == 0) {
-            bytes.toString() + " B"
-        } else {
-            String.format(java.util.Locale.US, "%.1f %s", value, units[index])
-        }
-    }
+    /** 字节数格式化（与 Web / Windows 端 `human_size` 同口径）；实现已收敛到 [UpdateParser]，这里保留同名入口。 */
+    fun humanSize(bytes: Long): String = UpdateParser.humanSize(bytes)
 }
