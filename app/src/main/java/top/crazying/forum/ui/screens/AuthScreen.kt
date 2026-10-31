@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -11,15 +12,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
-import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
-import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.ForumTextField
 import top.crazying.forum.ui.components.GhostButton
 import top.crazying.forum.ui.components.PrimaryButton
@@ -28,14 +30,17 @@ import top.crazying.forum.ui.components.toast
 /**
  * 登录 / 注册页。
  *
- * 本轮注册走「用户名 + 邮箱 + 密码」的直注（服务端仍然支持验证码注册，
- * 但邮箱验证码注册流程排到下一轮，见 README「后续计划」）。
+ * 登录用「用户名 / 邮箱 + 密码」；注册需先向邮箱发送验证码，再连同用户名、邮箱、密码一并提交。
+ * 人机验证由 [top.crazying.forum.core.Api] 内部自动完成（全局 ALTCHA 等待/失败弹窗），页面不再直接处理。
  */
 @Composable
 fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
     var register by remember { mutableStateOf(startRegister) }
     var account by remember { mutableStateOf(App.prefs.lastName) }
-    var email by remember { mutableStateOf("" ) }
+    var email by remember { mutableStateOf("") }
+    var code by remember { mutableStateOf("") }
+    var codeCountdown by remember { mutableStateOf(0) }
+    var sendingCode by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var password2 by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -44,6 +49,41 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val colors = ForumTheme.colors
+
+    LaunchedEffect(codeCountdown) {
+        if (codeCountdown > 0) {
+            delay(1000)
+            codeCountdown -= 1
+        }
+    }
+
+    /** 发送注册验证码：60 秒倒计时，发送前先做本地邮箱格式校验。 */
+    fun sendCode() {
+        if (sendingCode || codeCountdown > 0) return
+        error = ""
+        if (!email.contains("@")) {
+            error = "请先填写正确的邮箱"
+            return
+        }
+        sendingCode = true
+        scope.launch {
+            try {
+                val result = App.api.sendRegisterCode(email.trim())
+                if (result.ok) {
+                    codeCountdown = 60
+                    toast(context, result.message.ifBlank { "验证码已发送至邮箱" })
+                } else {
+                    error = result.message
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                error = "发送验证码失败，请重试"
+            } finally {
+                sendingCode = false
+            }
+        }
+    }
 
     fun submit() {
         if (busy) return
@@ -56,6 +96,10 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
             }
             if (!email.contains("@")) {
                 error = "请填写正确的邮箱"
+                return
+            }
+            if (code.trim().isEmpty()) {
+                error = "请输入邮箱验证码"
                 return
             }
             if (password.length < 8 || !password.any { it.isLetter() } || !password.any { it.isDigit() }) {
@@ -73,28 +117,25 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
 
         busy = true
         scope.launch {
-            // 人机验证（服务端未启用时返回空串，直接继续）。用户取消则中断本次登录/注册。
-            val captchaToken = askCaptcha()
-            if (captchaToken == null) {
-                busy = false
-                return@launch
-            }
-            val result = if (register) {
-                App.api.register(account.trim(), email.trim(), password, captchaToken)
-            } else {
-                val key = account.trim()
-                if (key.contains("@")) {
-                    App.api.login(email = key, password = password, captchaToken = captchaToken)
+            try {
+                val result = if (register) {
+                    App.api.register(account.trim(), email.trim(), password, code.trim())
                 } else {
-                    App.api.login(name = key, password = password, captchaToken = captchaToken)
+                    // ov2 的 identifier 统一走 name 字段，服务端同时接受用户名与邮箱。
+                    App.api.login(name = account.trim(), password = password)
                 }
-            }
-            busy = false
-            if (result.ok) {
-                toast(context, if (register) "注册成功" else "登录成功")
-                nav.pop()
-            } else {
-                error = result.message
+                if (result.ok) {
+                    toast(context, if (register) "注册成功" else "登录成功")
+                    nav.pop()
+                } else {
+                    error = result.message
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                error = "操作失败，请重试"
+            } finally {
+                busy = false
             }
         }
     }
@@ -150,7 +191,30 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
                     value = email,
                     onValueChange = { email = it },
                     placeholder = "邮箱",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ForumTextField(
+                        value = code,
+                        onValueChange = { code = it },
+                        placeholder = "邮箱验证码",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                    )
+                    GhostButton(
+                        text = when {
+                            sendingCode -> "发送中…"
+                            codeCountdown > 0 -> "${codeCountdown}s"
+                            else -> "获取验证码"
+                        },
+                        enabled = !sendingCode && codeCountdown == 0,
+                        tint = colors.primary,
+                        onClick = { sendCode() },
+                    )
+                }
             }
             ForumTextField(
                 value = password,
@@ -200,21 +264,6 @@ fun AuthScreen(nav: Navigator, startRegister: Boolean = false) {
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
-
-            // 网页端登录：服务端是 Cookie 会话，走站点真实登录页拿 Cookie 再搬进 App。
-            // 官方 Turnstile 在真实网页里渲染，不受 App 内嵌承载页的层级/命中区问题影响。
-            GhostButton(
-                text = "使用网页端登录",
-                onClick = { nav.push(Screen.WebLogin) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                text = "在网页里登录后会自动回到 App，适合人机验证加载异常时使用。",
-                color = colors.textMuted,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-            )
         }
     }
 }

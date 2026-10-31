@@ -19,28 +19,24 @@ class FeedStateTest {
 
     @Test
     fun firstLoadIsNeeded() {
-        assertTrue(needReload(null, "latest|"))
+        assertTrue(needReload(null, "latest"))
     }
 
     @Test
     fun sameContentKeyDoesNotReload() {
         // 从帖子详情返回：loadedKey 与当前标识一致 → 复用，不重载
-        assertFalse(needReload("latest|", "latest|"))
+        assertFalse(needReload("latest", "latest"))
     }
 
     @Test
     fun switchingFeedReloads() {
-        assertTrue(needReload("latest|", "comprehensive|"))
+        // 首页只有 latest / random 两个信息流（登录用户已不再参与内容键）
+        assertTrue(needReload("latest", "random"))
     }
 
     @Test
     fun switchingCategoryReloads() {
         assertTrue(needReload("general", "creative"))
-    }
-
-    @Test
-    fun loginChangeReloads() {
-        assertTrue(needReload("favorites|", "favorites|HG0001"))
     }
 
     @Test
@@ -86,8 +82,8 @@ class FeedStateTest {
     fun defaultFilterIsAppliedOnlyWhenCreating() {
         val store = FeedStateStore()
         assertEquals("latest", store.feed("home", "latest").filter)
-        // 已存在时不再套用默认值（用户已切到别的信息流，不能被打回）
-        store.feed("home", "latest").filter = "favorites"
-        assertEquals("favorites", store.feed("home", "latest").filter)
+        // 已存在时不再套用默认值（用户已切到随机推荐，不能被打回）
+        store.feed("home", "latest").filter = "random"
+        assertEquals("random", store.feed("home", "latest").filter)
     }
 }

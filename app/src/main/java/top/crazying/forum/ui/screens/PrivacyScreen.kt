@@ -81,7 +81,7 @@ fun PrivacyPolicyPage(onBack: () -> Unit) {
 /** 隐私政策正文（仅 [通用] + [ANDROID] 段，章节号一~十连续，Android 小节重编号为 3.1）。 */
 private val PRIVACY: List<PBlock> = listOf(
     PBlock.Heading("妖精论坛 隐私政策"),
-    PBlock.Paragraph("生效日期：2026 年 10 月 1 日　|　最近更新：2026 年 10 月 4 日　|　版本：2.1"),
+    PBlock.Paragraph("生效日期：2026 年 10 月 1 日　|　最近更新：2026 年 10 月 25 日　|　版本：2.2"),
 
     // —— 引言与适用范围 ——
     PBlock.Heading("引言与适用范围"),
@@ -125,6 +125,7 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Bullet("· cacheDir/updates/ — 应用缓存目录：已下载的更新安装包（超过 24 小时自动清理）"),
     PBlock.Bullet("· Coil 磁盘缓存 — 应用缓存目录：帖子图片缓存（按 24 小时时段分目录，过期整体作废）"),
     PBlock.Paragraph("本地缓存策略：上述本地缓存均最多保留 24 小时。过期后仍会先用旧数据展示，随后在后台静默刷新并覆盖；刷新失败时保留旧数据（离线也能看到上次的内容）。"),
+    PBlock.Paragraph("人机验证（ALTCHA）：求解在设备本地进行，不向第三方发送你的密码、正文或账号信息；仅在验证完成后把工作量证明结果提交给论坛服务端。"),
     PBlock.Paragraph("说明：Android 端的登录 Cookie 以明文形式保存在应用私有 SharedPreferences 中。由于该文件位于应用沙盒内、其他应用无法读取，我们暂未额外加密；卸载应用会一并删除。"),
     PBlock.Paragraph("权限说明（Android）：仅申请「网络访问」与「安装未知来源应用」（用于应用内更新）；不申请通讯录、短信、定位、相机、麦克风等敏感权限。"),
 
@@ -138,7 +139,6 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Bullet("· github.com / *.githubusercontent.com / *.githubassets.com — 检查更新、下载新版安装包、查看项目主页（触达端：三端）"),
     PBlock.Bullet("· ghproxy.net / gh-proxy.com / ghfast.top — 第三方 GitHub 加速镜像，直连 GitHub 失败时下载更新包（触达端：三端）"),
     PBlock.Bullet("· dns.alidns.com / doh.pub / cloudflare-dns.com / dns.google — 仅用于解析 github.com 等域名（应对 DNS 污染）（触达端：Windows）"),
-    PBlock.Bullet("· challenges.cloudflare.com（Cloudflare Turnstile） — 提供人机验证（登录 / 注册 / 改密等操作前校验）；本论坛仅接收一次性验证令牌（触达端：三端）"),
     PBlock.Bullet("· smtp.163.com（网易 163 邮箱） — 发送注册、改密、换绑、注销等验证码邮件（触达端：服务端）"),
     PBlock.Bullet("· localhost（本机回环） — GitHub OAuth 授权回调（触达端：Windows）"),
     PBlock.Paragraph("我们不会向上述第三方提供你的账号信息；上述请求仅携带实现该功能所必需的参数（如文件名、帖子 ID）。"),
@@ -147,7 +147,6 @@ private val PRIVACY: List<PBlock> = listOf(
     // —— 五 ——
     PBlock.Heading("五、信息的存储与保存期限"),
     PBlock.Paragraph("存储位置：本论坛的服务器位于中华人民共和国境内。除服务器所在云服务商外，我们不向境外提供你的个人信息。"),
-    PBlock.Paragraph("境外传输提示：人机验证由 Cloudflare, Inc.（美国）提供。触发验证时你的设备会直接向 challenges.cloudflare.com 发起请求，可能包含 IP 地址与浏览器环境信息，但不包含你的账号信息；验证完成后 Cloudflare 即时作废本次令牌，本论坛仅接收「通过 / 不通过」的结果。"),
     PBlock.Paragraph("我们遵循最短必要原则，保存期限如下："),
     PBlock.Bullet("· 账号信息（用户名、邮箱、密码哈希） — 自注销之日起删除；选择「匿名化保留」则仅保留无法识别到你本人的脱敏记录"),
     PBlock.Bullet("· 帖子与评论 — 你主动删除或注销账号时删除；「匿名化保留」模式下保留正文但去除可识别身份"),
@@ -164,7 +163,7 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Bullet("· 传输过程尽可能使用 HTTPS；"),
     PBlock.Bullet("· 敏感操作（修改密码、换绑邮箱、注销账号）均需邮箱验证码或密码二次验证；"),
     PBlock.Bullet("· 接口设有频率限制，防止暴力破解与滥用；"),
-    PBlock.Bullet("· 登录 / 注册 / 改密 / 换绑邮箱 / 注销等敏感操作启用 Cloudflare Turnstile 人机验证，验证令牌一次性有效；"),
+    PBlock.Bullet("· 登录 / 注册 / 发评论等敏感操作启用 ALTCHA 工作量证明；求解在设备本地完成，不上传你输入的内容，服务端仅校验结果并签发 5 分钟有效的 grant；"),
     PBlock.Bullet("· 服务端数据库不对外开放。"),
     PBlock.Paragraph("尽管我们已采取上述合理措施，但互联网环境并非绝对安全。请你妥善保管账号密码，不要与他人共享。"),
     PBlock.Paragraph("请你特别注意：你在帖子、评论、世界频道或个性签名中主动公开的信息，可能被其他用户或第三方看到、保存、转发，请谨慎发布。"),
@@ -182,7 +181,7 @@ private val PRIVACY: List<PBlock> = listOf(
     PBlock.Bullet("4. 注销账号：我们提供真正可用的自助注销入口（「个人主页 → 编辑资料 → 账号安全 → 注销账号」）。注销时你可以选择："),
     PBlock.Bullet("　- 彻底删除：删除账号及你发布的全部帖子、评论、点赞、收藏、关注、举报记录，该操作不可恢复；"),
     PBlock.Bullet("　- 匿名化保留：删除邮箱、密码等身份信息，用户名统一显示为「已注销用户」，历史帖子与评论正文保留但无法再关联到你。"),
-    PBlock.Bullet("　为保护账号安全，注销前需要通过「账号密码」或「绑定邮箱验证码」（二选一）验证身份，并输入「注销账号」四字确认。"),
+    PBlock.Bullet("　为保护账号安全，注销前需要输入账号密码，并输入当前用户名确认。"),
     PBlock.Bullet("5. 撤回同意：你可以随时停止使用本论坛，并通过上述方式注销账号；清除浏览器 Cookie 与本地存储可撤回对功能性存储的同意；"),
     PBlock.Bullet("6. 投诉举报：若你认为你的个人信息权利受到侵害，可通过本政策第十部分的联系方式与我们联系，我们将在 15 个工作日内答复。"),
 

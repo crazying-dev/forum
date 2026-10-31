@@ -27,7 +27,7 @@ import top.crazying.forum.ui.components.Avatar
 import top.crazying.forum.ui.components.GhostButton
 import top.crazying.forum.ui.components.Pill
 
-/** 首页：欢迎语 + 多个信息流（最新发布 / 综合排序 / 随机推荐 / 我的收藏）。 */
+/** 首页：欢迎语 + 信息流（最新发布 / 随机推荐）。 */
 @Composable
 fun HomeScreen(nav: Navigator, store: FeedStateStore) {
     val colors = ForumTheme.colors
@@ -35,7 +35,6 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
     val me = App.user.value
     val name = me?.optString("name", "") ?: ""
     val avatar = me?.optString("avatar", "") ?: ""
-    val meId = me?.optString("id", "") ?: ""
 
     // 状态由根节点持有：从帖子详情返回时复用，列表内容与滚动位置都不丢
     val st = remember { store.feed("home", "latest") }
@@ -44,22 +43,12 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
         st.loading = true
         if (replace) st.error = ""
         val kind = st.filter
-        val result = when (kind) {
-            "random" -> App.api.randomPosts(Constants.RANDOM_LIMIT)
-            "comprehensive" -> App.api.posts(
-                page = 1,
-                pageSize = Constants.COMPREHENSIVE_LIMIT,
-                sort = "comprehensive",
-            )
-            "favorites" -> App.api.userFavorites(
-                userId = App.userId,
+        val result = if (kind == "random") {
+            App.api.randomPosts()
+        } else {
+            App.api.posts(
                 page = targetPage,
                 pageSize = Constants.PAGE_SIZE,
-            )
-            else -> App.api.posts(
-                page = targetPage,
-                pageSize = Constants.PAGE_SIZE,
-                sort = "time",
             )
         }
         if (st.filter != kind) return
@@ -74,9 +63,9 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
         st.hasMore = kind == "latest" && list.size >= Constants.PAGE_SIZE
     }
 
-    // 内容标识（信息流 + 登录用户）不变时不重载：
+    // 内容标识（信息流）不变时不重载：
     // 从帖子详情返回时标识照旧，直接复用已加载数据与滚动位置
-    val contentKey = st.filter + "|" + meId
+    val contentKey = st.filter
     LaunchedEffect(contentKey) {
         if (needReload(st.loadedKey, contentKey)) {
             st.posts = emptyList()
@@ -136,11 +125,7 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
             FeedChip("最新发布", st.filter == "latest") {
                 if (st.filter != "latest") st.filter = "latest" else scope.launch { load(1, true) }
             }
-            FeedChip("综合排序", st.filter == "comprehensive") { st.filter = "comprehensive" }
             FeedChip("随机推荐", st.filter == "random") { st.filter = "random" }
-            if (name.isNotBlank()) {
-                FeedChip("我的收藏", st.filter == "favorites") { st.filter = "favorites" }
-            }
         }
 
         PostFeedList(
@@ -152,14 +137,9 @@ fun HomeScreen(nav: Navigator, store: FeedStateStore) {
             onLoadMore = { scope.launch { load(st.page + 1, false) } },
             onClickPost = { id -> if (id.isNotBlank()) nav.push(Screen.PostDetail(id)) },
             onClickUser = { uid -> if (uid.isNotBlank()) nav.push(Screen.UserProfile(uid)) },
-            emptyText = if (st.filter == "favorites") "还没有收藏的帖子" else "暂无帖子",
+            emptyText = "暂无帖子",
             state = st.listState,
         )
-    }
-
-    // 收藏流需要登录态，掉线时自动退回最新发布
-    LaunchedEffect(me) {
-        if (me == null && st.filter == "favorites") st.filter = "latest"
     }
 }
 

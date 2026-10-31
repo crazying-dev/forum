@@ -20,7 +20,7 @@ import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.*
 
-/** 搜索：帖子 + 用户（服务端要求关键词至少 2 个字符）。 */
+/** 搜索：帖子 + 用户（服务端要求关键词至少 1 个字符）。 */
 @Composable
 fun SearchScreen(nav: Navigator, store: FeedStateStore, initialKeyword: String = "") {
     val colors = ForumTheme.colors
@@ -31,8 +31,8 @@ fun SearchScreen(nav: Navigator, store: FeedStateStore, initialKeyword: String =
 
     suspend fun runSearch() {
         val k = st.keyword.trim()
-        if (k.length < 2) {
-            st.error = "请输入至少 2 个字符"
+        if (k.length < 1) {
+            st.error = "关键词至少1个字符"
             return
         }
         st.loading = true
@@ -52,7 +52,7 @@ fun SearchScreen(nav: Navigator, store: FeedStateStore, initialKeyword: String =
 
     // 带关键词进入时自动搜索一次；从帖子详情返回时 st.searched 已为 true，不重复搜索
     LaunchedEffect(Unit) {
-        if (!st.searched && initialKeyword.trim().length >= 2) runSearch()
+        if (!st.searched && initialKeyword.trim().isNotEmpty()) runSearch()
     }
 
     PageScaffold(title = "搜索", onBack = { nav.pop() }) { padding ->
@@ -105,7 +105,7 @@ fun SearchScreen(nav: Navigator, store: FeedStateStore, initialKeyword: String =
                             UserRow(
                                 name = u.name,
                                 avatar = u.avatar,
-                                subtitle = if (u.intro.isNotBlank()) u.intro else "帖子 ${u.postCount} · 粉丝 ${u.followerCount}",
+                                subtitle = u.intro.ifBlank { "查看主页" },
                                 onClick = { nav.push(Screen.UserProfile(u.id)) },
                             )
                         }

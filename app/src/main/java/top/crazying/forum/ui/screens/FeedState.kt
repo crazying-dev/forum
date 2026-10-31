@@ -19,7 +19,7 @@ import top.crazying.forum.data.UserItem
  * 返回时复用同一实例，滚动位置由 [listState] 记住。
  */
 class FeedState(defaultFilter: String = "") {
-    /** 首页：信息流 kind（latest / comprehensive / random / favorites）；论坛：分类 key（空串 = 全部）。 */
+    /** 首页：信息流 kind（latest / random）；论坛：分类 key（空串 = 全部）。 */
     var filter by mutableStateOf(defaultFilter)
 
     var posts by mutableStateOf<List<Post>>(emptyList())
@@ -33,6 +33,17 @@ class FeedState(defaultFilter: String = "") {
 
     /** 滚动位置：延迟创建，避免仅做逻辑测试时触碰 Compose foundation。 */
     val listState: LazyListState by lazy { LazyListState() }
+}
+
+/**
+ * 世界频道的草稿与发送状态。
+ *
+ * 由 [FeedStateStore] 持有（位于导航 `when` 之外），切换 tab / 点进用户主页再回来时草稿不丢；
+ * 发送协程由根节点传入的长生命周期 scope 启动，离开页面不会取消已发出的请求。
+ */
+class WorldState {
+    var draft by mutableStateOf("")
+    var sending by mutableStateOf(false)
 }
 
 /** 用户主页状态（资料卡 + 帖子 / 收藏 / 评论 三个列表）。 */
@@ -75,6 +86,9 @@ class FeedStateStore {
     private val feeds = mutableMapOf<String, FeedState>()
     private val users = mutableMapOf<String, UserFeedState>()
     private val searches = mutableMapOf<String, SearchState>()
+
+    /** 世界频道草稿 / 发送状态（跨 tab、跨二级页面保留）。 */
+    val world = WorldState()
 
     fun feed(key: String, defaultFilter: String = ""): FeedState =
         feeds.getOrPut(key) { FeedState(defaultFilter) }

@@ -26,7 +26,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import top.crazying.forum.core.App
-import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
@@ -63,8 +62,9 @@ private fun daysInMonth(year: Int, month: Int): Int {
 /**
  * 「编辑资料」页：资料（头像 / 昵称 / 性别 / 出生日期 / 简介）+ 账号安全（修改密码 / 更换绑定邮箱）。
  *
- * 对齐网页端「编辑资料」面板；头像随选随传，其余字段点「保存」一次提交（`PUT /api/user/info`）。
+ * 对齐网页端「编辑资料」面板；头像随选随传，其余字段点「保存」一次提交（`PATCH /ov2/api/users/me`）。
  * 出生日期仅在用户确实改动时才提交，避免把默认的 2000-01-01 误写入资料。
+ * 修改密码校验当前密码；更换邮箱走「验证当前邮箱 → 验证新邮箱」四步向导。
  */
 @Composable
 fun ProfileEditScreen(nav: Navigator) {
@@ -106,16 +106,15 @@ fun ProfileEditScreen(nav: Navigator) {
 
     // ── 修改密码 ──
     var showPwd by remember { mutableStateOf(false) }
-    var pwdCode by remember { mutableStateOf("") }
+    var pwdCurrent by remember { mutableStateOf("") }
     var pwdNew by remember { mutableStateOf("") }
     var pwdNew2 by remember { mutableStateOf("") }
-    var pwdCountdown by remember { mutableStateOf(0) }
-    var pwdSending by remember { mutableStateOf(false) }
     var pwdBusy by remember { mutableStateOf(false) }
     var pwdError by remember { mutableStateOf("") }
 
-    // ── 更换邮箱 ──
+    // ── 更换邮箱（四步向导：1 发旧码、2 验旧码、3 发新码、4 确认换绑） ──
     var showEmail by remember { mutableStateOf(false) }
+    var emailStep by remember { mutableStateOf(1) }
     var oldCode by remember { mutableStateOf("") }
     var newEmail by remember { mutableStateOf("") }
     var newCode by remember { mutableStateOf("") }
@@ -126,7 +125,6 @@ fun ProfileEditScreen(nav: Navigator) {
     var emailBusy by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf("") }
 
-    LaunchedEffect(pwdCountdown) { if (pwdCountdown > 0) { delay(1000); pwdCountdown -= 1 } }
     LaunchedEffect(oldCountdown) { if (oldCountdown > 0) { delay(1000); oldCountdown -= 1 } }
     LaunchedEffect(newCountdown) { if (newCountdown > 0) { delay(1000); newCountdown -= 1 } }
 
@@ -169,55 +167,59 @@ fun ProfileEditScreen(nav: Navigator) {
         }
     }
 
-    fun sendPwdCode() {
-        if (pwdSending || pwdCountdown > 0) return
-        pwdError = ""
-        pwdSending = true
-        scope.launch {
-            // 发送邮箱验证码前先过人机验证；用户取消则中止。
-            val captchaToken = askCaptcha()
-            if (captchaToken == null) { pwdSending = false; return@launch }
-            val r = App.api.sendChangePasswordCode(captchaToken)
-            pwdSending = false
-            if (r.ok) { pwdCountdown = 60; toast(context, r.message.ifBlank { "验证码已发送至当前绑定邮箱" }) }
-            else pwdError = r.message
-        }
-    }
-
     fun submitPwd() {
         if (pwdBusy) return
         pwdError = ""
-        if (pwdCode.trim().isEmpty()) { pwdError = "请输入邮箱验证码"; return }
+        if (pwdCurrent.isEmpty()) { pwdError = "请输入当前密码"; return }
         if (pwdNew.isBlank()) { pwdError = "请输入新密码"; return }
         if (pwdNew != pwdNew2) { pwdError = "两次输入的新密码不一致"; return }
         pwdBusy = true
         scope.launch {
-            val r = App.api.changePassword(pwdCode, pwdNew)
+            val r = App.api.changePassword(pwdCurrent, pwdNew)
             pwdBusy = false
             if (r.ok) {
-                App.logoutLocal()
-                toast(context, "密码已修改，请用新密码重新登录")
-                nav.pop()
-                nav.push(Screen.Auth(false))
+                pwdCurrent = ""; pwdNew = ""; pwdNew2 = ""
+                // 服务端会为当前会话重签 Cookie，本机保持登录，其他设备退出。
+                toast(context, "密码已修改，其他设备已退出登录")
             } else pwdError = r.message
         }
     }
 
+    /** 第 1 步：向当前绑定邮箱发验证码。 */
     fun sendOldCode() {
         if (oldSending || oldCountdown > 0) return
         emailError = ""
         oldSending = true
         scope.launch {
-            // 发送邮箱验证码前先过人机验证；用户取消则中止。
-            val captchaToken = askCaptcha()
-            if (captchaToken == null) { oldSending = false; return@launch }
-            val r = App.api.sendChangeEmailOldCode(captchaToken)
+            val r = App.api.sendChangeEmailOldCode()
             oldSending = false
             if (r.ok) { oldCountdown = 60; toast(context, r.message.ifBlank { "验证码已发送至当前邮箱" }) }
             else emailError = r.message
         }
     }
 
+    /** 第 2 步：验证当前邮箱验证码，成功后进入第 3 步。 */
+    fun verifyOldCode() {
+        if (emailBusy) return
+        emailError = ""
+        val code = oldCode.trim()
+        if (code.isEmpty()) { emailError = "请输入当前邮箱验证码"; return }
+        emailBusy = true
+        scope.launch {
+            emailStep = 2
+            val r = App.api.verifyChangeEmailOld(code)
+            emailBusy = false
+            if (r.ok) {
+                emailStep = 3
+                toast(context, "当前邮箱已验证")
+            } else {
+                emailStep = 1
+                emailError = r.message
+            }
+        }
+    }
+
+    /** 第 3 步：向新邮箱发验证码。 */
     fun sendNewCode() {
         if (newSending || newCountdown > 0) return
         emailError = ""
@@ -225,30 +227,32 @@ fun ProfileEditScreen(nav: Navigator) {
         if (!EMAIL_RE.matches(target)) { emailError = "请输入有效的新邮箱地址"; return }
         newSending = true
         scope.launch {
-            // 发送邮箱验证码前先过人机验证；用户取消则中止。
-            val captchaToken = askCaptcha()
-            if (captchaToken == null) { newSending = false; return@launch }
-            val r = App.api.sendChangeEmailCode(target, captchaToken)
+            val r = App.api.sendChangeEmailNewCode(target)
             newSending = false
-            if (r.ok) { newCountdown = 60; toast(context, r.message.ifBlank { "验证码已发送至新邮箱" }) }
-            else emailError = r.message
+            if (r.ok) {
+                newCountdown = 60
+                emailStep = 4
+                toast(context, r.message.ifBlank { "验证码已发送至新邮箱" })
+            } else emailError = r.message
         }
     }
 
+    /** 第 4 步：凭新邮箱验证码完成换绑。 */
     fun submitEmail() {
         if (emailBusy) return
         emailError = ""
-        val target = newEmail.trim()
-        if (oldCode.trim().isEmpty() || newCode.trim().isEmpty()) { emailError = "请填写两枚验证码"; return }
-        if (!EMAIL_RE.matches(target)) { emailError = "请输入有效的新邮箱地址"; return }
+        val code = newCode.trim()
+        if (code.isEmpty()) { emailError = "请输入新邮箱验证码"; return }
         emailBusy = true
         scope.launch {
-            val r = App.api.changeEmail(target, oldCode, newCode)
+            val r = App.api.confirmChangeEmail(code)
             emailBusy = false
             if (r.ok) {
                 oldCode = ""; newCode = ""; newEmail = ""
+                emailStep = 1
                 toast(context, "绑定邮箱已更换")
                 showEmail = false
+                runCatching { App.api.me() }
             } else emailError = r.message
         }
     }
@@ -359,35 +363,21 @@ fun ProfileEditScreen(nav: Navigator) {
 
             // ── 账号安全 ──
             SectionTitle("账号安全")
-            Muted("修改密码、更换绑定邮箱与注销账号均需通过邮箱验证码确认身份。", maxLines = 3)
+            Muted("修改密码需验证当前密码；更换绑定邮箱需依次验证当前邮箱与新邮箱。", maxLines = 3)
 
             GhostButton(
                 text = if (showPwd) "修改密码 ▲" else "修改密码 ▼",
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { showPwd = !showPwd },
+                onClick = { showPwd = !showPwd; pwdError = "" },
             )
             if (showPwd) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Muted("验证码将发送至当前绑定邮箱：$currentEmail", maxLines = 3)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ForumTextField(
-                            value = pwdCode,
-                            onValueChange = { pwdCode = it },
-                            placeholder = "邮箱验证码",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                        )
-                        GhostButton(
-                            text = when {
-                                pwdSending -> "发送中…"
-                                pwdCountdown > 0 -> "${pwdCountdown}s"
-                                else -> "获取验证码"
-                            },
-                            enabled = !pwdSending && pwdCountdown == 0,
-                            tint = colors.primary,
-                            onClick = { sendPwdCode() },
-                        )
-                    }
+                    ForumTextField(
+                        value = pwdCurrent,
+                        onValueChange = { pwdCurrent = it },
+                        placeholder = "当前密码",
+                        visual = PasswordVisualTransformation(),
+                    )
                     ForumTextField(
                         value = pwdNew,
                         onValueChange = { pwdNew = it },
@@ -408,71 +398,96 @@ fun ProfileEditScreen(nav: Navigator) {
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { submitPwd() },
                     )
-                    Muted("修改成功后当前登录会失效，需要用新密码重新登录。", maxLines = 3)
+                    Muted("修改成功后本机保持登录，其他设备会被退出登录。", maxLines = 3)
                 }
             }
 
             GhostButton(
                 text = if (showEmail) "更换绑定邮箱 ▲" else "更换绑定邮箱 ▼",
                 modifier = Modifier.fillMaxWidth(),
-                onClick = { showEmail = !showEmail },
+                onClick = {
+                    showEmail = !showEmail
+                    emailError = ""
+                    if (!showEmail) { emailStep = 1; oldCode = ""; newCode = "" }
+                },
             )
             if (showEmail) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Muted("当前绑定邮箱：$currentEmail", maxLines = 2)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ForumTextField(
-                            value = oldCode,
-                            onValueChange = { oldCode = it },
-                            placeholder = "当前邮箱验证码",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                        )
-                        GhostButton(
-                            text = when {
-                                oldSending -> "发送中…"
-                                oldCountdown > 0 -> "${oldCountdown}s"
-                                else -> "获取验证码"
-                            },
-                            enabled = !oldSending && oldCountdown == 0,
-                            tint = colors.primary,
-                            onClick = { sendOldCode() },
-                        )
+                    when (emailStep) {
+                        1 -> {
+                            Muted("第 1 步 / 共 4 步 · 当前绑定邮箱：$currentEmail", maxLines = 2)
+                            GhostButton(
+                                text = when {
+                                    oldSending -> "发送中…"
+                                    oldCountdown > 0 -> "${oldCountdown}s"
+                                    else -> "发送验证码到当前邮箱"
+                                },
+                                enabled = !oldSending && oldCountdown == 0,
+                                tint = colors.primary,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { sendOldCode() },
+                            )
+                            ForumTextField(
+                                value = oldCode,
+                                onValueChange = { oldCode = it },
+                                placeholder = "当前邮箱验证码",
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            if (emailError.isNotBlank()) Text(emailError, color = colors.danger, fontSize = 13.sp)
+                            GhostButton(
+                                text = if (emailBusy) "验证中…" else "验证当前邮箱",
+                                enabled = !emailBusy,
+                                tint = colors.primary,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { verifyOldCode() },
+                            )
+                        }
+                        2 -> Muted("第 2 步 / 共 4 步 · 正在验证当前邮箱…", maxLines = 2)
+                        3 -> {
+                            Muted("第 3 步 / 共 4 步 · 当前邮箱已验证，请输入新邮箱", maxLines = 2)
+                            ForumTextField(
+                                value = newEmail,
+                                onValueChange = { newEmail = it },
+                                placeholder = "新邮箱地址",
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            )
+                            if (emailError.isNotBlank()) Text(emailError, color = colors.danger, fontSize = 13.sp)
+                            GhostButton(
+                                text = when {
+                                    newSending -> "发送中…"
+                                    newCountdown > 0 -> "${newCountdown}s"
+                                    else -> "发送验证码到新邮箱"
+                                },
+                                enabled = !newSending && newCountdown == 0,
+                                tint = colors.primary,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { sendNewCode() },
+                            )
+                        }
+                        else -> {
+                            Muted("第 4 步 / 共 4 步 · 验证码已发送至 $newEmail", maxLines = 2)
+                            ForumTextField(
+                                value = newCode,
+                                onValueChange = { newCode = it },
+                                placeholder = "新邮箱验证码",
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            )
+                            if (emailError.isNotBlank()) Text(emailError, color = colors.danger, fontSize = 13.sp)
+                            GhostButton(
+                                text = if (emailBusy) "提交中…" else "确认换绑",
+                                enabled = !emailBusy,
+                                tint = colors.primary,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { submitEmail() },
+                            )
+                            GhostButton(
+                                text = "重新填写新邮箱",
+                                enabled = !newSending,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { emailStep = 3; newCode = ""; emailError = "" },
+                            )
+                        }
                     }
-                    ForumTextField(
-                        value = newEmail,
-                        onValueChange = { newEmail = it },
-                        placeholder = "新邮箱地址",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ForumTextField(
-                            value = newCode,
-                            onValueChange = { newCode = it },
-                            placeholder = "新邮箱验证码",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                        )
-                        GhostButton(
-                            text = when {
-                                newSending -> "发送中…"
-                                newCountdown > 0 -> "${newCountdown}s"
-                                else -> "获取验证码"
-                            },
-                            enabled = !newSending && newCountdown == 0,
-                            tint = colors.primary,
-                            onClick = { sendNewCode() },
-                        )
-                    }
-                    if (emailError.isNotBlank()) Text(emailError, color = colors.danger, fontSize = 13.sp)
-                    GhostButton(
-                        text = if (emailBusy) "提交中…" else "确认更换邮箱",
-                        enabled = !emailBusy,
-                        tint = colors.primary,
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { submitEmail() },
-                    )
-                    Muted("需分别验证「当前邮箱」与「新邮箱」两枚验证码。", maxLines = 3)
                 }
             }
 

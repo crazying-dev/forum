@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -18,14 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.crazying.forum.core.App
-import top.crazying.forum.core.askCaptcha
 import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
@@ -33,15 +29,12 @@ import top.crazying.forum.ui.components.*
 
 private const val MODE_PURGE = "purge"
 private const val MODE_ANONYMIZE = "anonymize"
-private const val METHOD_PASSWORD = "password"
-private const val METHOD_CODE = "code"
-private const val CONFIRM_TEXT = "注销账号"
 
 /**
  * 自助注销账号页。
  *
- * 两种方式（彻底删除 / 匿名化保留）+ 两种身份验证（密码 / 邮箱验证码），
- * 需输入「注销账号」四字并二次确认；成功后清空本地登录态并回到登录页。
+ * 两种方式（彻底删除 / 匿名化保留）+ 密码验证，
+ * 需输入当前用户名并二次确认；成功后清空本地登录态并回到登录页。
  */
 @Composable
 fun DeleteAccountScreen(nav: Navigator) {
@@ -62,56 +55,28 @@ fun DeleteAccountScreen(nav: Navigator) {
     }
 
     var mode by remember { mutableStateOf(MODE_ANONYMIZE) }
-    var method by remember { mutableStateOf(METHOD_PASSWORD) }
     var password by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
-    var confirmText by remember { mutableStateOf("") }
-    var countdown by remember { mutableStateOf(0) }
-    var sendingCode by remember { mutableStateOf(false) }
+    var confirmName by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var showConfirm by remember { mutableStateOf(false) }
 
-    // 验证码 60 秒倒计时（禁用「获取验证码」）。
-    LaunchedEffect(countdown) {
-        if (countdown > 0) {
-            delay(1000)
-            countdown -= 1
-        }
-    }
-
-    fun sendCode() {
-        if (sendingCode || countdown > 0) return
-        error = ""
-        sendingCode = true
-        scope.launch {
-            // 发送注销验证码前先过人机验证；用户取消则中止。
-            val captchaToken = askCaptcha()
-            if (captchaToken == null) { sendingCode = false; return@launch }
-            val r = App.api.sendDeleteAccountCode(captchaToken)
-            sendingCode = false
-            if (r.ok) {
-                countdown = 60
-                toast(context, r.message.ifBlank { "验证码已发送至绑定邮箱" })
-            } else {
-                error = r.message
-            }
-        }
-    }
+    // ov2 要求输入当前用户名作为二次确认。
+    val currentName = App.user.value?.optString("name", "") ?: ""
 
     fun submit() {
         if (busy) return
         error = ""
-        if (confirmText.trim() != CONFIRM_TEXT) {
-            error = "请输入「$CONFIRM_TEXT」四字以确认"
+        if (currentName.isBlank()) {
+            error = "无法获取当前用户名，请重新登录后再试"
             return
         }
-        if (method == METHOD_PASSWORD && password.isEmpty()) {
+        if (confirmName.trim() != currentName) {
+            error = "请输入当前用户名「$currentName」以确认"
+            return
+        }
+        if (password.isEmpty()) {
             error = "请输入账号密码"
-            return
-        }
-        if (method == METHOD_CODE && code.trim().isEmpty()) {
-            error = "请输入邮箱验证码"
             return
         }
         showConfirm = true
@@ -121,17 +86,10 @@ fun DeleteAccountScreen(nav: Navigator) {
         if (busy) return
         scope.launch {
             busy = true
-            // 服务端把 `/api/user/delete` 一并纳入人机验证（与发码步骤各自独立）。
-            val captchaToken = askCaptcha()
-            if (captchaToken == null) {
-                busy = false
-                return@launch
-            }
             val r = App.api.deleteAccount(
                 mode = mode,
-                password = if (method == METHOD_PASSWORD) password else null,
-                code = if (method == METHOD_CODE) code.trim() else null,
-                captchaToken = captchaToken,
+                password = password,
+                confirmName = confirmName.trim(),
             )
             busy = false
             showConfirm = false
@@ -181,58 +139,21 @@ fun DeleteAccountScreen(nav: Navigator) {
             Muted("默认选择「匿名化保留」，可随时切换。")
 
             // ── 身份验证 ──
-            SectionTitle("身份验证（二选一）")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill(
-                    text = "账号密码",
-                    active = method == METHOD_PASSWORD,
-                    onClick = { method = METHOD_PASSWORD },
-                )
-                Pill(
-                    text = "邮箱验证码",
-                    active = method == METHOD_CODE,
-                    onClick = { method = METHOD_CODE },
-                )
-            }
-            if (method == METHOD_PASSWORD) {
-                ForumTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    placeholder = "请输入账号密码",
-                    visual = PasswordVisualTransformation(),
-                )
-            } else {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ForumTextField(
-                        value = code,
-                        onValueChange = { code = it },
-                        placeholder = "邮箱验证码",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
-                    )
-                    GhostButton(
-                        text = when {
-                            sendingCode -> "发送中…"
-                            countdown > 0 -> "${countdown}s"
-                            else -> "获取验证码"
-                        },
-                        enabled = !sendingCode && countdown == 0,
-                        tint = colors.primary,
-                        onClick = { sendCode() },
-                    )
-                }
-                Muted("验证码将发送至当前绑定邮箱，5 分钟内有效。")
-            }
+            SectionTitle("身份验证")
+            ForumTextField(
+                value = password,
+                onValueChange = { password = it },
+                placeholder = "请输入账号密码",
+                visual = PasswordVisualTransformation(),
+            )
+            Muted("ov2 只支持密码验证身份，请确认密码无误后再提交。")
 
             // ── 确认输入 ──
             SectionTitle("确认操作")
             ForumTextField(
-                value = confirmText,
-                onValueChange = { confirmText = it },
-                placeholder = "请输入「$CONFIRM_TEXT」以确认",
+                value = confirmName,
+                onValueChange = { confirmName = it },
+                placeholder = "请输入当前用户名「$currentName」以确认",
             )
 
             if (error.isNotBlank()) {

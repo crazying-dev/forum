@@ -19,8 +19,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import top.crazying.forum.core.App
 import top.crazying.forum.core.TimeFmt
+import top.crazying.forum.core.richtext.RichDocument
 import top.crazying.forum.data.CommentItem
 import top.crazying.forum.data.Post
 import top.crazying.forum.data.UserItem
@@ -28,6 +30,7 @@ import top.crazying.forum.theme.ForumTheme
 import top.crazying.forum.ui.Navigator
 import top.crazying.forum.ui.Screen
 import top.crazying.forum.ui.components.*
+import top.crazying.forum.ui.richtext.RichTextView
 
 /** 其他用户的主页：资料卡 + 关注 + 帖子/收藏/评论 三个列表。 */
 @Composable
@@ -48,7 +51,17 @@ fun UserScreen(nav: Navigator, store: FeedStateStore, userId: String) {
             return
         }
         st.profileError = ""
-        st.user = result.jsonObj("user")?.let { UserItem.from(it) }
+        // ov2 `/users/:id`：user / stats / follow_stats / is_following / is_self 都在顶层。
+        val user = result.jsonObj("user") ?: return
+        val stats = result.jsonObj("stats") ?: JSONObject()
+        val fs = result.jsonObj("follow_stats")
+        st.user = UserItem.fromProfile(
+            user = user,
+            stats = stats,
+            followStats = fs,
+            isFollowing = result.bool("is_following"),
+            isSelf = result.bool("is_self"),
+        )
     }
 
     suspend fun loadList() {
@@ -216,7 +229,11 @@ fun UserScreen(nav: Navigator, store: FeedStateStore, userId: String) {
                                     overflow = TextOverflow.Ellipsis,
                                 )
                                 Spacer(Modifier.height(4.dp))
-                                Text(c.content, color = colors.textPrimary, fontSize = 14.sp)
+                                // 评论正文可能已是 HTML：按 content_format 渲染富文本。
+                                val doc = remember(c.id, c.content, c.contentFormat) {
+                                    RichDocument.fromContent(c.content, c.contentFormat)
+                                }
+                                RichTextView(doc = doc, compact = true)
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     TimeFmt.fmtTime(c.createdAt),

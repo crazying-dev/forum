@@ -12,6 +12,8 @@ import okhttp3.HttpUrl
  *
  * 实现上有意回避了 OkHttp 内部的 `hostOnly` 字段（不同大版本可读性不同），
  * 重建时统一用 `domain(...)`；对 `www.yjlt.top` 这种单主机站点行为完全一致。
+ *
+ * 登录态只能由服务端响应写入（[saveFromResponse]），不再支持从网页登录导入 Cookie。
  */
 class PrefsCookieJar(private val prefs: Prefs) : CookieJar {
 
@@ -90,19 +92,6 @@ class PrefsCookieJar(private val prefs: Prefs) : CookieJar {
                 if (c.matches(url)) out.add(c)
             }
             return out
-        }
-    }
-
-    /**
-     * 直接写入一条 Cookie（不改动入参）。
-     *
-     * 用于「网页登录」：从 WebView 的 `CookieManager` 读到站点的 `token` / `ID`
-     * 后搬进本 jar，后续原生请求即自带登录态。
-     */
-    fun put(cookie: Cookie) {
-        synchronized(lock) {
-            store[keyOf(cookie)] = cookie
-            save()
         }
     }
 

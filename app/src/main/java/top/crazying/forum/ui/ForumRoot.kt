@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -23,9 +24,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import top.crazying.forum.core.App
 import top.crazying.forum.core.Constants
 import top.crazying.forum.core.Updater
@@ -43,7 +46,6 @@ import top.crazying.forum.ui.screens.PrivacyScreen
 import top.crazying.forum.ui.screens.ProfileEditScreen
 import top.crazying.forum.ui.screens.SearchScreen
 import top.crazying.forum.ui.screens.UserScreen
-import top.crazying.forum.ui.screens.WebLoginScreen
 import top.crazying.forum.ui.screens.WikiScreen
 import top.crazying.forum.ui.screens.WorldScreen
 import top.crazying.forum.ui.screens.YearConvertScreen
@@ -59,6 +61,12 @@ import top.crazying.forum.ui.screens.YearConvertScreen
 fun ForumRoot() {
     ForumTheme {
         val colors = ForumTheme.colors
+
+        // 键盘弹出时隐藏底部 tab 栏：世界频道的输入框就在页内底部，
+        // 不隐藏的话「键盘 + 导航栏 + 输入框」会三层叠加，消息列表被挤得只剩一点。
+        // 读取 ime insets 会在键盘显示/隐藏时自动重组。
+        val density = LocalDensity.current
+        val keyboardVisible = WindowInsets.ime.getBottom(density) > 0
 
         // 服务端「版本过低」闸门（HTTP 426 / VERSION_TOO_LOW）：
         // 放在最外层、先于隐私门判断，保证任何界面都绕不过去。
@@ -80,6 +88,9 @@ fun ForumRoot() {
         }
 
         val nav = remember { Navigator() }
+
+        // 根级协程作用域：世界频道发送等不应因离开页面而取消的操作由它启动。
+        val rootScope = rememberCoroutineScope()
 
         // 跨页面保留的列表状态（位于 `when` 之外）：从帖子详情返回时，
         // 列表页复用同一实例，已加载内容与滚动位置都不丢。
@@ -105,7 +116,7 @@ fun ForumRoot() {
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
             containerColor = colors.bgBody,
             bottomBar = {
-                if (nav.isTabRoot) {
+                if (nav.isTabRoot && !keyboardVisible) {
                     NavigationBar(containerColor = colors.bgHeader) {
                         BOTTOM_TABS.forEach { tab ->
                             val selected = nav.current == tab.screen
@@ -140,7 +151,7 @@ fun ForumRoot() {
                 when (val s = nav.current) {
                     Screen.Home -> HomeScreen(nav, feedStore)
                     Screen.Forum -> ForumScreen(nav, feedStore)
-                    Screen.World -> WorldScreen(nav)
+                    Screen.World -> WorldScreen(nav, feedStore, rootScope)
                     Screen.Wiki -> WikiScreen()
                     Screen.EasterEgg -> EasterEggScreen(nav)
                     Screen.Me -> MeScreen(nav)
@@ -153,17 +164,20 @@ fun ForumRoot() {
                     is Screen.Search -> SearchScreen(nav, feedStore, s.keyword)
                     is Screen.UserProfile -> UserScreen(nav, feedStore, s.userId)
                     is Screen.Auth -> AuthScreen(nav, s.register)
-                    Screen.WebLogin -> WebLoginScreen(nav)
                 }
 
                 // 发现新版本时由 App.updateInfo 驱动弹出（冷启动自动检查 / 设置页手动检查）
                 UpdateDialogHost()
-
-                // 人机验证（滑块拼图）：业务流程调用 `askCaptcha()` 时由 CaptchaPrompt 驱动。
-                // 放在最后，保证叠在页面自带的 AlertDialog（如注销二次确认）之上。
-                CaptchaHost()
             }
         }
+
+        // 启动公告：每次冷启动弹一次（进程内），说明 ov2 APP 开发计划。
+        // 放在隐私门之后：未同意隐私政策时先走隐私流程，不与公告叠加。
+        Ov2NoticeHost()
+
+        // ALTCHA 等待/失败弹窗：由 Api.ensureCaptchaProof() 自动驱动。
+        // 放在 Scaffold 之外，覆盖底部导航栏，验证期间不允许切换 tab。
+        AltchaHost()
     }
 }
 
