@@ -193,7 +193,7 @@ func (h *legacyHandler) versionGate() gin.HandlerFunc {
 }
 
 func (h *legacyHandler) appDownloadURL(platform string) string {
-	// 426 响应必须快速返回：只读缓存/内置清单，不在这里触发 GitHub 拉取。
+	// 426 响应必须快速返回：只读缓存清单，不在这里触发 GitHub 拉取。
 	pf := legacy.FindPlatform(h.svc.Releases.CachedManifest(), platform)
 	if pf == nil {
 		return ""

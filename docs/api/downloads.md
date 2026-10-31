@@ -1,6 +1,6 @@
 # 下载客户端 / 版本检查
 
-数据源：GitHub Releases `crazying-dev/forum`（服务端 10 分钟缓存，可选 `GITHUB_TOKEN`）；读不到返回 502，不回退内置清单。
+数据源：GitHub Releases `yoyo-ouo/yj-forum-ouo`（服务端 10 分钟缓存，可选 `GITHUB_TOKEN`）。GitHub 读不到时：`/downloads/*` 返回 502；`/api/app/releases` 与版本闸门返回空清单（无平台、无 min_versions，不展示发布、不强制升级）。不回退内置清单。
 
 ## 列表
 

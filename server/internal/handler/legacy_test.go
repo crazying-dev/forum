@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -86,6 +87,8 @@ func testReleaseService() *legacy.Service {
 			},
 		}, nil
 	}
+	// 预热缓存：未预热时版本闸门按空清单放行（不拦截）。
+	provider.Manifest()
 	svc.Releases = provider
 	return svc
 }
@@ -130,6 +133,68 @@ func TestLegacyVersionGate426(t *testing.T) {
 	}
 	if w := do("/api/app/check", "windows", "1.0.0"); w.Code != http.StatusOK {
 		t.Fatalf("/api/app/* 应豁免闸门，实际 %d", w.Code)
+	}
+}
+
+// GitHub 不可达（未预热 / 拉取失败）时版本闸门不拦截，避免误伤旧客户端。
+func TestLegacyVersionGateFailOpenWithoutManifest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := legacy.NewService(nil, nil, nil)
+	provider := legacy.NewReleaseProvider("")
+	provider.Fetch = func() (*legacy.ReleaseManifest, error) {
+		return nil, errors.New("github 不可达")
+	}
+	svc.Releases = provider
+	h := &legacyHandler{svc: svc}
+	r := gin.New()
+	r.Use(h.versionGate())
+	r.GET("/api/posts", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"success": true}) })
+
+	req := httptest.NewRequest(http.MethodGet, "/api/posts", nil)
+	req.Header.Set("X-Client-Platform", "windows")
+	req.Header.Set("X-Client-Version", "1.0.0")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("GitHub 不可达时不应拦截，实际 %d body=%s", w.Code, w.Body.String())
+	}
+}
+
+// GitHub 不可达时 /api/app/releases 返回空清单，AppCheck 不 panic。
+func TestLegacyAppReleasesEmptyManifest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := legacy.NewService(nil, nil, nil)
+	provider := legacy.NewReleaseProvider("")
+	provider.Fetch = func() (*legacy.ReleaseManifest, error) {
+		return nil, errors.New("github 不可达")
+	}
+	svc.Releases = provider
+	h := &legacyHandler{svc: svc}
+	r := gin.New()
+	r.GET("/api/app/releases", h.AppReleases)
+	r.GET("/api/app/check", h.AppCheck)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/app/releases", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("app/releases 状态 %d，body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Success     bool                     `json:"success"`
+		MinVersions map[string]string        `json:"min_versions"`
+		Platforms   []legacy.ReleasePlatform `json:"platforms"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("解析失败：%v body=%s", err, w.Body.String())
+	}
+	if !body.Success || len(body.Platforms) != 0 || len(body.MinVersions) != 0 {
+		t.Fatalf("空清单不符：%s", w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/app/check?platform=windows&version=1.0.0", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("空清单下 app/check 应为 404（未知平台），实际 %d body=%s", w.Code, w.Body.String())
 	}
 }
 

@@ -810,7 +810,7 @@ func truncateRunes(s string, max int) string {
 
 // ---- 应用发布 / 最低版本闸门 ----
 
-const defaultGitHubRepo = "crazying-dev/forum"
+const defaultGitHubRepo = "yoyo-ouo/yj-forum-ouo"
 
 // ReleaseAsset 与 legacy app_releases.json 的 release 结构一致。
 type ReleaseAsset struct {
@@ -843,7 +843,7 @@ type ReleaseManifest struct {
 	Platforms   []ReleasePlatform `json:"platforms"`
 }
 
-// ReleaseProvider 从 GitHub Releases 拉取并缓存发布清单；失败时回退内置清单。
+// ReleaseProvider 从 GitHub Releases 拉取并缓存发布清单；拉取失败时返回空清单。
 type ReleaseProvider struct {
 	mu        sync.Mutex
 	cached    *ReleaseManifest
@@ -868,17 +868,30 @@ func NewReleaseProvider(token string) *ReleaseProvider {
 }
 
 // Manifest 返回缓存或新拉取的清单（永不返回 nil）。
+//
+// 拉取失败时保留上一份成功清单（stale-while-error）：GitHub 抖动不会把发布信息与版本闸门
+// 一并清空；只有从未成功拉取过时才返回空清单。网络请求不持锁，避免拖慢每个 /api/* 请求。
 func (p *ReleaseProvider) Manifest() *ReleaseManifest {
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	now := time.Now()
-	if p.cached != nil && now.Sub(p.fetchedAt) < p.TTL {
+	if p.cached != nil && time.Since(p.fetchedAt) < p.TTL {
 		p.hits++
-		return p.cached
+		m := p.cached
+		p.mu.Unlock()
+		return m
 	}
-	p.misses++
+	if p.fetching {
+		// 已有请求在飞：先给调用方一份现有数据，不重复拉取。
+		m := p.cached
+		p.mu.Unlock()
+		if m != nil {
+			return m
+		}
+		return emptyManifest()
+	}
 	p.fetching = true
-	defer func() { p.fetching = false }()
+	p.misses++
+	p.mu.Unlock()
+
 	var (
 		m   *ReleaseManifest
 		err error
@@ -888,11 +901,18 @@ func (p *ReleaseProvider) Manifest() *ReleaseManifest {
 	} else {
 		m, err = fetchGitHubManifest(p.Client, p.Token, p.Repo)
 	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.fetching = false
+	p.fetchedAt = time.Now()
 	if err != nil || m == nil || len(m.Platforms) == 0 || !hasAnyRelease(m) {
-		m = fallbackManifest()
+		if p.cached != nil {
+			return p.cached
+		}
+		m = emptyManifest()
 	}
 	p.cached = m
-	p.fetchedAt = now
 	return m
 }
 
@@ -905,21 +925,21 @@ func hasAnyRelease(m *ReleaseManifest) bool {
 	return false
 }
 
-// CachedManifest 返回已缓存的清单；未预热时返回内置清单（不触发网络）。
+// CachedManifest 返回已缓存的清单；未预热时返回空清单（不触发网络）。
 func (p *ReleaseProvider) CachedManifest() *ReleaseManifest {
 	p.mu.Lock()
 	m := p.cached
 	p.mu.Unlock()
 	if m == nil {
-		return fallbackManifest()
+		return emptyManifest()
 	}
 	return m
 }
 
 // MinVersion 平台最低版本；未知/无发布返回空串（不拦截）。
 //
-// 版本闸门在每个 /api/* 请求上执行，不能因 GitHub 慢而阻塞：未预热时先用内置
-// 清单立即返回，同时异步拉取最新清单，后续请求即使用缓存（/api/app/* 也会预热）。
+// 版本闸门在每个 /api/* 请求上执行，不能因 GitHub 慢而阻塞：未预热时直接返回空串
+// （不拦截任何版本），同时异步拉取；缓存过期时也异步刷新，但先用旧值（stale）应答。
 func (p *ReleaseProvider) MinVersion(platform string) string {
 	platform = strings.ToLower(strings.TrimSpace(platform))
 	if platform == "" || platform == "web" {
@@ -927,13 +947,13 @@ func (p *ReleaseProvider) MinVersion(platform string) string {
 	}
 	p.mu.Lock()
 	m := p.cached
-	if m == nil && !p.fetching {
-		p.fetching = true
+	stale := m == nil || time.Since(p.fetchedAt) >= p.TTL
+	if stale && !p.fetching {
 		go p.Manifest()
 	}
 	p.mu.Unlock()
 	if m == nil {
-		m = fallbackManifest()
+		return ""
 	}
 	if v, ok := m.MinVersions[platform]; ok {
 		return strings.TrimSpace(v)
@@ -1325,24 +1345,10 @@ func firstN(s string, n int) string {
 	return s[:n]
 }
 
-// fallbackManifest 内置回退清单（GitHub 不可达时保证旧客户端能更新）。
-func fallbackManifest() *ReleaseManifest {
+// emptyManifest 空清单：GitHub 不可达 / 未预热时使用，表示“暂无任何发布”。
+// 不含平台与 min_versions，下游据此不展示发布列表、不强制升级。
+func emptyManifest() *ReleaseManifest {
 	return &ReleaseManifest{
-		Schema: 1, UpdatedAt: "2026-10-17T19:35:00+08:00",
-		MinVersions: map[string]string{"windows": "1.3.18", "android": "1.0.16", "web": "0"},
-		Platforms: []ReleasePlatform{
-			{Key: "windows", Name: "Windows", Icon: "fa-windows", Status: "available", Requirement: "Windows 10 / 11（64 位）", Releases: []ReleaseAsset{{
-				Version: "1.3.18", Channel: "stable", Date: "2026-10-10", Size: 158186366,
-				URL:      "https://github.com/crazying-dev/forum/releases/download/Windows-V1.3.18/forum_setup.exe",
-				Filename: "forum_setup.exe", Notes: []string{},
-			}}},
-			{Key: "android", Name: "Android", Icon: "fa-android", Status: "available", Requirement: "Android 7.0 及以上", Releases: []ReleaseAsset{{
-				Version: "1.0.16", Channel: "stable", Date: "2026-10-10", Size: 8152504,
-				URL:      "https://github.com/crazying-dev/forum/releases/download/Android-V1.0.16/forum-android-1.0.16.apk",
-				Filename: "forum-android-1.0.16.apk", Notes: []string{},
-			}}},
-			{Key: "linux", Name: "Linux", Icon: "fa-linux", Status: "coming_soon", Requirement: "x86_64 桌面发行版", Releases: []ReleaseAsset{}},
-			{Key: "macos", Name: "macOS", Icon: "fa-apple", Status: "coming_soon", Requirement: "macOS 11 及以上（Intel / Apple Silicon）", Releases: []ReleaseAsset{}},
-		},
+		Schema: 1, MinVersions: map[string]string{}, Platforms: []ReleasePlatform{},
 	}
 }

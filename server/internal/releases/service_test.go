@@ -27,7 +27,7 @@ func newTestService(t *testing.T, body string, status int) (*Service, *int32) {
 	var hits int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&hits, 1)
-		if r.URL.Path != "/repos/crazying-dev/forum/releases" {
+		if r.URL.Path != "/repos/"+DefaultRepo+"/releases" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if got := r.URL.Query().Get("per_page"); got != "100" {

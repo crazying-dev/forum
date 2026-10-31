@@ -1,6 +1,6 @@
 // Package releases 读取 GitHub Releases 并提供下载页/客户端更新所需的清单与版本检查。
 //
-// 唯一数据源是 GitHub（crazying-dev/forum），读不到时返回 error，不回退内置清单。
+// 唯一数据源是 GitHub（yoyo-ouo/yj-forum-ouo），读不到时返回 error，不回退内置清单。
 package releases
 
 import (
@@ -19,7 +19,7 @@ import (
 
 const (
 	// DefaultRepo GitHub 仓库（owner/name）。
-	DefaultRepo = "crazying-dev/forum"
+	DefaultRepo = "yoyo-ouo/yj-forum-ouo"
 
 	defaultAPIBase   = "https://api.github.com"
 	defaultCacheTTL  = 10 * time.Minute

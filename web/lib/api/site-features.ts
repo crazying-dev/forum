@@ -65,8 +65,8 @@ export interface ReleaseListResult {
   page_size: number;
 }
 
-/** GitHub Releases 页面（后端 GitHub 读取失败时的兜底直链） */
-export const GITHUB_RELEASES_URL = "https://github.com/crazying-dev/forum/releases";
+/** GitHub Releases 页面（后端 GitHub 读取失败时的直链） */
+export const GITHUB_RELEASES_URL = "https://github.com/yoyo-ouo/yj-forum-ouo/releases";
 
 export const downloadApi = {
   list: (platform: string, page = 1, pageSize = 20) =>
